@@ -1,7 +1,10 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Ensure compatibility with React 18
+    serverComponentsExternalPackages: [],
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -11,9 +14,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    serverComponentsExternalPackages: [],
-  },
-};
+}
 
-export default nextConfig;
+export default nextConfig

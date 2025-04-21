@@ -3,15 +3,15 @@ import { getChatRoomById, getMessagesByChatRoomId, createMessage, createMultiple
 import { getUserIdFromRequest } from "@/lib/auth-utils"
 
 // 채팅방의 메시지 목록 조회
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
   try {
     // 사용자 인증 확인
-    const userId = await getUserIdFromRequest(req)
+    const userId = await getUserIdFromRequest(request)
     if (!userId) {
       return NextResponse.json({ success: false, message: "인증이 필요합니다." }, { status: 401 })
     }
 
-    const chatRoomId = Number.parseInt(params.id)
+    const chatRoomId = Number.parseInt(context.params.id)
 
     // 채팅방 존재 확인
     const chatRoom = await getChatRoomById(chatRoomId)
@@ -39,15 +39,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // 메시지 생성
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, context: { params: { id: string } }) {
   try {
     // 사용자 인증 확인
-    const userId = await getUserIdFromRequest(req)
+    const userId = await getUserIdFromRequest(request)
     if (!userId) {
       return NextResponse.json({ success: false, message: "인증이 필요합니다." }, { status: 401 })
     }
 
-    const chatRoomId = Number.parseInt(params.id)
+    const chatRoomId = Number.parseInt(context.params.id)
 
     // 채팅방 존재 확인
     const chatRoom = await getChatRoomById(chatRoomId)
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ success: false, message: "접근 권한이 없습니다." }, { status: 403 })
     }
 
-    const body = await req.json()
+    const body = await request.json()
 
     // 단일 메시지 또는 여러 메시지 처리
     if (Array.isArray(body)) {
