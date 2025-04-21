@@ -72,7 +72,8 @@
     "@ai-sdk/openai": "latest",
     "jsonwebtoken": "latest",
     "bcryptjs": "latest",
-    "openai": "latest"
+    "openai": "latest",
+    "@google/generative-ai": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
