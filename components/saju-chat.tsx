@@ -288,6 +288,8 @@ export default function SajuChat({
     initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
   )
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [isHtmlResponse, setIsHtmlResponse] = useState(false) // Add this line
   const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
   const [lastMessageId, setLastMessageId] = useState<string>("")
 
@@ -354,6 +356,11 @@ export default function SajuChat({
     },
     onError: (error) => {
       console.error("Chat error:", error)
+
+      // Check if the error message indicates an HTML response
+      if (error.message.includes("DOCTYPE html")) {
+        setIsHtmlResponse(true)
+      }
 
       // 오류 발생 시 사용자에게 알림
       const errorMessage = {
@@ -458,10 +465,10 @@ export default function SajuChat({
     setIsGeneratingQuestions(true)
     console.log("Generating new suggested questions...")
 
-    try {
-      // 최근 메시지 3개만 사용 (텍스트 유지)
-      const recentMessages = messages.slice(-3)
+    // 최근 메시지 5개 추출
+    const recentMessages = messages.slice(-5)
 
+    try {
       const response = await fetch("/api/suggested-questions", {
         method: "POST",
         headers: {
@@ -474,34 +481,34 @@ export default function SajuChat({
           roomType,
           currentYear: 2025,
           yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-          // 창의적인 질문 생성을 위한 플래그 추가
           creative: true,
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to generate suggested questions")
+        const errorText = await response.text()
+        console.error("Failed to generate suggested questions:", errorText)
+        throw new Error(`Failed to generate suggested questions: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
       console.log("API response for suggested questions:", data)
 
       if (data.suggestedQuestions && Array.isArray(data.suggestedQuestions) && data.suggestedQuestions.length > 0) {
-        // 새로운 질문으로 상태 업데이트
         console.log("Setting new suggested questions:", data.suggestedQuestions)
         setSuggestedQuestions(data.suggestedQuestions.slice(0, 2))
+        setApiError(null) // Clear any previous API error
       } else {
         console.warn("No suggested questions returned from API")
-        // 기본 질문으로 폴백
         setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
+        setApiError(null) // Clear any previous API error
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating suggested questions:", error)
-      // 오류 발생 시 채팅방 유형에 맞는 기본 질문 세트 사용
+      setApiError(error.message || "Failed to generate suggested questions") // Set API error message
       setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
     } finally {
       setIsGeneratingQuestions(false)
-      // 질문 생성 후 플래그를 false로 설정하여 중복 생성 방지
       setShouldGenerateQuestions(false)
     }
   }, [messages, saju, roomType, shouldGenerateQuestions])
@@ -820,9 +827,13 @@ export default function SajuChat({
                     }`}
                   >
                     <div className="whitespace-pre-wrap">
-                      <ReactMarkdown remarkRehypeOptions={{ allowDangerousHtml: true }}>
-                        {message.content}
-                      </ReactMarkdown>
+                      {isHtmlResponse ? (
+                        "죄송합니다. 응답을 생성하는 중에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+                      ) : (
+                        <ReactMarkdown remarkRehypeOptions={{ allowDangerousHtml: true }}>
+                          {message.content}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -854,6 +865,11 @@ export default function SajuChat({
           {/* 입력 필드 영역 - 고정 위치 설정 */}
           <div className="fixed bottom-0 left-0 right-0 z-10 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 pb-safe">
             {/* Suggested Questions */}
+            {apiError && (
+              <div className="text-red-500 text-sm text-center mt-2">
+                Error generating suggested questions: {apiError}
+              </div>
+            )}
             <div className="px-3 sm:px-4 pt-2 pb-1 bg-gray-50 dark:bg-gray-900">
               <div className="flex justify-between items-center">
                 <p className="text-xs text-gray-500">추천 질문:</p>
