@@ -5,16 +5,16 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { Loader2, MessageSquare } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import ReactMarkdown from "react-markdown"
 import type { Saju } from "@/lib/saju"
 import SajuDiagram from "./saju-diagram"
 import { getSajuInterpretation } from "@/lib/api-client"
 import FeedbackButtons from "./feedback-buttons"
-import { Progress } from "@/components/ui/progress"
 import AdditionalQuestions from "./additional-questions"
 import { useRouter } from "next/navigation"
+import { AnimatedLoading } from "./animated-loading"
 
 interface SajuResultClientProps {
   saju: Saju
@@ -53,6 +53,7 @@ export default function SajuResultClient({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingStage, setLoadingStage] = useState("사주 분석 준비")
+  const [detailedStage, setDetailedStage] = useState("사주 정보를 확인하고 있습니다")
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
   const [activeTab, setActiveTab] = useState("diagram")
@@ -103,6 +104,7 @@ export default function SajuResultClient({
     setError(null)
     setLoadingProgress(0)
     setLoadingStage("사주 분석 준비")
+    setDetailedStage("사주 정보를 확인하고 있습니다")
 
     // 로딩 진행 상태 시뮬레이션
     const loadingInterval = setInterval(() => {
@@ -110,12 +112,24 @@ export default function SajuResultClient({
         const newProgress = prev + 1
 
         // 진행 단계에 따라 메시지 업데이트
-        if (newProgress === 20) {
-          setLoadingStage("사주 정보 확인 중")
-        } else if (newProgress === 40) {
-          setLoadingStage("운세 분석 중")
-        } else if (newProgress === 70) {
-          setLoadingStage("운세 분석 마무리")
+        if (newProgress === 15) {
+          setLoadingStage("천간(天干) 분석 중")
+          setDetailedStage("천간의 오행과 십성을 분석하고 있습니다")
+        } else if (newProgress === 30) {
+          setLoadingStage("지지(地支) 분석 중")
+          setDetailedStage("지지의 오행과 십이운성을 분석하고 있습니다")
+        } else if (newProgress === 45) {
+          setLoadingStage("일주(日柱) 분석 중")
+          setDetailedStage("일간을 중심으로 사주의 균형을 확인하고 있습니다")
+        } else if (newProgress === 60) {
+          setLoadingStage("용신(用神) 분석 중")
+          setDetailedStage("사주의 용신과 희신을 찾고 있습니다")
+        } else if (newProgress === 75) {
+          setLoadingStage("대운(大運) 분석 중")
+          setDetailedStage("현재와 미래의 운세를 계산하고 있습니다")
+        } else if (newProgress === 85) {
+          setLoadingStage("해석 생성 중")
+          setDetailedStage("분석 결과를 바탕으로 해석을 생성하고 있습니다")
         }
 
         return Math.min(newProgress, 95) // 최대 95%까지만 진행 (API 응답 전)
@@ -130,6 +144,8 @@ export default function SajuResultClient({
       localStorage.setItem(storageKey, result.interpretation)
 
       setLoadingProgress(100) // 완료 시 100%로 설정
+      setLoadingStage("분석 완료")
+      setDetailedStage("사주 해석이 완료되었습니다")
     } catch (err) {
       console.error("Error fetching interpretation:", err)
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
@@ -261,17 +277,7 @@ ${interpretation}
                 )}
 
                 {isLoading && (
-                  <div className="flex flex-col items-center justify-center py-6 space-y-3">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <div className="text-center space-y-1">
-                      <p className="font-medium text-primary">{loadingStage}</p>
-                      <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
-                    </div>
-                    <div className="w-full max-w-xs mt-1">
-                      <Progress value={loadingProgress} className="h-1.5" />
-                      <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgress}% 완료</p>
-                    </div>
-                  </div>
+                  <AnimatedLoading progress={loadingProgress} stage={loadingStage} detailedStage={detailedStage} />
                 )}
 
                 {error && (
@@ -379,13 +385,7 @@ ${interpretation}
                 )}
 
                 {isLoading && (
-                  <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    <div className="text-center space-y-2">
-                      <p className="font-medium text-primary">분석 중...</p>
-                      <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
-                    </div>
-                  </div>
+                  <AnimatedLoading progress={loadingProgress} stage={loadingStage} detailedStage={detailedStage} />
                 )}
 
                 {error && (
