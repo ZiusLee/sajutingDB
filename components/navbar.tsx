@@ -5,9 +5,6 @@ import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useEffect, useState } from "react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { User, LogOut } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -71,40 +68,42 @@ export function Navbar() {
           <Link href="/calculator" passHref>
             <Button variant={pathname === "/calculator" ? "default" : "ghost"}>사주 계산기</Button>
           </Link>
-          {user && (
-            <Link href="/my-questions" passHref>
-              <Button variant={pathname === "/my-questions" ? "default" : "ghost"}>내 질문 목록</Button>
-            </Link>
-          )}
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {userName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/mypage" className="flex items-center">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>마이페이지</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout} className="flex items-center text-red-500">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>로그아웃</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Link href="/login" passHref>
-              <Button variant="outline">로그인</Button>
-            </Link>
-          )}
+          {/*
+  {user && (
+    <Link href="/my-questions" passHref>
+      <Button variant={pathname === "/my-questions" ? "default" : "ghost"}>내 질문 목록</Button>
+    </Link>
+  )}
+  {user ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary text-primary-foreground">
+              {userName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem asChild>
+          <Link href="/mypage" className="flex items-center">
+            <User className="mr-2 h-4 w-4" />
+            <span>마이페이지</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleLogout} className="flex items-center text-red-500">
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>로그아웃</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : (
+    <Link href="/login" passHref>
+      <Button variant="outline">로그인</Button>
+    </Link>
+  )}
+  */}
         </div>
       </div>
     </nav>

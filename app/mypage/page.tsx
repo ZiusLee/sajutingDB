@@ -1,17 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Calendar, Clock, LogOut } from "lucide-react"
+import { ArrowLeft, Calendar, Clock } from "lucide-react"
 import SajuDiagram from "@/components/saju-diagram"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { getSajuProfiles, getChatHistory } from "@/lib/user-data-transfer"
 
 // 채팅 내역 타입 정의
 interface ChatSession {
@@ -47,101 +46,6 @@ export default function MyPage() {
   const [sajuProfiles, setSajuProfiles] = useState<SajuProfile[]>([])
   const [selectedProfile, setSelectedProfile] = useState<SajuProfile | null>(null)
   const supabase = createClientComponentClient()
-
-  // 로그인 상태 확인 및 데이터 로드
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Check Supabase session first
-        const { data: sessionData } = await supabase.auth.getSession()
-
-        if (sessionData?.session) {
-          setIsAuthenticated(true)
-
-          // Get user data
-          const { data: userData } = await supabase.auth.getUser()
-          if (userData?.user) {
-            // Get user name from localStorage or user metadata
-            const name =
-              localStorage.getItem("user_name") ||
-              userData.user.user_metadata?.name ||
-              userData.user.email?.split("@")[0] ||
-              "사용자"
-
-            const email = userData.user.email || ""
-
-            setUserName(name)
-            setUserEmail(email)
-
-            // Ensure localStorage is updated
-            localStorage.setItem("user_authenticated", "true")
-            localStorage.setItem("user_id", userData.user.id)
-            if (!localStorage.getItem("user_name")) {
-              localStorage.setItem("user_name", name)
-            }
-            if (!localStorage.getItem("user_email") && email) {
-              localStorage.setItem("user_email", email)
-            }
-
-            return true
-          }
-        } else {
-          // Fallback to localStorage check
-          const isAuth = localStorage.getItem("user_authenticated") === "true"
-          setIsAuthenticated(isAuth)
-
-          if (isAuth) {
-            // User info from localStorage
-            const name = localStorage.getItem("user_name") || "사용자"
-            const email = localStorage.getItem("user_email") || ""
-            setUserName(name)
-            setUserEmail(email)
-            return true
-          }
-        }
-
-        // Not authenticated
-        setIsAuthenticated(false)
-        router.push("/login?returnUrl=/mypage")
-        return false
-      } catch (error) {
-        console.error("Authentication check error:", error)
-        setIsAuthenticated(false)
-        router.push("/login?returnUrl=/mypage")
-        return false
-      }
-    }
-
-    const loadUserData = async () => {
-      try {
-        // Load saju profiles using the utility function
-        const profiles = await getSajuProfiles()
-        setSajuProfiles(profiles)
-
-        // Set the first profile as selected if available
-        if (profiles && profiles.length > 0) {
-          setSelectedProfile(profiles[0])
-        }
-
-        // Load chat history using the utility function
-        const sessions = await getChatHistory()
-        setChatSessions(sessions)
-      } catch (error) {
-        console.error("Error loading user data:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    const init = async () => {
-      const authResult = await checkAuth()
-      if (authResult) {
-        await loadUserData()
-      }
-    }
-
-    init()
-  }, [router, supabase])
 
   // 로그아웃 처리
   const handleLogout = async () => {
@@ -236,10 +140,12 @@ export default function MyPage() {
               <h2 className="text-xl font-bold">{userName}</h2>
               <p className="text-gray-500 dark:text-gray-400">{userEmail}</p>
             </div>
-            <Button variant="outline" onClick={handleLogout} className="gap-2">
-              <LogOut className="h-4 w-4" />
-              로그아웃
-            </Button>
+            {/*
+          <Button variant="outline" onClick={handleLogout} className="gap-2">
+            <LogOut className="h-4 w-4" />
+            로그아웃
+          </Button>
+          */}
           </div>
         </CardContent>
       </Card>
@@ -297,7 +203,7 @@ export default function MyPage() {
                     size="sm"
                     onClick={() =>
                       router.push(
-                        `/chat-list?saju=${encodeURIComponent(JSON.stringify(selectedProfile.saju))}&name=${encodeURIComponent(selectedProfile.name)}&gender=${selectedProfile.gender}`,
+                        `/chat-list?saju=${encodeURIComponent(JSON.stringify(selectedProfile.saju))}&name=${encodeURIComponent(selectedProfile.name)}&gender=${encodeURIComponent(selectedProfile.gender)}`,
                       )
                     }
                   >
