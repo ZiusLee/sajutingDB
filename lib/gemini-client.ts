@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const MODEL_NAME = "gemini-pro"
-const API_KEY = process.env.GEMINI_API_KEY || "YOUR_API_KEY"
+const API_KEY = process.env.GEMINI_API_KEY
 
 async function streamGeminiText(messages: any, systemPrompt: string, temperature: number, maxOutputTokens: number) {
   try {
