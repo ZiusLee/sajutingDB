@@ -1,26 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// Get the OpenAI API key with the correct capitalization
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.openai_Api_key
-
-// Make sure we have the API key
-if (!OPENAI_API_KEY) {
-  console.warn("OpenAI API key is not defined in environment variables")
-}
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
 
 // API 라우트의 타임아웃 설정을 60초로 변경
 export const maxDuration = 60
 
+// OpenAI API 키를 환경 변수에서 가져옵니다.
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+
 export async function POST(request: NextRequest) {
   try {
     console.log("Received additional interpretation request")
-    const {
-      saju,
-      name,
-      gender,
-      questionCategory,
-      relationshipStatus = "solo",
-    } = await request.json()
+    const { saju, name, gender, questionCategory, relationshipStatus = "solo" } = await request.json()
 
     if (!saju) {
       console.error("Missing saju data in request")
@@ -319,4 +310,90 @@ ${relationshipContext}
 - 파트너와의 관계를 더 깊게 발전시키는 방법
 
 ### 4. 결혼으로 가기 위한 보완점
-- 연애에서 결혼으로 가려면 어떤 부분을 보완해야할까? (나
+- 연애에서 결혼으로 가려면 어떤 부분을 보완해야할까? (나의 성격, 배우자, 환경적인 요인)
+
+### 5. 결론 및 실천적 조언
+- 더 나은 연애 관계를 위한 핵심 포인트
+- 구체적인 행동 지침과 마인드셋
+
+중요: 제목에는 반드시 이 사람의 연애 문제 해결책을 관통하는 핵심 주제나 해결책을 한 문장으로 명확하게 표현해주세요.
+
+한국어로 친절하게 설명해주세요. 마크다운 형식으로 응답해주세요.
+`
+    } else {
+      prompt = `
+사주팔자 전문가로서 다음 사주에 대한 추가 질문에 답해주세요:
+
+오늘 날짜: ${new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}
+
+- 이름: ${userName}
+- 성별: ${genderText}
+- 질문 카테고리: ${questionCategory}
+- 년주: ${yearStem}${yearBranch}
+- 월주: ${monthStem}${monthBranch}
+- 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})
+- 시주: ${hourStem}${hourBranch}
+- 띠: ${yearAnimal}
+- 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
+
+${relationshipContext}
+
+한국어로 친절하게 설명해주세요. 마크다운 형식으로 응답해주세요.
+`
+    }
+
+    // 비스트리밍 요청 처리
+    const startTime = Date.now()
+    let interpretation = ""
+    let responseTime = 0
+
+    try {
+      console.log("Attempting to generate text with OpenAI model")
+
+      // OpenAI API 키 확인
+      if (!OPENAI_API_KEY) {
+        console.error("OPENAI_API_KEY is not defined")
+        throw new Error("OpenAI API key is missing")
+      }
+
+      const { text } = await generateText({
+        model: openai("gpt-4o"),
+        prompt: prompt,
+        temperature: 0.7,
+        maxTokens: 3000,
+        apiKey: OPENAI_API_KEY,
+        system:
+          "당신은 사주팔자 전문가입니다. 질문에 대한 답변을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요. 적절한 이모지를 사용하여 가독성을 높여주세요.",
+      })
+
+      interpretation = text
+      responseTime = Date.now() - startTime
+      console.log(`OpenAI response generated in ${responseTime}ms`)
+
+      // 응답 반환
+      return NextResponse.json({
+        interpretation,
+        model: "openai",
+        responseTime: `${responseTime}ms`,
+      })
+    } catch (error) {
+      console.error("Error generating interpretation:", error)
+
+      // 오류 발생 시 폴백 해석 반환
+      return NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: 500 },
+      )
+    }
+  } catch (error) {
+    console.error("Unhandled error in API route:", error)
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+      },
+      { status: 500 },
+    )
+  }
+}
