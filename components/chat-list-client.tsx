@@ -33,34 +33,8 @@ import { ko } from "date-fns/locale"
 
 // 사용자의 사주에 맞는 맞춤 채팅방 제목 생성
 function getPersonalizedRoomTitle(saju: any, gender: string): string {
-  // 사주 데이터를 분석하여 맞춤 제목 생성
-  // 예: 오행 분포, 일주, 성별 등을 고려
-
-  // 간단한 예시: 오행 분포에 따라 다른 제목 반환
-  if (saju?.elements) {
-    const maxElement = Object.entries(saju.elements).reduce(
-      (max, [element, count]) => (count > max.count ? { element, count } : max),
-      { element: "", count: 0 },
-    ).element
-
-    switch (maxElement.element) {
-      case "wood":
-        return "자기 계발 맞춤 상담"
-      case "fire":
-        return "열정 찾기 맞춤 상담"
-      case "earth":
-        return "안정 찾기 맞춤 상담"
-      case "metal":
-        return "목표 달성 맞춤 상담"
-      case "water":
-        return "지혜 찾기 맞춤 상담"
-      default:
-        return "맞춤 상담"
-    }
-  }
-
-  // 기본값
-  return gender === "male" ? "남성 맞춤 상담" : "여성 맞춤 상담"
+  // 모든 경우에 "고민상담"으로 반환
+  return "고민상담"
 }
 
 // 사용자의 사주에 맞는 맞춤 아이콘 생성
@@ -369,7 +343,7 @@ export default function ChatListClient() {
         const personalizedRoom: ChatRoom = {
           id: "personalized",
           title: getPersonalizedRoomTitle(saju, gender),
-          description: "당신의 사주에 맞는 맞춤 상담",
+          description: "당신의 고민을 사주를 바탕으로 상담해드립니다",
           icon: getPersonalizedRoomIcon(dominantElement),
           lastMessage:
             savedChatData.personalized?.messages?.length > 1
@@ -377,7 +351,7 @@ export default function ChatListClient() {
                   0,
                   30,
                 ) + "..."
-              : `${userName}님만을 위한 맞춤 상담을 시작하세요`,
+              : `${userName}님의 고민을 들려주세요`,
           time: savedChatData.personalized?.lastMessageTime
             ? new Date(savedChatData.personalized.lastMessageTime)
             : new Date(Date.now() - 1000 * 60 * 60 * 6), // 6시간 전

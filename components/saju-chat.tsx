@@ -90,9 +90,10 @@ const initialSuggestedQuestionsByType: Record<string, string[]> = {
     "푸른 뱀의 해에 결혼 생활에서 주의해야 할 점이 있나요?",
   ],
   personalized: [
-    "제 사주에서 가장 두드러진 특징은 무엇인가요?",
-    "2025년 을사년이 제 사주와 어떻게 상호작용하나요?",
-    "푸른 뱀의 해에 제 사주에 맞는 행운을 끌어당기는 방법이 있을까요?",
+    "요즘 제 고민이 있는데 어떻게 해결하면 좋을까요?",
+    "인간관계에 어려움을 겪고 있는데 제 사주가 원인일까요?",
+    "직장에서의 스트레스를 어떻게 해소하면 좋을까요?",
+    "미래에 대한 불안감이 있는데 어떻게 극복할 수 있을까요?",
   ],
   "daily-fortune": [
     `오늘(${formatTodayDate()})의 운세를 보시겠습니까?`,
@@ -132,6 +133,11 @@ ${currentYear}년은 푸른 뱀의 해로, 음(陰)의 목(木) 기운과 뱀의
     case "daily-fortune":
       return `안녕하세요, ${userName}님! 사주를 기반으로 오늘(${today})의 운세를 알려드리는 AI입니다. 오늘 하루는 어떤 운이 따를까요? 🍀`
 
+    case "personalized":
+      return `안녕하세요, ${userName}님! 고민상담을 시작하겠습니다.
+
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. ${userName}님의 고민이 무엇인지 말씀해주시면, 사주를 바탕으로 해결책을 제시해드리겠습니다. 인간관계, 직장, 심리적 고민 등 어떤 것이든 편하게 말씀해주세요.`
+
     case "general":
     default:
       return `안녕하세요, ${userName}님! 사주팔자를 기반으로 인생의 중요한 시기와 방향성에 대해 상담해드리는 AI 상담사입니다. 
@@ -156,7 +162,7 @@ const getRoomTitle = (roomType: string): string => {
     case "marriage":
       return "결혼운"
     case "personalized":
-      return "맞춤 상담"
+      return "고민상담"
     case "daily-fortune":
       return "오늘의 운세"
     case "general":
@@ -181,7 +187,7 @@ const getConsultantName = (roomType: string): string => {
     case "marriage":
       return "결혼 상담사"
     case "personalized":
-      return "맞춤 상담사"
+      return "고민 상담사"
     case "daily-fortune":
       return "AI 운세봇"
     case "general":
@@ -204,7 +210,7 @@ const getConsultantAvatar = (roomType: string): string => {
     case "marriage":
       return "/celebration.svg" // 결혼 상담사 이미지로 교체 필요
     case "personalized":
-      return "/celebration.svg" // 맞춤 상담사 이미지로 교체 필요
+      return "/celebration.svg" // 고민 상담사 이미지로 교체 필요
     default:
       return "/celebration.svg"
   }
