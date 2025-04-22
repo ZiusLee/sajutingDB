@@ -208,7 +208,7 @@ ${relationshipGuidance}
       try {
         console.log("Attempting to generate compatibility analysis with OpenAI model")
         const { text } = await generateText({
-          model: openai("gpt-4o"),
+          model: openai("gpt-4.1"),
           prompt: prompt,
           temperature: 0.7,
           maxTokens: 2500,

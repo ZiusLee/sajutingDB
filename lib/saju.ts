@@ -35,6 +35,23 @@ const BRANCH_ELEMENTS = {
   해: "water",
 }
 
+// 지지의 십성 계산을 위한 정확한 천간 매핑
+// 각 지지는 특정 천간의 기운을 가지고 있음
+const BRANCH_TO_STEM_MAP = {
+  자: "계", // 자(鼠)는 계(癸)의 기운
+  축: "기", // 축(牛)는 기(己)의 기운
+  인: "갑", // 인(虎)는 갑(甲)의 기운
+  묘: "을", // 묘(兎)는 을(乙)의 기운
+  진: "무", // 진(龍)는 무(戊)의 기운
+  사: "병", // 사(蛇)는 병(丙)의 기운
+  오: "정", // 오(馬)는 정(丁)의 기운
+  미: "기", // 미(羊)는 기(己)의 기운
+  신: "경", // 신(猴)는 경(庚)의 기운
+  유: "신", // 유(鷄)는 신(辛)의 기운
+  술: "무", // 술(狗)는 무(戊)의 기운
+  해: "임", // 해(豬)는 임(壬)의 기운, changed from "계" to "임"
+}
+
 // 오행 한글 이름
 const ELEMENT_NAMES = {
   wood: "목(木)",
@@ -88,6 +105,7 @@ const MANSERYEOK_DATA = [
   [1999, 2, 13, "기", "묘", "병", "인", "병", "신"], // 1999년 2월 13일: 기묘년 병인월 병신일
 ]
 
+// Update the Saju interface to ensure all properties are properly typed
 export interface Saju {
   yearStem: string
   yearBranch: string
@@ -119,14 +137,14 @@ export interface Saju {
   gender?: string
   name?: string
   timeUnknown?: boolean
-  yearStemSibseong?: string
-  monthStemSibseong?: string
-  dayStemSibseong?: string
-  hourStemSibseong?: string
-  yearBranchSibseong?: string
-  monthBranchSibseong?: string
-  dayBranchSibseong?: string
-  hourBranchSibseong?: string
+  yearStemSibseong: string
+  monthStemSibseong: string
+  dayStemSibseong: string
+  hourStemSibseong: string
+  yearBranchSibseong: string
+  monthBranchSibseong: string
+  dayBranchSibseong: string
+  hourBranchSibseong: string
 }
 
 // 입춘 날짜 (평균적으로 2월 4일경)
@@ -668,91 +686,35 @@ function getMonthBranchFromManseryeok(year: number, month: number, day: number, 
   return getMonthBranchWithExactTime(year, month, day, hour)
 }
 
-// getMonthPillar 함수 수정 - hour 매개변수 추가
+// Add this helper function before the calculateSaju function
+function getBranchElement(branch: string): string {
+  return BRANCH_TO_STEM_MAP[branch as keyof typeof BRANCH_TO_STEM_MAP]
+}
+
+// 월간지 계산 (Month Pillar)
 function getMonthPillar(
   solarYear: number,
   solarMonth: number,
   solarDay: number,
   yearStem: string,
-  isLeapMonth = false,
-  hour = 0,
+  isLeapMonth: boolean,
+  hour: number,
 ): { stem: string; branch: string } {
-  // Special case handling
-  if (solarYear === 1998 && solarMonth === 7 && !isLeapMonth) {
-    // 동추원만세력 기준 1998년 7월은 오월
-    return { stem: "무", branch: "오" }
-  }
+  const monthBranch = getMonthBranchFromManseryeok(solarYear, solarMonth, solarDay, hour)
+  const monthStem = getMonthStem(yearStem, monthBranch)
 
-  // 만세력 데이터 직접 매핑 (특정 날짜)
-  if (solarYear === 1996 && solarMonth === 1 && solarDay >= 6) {
-    return { stem: "무", branch: "자" }
-  }
-
-  if (solarYear === 1988 && solarMonth === 5 && solarDay >= 5) {
-    return { stem: "정", branch: "사" }
-  }
-
-  // 윤달 처리
-  if (isLeapMonth) {
-    // 윤달은 이전 달의 월주를 그대로 사용
-    // 이전 달의 월지 계산
-    const prevMonth = solarMonth === 1 ? 12 : solarMonth - 1
-    const prevMonthDay = solarDay // 같은 날짜 사용
-    const prevYear = solarMonth === 1 ? solarYear - 1 : solarYear
-
-    // 이전 달의 월지 계산 - 시간 정보 전달
-    const monthBranch = getMonthBranchFromManseryeok(prevYear, prevMonth, prevMonthDay, hour)
-    const monthStem = getMonthStem(yearStem, monthBranch)
-
-    return { stem: monthStem, branch: monthBranch }
-  }
-
-  try {
-    // 일반적인 계산 - 시간 정보 전달
-    const monthBranch = getMonthBranchFromManseryeok(solarYear, solarMonth, solarDay, hour)
-    const monthStem = getMonthStem(yearStem, monthBranch)
-    return { stem: monthStem, branch: monthBranch }
-  } catch (error) {
-    console.error(`Error calculating month pillar for ${solarYear}-${solarMonth}-${solarDay}:`, error)
-    // Fallback to a safe default
-    return { stem: "무", branch: "자" }
+  return {
+    stem: monthStem,
+    branch: monthBranch,
   }
 }
 
-// 월간 결정 (연간과 월지에 따라)
+// 월간 계산 (Month Stem)
 function getMonthStem(yearStem: string, monthBranch: string): string {
-  // 월지 순서 (인월부터 시작)
-  const monthBranchOrder = ["인", "묘", "진", "사", "오", "미", "신", "유", "술", "해", "자", "축"]
-  const monthBranchIndex = monthBranchOrder.indexOf(monthBranch)
+  const yearStemIndex = HEAVENLY_STEMS.indexOf(yearStem)
+  const branchIndex = EARTHLY_BRANCHES.indexOf(monthBranch)
 
-  if (monthBranchIndex === -1) {
-    console.error(`Invalid month branch: ${monthBranch}`)
-    return "무" // 기본값
-  }
-
-  // 연간별 월간 시작 인덱스 (동추원만세력 기반)
-  // 각 연간에 따른 인월의 월간 시작 인덱스
-  const yearStemToFirstMonthStem: Record<string, number> = {
-    갑: 2, // 갑년 인월은 병(丙)으로 시작
-    을: 4, // 을년 인월은 무(戊)로 시작
-    병: 6, // 병년 인월은 경(庚)으로 시작
-    정: 8, // 정년 인월은 임(壬)으로 시작
-    무: 0, // 무년 인월은 갑(甲)으로 시작
-    기: 2, // 기년 인월은 병(丙)으로 시작
-    경: 4, // 경년 인월은 무(戊)로 시작
-    신: 6, // 신년 인월은 경(庚)으로 시작
-    임: 8, // 임년 인월은 임(壬)으로 시작
-    계: 0, // 계년 인월은 갑(甲)으로 시작
-  }
-
-  const firstMonthStemIndex = yearStemToFirstMonthStem[yearStem]
-
-  if (firstMonthStemIndex === undefined) {
-    console.error(`Invalid year stem: ${yearStem}`)
-    return "무" // 기본값
-  }
-
-  const stemIndex = (firstMonthStemIndex + monthBranchIndex) % 10
+  const stemIndex = (yearStemIndex * 2 + branchIndex) % 10
   return HEAVENLY_STEMS[stemIndex]
 }
 
@@ -838,7 +800,7 @@ export function calculateSaju(
   // 사주 해석 생성
   const interpretation = generateInterpretation(elements, dayStem, dayBranch, timeUnknown)
 
-  // 간지 인덱스 찾기
+  // 간지 인덱스 찾기\
   const yearStemIndex = HEAVENLY_STEMS.indexOf(yearStem)
   const yearBranchIndex = EARTHLY_BRANCHES.indexOf(yearBranch)
   const monthStemIndex = HEAVENLY_STEMS.indexOf(monthStem)
@@ -866,6 +828,26 @@ export function calculateSaju(
     return calculatedMonthBranch // 다른 경우는 계산된 월지 그대로 반환
   }
 
+  // 십성 계산
+  const yearStemSibseong = calculateSibseong(dayStem, yearStem)
+  const monthStemSibseong = calculateSibseong(dayStem, monthStem)
+  const dayStemSibseong = calculateSibseong(dayStem, dayStem)
+  const hourStemSibseong = calculateSibseong(dayStem, hourStem === "?" ? dayStem : hourStem)
+
+  const yearBranchSibseong = calculateSibseong(
+    dayStem,
+    BRANCH_TO_STEM_MAP[yearBranch as keyof typeof BRANCH_TO_STEM_MAP],
+  )
+  const monthBranchSibseong = calculateSibseong(
+    dayStem,
+    BRANCH_TO_STEM_MAP[monthBranch as keyof typeof BRANCH_TO_STEM_MAP],
+  )
+  const dayBranchSibseong = calculateSibseong(dayStem, BRANCH_TO_STEM_MAP[dayBranch as keyof typeof BRANCH_TO_STEM_MAP])
+  const hourBranchSibseong =
+    hourBranch !== "?"
+      ? calculateSibseong(dayStem, BRANCH_TO_STEM_MAP[hourBranch as keyof typeof BRANCH_TO_STEM_MAP])
+      : ""
+
   return {
     yearStem,
     yearBranch,
@@ -889,16 +871,15 @@ export function calculateSaju(
     dayMaster: dayStem,
     dayMasterHanja: HEAVENLY_STEMS_HANJA[dayStemIndex],
     gender,
-    name,
     timeUnknown,
-    yearStemSibseong: calculateSibseong(dayStem, yearStem),
-    monthStemSibseong: calculateSibseong(dayStem, monthStem),
-    dayStemSibseong: calculateSibseong(dayStem, dayStem),
-    hourStemSibseong: calculateSibseong(dayStem, hourStem === "?" ? dayStem : hourStem),
-    // Assign values to the new properties
-    yearBranchSibseong: calculateSibseong(dayStem, yearBranch),
-    monthBranchSibseong: calculateSibseong(dayStem, monthBranch),
-    dayBranchSibseong: calculateSibseong(dayStem, dayBranch),
-    hourBranchSibseong: calculateSibseong(dayStem, hourBranch === "?" ? dayStem : hourStem),
+    yearStemSibseong,
+    monthStemSibseong,
+    dayStemSibseong,
+    hourStemSibseong,
+    yearBranchSibseong,
+    monthBranchSibseong,
+    dayBranchSibseong,
+    hourBranchSibseong,
   }
 }
+export default calculateSaju

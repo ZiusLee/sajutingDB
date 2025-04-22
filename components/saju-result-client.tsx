@@ -358,6 +358,29 @@ ${interpretation}
                   </div>
                 </div>
 
+                {/* Add this after the Heavenly Stems Sibseong display section */}
+                <div className="mt-4">
+                  <h3 className="text-lg font-semibold mb-2">지지 십성</h3>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="text-center p-2 bg-gray-100 rounded">
+                      <div className="font-medium">연지</div>
+                      <div>{saju.yearBranchSibseong}</div>
+                    </div>
+                    <div className="text-center p-2 bg-gray-100 rounded">
+                      <div className="font-medium">월지</div>
+                      <div>{saju.monthBranchSibseong}</div>
+                    </div>
+                    <div className="text-center p-2 bg-gray-100 rounded">
+                      <div className="font-medium">일지</div>
+                      <div>{saju.dayBranchSibseong}</div>
+                    </div>
+                    <div className="text-center p-2 bg-gray-100 rounded">
+                      <div className="font-medium">시지</div>
+                      <div>{saju.timeUnknown ? "-" : saju.hourBranchSibseong}</div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Add chat button to diagram tab - Desktop */}
                 <div className="mt-6">
                   <Button className="w-full flex items-center justify-center gap-2" onClick={navigateToChatList}>

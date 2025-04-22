@@ -100,10 +100,6 @@ export async function getDetailedInterpretation(
     }
 
     const data = await response.json()
-    // Add model information to the UI
-    if (data.model) {
-      console.log(`Interpretation generated using ${data.model} model in ${data.responseTime || "unknown"} time`)
-    }
     return data
   } catch (error) {
     console.error("Error fetching detailed interpretation:", error)
