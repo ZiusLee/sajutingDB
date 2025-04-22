@@ -2,10 +2,8 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Send, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
@@ -44,41 +42,13 @@ export default function SajuChat({
   // 상단 헤더 숨기기
   useHideHeaderAndFooter()
 
-  // 로그인 관련 상태
+  // 상태 관리
   const router = useRouter()
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
-  const [loginPromptMessage, setLoginPromptMessage] = useState("")
   const [questionCount, setQuestionCount] = useState(0)
-  const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-  const supabase = createClientComponentClient()
+  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true)
 
   // Chat context
   const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
-
-  // 로그인 페이지로 이동
-  const handleLogin = () => {
-    router.push("/login?returnUrl=" + encodeURIComponent(window.location.pathname))
-  }
-
-  // 로그인 프롬프트 닫기
-  const handleCloseLoginPrompt = () => {
-    setShowLoginPrompt(false)
-  }
-
-  // 현재 로그인한 사용자 정보 가져오기
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        setUserId(user.id)
-      }
-    }
-
-    fetchUser()
-  }, [supabase])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -89,15 +59,12 @@ export default function SajuChat({
   )
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
-  const [isHtmlResponse, setIsHtmlResponse] = useState(false) // Add this line
+  const [isHtmlResponse, setIsHtmlResponse] = useState(false)
   const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
   const [lastMessageId, setLastMessageId] = useState<string>("")
 
   // 새로운 상태 추가: 질문 생성 여부를 추적
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-
-  // 상태 추가: 추천 질문 표시 여부
-  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true)
 
   // Get saved chat session or create initial messages
   const savedSession = activeChatSession || getChatSession(sessionKey)
@@ -119,7 +86,6 @@ export default function SajuChat({
       gender,
       initialInterpretation,
       roomType,
-      userId, // 사용자 ID 전달
       currentYear: 2025,
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
     },
@@ -132,7 +98,7 @@ export default function SajuChat({
       setLastMessageId(message.id)
 
       // 채팅 데이터 저장 - 완료된 메시지를 포함하여 저장
-      const updatedMessages = [...messages, message]
+      const updatedMessages = messages && Array.isArray(messages) ? [...messages, message] : [message]
 
       // 현재 채팅방 유형에 맞는 세션 키 생성
       const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
@@ -157,8 +123,8 @@ export default function SajuChat({
     onError: (error) => {
       console.error("Chat error:", error)
 
-      // Check if the error message indicates an HTML response
-      if (error.message.includes("DOCTYPE html")) {
+      // Check if the error message includes an HTML response
+      if (error.message && error.message.includes("DOCTYPE html")) {
         setIsHtmlResponse(true)
       }
 
@@ -170,7 +136,7 @@ export default function SajuChat({
       }
 
       // 오류 메시지를 채팅에 추가
-      const updatedMessages = [...messages, errorMessage]
+      const updatedMessages = messages && Array.isArray(messages) ? [...messages, errorMessage] : [errorMessage]
 
       // 세션 저장
       const sessionData = {
@@ -202,16 +168,6 @@ export default function SajuChat({
     const newQuestionCount = questionCount + 1
     setQuestionCount(newQuestionCount)
 
-    // Show login prompt after 5 questions if not already shown\
-    // 질문을 모두 사 -> This hook is being called conditionally, but all hooks must be called in the exact same order in every component render.
-    const shouldShowLoginPrompt = newQuestionCount >= 5 && !isLoggedIn && !hasShownLoginPrompt
-
-    if (shouldShowLoginPrompt) {
-      setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-      setShowLoginPrompt(true)
-      setHasShownLoginPrompt(true)
-    }
-
     // 사용자가 질문을 제출하면 질문 생성 플래그를 false로 설정
     setShouldGenerateQuestions(false)
 
@@ -221,29 +177,21 @@ export default function SajuChat({
 
   // 뒤로가기 핸들러 - 채팅 데이터 저장 후 뒤로가기
   const handleBackWithSave = () => {
-    // If not logged in and hasn't shown prompt yet, show login prompt
-    if (!isLoggedIn && !hasShownLoginPrompt && questionCount > 0) {
-      setLoginPromptMessage("채팅 내역을 저장하려면 로그인이 필요합니다. 로그인하시겠습니까?")
-      setShowLoginPrompt(true)
-      setHasShownLoginPrompt(true)
-    } else {
-      // Otherwise, just go back
-      // 채팅 데이터 저장
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages,
-        lastMessageTime: new Date().toISOString(),
-      }
-
-      saveChatSession(sessionKey, sessionData)
-
-      // 뒤로가기 실행
-      window.history.back()
+    // 채팅 데이터 저장
+    const sessionData = {
+      saju,
+      name,
+      gender,
+      interpretation: initialInterpretation,
+      roomType,
+      messages,
+      lastMessageTime: new Date().toISOString(),
     }
+
+    saveChatSession(sessionKey, sessionData)
+
+    // 뒤로가기 실행
+    window.history.back()
   }
 
   // 예상 질문 클릭 핸들러
@@ -337,7 +285,7 @@ export default function SajuChat({
       const lastMessage = messages[messages.length - 1]
 
       // assistant 메시지이고 welcome 메시지가 아닌 경우에만 새 질문 생성
-      if (lastMessage.role === "assistant" && lastMessage.id !== "welcome") {
+      if (lastMessage && lastMessage.role === "assistant" && lastMessage.id !== "welcome") {
         console.log("Triggering new question generation after assistant message")
 
         // 디바운스 처리로 연속 호출 방지
@@ -541,10 +489,6 @@ export default function SajuChat({
     }
   }, [roomType, sessionKey, name, gender])
 
-  const loginPromptDialog = (
-    <LoginPromptDialog isOpen={showLoginPrompt} onClose={handleCloseLoginPrompt} message={loginPromptMessage} />
-  )
-
   return (
     <Card className="w-full border-0 sm:border relative z-10 hide-parent-header">
       <CardHeader className="px-2 py-2 sm:px-4 sm:py-3 border-b flex flex-row items-center justify-between">
@@ -722,7 +666,6 @@ export default function SajuChat({
           </div>
         </div>
       </CardContent>
-      {loginPromptDialog}
     </Card>
   )
 }

@@ -12,7 +12,6 @@ export default function SajuChatPage() {
   const { toast } = useToast()
   const [saju, setSaju] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [sessionIdentifier, setSessionIdentifier] = useState<string | null>(null)
 
   useEffect(() => {
@@ -31,16 +30,23 @@ export default function SajuChatPage() {
         return
       }
 
-      const parsedSaju = JSON.parse(savedSaju)
-      setSaju(parsedSaju)
-      setLoading(false)
-
-      // 로그인 상태 확인
-      // 실제 구현에서는 세션이나 토큰을 확인하는 로직으로 대체
-      const userToken = localStorage.getItem("user_token")
-      setIsLoggedIn(!!userToken)
-
-      setSessionIdentifier(savedSession)
+      try {
+        const parsedSaju = JSON.parse(savedSaju)
+        if (!parsedSaju || !parsedSaju.saju) {
+          throw new Error("Invalid saju data format")
+        }
+        setSaju(parsedSaju)
+        setLoading(false)
+        setSessionIdentifier(savedSession)
+      } catch (parseError) {
+        console.error("Error parsing saju data:", parseError)
+        toast({
+          title: "데이터 형식 오류",
+          description: "사주 데이터 형식이 올바르지 않습니다.",
+          variant: "destructive",
+        })
+        router.push("/")
+      }
     } catch (error) {
       console.error("Error loading saju data:", error)
       toast({
@@ -73,7 +79,7 @@ export default function SajuChatPage() {
         initialInterpretation={saju.interpretation || ""}
         roomType={params.roomType as string}
         onBack={handleBack}
-        isLoggedIn={isLoggedIn}
+        isLoggedIn={false} // Set to false since we're not using auth
         sessionKey={sessionIdentifier || ""}
       />
     </div>

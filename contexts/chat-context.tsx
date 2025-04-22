@@ -42,6 +42,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // Save chat session
   const saveChatSession = (key: string, session: ChatSession) => {
+    if (!key || !session) {
+      console.error("Invalid key or session data:", { key, session })
+      return
+    }
+
     setChatSessions((prev) => {
       const updated = { ...prev, [key]: session }
       // Save to localStorage
@@ -56,6 +61,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // Get chat session
   const getChatSession = (key: string): ChatSession | null => {
+    if (!key) return null
     return chatSessions[key] || null
   }
 
