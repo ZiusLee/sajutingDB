@@ -260,7 +260,7 @@ export default function SajuChat({
   // 새로운 예상 질문 생성 함수
   const generateNewSuggestedQuestions = useCallback(async () => {
     // 메시지가 최소 2개 이상일 때만 API 호출 (초기 메시지 + 최소 1개의 대화)
-    if (messages.length < 2 || !shouldGenerateQuestions) return
+    if ((messages && messages.length < 2) || !shouldGenerateQuestions) return
 
     setIsGeneratingQuestions(true)
     console.log("Generating new suggested questions...")
@@ -333,7 +333,7 @@ export default function SajuChat({
   // 마지막 메시지가 assistant인 경우에만 새 질문 생성 (중복 호출 방지)
   useEffect(() => {
     // 메시지가 있고, 마지막 메시지가 assistant이고, 생성 중이 아니고, 생성이 허용된 경우에만 실행
-    if (messages.length > 0 && !isGeneratingQuestions && shouldGenerateQuestions) {
+    if (messages && messages.length > 0 && !isGeneratingQuestions && shouldGenerateQuestions) {
       const lastMessage = messages[messages.length - 1]
 
       // assistant 메시지이고 welcome 메시지가 아닌 경우에만 새 질문 생성
@@ -606,30 +606,31 @@ export default function SajuChat({
 
             {/* 메시지 표시 영역 */}
             <div className="px-3 sm:px-4 py-2 space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={message.id || index}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
+              {messages &&
+                messages.map((message, index) => (
                   <div
-                    className={`max-w-[80%] sm:max-w-[70%] rounded-lg p-3 ${
-                      message.role === "user"
-                        ? "bg-blue-500 text-white rounded-br-none"
-                        : "bg-gray-100 dark:bg-gray-800 rounded-bl-none"
-                    }`}
+                    key={message.id || index}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    <div className="whitespace-pre-wrap">
-                      {isHtmlResponse ? (
-                        "죄송합니다. 응답을 생성하는 중에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
-                      ) : (
-                        <ReactMarkdown remarkRehypeOptions={{ allowDangerousHtml: true }}>
-                          {message.content}
-                        </ReactMarkdown>
-                      )}
+                    <div
+                      className={`max-w-[80%] sm:max-w-[70%] rounded-lg p-3 ${
+                        message.role === "user"
+                          ? "bg-blue-500 text-white rounded-br-none"
+                          : "bg-gray-100 dark:bg-gray-800 rounded-bl-none"
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap">
+                        {isHtmlResponse ? (
+                          "죄송합니다. 응답을 생성하는 중에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+                        ) : (
+                          <ReactMarkdown remarkRehypeOptions={{ allowDangerousHtml: true }}>
+                            {message.content}
+                          </ReactMarkdown>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="max-w-[80%] sm:max-w-[70%] rounded-lg p-3 bg-gray-100 dark:bg-gray-800 rounded-bl-none">
