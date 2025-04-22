@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { SajuLogo } from "./saju-logo"
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export function SiteHeader() {
   const router = useRouter()
@@ -86,32 +87,30 @@ export function SiteHeader() {
         </div>
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
-            {/*
-  {isLoading ? (
-    // Show loading state
-    <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
-  ) : user ? (
-    // Profile avatar - using Button instead of Link for better click handling
-    <Button
-      variant="ghost"
-      className="p-0 h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
-      onClick={goToMyPage}
-      aria-label="마이페이지"
-    >
-      <div className="flex items-center gap-2">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className="bg-primary text-primary-foreground">
-            {userName.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-      </div>
-    </Button>
-  ) : (
-    <Button variant="default" onClick={() => router.push("/login")}>
-      로그인/회원가입
-    </Button>
-  )}
-  */}
+            {isLoading ? (
+              // Show loading state
+              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+            ) : user ? (
+              // Profile avatar - using Button instead of Link for better click handling
+              <Button
+                variant="ghost"
+                className="p-0 h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
+                onClick={goToMyPage}
+                aria-label="마이페이지"
+              >
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {userName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              </Button>
+            ) : (
+              <Button variant="default" onClick={() => router.push("/login")}>
+                로그인/회원가입
+              </Button>
+            )}
             <ThemeToggle />
           </nav>
         </div>

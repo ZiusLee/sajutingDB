@@ -1,22 +1,45 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useRef, useEffect, useCallback } from "react"
+import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+
+// useHideHeader 훅을 확장하여 footer도 함께 숨기도록 수정
+const useHideHeaderAndFooter = () => {
+  useEffect(() => {
+    // 상위 헤더와 푸터 요소 찾기 및 숨기기
+    const header = document.querySelector("header")
+    const footer = document.querySelector("footer")
+
+    if (header) {
+      header.style.display = "none"
+    }
+
+    if (footer) {
+      footer.style.display = "none"
+    }
+
+    // 컴포넌트 언마운트 시 원래대로 복원
+    return () => {
+      if (header) {
+        header.style.display = ""
+      }
+      if (footer) {
+        footer.style.display = ""
+      }
+    }
+  }, [])
+}
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Send, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
-import {
-  getInitialMessageByRoomType,
-  getRoomTitle,
-  generateChatSessionKey,
-  initialSuggestedQuestionsByType,
-} from "@/lib/chat-utils"
-import { useHideHeaderAndFooter } from "@/hooks/use-hide-header-and-footer"
 
 interface SajuChatProps {
   saju: any
@@ -25,8 +48,185 @@ interface SajuChatProps {
   initialInterpretation: string
   roomType: string
   onBack: () => void
-  isLoggedIn: boolean
-  sessionKey?: string
+  isLoggedIn?: boolean
+  sessionKey: string
+}
+
+// 초기 예상 질문 목록 (채팅방 유형별)
+const initialSuggestedQuestionsByType: Record<string, string[]> = {
+  general: [
+    "2025년 을사년에 제 운세는 어떤가요?",
+    "제 사주의 장점과 단점을 알려주세요.",
+    "제 사주에서 가장 강한 기운은 무엇인가요?",
+  ],
+  career: [
+    "제게 가장 잘 맞는 직업은 무엇인가요?",
+    "2025년 을사년에 이직하기 좋은 시기는 언제인가요?",
+    "푸른 뱀의 해에 승진 가능성이 높은 시기는 언제인가요?",
+  ],
+  love: [
+    "2025년 을사년에 제 연애운은 어떤가요?",
+    "푸른 뱀의 해에 좋은 인연을 만날 시기는 언제인가요?",
+    "제 사주에 맞는 이상적인 짝은 어떤 사람인가요?",
+  ],
+  health: [
+    "제 사주에서 주의해야 할 건강 문제는 무엇인가요?",
+    "2025년 을사년에 특별히 건강관리가 필요한 부분이 있나요?",
+    "제 체질에 맞는 운동은 무엇인가요?",
+  ],
+  yearly: [
+    "2025년 을사년에 특별히 주의해야 할 시기가 있나요?",
+    "을사년에 가장 운이 좋은 달은 언제인가요?",
+    "푸른 뱀의 해에 중요한 결정을 내리기 좋은 시기는 언제인가요?",
+  ],
+  business: [
+    "2025년 을사년에 사업 시작하기 좋은 시기는 언제인가요?",
+    "푸른 뱀의 해에 투자하기 좋은 분야는 무엇인가요?",
+    "을사년에 재물운을 높이는 방법이 있을까요?",
+  ],
+  marriage: [
+    "2025년 을사년에 결혼하기 좋은 시기는 언제인가요?",
+    "제 사주에 맞는 배우자는 어떤 사람인가요?",
+    "푸른 뱀의 해에 결혼 생활에서 주의해야 할 점이 있나요?",
+  ],
+  personalized: [
+    "제 사주에서 가장 두드러진 특징은 무엇인가요?",
+    "2025년 을사년이 제 사주와 어떻게 상호작용하나요?",
+    "푸른 뱀의 해에 제 사주에 맞는 행운을 끌어당기는 방법이 있을까요?",
+  ],
+  "daily-fortune": [
+    `오늘(${formatTodayDate()})의 운세를 보시겠습니까?`,
+    "오늘 하루를 어떻게 보내는 것이 좋을까요?",
+    "오늘 저에게 행운을 가져다 줄 요소는 무엇인가요?",
+  ],
+}
+
+// 채팅방 유형별 초기 메시지
+const getInitialMessageByRoomType = (name: string, roomType: string): string => {
+  // 올해는 2025년 을사년으로 고정
+  const currentYear = 2025
+  const today = formatTodayDate()
+  const userName = name || "사용자"
+
+  switch (roomType) {
+    case "career":
+      return `안녕하세요, ${userName}님! 직업운에 대한 사주 상담을 시작해볼게요.
+
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 취업, 이직, 승진, 직장 생활 등 직업과 관련된 질문을 해주시면 사주를 바탕으로 답변해드릴게요. 어떤 직업이 잘 맞는지, 언제 이직하면 좋을지 등 구체적인 질문을 해보세요.`
+
+    case "love":
+      return `안녕하세요, ${userName}님! 애정운에 대한 사주 상담을 시작할게요.
+
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해인데요. 연애, 만남, 인연 등 애정 관계에 대해 궁금한 점이 있으시면 사주를 바탕으로 답변해드릴게요. 언제 좋은 인연을 만날지, 어떤 유형의 사람과 잘 맞는지 등 구체적인 질문을 해보세요.`
+
+    case "health":
+      return `안녕하세요, ${userName}님! 건강운에 대한 사주 상담을 시작해볼게요.
+
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 체질, 건강 관리, 주의해야 할 질병 등 건강과 관련된 질문을 해주면 사주를 바탕으로 답변해드릴게요. 어떤 부분에 주의해야 하는지, 어떤 운동이나 식습관이 좋을지 등 구체적인 질문을 해보세요.`
+
+    case "yearly":
+      return `안녕하세요, ${userName}님! ${currentYear}년 을사년(乙巳年) 운세에 대한 상담을 시작합니다. 
+
+${currentYear}년은 푸른 뱀의 해로, 음(陰)의 목(木) 기운과 뱀의 지혜로운 에너지가 함께합니다. 올해의 전반적인 운세, 중요한 시기, 주의해야 할 점 등 올해 운세와 관련된 질문을 해주시면 사주를 바탕으로 답변해드리겠습니다. 어떤 달에 특별히 주의해야 하는지, 언제 중요한 결정을 내리면 좋을지 등 구체적인 질문을 해보세요.`
+
+    case "daily-fortune":
+      return `안녕하세요, ${userName}님! 사주를 기반으로 오늘(${today})의 운세를 알려드리는 AI입니다. 오늘 하루는 어떤 운이 따를까요? 🍀`
+
+    case "general":
+    default:
+      return `안녕하세요, ${userName}님! 사주팔자를 기반으로 인생의 중요한 시기와 방향성에 대해 상담해드리는 AI 상담사입니다. 
+
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 음(陰)의 목(木) 기운과 뱀의 지혜로운 에너지가 함께하는 해로, 결혼 시기, 성공 시기, 연애 시기, 일이 풀리는 시기 등 구체적인 질문을 해주시면 사주를 바탕으로 답변해드리겠습니다. ${currentYear}년 을사년의 운세와 앞으로의 인생 흐름에 대해 궁금한 점이 있으시면 무엇이든 물어보세요!`
+  }
+}
+
+// 채팅방 유형별 제목
+const getRoomTitle = (roomType: string): string => {
+  switch (roomType) {
+    case "career":
+      return "직업운"
+    case "love":
+      return "애정운"
+    case "health":
+      return "건강운"
+    case "yearly":
+      return "올해운 상담"
+    case "business":
+      return "사업운"
+    case "marriage":
+      return "결혼운"
+    case "personalized":
+      return "맞춤 상담"
+    case "daily-fortune":
+      return "오늘의 운세"
+    case "general":
+    default:
+      return "사주 채팅 상담"
+  }
+}
+
+// 채팅방 유형별 상담사 이름
+const getConsultantName = (roomType: string): string => {
+  switch (roomType) {
+    case "career":
+      return "직업 상담사"
+    case "love":
+      return "연애 상담사"
+    case "health":
+      return "건강 상담사"
+    case "yearly":
+      return "AI 상담사"
+    case "business":
+      return "사업 상담사"
+    case "marriage":
+      return "결혼 상담사"
+    case "personalized":
+      return "맞춤 상담사"
+    case "daily-fortune":
+      return "AI 운세봇"
+    case "general":
+    default:
+      return "AI 상담사"
+  }
+}
+
+// 채팅방 유형별 아바타 이미지
+const getConsultantAvatar = (roomType: string): string => {
+  switch (roomType) {
+    case "career":
+      return "/celebration.svg" // 직업 상담사 이미지로 교체 필요
+    case "love":
+      return "/celebration.svg" // 연애 상담사 이미지로 교체 필요
+    case "health":
+      return "/celebration.svg" // 건강 상담사 이미지로 교체 필요
+    case "business":
+      return "/celebration.svg" // 사업 상담사 이미지로 교체 필요
+    case "marriage":
+      return "/celebration.svg" // 결혼 상담사 이미지로 교체 필요
+    case "personalized":
+      return "/celebration.svg" // 맞춤 상담사 이미지로 교체 필요
+    default:
+      return "/celebration.svg"
+  }
+}
+
+// Function to format today's date in M/d format
+function formatTodayDate() {
+  const today = new Date()
+  return `${today.getMonth() + 1}/${today.getDate()}`
+}
+
+// Function to generate a unique chat session key
+const generateChatSessionKey = (name: string, saju: any, roomType: string) => {
+  // 사주 데이터에서 고유 식별자로 사용할 핵심 정보만 추출
+  const birthYear = saju.year || ""
+  const birthMonth = saju.month || ""
+  const birthDay = saju.day || ""
+  const birthHour = saju.hour || ""
+  const gender = saju.gender || ""
+
+  // 채팅방 유형을 명확하게 포함하여 세션 키 생성
+  return `chat_${name}_${birthYear}${birthMonth}${birthDay}${birthHour}_${gender}_${roomType}`
 }
 
 export default function SajuChat({
@@ -36,19 +236,49 @@ export default function SajuChat({
   initialInterpretation,
   roomType,
   onBack,
-  isLoggedIn,
+  isLoggedIn = false,
   sessionKey,
 }: SajuChatProps) {
   // 상단 헤더 숨기기
+  // 기존 useHideHeader 대신 새로운 훅 사용
+  // useHideHeader() 대신 아래 코드로 변경
   useHideHeaderAndFooter()
 
-  // 상태 관리
+  // 로그인 관련 상태
   const router = useRouter()
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const [loginPromptMessage, setLoginPromptMessage] = useState("")
   const [questionCount, setQuestionCount] = useState(0)
-  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true)
+  const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const supabase = createClientComponentClient()
 
   // Chat context
   const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
+
+  // 로그인 페이지로 이동
+  const handleLogin = () => {
+    router.push("/login?returnUrl=" + encodeURIComponent(window.location.pathname))
+  }
+
+  // 로그인 프롬프트 닫기
+  const handleCloseLoginPrompt = () => {
+    setShowLoginPrompt(false)
+  }
+
+  // 현재 로그인한 사용자 정보 가져오기
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+      }
+    }
+
+    fetchUser()
+  }, [supabase])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -58,13 +288,14 @@ export default function SajuChat({
     initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
   )
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
-  const [apiError, setApiError] = useState<string | null>(null)
-  const [isHtmlResponse, setIsHtmlResponse] = useState(false)
   const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
   const [lastMessageId, setLastMessageId] = useState<string>("")
 
   // 새로운 상태 추가: 질문 생성 여부를 추적
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
+
+  // 상태 추가: 추천 질문 표시 여부
+  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true)
 
   // Get saved chat session or create initial messages
   const savedSession = activeChatSession || getChatSession(sessionKey)
@@ -86,6 +317,7 @@ export default function SajuChat({
       gender,
       initialInterpretation,
       roomType,
+      userId, // 사용자 ID 전달
       currentYear: 2025,
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
     },
@@ -98,7 +330,7 @@ export default function SajuChat({
       setLastMessageId(message.id)
 
       // 채팅 데이터 저장 - 완료된 메시지를 포함하여 저장
-      const updatedMessages = messages && Array.isArray(messages) ? [...messages, message] : [message]
+      const updatedMessages = [...messages, message]
 
       // 현재 채팅방 유형에 맞는 세션 키 생성
       const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
@@ -123,12 +355,7 @@ export default function SajuChat({
     onError: (error) => {
       console.error("Chat error:", error)
 
-      // Check if the error message includes an HTML response
-      if (error.message && error.message.includes("DOCTYPE html")) {
-        setIsHtmlResponse(true)
-      }
-
-      // 오류 메시지를 채팅에 추가
+      // 오류 발생 시 사용자에게 알림
       const errorMessage = {
         id: Date.now().toString(),
         role: "assistant",
@@ -136,7 +363,7 @@ export default function SajuChat({
       }
 
       // 오류 메시지를 채팅에 추가
-      const updatedMessages = messages && Array.isArray(messages) ? [...messages, errorMessage] : [errorMessage]
+      const updatedMessages = [...messages, errorMessage]
 
       // 세션 저장
       const sessionData = {
@@ -168,6 +395,21 @@ export default function SajuChat({
     const newQuestionCount = questionCount + 1
     setQuestionCount(newQuestionCount)
 
+    // 모바일에서 키보드 닫기
+    if (inputRef.current) {
+      inputRef.current.blur()
+    }
+
+    // Show login prompt after 5 questions if not already shown\
+    // 질문을 모두 사 -> This hook is being called conditionally, but all hooks must be called in the exact same order in every component render.
+    const shouldShowLoginPrompt = newQuestionCount >= 5 && !isLoggedIn && !hasShownLoginPrompt
+
+    if (shouldShowLoginPrompt) {
+      setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+      setShowLoginPrompt(true)
+      setHasShownLoginPrompt(true)
+    }
+
     // 사용자가 질문을 제출하면 질문 생성 플래그를 false로 설정
     setShouldGenerateQuestions(false)
 
@@ -177,21 +419,29 @@ export default function SajuChat({
 
   // 뒤로가기 핸들러 - 채팅 데이터 저장 후 뒤로가기
   const handleBackWithSave = () => {
-    // 채팅 데이터 저장
-    const sessionData = {
-      saju,
-      name,
-      gender,
-      interpretation: initialInterpretation,
-      roomType,
-      messages,
-      lastMessageTime: new Date().toISOString(),
+    // If not logged in and hasn't shown prompt yet, show login prompt
+    if (!isLoggedIn && !hasShownLoginPrompt && questionCount > 0) {
+      setLoginPromptMessage("채팅 내역을 저장하려면 로그인이 필요합니다. 로그인하시겠습니까?")
+      setShowLoginPrompt(true)
+      setHasShownLoginPrompt(true)
+    } else {
+      // Otherwise, just go back
+      // 채팅 데이터 저장
+      const sessionData = {
+        saju,
+        name,
+        gender,
+        interpretation: initialInterpretation,
+        roomType,
+        messages,
+        lastMessageTime: new Date().toISOString(),
+      }
+
+      saveChatSession(sessionKey, sessionData)
+
+      // 뒤로가기 실행
+      window.history.back()
     }
-
-    saveChatSession(sessionKey, sessionData)
-
-    // 뒤로가기 실행
-    window.history.back()
   }
 
   // 예상 질문 클릭 핸들러
@@ -208,15 +458,15 @@ export default function SajuChat({
   // 새로운 예상 질문 생성 함수
   const generateNewSuggestedQuestions = useCallback(async () => {
     // 메시지가 최소 2개 이상일 때만 API 호출 (초기 메시지 + 최소 1개의 대화)
-    if ((messages && messages.length < 2) || !shouldGenerateQuestions) return
+    if (messages.length < 2 || !shouldGenerateQuestions) return
 
     setIsGeneratingQuestions(true)
     console.log("Generating new suggested questions...")
 
-    // 최근 메시지 5개 추출
-    const recentMessages = messages.slice(-5)
-
     try {
+      // 최근 메시지 3개만 사용 (텍스트 유지)
+      const recentMessages = messages.slice(-3)
+
       const response = await fetch("/api/suggested-questions", {
         method: "POST",
         headers: {
@@ -229,34 +479,34 @@ export default function SajuChat({
           roomType,
           currentYear: 2025,
           yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+          // 창의적인 질문 생성을 위한 플래그 추가
           creative: true,
         }),
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("Failed to generate suggested questions:", errorText)
-        throw new Error(`Failed to generate suggested questions: ${response.status} - ${errorText}`)
+        throw new Error("Failed to generate suggested questions")
       }
 
       const data = await response.json()
       console.log("API response for suggested questions:", data)
 
       if (data.suggestedQuestions && Array.isArray(data.suggestedQuestions) && data.suggestedQuestions.length > 0) {
+        // 새로운 질문으로 상태 업데이트
         console.log("Setting new suggested questions:", data.suggestedQuestions)
         setSuggestedQuestions(data.suggestedQuestions.slice(0, 2))
-        setApiError(null) // Clear any previous API error
       } else {
         console.warn("No suggested questions returned from API")
+        // 기본 질문으로 폴백
         setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
-        setApiError(null) // Clear any previous API error
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating suggested questions:", error)
-      setApiError(error.message || "Failed to generate suggested questions") // Set API error message
+      // 오류 발생 시 채팅방 유형에 맞는 기본 질문 세트 사용
       setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
     } finally {
       setIsGeneratingQuestions(false)
+      // 질문 생성 후 플래그를 false로 설정하여 중복 생성 방지
       setShouldGenerateQuestions(false)
     }
   }, [messages, saju, roomType, shouldGenerateQuestions])
@@ -264,10 +514,15 @@ export default function SajuChat({
   // 메시지가 변경될 때마다 스크롤을 아래로 이동
   useEffect(() => {
     if (messagesEndRef.current && chatContainerRef.current) {
-      const chatContainer = chatContainerRef.current
-      chatContainer.scrollTop = chatContainer.scrollHeight
+      // 약간의 지연을 두고 스크롤 실행 (모바일에서 더 안정적)
+      setTimeout(() => {
+        const chatContainer = chatContainerRef.current
+        if (chatContainer) {
+          chatContainer.scrollTop = chatContainer.scrollHeight
+        }
+      }, 100)
     }
-  }, [messages])
+  }, [messages, isLoading])
 
   // 컴포넌트가 마운트되면 입력 필드에 포커스
   useEffect(() => {
@@ -281,11 +536,11 @@ export default function SajuChat({
   // 마지막 메시지가 assistant인 경우에만 새 질문 생성 (중복 호출 방지)
   useEffect(() => {
     // 메시지가 있고, 마지막 메시지가 assistant이고, 생성 중이 아니고, 생성이 허용된 경우에만 실행
-    if (messages && messages.length > 0 && !isGeneratingQuestions && shouldGenerateQuestions) {
+    if (messages.length > 0 && !isGeneratingQuestions && shouldGenerateQuestions) {
       const lastMessage = messages[messages.length - 1]
 
       // assistant 메시지이고 welcome 메시지가 아닌 경우에만 새 질문 생성
-      if (lastMessage && lastMessage.role === "assistant" && lastMessage.id !== "welcome") {
+      if (lastMessage.role === "assistant" && lastMessage.id !== "welcome") {
         console.log("Triggering new question generation after assistant message")
 
         // 디바운스 처리로 연속 호출 방지
@@ -489,6 +744,10 @@ export default function SajuChat({
     }
   }, [roomType, sessionKey, name, gender])
 
+  const loginPromptDialog = (
+    <LoginPromptDialog isOpen={showLoginPrompt} onClose={handleCloseLoginPrompt} message={loginPromptMessage} />
+  )
+
   return (
     <Card className="w-full border-0 sm:border relative z-10 hide-parent-header">
       <CardHeader className="px-2 py-2 sm:px-4 sm:py-3 border-b flex flex-row items-center justify-between">
@@ -500,10 +759,18 @@ export default function SajuChat({
         {/* 균형을 위한 빈 공간 */}
       </CardHeader>
 
+      {/* 스크롤 관련 레이아웃 수정 - return 부분의 Card 내부 구조 변경 */}
+      {/* 기존 코드:
+      // <CardContent className="p-0">
+      //   <div className="flex flex-col h-[80vh]">
+      //     <div ref={chatContainerRef} className="flex-1 overflow-y-auto overflow-anchor-none">
+      //       ...
+
+      // 아래 코드로 변경: */}
       <CardContent className="p-0">
         <div className="flex flex-col h-[calc(100vh-120px)] relative">
           {/* 메시지 영역 - 하단 패딩 추가하여 입력 필드에 가려지지 않도록 함 */}
-          <div className="flex-1 overflow-y-auto pb-[130px]" ref={chatContainerRef}>
+          <div className="flex-1 overflow-y-auto pb-[180px]" ref={chatContainerRef}>
             {/* 사주 정보 카드 */}
             <div className="p-3 sm:p-4 pb-0">
               <div className="flex flex-col sm:flex-row gap-4 items-center p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -550,31 +817,26 @@ export default function SajuChat({
 
             {/* 메시지 표시 영역 */}
             <div className="px-3 sm:px-4 py-2 space-y-4">
-              {messages &&
-                messages.map((message, index) => (
+              {messages.map((message, index) => (
+                <div
+                  key={message.id || index}
+                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                >
                   <div
-                    key={message.id || index}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    className={`max-w-[80%] sm:max-w-[70%] rounded-lg p-3 ${
+                      message.role === "user"
+                        ? "bg-blue-500 text-white rounded-br-none"
+                        : "bg-gray-100 dark:bg-gray-800 rounded-bl-none"
+                    }`}
                   >
-                    <div
-                      className={`max-w-[80%] sm:max-w-[70%] rounded-lg p-3 ${
-                        message.role === "user"
-                          ? "bg-blue-500 text-white rounded-br-none"
-                          : "bg-gray-100 dark:bg-gray-800 rounded-bl-none"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">
-                        {isHtmlResponse ? (
-                          "죄송합니다. 응답을 생성하는 중에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
-                        ) : (
-                          <ReactMarkdown remarkRehypeOptions={{ allowDangerousHtml: true }}>
-                            {message.content}
-                          </ReactMarkdown>
-                        )}
-                      </div>
+                    <div className="whitespace-pre-wrap">
+                      <ReactMarkdown remarkRehypeOptions={{ allowDangerousHtml: true }}>
+                        {message.content}
+                      </ReactMarkdown>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="max-w-[80%] sm:max-w-[70%] rounded-lg p-3 bg-gray-100 dark:bg-gray-800 rounded-bl-none">
@@ -600,13 +862,8 @@ export default function SajuChat({
           </div>
 
           {/* 입력 필드 영역 - 고정 위치 설정 */}
-          <div className="fixed bottom-0 left-0 right-0 z-10 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 pb-safe">
+          <div className="fixed bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 pb-safe">
             {/* Suggested Questions */}
-            {apiError && (
-              <div className="text-red-500 text-sm text-center mt-2">
-                Error generating suggested questions: {apiError}
-              </div>
-            )}
             <div className="px-3 sm:px-4 pt-2 pb-1 bg-gray-50 dark:bg-gray-900">
               <div className="flex justify-between items-center">
                 <p className="text-xs text-gray-500">추천 질문:</p>
@@ -615,7 +872,7 @@ export default function SajuChat({
                 </Button>
               </div>
               <div className={`flex flex-wrap gap-2 ${showSuggestedQuestions ? "" : "hidden"}`}>
-                {suggestedQuestions && suggestedQuestions.length > 0 ? (
+                {suggestedQuestions.length > 0 ? (
                   suggestedQuestions.map((question, index) => (
                     <button
                       key={`suggested-${index}-${question.substring(0, 10)}`}
@@ -666,6 +923,7 @@ export default function SajuChat({
           </div>
         </div>
       </CardContent>
+      {loginPromptDialog}
     </Card>
   )
 }

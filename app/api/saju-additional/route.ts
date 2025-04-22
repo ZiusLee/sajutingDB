@@ -2,16 +2,28 @@ import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 
+// Get the OpenAI API key with the correct capitalization
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.openai_Api_key
+
+// Make sure we have the API key
+if (!OPENAI_API_KEY) {
+  console.warn("OpenAI API key is not defined in environment variables")
+}
+
 // API 라우트의 타임아웃 설정을 60초로 변경
 export const maxDuration = 60
-
-// OpenAI API 키를 환경 변수에서 가져옵니다.
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 export async function POST(request: NextRequest) {
   try {
     console.log("Received additional interpretation request")
-    const { saju, name, gender, questionCategory, relationshipStatus = "solo" } = await request.json()
+    const {
+      saju,
+      name,
+      gender,
+      model = "deepseek",
+      questionCategory,
+      relationshipStatus = "solo",
+    } = await request.json()
 
     if (!saju) {
       console.error("Missing saju data in request")
@@ -38,13 +50,13 @@ export async function POST(request: NextRequest) {
       dayMaster,
     } = saju
 
-    // 이름과 성별 정보 추가
+    // 이름과 성별 정��� 추가
     const userName = name || "사용자"
     const userGender = gender || "male"
     const genderText = userGender === "male" ? "남성" : "여성"
 
     console.log(
-      `Processing additional request for ${userName} (${genderText}), category: ${questionCategory}, relationshipStatus: ${relationshipStatus}`,
+      `Processing additional request for ${userName} (${genderText}), model: ${model}, category: ${questionCategory}, relationshipStatus: ${relationshipStatus}`,
     )
 
     // 관계 상태에 따른 추가 분석 지침
@@ -213,7 +225,7 @@ ${relationshipContext}
 - 행복한 결혼생활을 위한 핵심 포인트
 - 구체적인 행동 지침과 마인드셋
 
-중요: 제목에는 반드시 이 사람의 결혼생활 문제를 관통하는 핵심 주제나 해결책을 한 문장으로 명확하게 표현해주세요.
+중요: 제목에는 반드시 이 사람의 결혼생활 문���를 관통하는 핵심 주제나 해결책을 한 문장으로 명확하게 표현해주세요.
 
 한국어로 친절하게 설명해주세요. 마크다운 형식으로 응답해주세요.
 `
@@ -310,25 +322,37 @@ ${relationshipContext}
 - 파트너와의 관계를 더 깊게 발전시키는 방법
 
 ### 4. 결혼으로 가기 위한 보완점
-- 연애에서 결혼으로 가려면 어떤 부분을 보완해야할까? (나의 성격, 배우자, 환경적인 요인)
+- 연애에서 결혼으로 가려면 어떤 부분을 보완해야할까? (나에게 부족한 오행을 고려하여 설명)
+- 장기적인 관계를 위한 사주적 조언
 
 ### 5. 결론 및 실천적 조언
-- 더 나은 연애 관계를 위한 핵심 포인트
+- 행복한 연애 관계를 위한 핵심 포인트
 - 구체적인 행동 지침과 마인드셋
 
-중요: 제목에는 반드시 이 사람의 연애 문제 해결책을 관통하는 핵심 주제나 해결책을 한 문장으로 명확하게 표현해주세요.
+중요: 제목에는 반드시 이 사람의 연애 문제를 관통하는 핵심 주제나 해결책을 한 문장으로 명확하게 표현해주세요.
 
 한국어로 친절하게 설명해주세요. 마크다운 형식으로 응답해주세요.
 `
-    } else {
+    } else if (questionCategory === "dating-strategy") {
+      // 4. 사주를 활용한 연애 전략
       prompt = `
-사주팔자 전문가로서 다음 사주에 대한 추가 질문에 답해주세요:
+사주팔자 전문가로서 다음 사주에 대한 연애 전략에 대해 해석해주세요:
 
 오늘 날짜: ${new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}
 
 - 이름: ${userName}
 - 성별: ${genderText}
-- 질문 카테고리: ${questionCategory}
+- 현재 관계 상태: ${
+        relationshipStatus === "solo"
+          ? "솔로"
+          : relationshipStatus === "flirting"
+            ? "썸타는 중"
+            : relationshipStatus === "dating"
+              ? "연애 중"
+              : relationshipStatus === "married"
+                ? "결혼 중"
+                : "미상"
+      }
 - 년주: ${yearStem}${yearBranch}
 - 월주: ${monthStem}${monthBranch}
 - 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})
@@ -338,60 +362,201 @@ ${relationshipContext}
 
 ${relationshipContext}
 
+다음 내용을 포함하여 해석해주세요:
+
+## ${dayStem}${dayBranch}일주 연애 전략: [전체 내용을 관통하는 핵심 주제]
+
+### 1. 연애에서의 사주적 강점
+- 사주를 통해 연애를 성공적으로 이끌어갈 수 있는 팁은? (일주 기반 성격 분석)
+- 연애 관계에서 발휘되는 장점
+
+### 2. 2025년 을사년의 연애운 극대화 방법
+- 나의 사주에서 연애운을 극대화시키는 방법은 무엇인가? (나에게 부족한 오행을 보완하는 방법)
+- 을사년의 천간/지지를 활용한 연애 기회 포착법
+
+### 3. 연애상대와 결혼상대 구분법
+- 연애상대와 결혼상대 어떻게 구분할 수 있을까? (나에게 부족한 오행을 가진 사람이 좋은 궁합임을 고려)
+- 장기적인 관계를 위한 파트너 선택 기준
+
+### 4. 단점 보완 전략
+- 안정적인 연애나 행복한 결혼생활을 위해 나의 단점을 어떻게 보완할 수 있을까?
+- 사주적 약점을 극복하기 위한 실천적 방법
+
+### 5. 결론 및 실천적 조언
+- 성공적인 연애를 위한 핵심 포인트
+- 구체적인 행동 지침과 마인드셋
+
+중요: 제목에는 반드시 이 사람의 연애 전략을 관통하는 핵심 주제나 방향을 한 장으로 명확하게 표현해주세요.
+
 한국어로 친절하게 설명해주세요. 마크다운 형식으로 응답해주세요.
 `
+    } else if (questionCategory.startsWith("custom:")) {
+      // 5. 나만의 추가 질문
+      prompt = `
+사주팔자 전문가로서 다음 사주에 대한 사용자의 추가 질문에 답변해주세요:
+
+오늘 날짜: ${new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}
+
+- 이름: ${userName}
+- 성별: ${genderText}
+- 현재 관계 상태: ${
+        relationshipStatus === "solo"
+          ? "솔로"
+          : relationshipStatus === "flirting"
+            ? "썸타는 중"
+            : relationshipStatus === "dating"
+              ? "연애 중"
+              : relationshipStatus === "married"
+                ? "결혼 중"
+                : "미상"
+      }
+- 년주: ${yearStem}${yearBranch}
+- 월주: ${monthStem}${monthBranch}
+- 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})
+- 시주: ${hourStem}${hourBranch}
+- 띠: ${yearAnimal}
+- 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
+
+${relationshipContext}
+
+사용자 질문: ${questionCategory.split("custom:")[1] || "사주에 대한 추가 질문"}
+
+참고: 현재는 2025년 을사년입니다. 이를 고려하여 분석해주세요.
+
+한국어로 친절하게 설명해주세요. 마크다운 형식으로 응답해주세요.
+`
+    } else {
+      return NextResponse.json({ error: "Invalid question category" }, { status: 400 })
     }
 
     // 비스트리밍 요청 처리
     const startTime = Date.now()
     let interpretation = ""
     let responseTime = 0
+    let currentModel = model
+    let fallbackFromOpenAI = false
 
-    try {
-      console.log("Attempting to generate text with OpenAI model")
+    // OpenAI API 호출
+    if (currentModel === "openai") {
+      try {
+        console.log("Attempting to generate additional text with OpenAI model")
+        const { text } = await generateText({
+          model: openai("gpt-4o"),
+          prompt: prompt,
+          temperature: 0.7,
+          maxTokens: 3000,
+          apiKey: OPENAI_API_KEY,
+        })
 
-      // OpenAI API 키 확인
-      if (!OPENAI_API_KEY) {
-        console.error("OPENAI_API_KEY is not defined")
-        throw new Error("OpenAI API key is missing")
+        interpretation = text
+        responseTime = Date.now() - startTime
+        console.log(`OpenAI additional response received in ${responseTime}ms`)
+
+        return NextResponse.json({
+          interpretation,
+          model: "openai",
+          responseTime: `${responseTime}ms`,
+        })
+      } catch (openaiError) {
+        console.error("OpenAI API error:", openaiError)
+
+        // Check if the error is related to quota or billing
+        const errorMessage = openaiError instanceof Error ? openaiError.message : "Unknown error"
+        const isQuotaError =
+          errorMessage.includes("quota") ||
+          errorMessage.includes("billing") ||
+          errorMessage.includes("exceeded") ||
+          errorMessage.includes("rate limit")
+
+        if (isQuotaError) {
+          console.log("OpenAI quota exceeded, falling back to DeepSeek model...")
+          currentModel = "deepseek"
+          fallbackFromOpenAI = true
+        } else {
+          throw new Error(`OpenAI API error: ${errorMessage}`)
+        }
       }
-
-      const { text } = await generateText({
-        model: openai("gpt-4o"),
-        prompt: prompt,
-        temperature: 0.7,
-        maxTokens: 3000,
-        apiKey: OPENAI_API_KEY,
-        system:
-          "당신은 사주팔자 전문가입니다. 질문에 대한 답변을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요. 적절한 이모지를 사용하여 가독성을 높여주세요.",
-      })
-
-      interpretation = text
-      responseTime = Date.now() - startTime
-      console.log(`OpenAI response generated in ${responseTime}ms`)
-
-      // 응답 반환
-      return NextResponse.json({
-        interpretation,
-        model: "openai",
-        responseTime: `${responseTime}ms`,
-      })
-    } catch (error) {
-      console.error("Error generating interpretation:", error)
-
-      // 오류 발생 시 폴백 해석 반환
-      return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "Unknown error",
-        },
-        { status: 500 },
-      )
     }
+
+    // DeepSeek 모델 사용
+    if (currentModel === "deepseek") {
+      try {
+        console.log(
+          `Attempting to generate additional text with DeepSeek model${fallbackFromOpenAI ? " (fallback from OpenAI)" : ""}`,
+        )
+        const response = await fetch("https://api.deepseek.com/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer sk-3b3cde78c0224436bc60d3a293129f47",
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "당신은 사주팔자 전문가입니다. 사주에 대한 해석과 궁합이 좋은 사주 조합을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요.",
+              },
+              { role: "user", content: prompt },
+            ],
+            stream: false,
+            max_tokens: 3000,
+            temperature: 0.7,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.text()
+          console.error(`DeepSeek API error (${response.status}):`, errorData)
+          throw new Error(`DeepSeek API error: ${response.status}`)
+        }
+
+        const data = await response.json()
+        interpretation = data.choices[0].message.content
+        responseTime = Date.now() - startTime
+        console.log(`DeepSeek additional response received in ${responseTime}ms`)
+
+        return NextResponse.json({
+          interpretation,
+          model: "deepseek",
+          responseTime: `${responseTime}ms`,
+          fallbackFromOpenAI: fallbackFromOpenAI,
+        })
+      } catch (deepseekError) {
+        console.error("DeepSeek API error:", deepseekError)
+        throw new Error(
+          `DeepSeek API error: ${deepseekError instanceof Error ? deepseekError.message : "Unknown error"}`,
+        )
+      }
+    }
+
+    // 여기까지 왔다면 어떤 모델도 성공하지 못한 것이므로 오류 반환
+    console.error("Failed to generate additional interpretation with any model")
+    throw new Error("Failed to generate additional interpretation with any model")
   } catch (error) {
-    console.error("Unhandled error in API route:", error)
+    console.error("Error generating additional interpretation:", error)
+
+    const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : "Unknown error"
+    console.error(`Error details: ${errorMessage}`)
+
     return NextResponse.json(
       {
-        error: "Internal server error",
+        error: "Failed to generate additional interpretation",
+        details: errorMessage,
+        fallbackInterpretation: `
+# 추가 해석 오류
+
+추가 질문에 대한 해석을 가져오는 중 오류가 발생했습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: ${errorMessage}
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 잠시 후 다시 시도해보세요.
+        `,
       },
       { status: 500 },
     )

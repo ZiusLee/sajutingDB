@@ -236,7 +236,7 @@ export default function ChatListClient() {
               savedChatData["daily-fortune"]?.messages?.length > 1
                 ? savedChatData["daily-fortune"].messages[
                     savedChatData["daily-fortune"].messages.length - 1
-                  ]?.content?.substring(0, 30) + "..."
+                  ].content.substring(0, 30) + "..."
                 : `오늘(${todayDate})의 운세를 보시겠습니까?`,
             time: savedChatData["daily-fortune"]?.lastMessageTime
               ? new Date(savedChatData["daily-fortune"].lastMessageTime)
@@ -251,7 +251,7 @@ export default function ChatListClient() {
             icon: <Heart className="h-5 w-5" />,
             lastMessage:
               savedChatData.love?.messages?.length > 1
-                ? savedChatData.love.messages[savedChatData.love.messages.length - 1]?.content?.substring(0, 30) + "..."
+                ? savedChatData.love.messages[savedChatData.love.messages.length - 1].content.substring(0, 30) + "..."
                 : "당신의 인연에 대해 알려드릴게요",
             time: savedChatData.love?.lastMessageTime
               ? new Date(savedChatData.love.lastMessageTime)
@@ -266,7 +266,7 @@ export default function ChatListClient() {
             icon: <Briefcase className="h-5 w-5" />,
             lastMessage:
               savedChatData.career?.messages?.length > 1
-                ? savedChatData.career.messages[savedChatData.career.messages.length - 1]?.content?.substring(0, 30) +
+                ? savedChatData.career.messages[savedChatData.career.messages.length - 1].content.substring(0, 30) +
                   "..."
                 : `${userName}님에게 맞는 직업을 알려드릴게요!`,
             time: savedChatData.career?.lastMessageTime
@@ -282,7 +282,7 @@ export default function ChatListClient() {
             icon: <Activity className="h-5 w-5" />,
             lastMessage:
               savedChatData.health?.messages?.length > 1
-                ? savedChatData.health.messages[savedChatData.health.messages.length - 1]?.content?.substring(0, 30) +
+                ? savedChatData.health.messages[savedChatData.health.messages.length - 1].content.substring(0, 30) +
                   "..."
                 : "건강 관리에 대한 조언을 드립니다",
             time: savedChatData.health?.lastMessageTime
@@ -308,10 +308,8 @@ export default function ChatListClient() {
             icon: <TrendingUp className="h-5 w-5" />,
             lastMessage:
               savedChatData.business?.messages?.length > 1
-                ? savedChatData.business.messages[savedChatData.business.messages.length - 1]?.content?.substring(
-                    0,
-                    30,
-                  ) + "..."
+                ? savedChatData.business.messages[savedChatData.business.messages.length - 1].content.substring(0, 30) +
+                  "..."
                 : "사업 성공의 비결을 알려드리겠습니다!",
             time: savedChatData.business?.lastMessageTime
               ? new Date(savedChatData.business.lastMessageTime)
@@ -326,10 +324,8 @@ export default function ChatListClient() {
             icon: <BellRing className="h-5 w-5" />,
             lastMessage:
               savedChatData.marriage?.messages?.length > 1
-                ? savedChatData.marriage.messages[savedChatData.marriage.messages.length - 1]?.content?.substring(
-                    0,
-                    30,
-                  ) + "..."
+                ? savedChatData.marriage.messages[savedChatData.marriage.messages.length - 1].content.substring(0, 30) +
+                  "..."
                 : "결혼 생활의 행복을 위한 조언",
             time: savedChatData.marriage?.lastMessageTime
               ? new Date(savedChatData.marriage.lastMessageTime)
@@ -344,7 +340,7 @@ export default function ChatListClient() {
             icon: <Calendar className="h-5 w-5" />,
             lastMessage:
               savedChatData.yearly?.messages?.length > 1
-                ? savedChatData.yearly.messages[savedChatData.yearly.messages.length - 1]?.content?.substring(0, 30) +
+                ? savedChatData.yearly.messages[savedChatData.yearly.messages.length - 1].content.substring(0, 30) +
                   "..."
                 : "2025년 을사년 운세를 알려드립니다",
             time: savedChatData.yearly?.lastMessageTime
@@ -360,7 +356,7 @@ export default function ChatListClient() {
             icon: <MessageCircle className="h-5 w-5" />,
             lastMessage:
               savedChatData.general?.messages?.length > 1
-                ? savedChatData.general.messages[savedChatData.general.messages.length - 1]?.content?.substring(0, 30) +
+                ? savedChatData.general.messages[savedChatData.general.messages.length - 1].content.substring(0, 30) +
                   "..."
                 : `${userName}님의 사주에 대해 무엇이든 물어보세요!`,
             time: savedChatData.general?.lastMessageTime ? new Date(savedChatData.general.lastMessageTime) : new Date(),
@@ -377,7 +373,7 @@ export default function ChatListClient() {
           icon: getPersonalizedRoomIcon(dominantElement),
           lastMessage:
             savedChatData.personalized?.messages?.length > 1
-              ? savedChatData.personalized.messages[savedChatData.personalized.messages.length - 1]?.content?.substring(
+              ? savedChatData.personalized.messages[savedChatData.personalized.messages.length - 1].content.substring(
                   0,
                   30,
                 ) + "..."
@@ -470,6 +466,11 @@ export default function ChatListClient() {
       // 모든 데이터가 없는 경우 홈페이지로 이동 (최후의 fallback)
       router.push("/")
     }
+  }
+
+  // 로그인 페이지로 이동
+  const goToLogin = () => {
+    router.push("/login") // 로그인 페이지 경로에 맞게 수정
   }
 
   // 경고 무시하고 계속 진행
@@ -572,11 +573,15 @@ export default function ChatListClient() {
           <DialogHeader>
             <DialogTitle>데이터 저장 안내</DialogTitle>
             <DialogDescription>
-              이 페이지를 나가면 지금까지의 사주 데이터가 저장되지 않을 수 있습니다. 계속 진행하시겠습니까?
+              이 페이지를 나가면 지금까지의 사주 데이터가 저장되지 않을 수 있습니다. 데이터를 안전하게 저장하려면
+              로그인이 필요합니다.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={continueWithoutLogin}>계속 진행하기</Button>
+            <Button variant="outline" onClick={continueWithoutLogin}>
+              계속 진행하기
+            </Button>
+            <Button onClick={goToLogin}>로그인하기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

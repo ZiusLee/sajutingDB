@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
-import { generateGeminiText } from "@/lib/gemini-client"
 
 // API 라우트의 타임아웃 설정을 60초로 변경
 export const maxDuration = 60
@@ -189,66 +188,53 @@ ${relationshipGuidance}
     const startTime = Date.now()
     let interpretation = ""
     let responseTime = 0
-    let modelUsed = "gemini"
 
     try {
-      console.log("Attempting to generate text with Gemini model")
+      console.log("Attempting to generate text with OpenAI model")
 
-      // First try with Gemini
-      interpretation = await generateGeminiText(
-        [{ role: "user", content: prompt }],
-        "당신은 사주팔자 전문가입니다. 사주에 대한 해석과 궁합이 좋은 사주 조합을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요. 적절한 이모지를 사용하여 가독성을 높여주세요. 특히 연애운의 흐름에 대해서는 일관성 있게 답변해주세요. 같은 사주에 대해서는 항상 동일한 시기를 연애운이 강하거나 약한 시기로 제시해야 합니다. 연애운 예측은 사주의 일간, 오행 분석, 대운을 기반으로 체계적으로 도출해주세요",
-        0.8,
-        4000,
-      )
-
-      responseTime = Date.now() - startTime
-      console.log(`Gemini response generated in ${responseTime}ms`)
-    } catch (geminiError) {
-      console.error("Gemini API error, falling back to OpenAI:", geminiError)
-      modelUsed = "openai"
-
-      // Fallback to OpenAI
-      try {
-        // OpenAI API 키 확인
-        if (!process.env.OPENAI_API_KEY) {
-          console.error("OPENAI_API_KEY is not defined")
-          throw new Error("OpenAI API key is missing")
-        }
-
-        const { text } = await generateText({
-          model: openai("gpt-4o"),
-          prompt: prompt,
-          temperature: 0.8,
-          maxTokens: 4000,
-          apiKey: process.env.OPENAI_API_KEY,
-          system:
-            "당신은 사주팔자 전문가입니다. 사주에 대한 해석과 궁합이 좋은 사주 조합을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요. 적절한 이모지를 사용하여 가독성을 높여주세요. 특히 연애운의 흐름에 대해서는 일관성 있게 답변해주세요. 같은 사주에 대해서는 항상 동일한 시기를 연애운이 강하거나 약한 시기로 제시해야 합니다. 연애운 예측은 사주의 일간, 오행 분석, 대운을 기반으로 체계적으로 도출해주세요",
-        })
-
-        interpretation = text
-        responseTime = Date.now() - startTime
-        console.log(`OpenAI response generated in ${responseTime}ms`)
-      } catch (openaiError) {
-        console.error("OpenAI API error:", openaiError)
-        throw openaiError
+      // OpenAI API 키 확인
+      if (!process.env.OPENAI_API_KEY) {
+        console.error("OPENAI_API_KEY is not defined")
+        throw new Error("OpenAI API key is missing")
       }
+
+      const { text } = await generateText({
+        model: openai("gpt-4o"),
+        prompt: prompt,
+        temperature: 0.8,
+        maxTokens: 4000,
+        apiKey: process.env.OPENAI_API_KEY,
+        system:
+          "당신은 사주팔자 전문가입니다. 사주에 대한 해석과 궁합이 좋은 사주 조합을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요. 적절한 이모지를 사용하여 가독성을 높여주세요. 특히 연애운의 흐름에 대해서는 일관성 있게 답변해주세요. 같은 사주에 대해서는 항상 동일한 시기를 연애운이 강하거나 약한 시기로 제시해야 합니다. 연애운 예측은 사주의 일간, 오행 분석, 대운을 기반으로 체계적으로 도출해주세요",
+      })
+
+      interpretation = text
+      responseTime = Date.now() - startTime
+      console.log(`OpenAI response generated in ${responseTime}ms`)
+
+      // 응답 반환
+      return NextResponse.json({
+        interpretation,
+        model: "openai",
+        responseTime: `${responseTime}ms`,
+      })
+    } catch (error) {
+      console.error("Error generating interpretation:", error)
+
+      // 오류 발생 시 폴백 해석 반환
+      return NextResponse.json(
+        {
+          fallbackInterpretation: createFallbackInterpretation(error),
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: 500 },
+      )
     }
-
-    // 응답 반환
-    return NextResponse.json({
-      interpretation,
-      model: modelUsed,
-      responseTime: `${responseTime}ms`,
-    })
   } catch (error) {
-    console.error("Error generating interpretation:", error)
-
-    // 오류 발생 시 폴백 해석 반환
+    console.error("Unhandled error in API route:", error)
     return NextResponse.json(
       {
-        fallbackInterpretation: createFallbackInterpretation(error),
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Internal server error",
       },
       { status: 500 },
     )

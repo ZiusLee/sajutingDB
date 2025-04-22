@@ -18,7 +18,3 @@ export function checkSupabaseConfig() {
 export function getSupabaseUrl() {
   return process.env.NEXT_PUBLIC_SUPABASE_URL
 }
-
-// Add the GEMINI_API_KEY to the environment variables
-// This is just a placeholder - the actual key will be set in the environment
-export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyCTOjobwZTh6jofhDovlPdg45JztanFdLk"

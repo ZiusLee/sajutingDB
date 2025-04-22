@@ -48,9 +48,6 @@ export async function POST(request: NextRequest, context: { params: { id: string
     }
 
     const chatRoomId = Number.parseInt(context.params.id)
-    if (isNaN(chatRoomId)) {
-      return NextResponse.json({ success: false, message: "유효하지 않은 채팅방 ID입니다." }, { status: 400 })
-    }
 
     // 채팅방 존재 확인
     const chatRoom = await getChatRoomById(chatRoomId)
@@ -64,30 +61,11 @@ export async function POST(request: NextRequest, context: { params: { id: string
       return NextResponse.json({ success: false, message: "접근 권한이 없습니다." }, { status: 403 })
     }
 
-    let body
-    try {
-      body = await request.json()
-    } catch (parseError) {
-      return NextResponse.json({ success: false, message: "잘못된 요청 형식입니다." }, { status: 400 })
-    }
+    const body = await request.json()
 
     // 단일 메시지 또는 여러 메시지 처리
     if (Array.isArray(body)) {
       // 여러 메시지 생성
-      if (body.length === 0) {
-        return NextResponse.json({ success: false, message: "메시지가 없습니다." }, { status: 400 })
-      }
-
-      // Validate each message
-      for (const msg of body) {
-        if (!msg.role || !msg.content) {
-          return NextResponse.json(
-            { success: false, message: "모든 메시지에 역할과 내용이 필요합니다." },
-            { status: 400 },
-          )
-        }
-      }
-
       const messages = await createMultipleMessages(
         chatRoomId,
         body.map((msg) => ({
@@ -121,13 +99,6 @@ export async function POST(request: NextRequest, context: { params: { id: string
     }
   } catch (error) {
     console.error("메시지 생성 오류:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "메시지 생성 중 오류가 발생했습니다.",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, message: "메시지 생성 중 오류가 발생했습니다." }, { status: 500 })
   }
 }

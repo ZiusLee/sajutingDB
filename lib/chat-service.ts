@@ -33,49 +33,21 @@ export interface MessageInput {
 
 // 채팅방 생성
 export async function createChatRoom(roomData: ChatRoomInput): Promise<ChatRoom> {
-  try {
-    const { user_id, saju_profile_id, room_type, title } = roomData
+  const { user_id, saju_profile_id, room_type, title } = roomData
 
-    if (!user_id || !room_type) {
-      throw new Error("User ID and room type are required")
-    }
+  const result = await query(
+    "INSERT INTO chat_rooms (user_id, saju_profile_id, room_type, title) VALUES ($1, $2, $3, $4) RETURNING *",
+    [user_id, saju_profile_id || null, room_type, title || null],
+  )
 
-    const result = await query(
-      "INSERT INTO chat_rooms (user_id, saju_profile_id, room_type, title) VALUES ($1, $2, $3, $4) RETURNING *",
-      [user_id, saju_profile_id || null, room_type, title || null],
-    )
-
-    if (!result || !result.rows || result.rows.length === 0) {
-      throw new Error("Failed to create chat room")
-    }
-
-    return result.rows[0]
-  } catch (error) {
-    console.error("Error creating chat room:", error)
-    throw error
-  }
+  return result.rows[0]
 }
 
 // 사용자 ID로 채팅방 목록 조회
 export async function getChatRoomsByUserId(userId: number): Promise<ChatRoom[]> {
-  try {
-    if (!userId) {
-      console.error("Invalid user ID provided")
-      return []
-    }
+  const result = await query("SELECT * FROM chat_rooms WHERE user_id = $1 ORDER BY updated_at DESC", [userId])
 
-    const result = await query("SELECT * FROM chat_rooms WHERE user_id = $1 ORDER BY updated_at DESC", [userId])
-
-    if (!result || !result.rows) {
-      console.error("Database query failed")
-      return []
-    }
-
-    return result.rows
-  } catch (error) {
-    console.error("Error getting chat rooms by user ID:", error)
-    return []
-  }
+  return result.rows
 }
 
 // ID로 채팅방 조회
@@ -120,31 +92,18 @@ export async function deleteChatRoom(id: number): Promise<boolean> {
 
 // 메시지 생성
 export async function createMessage(messageData: MessageInput): Promise<Message> {
-  try {
-    const { chat_room_id, role, content } = messageData
+  const { chat_room_id, role, content } = messageData
 
-    if (!chat_room_id || !role || content === undefined) {
-      throw new Error("Chat room ID, role, and content are required")
-    }
+  const result = await query("INSERT INTO messages (chat_room_id, role, content) VALUES ($1, $2, $3) RETURNING *", [
+    chat_room_id,
+    role,
+    content,
+  ])
 
-    const result = await query("INSERT INTO messages (chat_room_id, role, content) VALUES ($1, $2, $3) RETURNING *", [
-      chat_room_id,
-      role,
-      content,
-    ])
+  // 채팅방의 updated_at 업데이트
+  await query("UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [chat_room_id])
 
-    if (!result || !result.rows || result.rows.length === 0) {
-      throw new Error("Failed to create message")
-    }
-
-    // 채팅방의 updated_at 업데이트
-    await query("UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [chat_room_id])
-
-    return result.rows[0]
-  } catch (error) {
-    console.error("Error creating message:", error)
-    throw error
-  }
+  return result.rows[0]
 }
 
 // 채팅방 ID로 메시지 목록 조회
