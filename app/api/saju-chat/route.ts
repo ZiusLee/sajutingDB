@@ -1,6 +1,7 @@
 import { streamText } from "ai"
 import { openai } from "@ai-sdk/openai"
 import { solarToLunar } from "@/lib/lunar-calendar"
+import { streamGeminiResponse, convertToGeminiMessages } from "@/lib/gemini-api"
 
 export const runtime = "edge"
 
@@ -85,24 +86,47 @@ export async function POST(req: Request) {
 
       const apiMessages = [{ role: "system", content: dailyFortunePrompt }, ...messages]
 
-      const result = streamText({
-        model: openai("gpt-4o"),
-        messages: apiMessages,
-        temperature: 0.8, // 낮춰서 더 정확한 답변 유도
-        maxTokens: 4000, // 필요에 따라 토큰 수 조절
-      })
+      try {
+        // Gemini API로 응답 생성 시도
+        console.log("Attempting to generate response with Gemini")
+        const geminiMessages = convertToGeminiMessages(apiMessages)
+        const stream = await streamGeminiResponse(geminiMessages)
+        return new Response(stream)
+      } catch (geminiError) {
+        console.error("Error with Gemini, falling back to OpenAI:", geminiError)
 
-      return result.toDataStreamResponse()
+        // OpenAI로 폴백
+        console.log("Falling back to OpenAI")
+        const result = streamText({
+          model: openai("gpt-4o"),
+          messages: apiMessages,
+          temperature: 0.8,
+          maxTokens: 4000,
+        })
+
+        return result.toDataStreamResponse()
+      }
     } else {
-      const result = streamText({
-        model: openai("gpt-4o"),
-        messages: apiMessages,
-        temperature: 0.8, // 낮춰서 더 정확한 답변 유도
-        maxTokens: 4000, // 필요에 따라 토큰 수 조절
-      })
+      try {
+        // Gemini API로 응답 생성 시도
+        console.log("Attempting to generate response with Gemini")
+        const geminiMessages = convertToGeminiMessages(apiMessages)
+        const stream = await streamGeminiResponse(geminiMessages)
+        return new Response(stream)
+      } catch (geminiError) {
+        console.error("Error with Gemini, falling back to OpenAI:", geminiError)
 
-      // 스트리밍 응답 생성
-      return result.toDataStreamResponse()
+        // OpenAI로 폴백
+        console.log("Falling back to OpenAI")
+        const result = streamText({
+          model: openai("gpt-4o"),
+          messages: apiMessages,
+          temperature: 0.8,
+          maxTokens: 4000,
+        })
+
+        return result.toDataStreamResponse()
+      }
     }
   } catch (error) {
     console.error("Error in saju-chat API:", error)
