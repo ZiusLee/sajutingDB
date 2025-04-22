@@ -13,11 +13,13 @@ export default function SajuChatPage() {
   const [saju, setSaju] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [sessionIdentifier, setSessionIdentifier] = useState<string | null>(null)
 
   useEffect(() => {
     try {
       // 로컬 스토리지에서 사주 데이터 가져오기
       const savedSaju = localStorage.getItem("current_saju")
+      const savedSession = localStorage.getItem("session_identifier")
 
       if (!savedSaju) {
         toast({
@@ -37,6 +39,8 @@ export default function SajuChatPage() {
       // 실제 구현에서는 세션이나 토큰을 확인하는 로직으로 대체
       const userToken = localStorage.getItem("user_token")
       setIsLoggedIn(!!userToken)
+
+      setSessionIdentifier(savedSession)
     } catch (error) {
       console.error("Error loading saju data:", error)
       toast({
@@ -70,6 +74,7 @@ export default function SajuChatPage() {
         roomType={params.roomType as string}
         onBack={handleBack}
         isLoggedIn={isLoggedIn}
+        sessionKey={sessionIdentifier || ""}
       />
     </div>
   )

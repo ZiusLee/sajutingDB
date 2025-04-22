@@ -28,7 +28,7 @@ interface SajuChatProps {
   roomType: string
   onBack: () => void
   isLoggedIn: boolean
-  sessionKey: string
+  sessionKey?: string
 }
 
 export default function SajuChat({
