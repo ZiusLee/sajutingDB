@@ -671,7 +671,7 @@ export default function SajuChat({
                 </Button>
               </div>
               <div className={`flex flex-wrap gap-2 ${showSuggestedQuestions ? "" : "hidden"}`}>
-                {suggestedQuestions.length > 0 ? (
+                {suggestedQuestions && suggestedQuestions.length > 0 ? (
                   suggestedQuestions.map((question, index) => (
                     <button
                       key={`suggested-${index}-${question.substring(0, 10)}`}
