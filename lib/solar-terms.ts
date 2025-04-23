@@ -34,22 +34,65 @@ const SOLAR_TERM_LONGITUDES = [
   285, 300, 315, 330, 345, 0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270,
 ]
 
+// KASI API를 사용하여 절기 날짜를 가져오는 함수
+async function getSolarTermDateFromKASI(year: number, termIndex: number): Promise<Date | null> {
+  const KASI_API_KEY = process.env.KASI_API_KEY
+  if (!KASI_API_KEY) {
+    console.warn("KASI_API_KEY is not defined in environment variables")
+    return null
+  }
+
+  const apiUrl = `https://apis.data.go.kr/B090041/openapi/service/EphemerisService/getDateInfo?solYear=${year}&serviceKey=${KASI_API_KEY}`
+
+  try {
+    const response = await fetch(apiUrl)
+    if (!response.ok) {
+      console.error(`KASI API request failed with status ${response.status}`)
+      return null
+    }
+
+    const data = await response.json()
+    // API 응답 구조에 따라 적절히 파싱
+    // 예: data.response.body.items.item[termIndex].locdate
+    // 실제 API 응답 구조를 확인하고 수정해야 함
+    // const termDate = new Date(data.response.body.items.item[termIndex].locdate);
+    // return termDate;
+    return null // 임시로 null 반환
+  } catch (error) {
+    console.error("Error fetching solar term date from KASI API:", error)
+    return null
+  }
+}
+
 // 특정 연도의 절기 날짜 계산
-export function calculateSolarTerms(year: number): Record<string, Date> {
+export async function calculateSolarTerms(year: number): Promise<Record<string, Date>> {
   const terms: Record<string, Date> = {}
 
   for (let i = 0; i < 24; i++) {
-    const date = getSolarTermDate(year, i)
+    let date: Date | null = null
+
+    // KASI API에서 절기 날짜 가져오기 시도
+    try {
+      date = await getSolarTermDateFromKASI(year, i)
+    } catch (e) {
+      console.error("KASI API 호출 실패, 로컬 계산으로 대체:", e)
+    }
+
+    // KASI API에서 가져오지 못하면 로컬 계산 사용
+    if (!date) {
+      date = getSolarTermDateLocal(year, i)
+    }
+
     terms[SOLAR_TERM_NAMES[i]] = date
   }
 
   return terms
 }
 
-// 특정 연도와 절기 인덱스에 대한 날짜 계산
-function getSolarTermDate(year: number, termIndex: number): Date {
+// 특정 연도와 절기 인덱스에 대한 날짜 계산 (로컬)
+function getSolarTermDateLocal(year: number, termIndex: number): Date {
   // 절기 계산 공식 (근사값)
-  // 실제 정확한 계산은 천문학적 ��산이 필요하지만, 이 함수는 근사값을 제공
+  // 실제 정확한 계산은 천문학적 계산이 필요하지만, 이 함수는 근사값을 제공
 
   // 각 절기의 대략적인 날짜 (평균)
   const termMonths = [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12]

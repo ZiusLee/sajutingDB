@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -59,9 +59,7 @@ export default function BirthDateFormClient() {
   const router = useRouter()
 
   // 리다이렉트 처리
-  useEffect(() => {
-    console.log("useEffect triggered: ", birthdate)
-  }, [birthdate])
+  // useEffect 삭제
 
   // This part is different.
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,6 +121,8 @@ export default function BirthDateFormClient() {
           month: localLunarDate.month.toString().padStart(2, "0"),
           day: localLunarDate.day.toString().padStart(2, "0"),
           isLeapMonth: localLunarDate.isLeapMonth,
+          monthStem: localLunarDate.monthStem,
+          monthBranch: localLunarDate.monthBranch,
         }
       }
 
@@ -141,6 +141,9 @@ export default function BirthDateFormClient() {
         gender,
         name,
         timeUnknown,
+        lunarData.isLeapMonth,
+        lunarData.monthStem,
+        lunarData.monthBranch,
       )
 
       // handleSubmit 함수 내에서 사주 계산 후 데이터베이스에 저장하는 코드 추가

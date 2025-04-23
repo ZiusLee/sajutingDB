@@ -54,23 +54,19 @@ export async function getCompatibilityAnalysis(userInfo: any, partnerInfo: any, 
   }
 }
 
+// Function to fetch lunar date information
 export async function fetchLunarDate(year: string, month: string, day: string) {
   try {
-    console.log("Requesting lunar date")
-
-    const response = await fetch(`/api/lunar-date?year=${year}&month=${month}&day=${day}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+    console.log(`Fetching lunar date for ${year}-${month}-${day}`)
+    const response = await fetch(`/api/lunar-date?year=${year}&month=${month}&day=${day}`)
 
     if (!response.ok) {
-      throw new Error("Failed to get lunar date")
+      throw new Error(`Failed to fetch lunar date: ${response.statusText}`)
     }
 
-    const data = await response.json()
-    return data
+    const lunarData = await response.json()
+    console.log("Lunar data response:", lunarData)
+    return lunarData
   } catch (error) {
     console.error("Error fetching lunar date:", error)
     throw error

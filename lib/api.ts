@@ -5,13 +5,17 @@ const API_KEY = "/zYdSp0WAxD407AEJ320go1rcigjn9oriOuIWFEJjkk6+yRSpXkCeA56CR9GuQQ
 const ENCODED_API_KEY = encodeURIComponent(API_KEY)
 const BASE_URL = "https://apis.data.go.kr/B090041/openapi/service/LrsrCldInfoService"
 
+// Update the LunarDateResponse interface to include lunar stem and branch information
 interface LunarDateResponse {
   year: string
   month: string
   day: string
   isLeapMonth: boolean
+  monthStem?: string
+  monthBranch?: string
 }
 
+// Update the getLunarDate function to extract lunSecha from the API response
 export async function getLunarDate(
   solYear: string,
   solMonth: string,
@@ -51,22 +55,48 @@ export async function getLunarDate(
       const item = result.response.body.items.item
       console.log("Parsed lunar data:", item)
 
-      return {
-        year: item.lunYear,
-        month: item.lunMonth,
-        day: item.lunDay,
-        isLeapMonth: item.lunLeapmonth === "1",
+      // Extract lunar stem and branch information if available (lunSecha field)
+      let monthStem, monthBranch
+      if (item.lunSecha) {
+        // lunSecha format is typically "STEM_BRANCH" in Korean, e.g., "계축"
+        const lunSecha = item.lunSecha
+        // Extract first character as stem and second as branch
+        if (lunSecha.length >= 2) {
+          monthStem = lunSecha.charAt(0)
+          monthBranch = lunSecha.charAt(1)
+        }
       }
-    } else if (result.OpenAPI_ServiceResponse?.body?.items?.item) {
-      // Alternative response format
-      const item = result.OpenAPI_ServiceResponse.body.items.item
-      console.log("Parsed lunar data (alt format):", item)
 
       return {
         year: item.lunYear,
         month: item.lunMonth,
         day: item.lunDay,
         isLeapMonth: item.lunLeapmonth === "1",
+        monthStem,
+        monthBranch,
+      }
+    } else if (result.OpenAPI_ServiceResponse?.body?.items?.item) {
+      // Alternative response format
+      const item = result.OpenAPI_ServiceResponse.body.items.item
+      console.log("Parsed lunar data (alt format):", item)
+
+      // Extract lunar stem and branch information if available
+      let monthStem, monthBranch
+      if (item.lunSecha) {
+        const lunSecha = item.lunSecha
+        if (lunSecha.length >= 2) {
+          monthStem = lunSecha.charAt(0)
+          monthBranch = lunSecha.charAt(1)
+        }
+      }
+
+      return {
+        year: item.lunYear,
+        month: item.lunMonth,
+        day: item.lunDay,
+        isLeapMonth: item.lunLeapmonth === "1",
+        monthStem,
+        monthBranch,
       }
     } else {
       console.error("Unexpected API response structure:", JSON.stringify(result, null, 2))

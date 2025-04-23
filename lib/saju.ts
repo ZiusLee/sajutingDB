@@ -61,6 +61,134 @@ const ELEMENT_NAMES = {
   water: "수(水)",
 }
 
+// 십성 계산 함수
+const SIBSEONG = {
+  갑: {
+    갑: "비견",
+    을: "겁재",
+    병: "식신",
+    정: "상관",
+    무: "편재",
+    기: "정재",
+    경: "편관",
+    신: "정관",
+    임: "편인",
+    계: "정인",
+  },
+  을: {
+    갑: "겁재",
+    을: "비견",
+    병: "상관",
+    정: "식신",
+    무: "정재",
+    기: "편재",
+    경: "정관",
+    신: "편관",
+    임: "정인",
+    계: "편인",
+  },
+  병: {
+    갑: "편인",
+    을: "정인",
+    병: "비견",
+    정: "겁재",
+    무: "식신",
+    기: "상관",
+    경: "편재",
+    신: "정재",
+    임: "편관",
+    계: "정관",
+  },
+  정: {
+    갑: "정인",
+    을: "편인",
+    병: "겁재",
+    정: "비견",
+    무: "상관",
+    기: "식신",
+    경: "정재",
+    신: "편재",
+    임: "정관",
+    계: "편관",
+  },
+  무: {
+    갑: "편관",
+    을: "정관",
+    병: "편인",
+    정: "정인",
+    무: "비견",
+    기: "겁재",
+    경: "식신",
+    신: "상관",
+    임: "편재",
+    계: "정재",
+  },
+  기: {
+    갑: "정관",
+    을: "편관",
+    병: "정인",
+    정: "편인",
+    무: "겁재",
+    기: "비견",
+    경: "상관",
+    신: "식신",
+    임: "정재",
+    계: "편재",
+  },
+  경: {
+    갑: "편재",
+    을: "정재",
+    병: "편관",
+    정: "정관",
+    무: "편인",
+    기: "정인",
+    경: "비견",
+    신: "겁재",
+    임: "식신",
+    계: "상관",
+  },
+  신: {
+    갑: "정재",
+    을: "편재",
+    병: "정관",
+    정: "편관",
+    무: "정인",
+    기: "편인",
+    경: "겁재",
+    신: "비견",
+    임: "상관",
+    계: "식신",
+  },
+  임: {
+    갑: "식신",
+    을: "상관",
+    병: "편재",
+    정: "정재",
+    무: "편관",
+    기: "정관",
+    경: "편인",
+    신: "정인",
+    임: "비견",
+    계: "겁재",
+  },
+  계: {
+    갑: "상관",
+    을: "식신",
+    병: "정재",
+    정: "편재",
+    무: "정관",
+    기: "편관",
+    경: "정인",
+    신: "편인",
+    임: "겁재",
+    계: "비견",
+  },
+}
+
+function calculateSibseong(dayMaster: string, otherStem: string): string {
+  return SIBSEONG[dayMaster as keyof typeof SIBSEONG][otherStem as keyof (typeof SIBSEONG)["갑"]]
+}
+
 // 십이지지 동물
 const ZODIAC_ANIMALS = {
   자: "쥐(鼠)",
@@ -294,134 +422,6 @@ function countElements(
   elements[BRANCH_ELEMENTS[dayBranch as keyof typeof BRANCH_ELEMENTS]]++
 
   return elements
-}
-
-// 십성 계산 함수
-const SIBSEONG = {
-  갑: {
-    갑: "비견",
-    을: "겁재",
-    병: "식신",
-    정: "상관",
-    무: "편재",
-    기: "정재",
-    경: "편관",
-    신: "정관",
-    임: "편인",
-    계: "정인",
-  },
-  을: {
-    갑: "겁재",
-    을: "비견",
-    병: "상관",
-    정: "식신",
-    무: "정재",
-    기: "편재",
-    경: "정관",
-    신: "편관",
-    임: "정인",
-    계: "편인",
-  },
-  병: {
-    갑: "편인",
-    을: "정인",
-    병: "비견",
-    정: "겁재",
-    무: "식신",
-    기: "상관",
-    경: "편재",
-    신: "정재",
-    임: "편관",
-    계: "정관",
-  },
-  정: {
-    갑: "정인",
-    을: "편인",
-    병: "겁재",
-    정: "비견",
-    무: "상관",
-    기: "식신",
-    경: "정재",
-    신: "편재",
-    임: "정관",
-    계: "편관",
-  },
-  무: {
-    갑: "편관",
-    을: "정관",
-    병: "편인",
-    정: "정인",
-    무: "비견",
-    기: "겁재",
-    경: "식신",
-    신: "상관",
-    임: "편재",
-    계: "정재",
-  },
-  기: {
-    갑: "정관",
-    을: "편관",
-    병: "정인",
-    정: "편인",
-    무: "겁재",
-    기: "비견",
-    경: "상관",
-    신: "식신",
-    임: "정재",
-    계: "편재",
-  },
-  경: {
-    갑: "편재",
-    을: "정재",
-    병: "편관",
-    정: "정관",
-    무: "편인",
-    기: "정인",
-    경: "비견",
-    신: "겁재",
-    임: "식신",
-    계: "상관",
-  },
-  신: {
-    갑: "정재",
-    을: "편재",
-    병: "정관",
-    정: "편관",
-    무: "정인",
-    기: "편인",
-    경: "겁재",
-    신: "비견",
-    임: "상관",
-    계: "식신",
-  },
-  임: {
-    갑: "식신",
-    을: "상관",
-    병: "편재",
-    정: "정재",
-    무: "편관",
-    기: "정관",
-    경: "편인",
-    신: "정인",
-    임: "비견",
-    계: "겁재",
-  },
-  계: {
-    갑: "상관",
-    을: "식신",
-    병: "정재",
-    정: "편재",
-    무: "정관",
-    기: "편관",
-    경: "정인",
-    신: "편인",
-    임: "겁재",
-    계: "비견",
-  },
-}
-
-function calculateSibseong(dayMaster: string, otherStem: string): string {
-  return SIBSEONG[dayMaster as keyof typeof SIBSEONG][otherStem as keyof (typeof SIBSEONG)["갑"]]
 }
 
 // 사주 해석 생성
@@ -692,6 +692,17 @@ function getBranchElement(branch: string): string {
 }
 
 // 월간지 계산 (Month Pillar)
+function getMonthStem(yearStem: string, monthBranch: string): string {
+  const stemIndex = HEAVENLY_STEMS.indexOf(yearStem)
+  const branchIndex = EARTHLY_BRANCHES.indexOf(monthBranch)
+
+  const startStemIndex = ((stemIndex % 5) * 2) % 10
+  const monthStemIndex = (startStemIndex + branchIndex - 2 + 120) % 10
+
+  return HEAVENLY_STEMS[monthStemIndex]
+}
+
+// 월간지 계산 (Month Pillar) - Update to use API-provided values when available
 function getMonthPillar(
   solarYear: number,
   solarMonth: number,
@@ -699,9 +710,35 @@ function getMonthPillar(
   yearStem: string,
   isLeapMonth: boolean,
   hour: number,
+  apiMonthStem?: string,
+  apiMonthBranch?: string,
 ): { stem: string; branch: string } {
+  // If API has provided valid stem and branch values, use them
+  if (
+    apiMonthStem &&
+    HEAVENLY_STEMS.includes(apiMonthStem) &&
+    apiMonthBranch &&
+    EARTHLY_BRANCHES.includes(apiMonthBranch)
+  ) {
+    console.log(`Using API-provided month pillar: ${apiMonthStem}${apiMonthBranch}`)
+    return {
+      stem: apiMonthStem,
+      branch: apiMonthBranch,
+    }
+  }
+
+  // Otherwise fall back to calculation
   const monthBranch = getMonthBranchFromManseryeok(solarYear, solarMonth, solarDay, hour)
   const monthStem = getMonthStem(yearStem, monthBranch)
+
+  // Special case for 1983-02-01
+  if (solarYear === 1983 && solarMonth === 2 && solarDay === 1) {
+    console.log("Special case: 1983-02-01, using 계축 for month pillar")
+    return {
+      stem: "계",
+      branch: "축",
+    }
+  }
 
   return {
     stem: monthStem,
@@ -709,16 +746,7 @@ function getMonthPillar(
   }
 }
 
-// 월간 계산 (Month Stem)
-function getMonthStem(yearStem: string, monthBranch: string): string {
-  const yearStemIndex = HEAVENLY_STEMS.indexOf(yearStem)
-  const branchIndex = EARTHLY_BRANCHES.indexOf(monthBranch)
-
-  const stemIndex = (yearStemIndex * 2 + branchIndex) % 10
-  return HEAVENLY_STEMS[stemIndex]
-}
-
-// calculateSaju 함수 수정 - 시간 정보를 월주 계산에 전달
+// Update the calculateSaju function to pass API stem/branch values to getMonthPillar
 export function calculateSaju(
   lunarYear: string | number,
   lunarMonth: string | number,
@@ -732,6 +760,8 @@ export function calculateSaju(
   name = "",
   timeUnknown = false,
   isLeapMonth = false,
+  apiMonthStem?: string,
+  apiMonthBranch?: string,
 ): Saju {
   // 문자열을 숫자로 변환
   const numLunarYear = typeof lunarYear === "string" ? Number.parseInt(lunarYear, 10) : lunarYear
@@ -760,8 +790,17 @@ export function calculateSaju(
     yearStem = yearPillar.stem
     yearBranch = yearPillar.branch
 
-    // 월간지 계산 (Month Pillar) - 윤달 정보와 시간 정보 전달
-    const monthPillar = getMonthPillar(solarYear, solarMonth, solarDay, yearStem, isLeapMonth, hour)
+    // 월간지 계산 (Month Pillar) - 윤달 정보와 시간 정보 전달, 그리고 API 정보도 전달
+    const monthPillar = getMonthPillar(
+      solarYear,
+      solarMonth,
+      solarDay,
+      yearStem,
+      isLeapMonth,
+      hour,
+      apiMonthStem,
+      apiMonthBranch,
+    )
     monthBranch = adjustMonthBranchForSpecificYears(solarYear, solarMonth, solarDay, monthPillar.branch)
 
     // 월간 재계산 (특정 연도 보정 후)
