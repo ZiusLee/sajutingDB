@@ -1,13 +1,38 @@
-import { Card, CardContent } from "@/components/ui/card"
 import type { Saju } from "@/lib/saju"
 
 interface SajuDiagramProps {
   saju: Saju
   timeUnknown?: boolean
   size?: "sm" | "md" | "lg"
+  name?: string
+  gender?: string
+  solarYear?: string
+  solarMonth?: string
+  solarDay?: string
+  hour?: string
+  minute?: string
+  lunarYear?: string
+  lunarMonth?: string
+  lunarDay?: string
+  location?: string
 }
 
-export default function SajuDiagram({ saju, timeUnknown = false, size = "md" }: SajuDiagramProps) {
+export default function SajuDiagram({
+  saju,
+  timeUnknown = false,
+  size = "md",
+  name = "",
+  gender = "",
+  solarYear = "",
+  solarMonth = "",
+  solarDay = "",
+  hour = "",
+  minute = "",
+  lunarYear = "",
+  lunarMonth = "",
+  lunarDay = "",
+  location = "서울특별시",
+}: SajuDiagramProps) {
   // 오행 색상 매핑
   const elementColors = {
     wood: "bg-green-100 border-green-500 text-green-800 dark:bg-green-950 dark:border-green-400 dark:text-green-300",
@@ -61,119 +86,174 @@ export default function SajuDiagram({ saju, timeUnknown = false, size = "md" }: 
     return elementColors[branchElements[branch as keyof typeof branchElements]]
   }
 
-  // Size classes
-  const sizeClasses = {
-    sm: {
-      gap: "gap-1",
-      padding: "p-1",
-      textStem: "text-xs sm:text-sm",
-      textBranch: "text-xs",
-      spaceY: "space-y-1",
-      labelText: "text-xs",
-    },
-    md: {
-      gap: "gap-2",
-      padding: "p-1 sm:p-2",
-      textStem: "text-sm sm:text-base md:text-lg",
-      textBranch: "text-xs",
-      spaceY: "space-y-1 sm:space-y-2",
-      labelText: "text-xs sm:text-sm",
-    },
-    lg: {
-      gap: "gap-3",
-      padding: "p-2 sm:p-3",
-      textStem: "text-base sm:text-lg md:text-xl",
-      textBranch: "text-sm",
-      spaceY: "space-y-2 sm:space-y-3",
-      labelText: "text-sm sm:text-base",
-    },
+  // 십이지지 동물 이름
+  const branchAnimals = {
+    자: "쥐",
+    축: "소",
+    인: "호랑이",
+    묘: "토끼",
+    진: "용",
+    사: "뱀",
+    오: "말",
+    미: "양",
+    신: "원숭이",
+    유: "닭",
+    술: "개",
+    해: "돼지",
   }
 
-  const classes = sizeClasses[size]
+  // 천간 색상 이름
+  const stemColorNames = {
+    갑: "푸른",
+    을: "푸른",
+    병: "붉은",
+    정: "붉은",
+    무: "황색",
+    기: "황색",
+    경: "하얀",
+    신: "하얀",
+    임: "검은",
+    계: "검은",
+  }
+
+  // 일주 동물 이름 가져오기
+  const getDayMasterAnimal = () => {
+    if (saju.dayStem === "?" || saju.dayBranch === "?") return ""
+
+    const colorName = stemColorNames[saju.dayStem as keyof typeof stemColorNames] || ""
+    const animalName = branchAnimals[saju.dayBranch as keyof typeof branchAnimals] || ""
+
+    return `${colorName}${animalName}`
+  }
+
+  // 성별에 따른 텍스트 색상
+  const genderColor = gender === "male" ? "text-blue-500" : gender === "female" ? "text-red-500" : "text-gray-500"
 
   return (
-    <div className={`grid grid-cols-4 ${classes.gap}`}>
-      <div className={`${classes.spaceY}`}>
-        <div className={`text-center ${classes.labelText} text-muted-foreground`}>시주</div>
-        {timeUnknown ? (
-          <>
-            <Card className="border-2 border-dashed border-gray-400 dark:border-gray-500">
-              <CardContent className={`${classes.padding} text-center`}>
-                <div className={`${classes.textStem} font-bold text-gray-600 dark:text-gray-300`}>?</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">?</div>
-              </CardContent>
-            </Card>
-            <Card className="border-2 border-dashed border-gray-400 dark:border-gray-500">
-              <CardContent className={`${classes.padding} text-center`}>
-                <div className={`${classes.textStem} font-bold text-gray-600 dark:text-gray-300`}>?</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">?</div>
-              </CardContent>
-            </Card>
-          </>
-        ) : (
-          <>
-            <Card className={`border shadow-sm ${getStemColor(saju.hourStem)}`}>
-              <CardContent className={`${classes.padding} text-center`}>
-                <div className={`${classes.textStem} font-bold`}>{saju.hourStem}</div>
-                <div className={`${classes.textBranch}`}>{saju.hourStemHanja}</div>
-              </CardContent>
-            </Card>
-            <Card className={`border shadow-sm ${getBranchColor(saju.hourBranch)}`}>
-              <CardContent className={`${classes.padding} text-center`}>
-                <div className={`${classes.textStem} font-bold`}>{saju.hourBranch}</div>
-                <div className={`${classes.textBranch}`}>{saju.hourBranchHanja}</div>
-              </CardContent>
-            </Card>
-          </>
-        )}
+    <div className="space-y-4">
+      {/* 상단 정보 섹션 */}
+      <div className="flex items-center gap-3">
+        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-2xl">
+          {branchAnimals[saju.yearBranch as keyof typeof branchAnimals] || "?"}
+        </div>
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            {name || "사용자"}
+            {name && <span className="text-sm font-normal">({getDayMasterAnimal()})</span>}
+          </h2>
+        </div>
       </div>
 
-      <div className={`${classes.spaceY}`}>
-        <div className={`text-center ${classes.labelText} text-muted-foreground`}>일주</div>
-        <Card className={`border shadow-sm ${getStemColor(saju.dayStem)}`}>
-          <CardContent className={`${classes.padding} text-center`}>
-            <div className={`${classes.textStem} font-bold`}>{saju.dayStem}</div>
-            <div className={`${classes.textBranch}`}>{saju.dayStemHanja}</div>
-          </CardContent>
-        </Card>
-        <Card className={`border shadow-sm ${getBranchColor(saju.dayBranch)}`}>
-          <CardContent className={`${classes.padding} text-center`}>
-            <div className={`${classes.textStem} font-bold`}>{saju.dayBranch}</div>
-            <div className={`${classes.textBranch}`}>{saju.dayBranchHanja}</div>
-          </CardContent>
-        </Card>
+      {/* 날짜 정보 */}
+      <div className="space-y-1 text-base">
+        <p className={genderColor}>
+          양 {solarYear}/{solarMonth}/{solarDay} {hour}:{minute}{" "}
+          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location}
+        </p>
+        <p className="text-blue-500">
+          음(평달) {lunarYear}/{lunarMonth}/{lunarDay} {hour}:{minute}{" "}
+          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location}
+        </p>
+        <p className={genderColor}>
+          양 {solarYear}/{solarMonth}/{solarDay} {Number(hour) - 1}:{Number(minute) + 28}{" "}
+          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location} (지역시 -32분)
+        </p>
       </div>
 
-      <div className={`${classes.spaceY}`}>
-        <div className={`text-center ${classes.labelText} text-muted-foreground`}>월주</div>
-        <Card className={`border shadow-sm ${getStemColor(saju.monthStem)}`}>
-          <CardContent className={`${classes.padding} text-center`}>
-            <div className={`${classes.textStem} font-bold`}>{saju.monthStem}</div>
-            <div className={`${classes.textBranch}`}>{saju.monthStemHanja}</div>
-          </CardContent>
-        </Card>
-        <Card className={`border shadow-sm ${getBranchColor(saju.monthBranch)}`}>
-          <CardContent className={`${classes.padding} text-center`}>
-            <div className={`${classes.textStem} font-bold`}>{saju.monthBranch}</div>
-            <div className={`${classes.textBranch}`}>{saju.monthBranchHanja}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* 사주 표 */}
+      <div className="border rounded-lg overflow-hidden">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-50 dark:bg-gray-800">
+              <th className="p-2 border-b border-r"></th>
+              <th className="p-2 border-b border-r text-center">생시</th>
+              <th className="p-2 border-b border-r text-center">생일</th>
+              <th className="p-2 border-b border-r text-center">생월</th>
+              <th className="p-2 border-b text-center">생년</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* 천간 행 */}
+            <tr>
+              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">천간</td>
+              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
+                <div className={`text-2xl font-bold ${timeUnknown ? "" : getStemColor(saju.hourStem)}`}>
+                  {timeUnknown ? "?" : saju.hourStem}
+                </div>
+                <div className="text-xs text-gray-500">{timeUnknown ? "" : saju.hourStemHanja}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div className={`text-2xl font-bold ${getStemColor(saju.dayStem)}`}>{saju.dayStem}</div>
+                <div className="text-xs text-gray-500">{saju.dayStemHanja}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div className={`text-2xl font-bold ${getStemColor(saju.monthStem)}`}>{saju.monthStem}</div>
+                <div className="text-xs text-gray-500">{saju.monthStemHanja}</div>
+              </td>
+              <td className="p-2 border-b text-center">
+                <div className={`text-2xl font-bold ${getStemColor(saju.yearStem)}`}>{saju.yearStem}</div>
+                <div className="text-xs text-gray-500">{saju.yearStemHanja}</div>
+              </td>
+            </tr>
 
-      <div className={`${classes.spaceY}`}>
-        <div className={`text-center ${classes.labelText} text-muted-foreground`}>년주</div>
-        <Card className={`border shadow-sm ${getStemColor(saju.yearStem)}`}>
-          <CardContent className={`${classes.padding} text-center`}>
-            <div className={`${classes.textStem} font-bold`}>{saju.yearStem}</div>
-            <div className={`${classes.textBranch}`}>{saju.yearStemHanja}</div>
-          </CardContent>
-        </Card>
-        <Card className={`border shadow-sm ${getBranchColor(saju.yearBranch)}`}>
-          <CardContent className={`${classes.padding} text-center`}>
-            <div className={`${classes.textStem} font-bold`}>{saju.yearBranch}</div>
-            <div className={`${classes.textBranch}`}>{saju.yearBranchHanja}</div>
-          </CardContent>
-        </Card>
+            {/* 십성 행 */}
+            <tr>
+              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">십성</td>
+              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
+                <div>{timeUnknown ? "" : saju.hourStemSibseong}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div>{saju.dayStemSibseong}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div>{saju.monthStemSibseong}</div>
+              </td>
+              <td className="p-2 border-b text-center">
+                <div>{saju.yearStemSibseong}</div>
+              </td>
+            </tr>
+
+            {/* 지지 행 */}
+            <tr>
+              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">지지</td>
+              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
+                <div className={`text-2xl font-bold ${timeUnknown ? "" : getBranchColor(saju.hourBranch)}`}>
+                  {timeUnknown ? "?" : saju.hourBranch}
+                </div>
+                <div className="text-xs text-amber-600">{timeUnknown ? "" : saju.hourBranchHanja}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div className={`text-2xl font-bold ${getBranchColor(saju.dayBranch)}`}>{saju.dayBranch}</div>
+                <div className="text-xs text-amber-600">{saju.dayBranchHanja}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div className={`text-2xl font-bold ${getBranchColor(saju.monthBranch)}`}>{saju.monthBranch}</div>
+                <div className="text-xs text-amber-600">{saju.monthBranchHanja}</div>
+              </td>
+              <td className="p-2 border-b text-center">
+                <div className={`text-2xl font-bold ${getBranchColor(saju.yearBranch)}`}>{saju.yearBranch}</div>
+                <div className="text-xs text-amber-600">{saju.yearBranchHanja}</div>
+              </td>
+            </tr>
+
+            {/* 십성 행 */}
+            <tr>
+              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">십성</td>
+              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
+                <div>{timeUnknown ? "" : saju.hourBranchSibseong}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div>{saju.dayBranchSibseong}</div>
+              </td>
+              <td className="p-2 border-b border-r text-center">
+                <div>{saju.monthBranchSibseong}</div>
+              </td>
+              <td className="p-2 border-b text-center">
+                <div>{saju.yearBranchSibseong}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )

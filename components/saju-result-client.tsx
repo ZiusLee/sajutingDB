@@ -31,6 +31,7 @@ interface SajuResultClientProps {
   gender?: string
   model?: string
   relationshipStatus?: string
+  location?: string
 }
 
 export default function SajuResultClient({
@@ -48,6 +49,7 @@ export default function SajuResultClient({
   gender = "",
   model = "",
   relationshipStatus = "",
+  location = "서울특별시",
 }: SajuResultClientProps) {
   const [interpretation, setInterpretation] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -57,6 +59,14 @@ export default function SajuResultClient({
   const [isMobile, setIsMobile] = useState(false)
   const [activeTab, setActiveTab] = useState("diagram")
   const router = useRouter()
+
+  // 성별 정보 정규화
+  const normalizedGender =
+    gender === "male" || gender === "남성" || gender === "남자"
+      ? "male"
+      : gender === "female" || gender === "여성" || gender === "여자"
+        ? "female"
+        : ""
 
   // Generate a unique key for this saju to use in localStorage
   const sajuKey = `${saju.yearStem}${saju.yearBranch}${saju.monthStem}${saju.monthBranch}${saju.dayStem}${saju.dayBranch}${saju.hourStem || ""}${saju.hourBranch || ""}`
@@ -169,7 +179,7 @@ ${interpretation}
 
     // Navigate to chat list with all necessary parameters
     router.push(
-      `/chat-list?saju=${encodeURIComponent(sajuData)}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}&interpretation=${encodeURIComponent(interpretation || "")}&returnPath=/result`,
+      `/chat-list?saju=${encodeURIComponent(sajuData)}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(normalizedGender || "")}&interpretation=${encodeURIComponent(interpretation || "")}&returnPath=/result`,
     )
   }
 
@@ -208,36 +218,21 @@ ${interpretation}
             {activeTab === "diagram" && (
               <div className="p-3">
                 <h3 className="text-base font-medium mb-2">사주 도표</h3>
-                <SajuDiagram saju={saju} timeUnknown={timeUnknown} />
-                {/* Add 십성 table below SajuDiagram */}
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  <div>
-                    <h4 className="font-semibold text-sm">천간(天干)</h4>
-                    <div className="grid grid-cols-2 gap-1">
-                      <div>년주:</div>
-                      <div>{saju.yearStemSibseong}</div>
-                      <div>월주:</div>
-                      <div>{saju.monthStemSibseong}</div>
-                      <div>일주:</div>
-                      <div>{saju.dayStemSibseong}</div>
-                      <div>시주:</div>
-                      <div>{saju.hourStemSibseong}</div>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm">지지(地支)</h4>
-                    <div className="grid grid-cols-2 gap-1">
-                      <div>년주:</div>
-                      <div>{saju.yearBranchSibseong}</div>
-                      <div>월주:</div>
-                      <div>{saju.monthBranchSibseong}</div>
-                      <div>일주:</div>
-                      <div>{saju.dayBranchSibseong}</div>
-                      <div>시주:</div>
-                      <div>{saju.hourBranchSibseong}</div>
-                    </div>
-                  </div>
-                </div>
+                <SajuDiagram
+                  saju={saju}
+                  timeUnknown={timeUnknown}
+                  name={name}
+                  gender={normalizedGender}
+                  solarYear={solarYear}
+                  solarMonth={solarMonth}
+                  solarDay={solarDay}
+                  hour={hour}
+                  minute={minute}
+                  lunarYear={lunarYear}
+                  lunarMonth={lunarMonth}
+                  lunarDay={lunarDay}
+                  location={location}
+                />
 
                 {/* Add chat button to diagram tab - Mobile */}
                 <div className="mt-6">
@@ -302,7 +297,7 @@ ${interpretation}
                       <AdditionalQuestions
                         saju={saju}
                         name={name}
-                        gender={gender}
+                        gender={normalizedGender}
                         model={model}
                         relationshipStatus={relationshipStatus}
                         interpretation={interpretation}
@@ -327,59 +322,21 @@ ${interpretation}
           <TabsContent value="diagram" className="mt-4">
             <Card>
               <CardContent className="p-4">
-                <SajuDiagram saju={saju} timeUnknown={timeUnknown} />
-                {/* Add 십성 table below SajuDiagram */}
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  <div>
-                    <h4 className="font-semibold text-sm">천간(天干)</h4>
-                    <div className="grid grid-cols-2 gap-1">
-                      <div>년주:</div>
-                      <div>{saju.yearStemSibseong}</div>
-                      <div>월주:</div>
-                      <div>{saju.monthStemSibseong}</div>
-                      <div>일주:</div>
-                      <div>{saju.dayStemSibseong}</div>
-                      <div>시주:</div>
-                      <div>{saju.hourStemSibseong}</div>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm">지지(地支)</h4>
-                    <div className="grid grid-cols-2 gap-1">
-                      <div>년주:</div>
-                      <div>{saju.yearBranchSibseong}</div>
-                      <div>월주:</div>
-                      <div>{saju.monthBranchSibseong}</div>
-                      <div>일주:</div>
-                      <div>{saju.dayBranchSibseong}</div>
-                      <div>시주:</div>
-                      <div>{saju.hourBranchSibseong}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Add this after the Heavenly Stems Sibseong display section */}
-                <div className="mt-4">
-                  <h3 className="text-lg font-semibold mb-2">지지 십성</h3>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="text-center p-2 bg-gray-100 rounded">
-                      <div className="font-medium">연지</div>
-                      <div>{saju.yearBranchSibseong}</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-100 rounded">
-                      <div className="font-medium">월지</div>
-                      <div>{saju.monthBranchSibseong}</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-100 rounded">
-                      <div className="font-medium">일지</div>
-                      <div>{saju.dayBranchSibseong}</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-100 rounded">
-                      <div className="font-medium">시지</div>
-                      <div>{saju.timeUnknown ? "-" : saju.hourBranchSibseong}</div>
-                    </div>
-                  </div>
-                </div>
+                <SajuDiagram
+                  saju={saju}
+                  timeUnknown={timeUnknown}
+                  name={name}
+                  gender={normalizedGender}
+                  solarYear={solarYear}
+                  solarMonth={solarMonth}
+                  solarDay={solarDay}
+                  hour={hour}
+                  minute={minute}
+                  lunarYear={lunarYear}
+                  lunarMonth={lunarMonth}
+                  lunarDay={lunarDay}
+                  location={location}
+                />
 
                 {/* Add chat button to diagram tab - Desktop */}
                 <div className="mt-6">
@@ -438,7 +395,7 @@ ${interpretation}
                       <AdditionalQuestions
                         saju={saju}
                         name={name}
-                        gender={gender}
+                        gender={normalizedGender}
                         model={model}
                         relationshipStatus={relationshipStatus}
                         interpretation={interpretation} // 기존 해석 전달

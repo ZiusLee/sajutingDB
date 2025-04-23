@@ -19,9 +19,10 @@ export default async function ResultPage({
     name?: string
     gender?: string
     saju?: string
+    location?: string
   }
 }) {
-  const { date, hour, minute, timeUnknown, name, gender, saju: sajuParam } = searchParams
+  const { date, hour, minute, timeUnknown, name, gender, saju: sajuParam, location = "서울특별시" } = searchParams
 
   // 사주 파라미터가 있는 경우 (채팅 목록에서 돌아온 경우)
   if (sajuParam) {
@@ -55,6 +56,7 @@ export default async function ResultPage({
                   lunarDay={sajuData.lunarDay}
                   name={name}
                   gender={gender}
+                  location={location}
                 />
 
                 {/* 소셜미디어 공유 버튼 추가 */}
@@ -144,6 +146,7 @@ export default async function ResultPage({
                 lunarDay={lunarData.day}
                 name={name}
                 gender={gender}
+                location={location}
               />
 
               {/* 소셜미디어 공유 버튼 추가 */}
