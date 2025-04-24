@@ -441,8 +441,8 @@ export default function SajuChat({
 
       saveChatSession(sessionKey, sessionData)
 
-      // 뒤로가기 실행
-      window.history.back()
+      // 채팅 리스트로 이동
+      router.push("/chat-list")
     }
   }
 

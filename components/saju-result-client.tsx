@@ -14,7 +14,8 @@ import { getSajuInterpretation } from "@/lib/api-client"
 import FeedbackButtons from "./feedback-buttons"
 import { Progress } from "@/components/ui/progress"
 import AdditionalQuestions from "./additional-questions"
-import { useRouter } from "next/navigation"
+// 추가: useSearchParams 임포트
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 
 interface SajuResultClientProps {
@@ -60,7 +61,13 @@ export default function SajuResultClient({
   const [loadingMessages, setLoadingMessages] = useState<string[]>([])
   const loadingAnimationRef = useRef<NodeJS.Timeout | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  const [activeTab, setActiveTab] = useState("diagram")
+  // 컴포넌트 내부에서 searchParams 사용
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    // URL 파라미터에서 탭 정보를 읽어옴
+    const tabParam = searchParams.get("tab")
+    return tabParam === "interpretation" ? "interpretation" : "diagram"
+  })
   const router = useRouter()
   const [questionSet, setQuestionSet] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
@@ -409,7 +416,7 @@ ${interpretation}
           </div>
         </div>
       ) : (
-        <Tabs defaultValue="diagram" className="w-full">
+        <Tabs defaultValue={activeTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="diagram" data-value="diagram">
               사주 도표

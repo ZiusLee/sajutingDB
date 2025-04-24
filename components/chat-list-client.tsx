@@ -34,7 +34,7 @@ import { ko } from "date-fns/locale"
 // 사용자의 사주에 맞는 맞춤 채팅방 제목 생성
 function getPersonalizedRoomTitle(saju: any, gender: string): string {
   // 사주 데이터를 분석하여 맞춤 제목 생성
-  // ��: 오행 분포, 일주, 성별 등을 고려
+  // : 오행 분포, 일주, 성별 등을 고려
 
   // 간단한 예시: 오행 분포에 따라 다른 제목 반환
   if (saju?.elements) {
@@ -457,8 +457,8 @@ export default function ChatListClient() {
       const nameParam = chatData.name ? encodeURIComponent(chatData.name) : ""
       const genderParam = chatData.gender ? encodeURIComponent(chatData.gender) : ""
 
-      // 결과 페이지로 이동
-      router.push(`/result?saju=${sajuParam}&name=${nameParam}&gender=${genderParam}`)
+      // 총운 리포트 탭이 선택된 상태로 결과 페이지로 이동
+      router.push(`/result?saju=${sajuParam}&name=${nameParam}&gender=${genderParam}&tab=interpretation`)
     } else if (chatData?.returnPath) {
       // 기존 returnPath가 있으면 그 경로로 이동 (fallback)
       router.push(chatData.returnPath)
