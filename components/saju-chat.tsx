@@ -89,7 +89,11 @@ const initialSuggestedQuestionsByType: Record<string, string[]> = {
     "제 사주에 맞는 배우자는 어떤 사람인가요?",
     "푸른 뱀의 해에 결혼 생활에서 주의해야 할 점이 있나요?",
   ],
-  personalized: ["그냥 너무 불안해요", "뭘 해야할지 잘 모르겠어요", "요즘 번아웃이 온것 같아요"],
+  personalized: [
+    "요즘 제 고민이 있는데 어떻게 해결하면 좋을까요?",
+    "인간관계에 어려움을 겪고 있는데 제 사주가 원인일까요?",
+    "미래에 대한 불안감이 있는데 어떻게 극복할 수 있을까요?",
+  ],
   "daily-fortune": [
     `오늘(${formatTodayDate()})의 운세를 보시겠습니까?`,
     "오늘 하루를 어떻게 보내는 것이 좋을까요?",
@@ -117,9 +121,9 @@ const getInitialMessageByRoomType = (name: string, roomType: string): string => 
 ${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 취업, 이직, 승진, 직장 생활 등 직업과 관련된 질문을 해주시면 사주를 바탕으로 답변해드릴게요. 어떤 직업이 잘 맞는지, 언제 이직하면 좋을지 등 구체적인 질문을 해보세요.`
 
     case "personalized":
-      return `안녕하세요, ${userName}님! 직업운에 대한 사주 상담을 시작해볼게요.
+      return `안녕하세요, ${userName}님! 고민상담을 시작하겠습니다.
 
-${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 요즘은 뭐가 가장 고민되고 힘드신가요? 뭐든 편하게 얘기해주세요.`
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. ${userName}님의 고민이 무엇인지 말씀해주시면, 사주를 바탕으로 해결책을 제시해드리겠습니다. 인간관계, 직장, 심리적 고민 등 어떤 것이든 편하게 말씀해주세요.`
 
     case "love":
       return `안녕하세요, ${userName}님! 애정운에 대한 사주 상담을 시작할게요.
@@ -472,9 +476,7 @@ export default function SajuChat({
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error("Failed to generate suggested questions:", errorData)
-        throw new Error(`Failed to generate suggested questions: ${response.status} - ${JSON.stringify(errorData)}`)
+        throw new Error(`Failed to generate suggested questions: ${response.status}`)
       }
 
       const data = await response.json()
@@ -663,6 +665,10 @@ export default function SajuChat({
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <CardTitle className="text-lg">{getRoomTitle(roomType)}</CardTitle>
+        <Button variant="ghost" size="sm" onClick={() => setShowSajuInfo(!showSajuInfo)}>
+          사주도표
+          {showSajuInfo ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
       </CardHeader>
 
       <CardContent className="p-0">

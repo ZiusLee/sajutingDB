@@ -91,20 +91,28 @@ export async function POST(req: Request) {
 
       const apiMessages = [{ role: "system", content: dailyFortunePrompt }, ...messages]
 
+      // Calculate dynamic token limit
+      const totalInputTokens = apiMessages.reduce((acc, msg) => acc + msg.content.length, 0)
+      const maxTokens = Math.max(500, Math.min(1000, 4000 - totalInputTokens)) // Dynamic token limit
+
       const result = streamText({
         model: openai("gpt-4.1"),
         messages: apiMessages,
         temperature: 0.8, // 낮춰서 더 정확한 답변 유도
-        maxTokens: 4000, // 필요에 따라 토큰 수 조절
+        maxTokens: maxTokens, // 필요에 따라 토큰 수 조절
       })
 
       return result.toDataStreamResponse()
     } else {
+      // Calculate dynamic token limit
+      const totalInputTokens = apiMessages.reduce((acc, msg) => acc + msg.content.length, 0)
+      const maxTokens = Math.max(500, Math.min(1000, 4000 - totalInputTokens)) // Dynamic token limit
+
       const result = streamText({
         model: model,
         messages: apiMessages,
         temperature: 0.8, // 낮춰서 더 정확한 답변 유도
-        maxTokens: 4000, // 필요에 따라 토큰 수 조절
+        maxTokens: maxTokens, // 필요에 따라 토큰 수 조절
       })
 
       // 스트리밍 응답 생성

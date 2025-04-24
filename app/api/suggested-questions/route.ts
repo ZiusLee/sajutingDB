@@ -60,7 +60,7 @@ ${creative ? "이전 대화에서 언급되지 않은 새로운 주제나 관점
 
     // API 요청
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -104,11 +104,7 @@ ${typeSpecificPrompt}`,
         health: ["제 사주에서 주의해야 할 건강 문제는 무엇인가요?", "제 체질에 맞는 운동은 무엇인가요?"],
         business: ["2025년에 사업 시작하기 좋은 시기는 언제인가요?", "재물운을 높이는 방법이 있을까요?"],
         marriage: ["결혼하기 좋은 시기는 언제인가요?", "제 사주에 맞는 배우자는 어떤 사람인가요?"],
-        personalized: [
-          "제 사주에 맞는 인생의 조언을 듣고 싶어요",
-          "오늘 하루를 어떻게 보내는 것이 좋을까요?",
-          "인생의 중요한 결정을 앞두고 있습니다.",
-        ],
+        personalized: ["제 사주에서 가장 두드러진 특징은 무엇인가요?", "행운을 끌어당기는 방법이 있을까요?"],
         "daily-fortune": ["오늘의 운세를 보시겠습니까?", "오늘 하루를 어떻게 보내는 것이 좋을까요?"],
       }
 

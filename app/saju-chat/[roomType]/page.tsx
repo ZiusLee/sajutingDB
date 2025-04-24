@@ -13,6 +13,7 @@ export default function SajuChatPage() {
   const [saju, setSaju] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [sessionKey, setSessionKey] = useState<string>("")
 
   useEffect(() => {
     try {
@@ -31,6 +32,11 @@ export default function SajuChatPage() {
 
       const parsedSaju = JSON.parse(savedSaju)
       setSaju(parsedSaju)
+
+      // Generate a unique session key for this chat room
+      const generatedKey = `chat_${parsedSaju.name || "user"}_${params.roomType}`
+      setSessionKey(generatedKey)
+
       setLoading(false)
 
       // 로그인 상태 확인
@@ -46,7 +52,7 @@ export default function SajuChatPage() {
       })
       router.push("/")
     }
-  }, [router, toast])
+  }, [router, toast, params.roomType])
 
   const handleBack = () => {
     router.push("/chatlist")
@@ -70,6 +76,7 @@ export default function SajuChatPage() {
         roomType={params.roomType as string}
         onBack={handleBack}
         isLoggedIn={isLoggedIn}
+        sessionKey={sessionKey}
       />
     </div>
   )
