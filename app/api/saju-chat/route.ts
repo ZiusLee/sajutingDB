@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
     // 시스템 메시지 생성
     const systemMessage = `당신은 최고의 사주팔자 전문가이자 심리 상담가 입니다. 사용자에게 친절하고 명확하게 답변해주세요.
-    1. 길고 상세하게 적어줘. 채팅에서 사주관련질문에 대한 답변은 1000토큰이상 정도로 적어줘.나머지는 유동적으로
+    1. 길고 상세하게 적어줘. 채팅에서 사주관련질문에 대한 답변은 1000토큰 정도로 적어줘.나머지는 유동적으로
     2. 올해 을사년 2025년이라는 정보도 적극 활용하고, 이사람의 일주, 십성,월지용신 등 적극 활용해줘
     3. 그의 질문을 기반으로 대답해주는데 당신은 사주팔자 전문가이자 최고의 심리상담가이기도 해
 
@@ -93,26 +93,26 @@ export async function POST(req: Request) {
 
       // Calculate dynamic token limit
       const totalInputTokens = apiMessages.reduce((acc, msg) => acc + msg.content.length, 0)
-      const maxTokens = Math.max(500, Math.min(1000, 4000 - totalInputTokens)) // Dynamic token limit
+      const maxTokens = Math.max(500, Math.min(1500, 4000 - totalInputTokens)) // 토큰 제한 증가
 
       const result = streamText({
         model: openai("gpt-4.1"),
         messages: apiMessages,
-        temperature: 0.8, // 낮춰서 더 정확한 답변 유도
-        maxTokens: maxTokens, // 필요에 따라 토큰 수 조절
+        temperature: 0.8,
+        maxTokens: maxTokens,
       })
 
       return result.toDataStreamResponse()
     } else {
       // Calculate dynamic token limit
       const totalInputTokens = apiMessages.reduce((acc, msg) => acc + msg.content.length, 0)
-      const maxTokens = Math.max(500, Math.min(1000, 4000 - totalInputTokens)) // Dynamic token limit
+      const maxTokens = Math.max(500, Math.min(1500, 4000 - totalInputTokens)) // 토큰 제한 증가
 
       const result = streamText({
         model: model,
         messages: apiMessages,
-        temperature: 0.8, // 낮춰서 더 정확한 답변 유도
-        maxTokens: maxTokens, // 필요에 따라 토큰 수 조절
+        temperature: 0.8,
+        maxTokens: maxTokens,
       })
 
       // 스트리밍 응답 생성

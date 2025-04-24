@@ -243,7 +243,7 @@ export default function CompatibleMatches({
             name: "이○○",
             age: 30,
             birthYear: "1994년생",
-            saju: "임신-계유-갑술-을해",
+            saju: "임신-���유-갑술-을해",
             compatibility: "당신의 부족한 수(水) 오행을 보완해주고 오행 균형이 좋은 관계",
             compatibilityScore: 92,
             imageUrl: "/placeholder.svg?height=150&width=150",

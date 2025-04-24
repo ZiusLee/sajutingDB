@@ -288,7 +288,7 @@ export default function SajuChat({
   ]
 
   // AI SDK의 useChat 훅 사용
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput } = useAIChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, error, reload } = useAIChat({
     api: "/api/saju-chat",
     initialMessages,
     body: {
@@ -361,6 +361,17 @@ export default function SajuChat({
 
       // 오류 발생 시에도 질문 생성 허용
       setShouldGenerateQuestions(true)
+    },
+    onResponse: (response) => {
+      // 응답이 시작되면 스크롤을 아래로 이동
+      if (chatContainerRef.current) {
+        setTimeout(() => {
+          chatContainerRef.current?.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: "smooth",
+          })
+        }, 100)
+      }
     },
   })
 
@@ -502,14 +513,16 @@ export default function SajuChat({
 
   // 메시지가 변경될 때마다 스크롤을 아래로 이동
   useEffect(() => {
-    if (messagesEndRef.current && chatContainerRef.current && !isLoading) {
+    if (messagesEndRef.current && chatContainerRef.current) {
       // 약간의 지연을 두고 스크롤 실행 (모바일에서 더 안정적)
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const chatContainer = chatContainerRef.current
         if (chatContainer) {
           chatContainer.scrollTop = chatContainer.scrollHeight
         }
       }, 100)
+
+      return () => clearTimeout(timer)
     }
   }, [messages, isLoading])
 
@@ -725,7 +738,8 @@ export default function SajuChat({
             className="flex-1 overflow-y-auto pb-[140px] sm:pb-[160px]"
             style={{ scrollBehavior: "smooth" }}
           >
-            <div className="p-3 sm:p-4 space-y-4">
+            {/* 메시지 표시 영역 */}
+            <div className="px-3 sm:px-4 py-2 space-y-4">
               {messages.map((message, index) => (
                 <div
                   key={message.id || index}
@@ -761,6 +775,21 @@ export default function SajuChat({
                         style={{ animationDelay: "300ms" }}
                       ></div>
                     </div>
+                  </div>
+                </div>
+              )}
+              {error && (
+                <div className="flex justify-center my-4">
+                  <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-lg p-3 text-sm flex flex-col items-center">
+                    <p>메시지 로딩 중 오류가 발생했습니다.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={reload}
+                      className="mt-2 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                    >
+                      다시 시도
+                    </Button>
                   </div>
                 </div>
               )}
