@@ -143,12 +143,17 @@ interface ChatData {
 const loadChatDataFromLocalStorage = (name: string, saju: any) => {
   try {
     const chatSessionsStr = localStorage.getItem("saju_chat_sessions")
-    if (!chatSessionsStr) return {}
+    if (!chatSessionsStr) {
+      console.log("No chat sessions found in localStorage") // 디버깅 로그 추가
+      return {}
+    }
 
     const allChatSessions = JSON.parse(chatSessionsStr)
+    console.log("All chat sessions:", Object.keys(allChatSessions)) // 디버깅 로그 추가
 
     // Create a unique identifier for this user
     const userIdentifier = `${name}_${saju.year}${saju.month}${saju.day}`
+    console.log("User identifier:", userIdentifier) // 디버깅 로그 추가
 
     // Filter chat sessions to only include those belonging to this user
     const userChatSessions = Object.entries(allChatSessions)
@@ -161,6 +166,7 @@ const loadChatDataFromLocalStorage = (name: string, saju: any) => {
         return acc
       }, {})
 
+    console.log("User chat sessions:", Object.keys(userChatSessions)) // 디버깅 로그 추가
     return userChatSessions
   } catch (error) {
     console.error("Error loading chat data from localStorage:", error)
@@ -197,7 +203,7 @@ export default function ChatListClient() {
       const interpretation = searchParams.get("interpretation") || ""
       const returnPath = searchParams.get("returnPath") || "/"
 
-      console.log("Received parameters:", { name, gender }) // Debug log
+      console.log("Received parameters:", { name, gender, sajuParam }) // 디버깅 로그 추가
 
       if (!sajuParam) {
         setError("사주 정보가 없습니다.")
@@ -207,6 +213,7 @@ export default function ChatListClient() {
 
       try {
         const saju = JSON.parse(sajuParam)
+        console.log("Parsed saju data:", saju) // 디버깅 로그 추가
         const data = { saju, name, gender, interpretation, returnPath }
 
         // 상태 업데이트는 한 번에 처리
@@ -224,6 +231,7 @@ export default function ChatListClient() {
 
         // localStorage에서 저장된 채팅 데이터 불러오기 - Updated to be user-specific
         const savedChatData = loadChatDataFromLocalStorage(name, saju)
+        console.log("Loaded chat data from localStorage:", savedChatData) // 디버깅 로그 추가
 
         // 기본 채팅방 데이터
         const basicRooms: ChatRoom[] = [

@@ -36,7 +36,7 @@ const useHideHeaderAndFooter = () => {
 }
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Send, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, Send, ArrowLeft } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
@@ -441,8 +441,22 @@ export default function SajuChat({
 
       saveChatSession(sessionKey, sessionData)
 
-      // 채팅 리스트로 이동
-      router.push("/chat-list")
+      // 채팅 리스트로 이동 - 필요한 모든 파라미터 포함
+      if (saju) {
+        const sajuParam = encodeURIComponent(JSON.stringify(saju))
+        const nameParam = encodeURIComponent(name || "")
+        const genderParam = encodeURIComponent(gender || "")
+        const interpretationParam = encodeURIComponent(initialInterpretation || "")
+
+        // 채팅 리스트 페이지로 이동하면서 필요한 모든 파라미터 전달
+        // 두 가지 가능한 경로 중 올바른 것을 사용
+        router.push(
+          `/chat-list?saju=${sajuParam}&name=${nameParam}&gender=${genderParam}&interpretation=${interpretationParam}`,
+        )
+      } else {
+        // 사주 데이터가 없는 경우 (비정상적인 상황)
+        router.push("/")
+      }
     }
   }
 
@@ -818,110 +832,107 @@ export default function SajuChat({
             </div>
 
             {/* 메시지 표시 영역 */}
-            <div className="px-3 sm:px-4 py-2 space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={message.id || index}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[80%] sm:max-w-[70%] rounded-lg p-3 ${
-                      message.role === "user"
-                        ? "bg-blue-500 text-white rounded-br-none"
-                        : "bg-gray-100 dark:bg-gray-800 rounded-bl-none"
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">
-                      <ReactMarkdown remarkRehypeOptions={{ allowDangerousHtml: true }}>
-                        {message.content}
-                      </ReactMarkdown>
+            {messages.map((message, index) => (
+              <div key={message.id} className="mb-1">
+                {/* Assistant 메시지 */}
+                {message.role === "assistant" && (
+                  <div className="flex items-start gap-3 p-3 sm:p-4 bg-gray-100 dark:bg-gray-700 rounded-lg w-full">
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                      <img
+                        src={getConsultantAvatar(roomType) || "/placeholder.svg"}
+                        alt={getConsultantName(roomType)}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-col w-full">
+                      <div className="text-sm font-medium">{getConsultantName(roomType)}</div>
+                      <div className="prose dark:prose-invert break-words">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="max-w-[80%] sm:max-w-[70%] rounded-lg p-3 bg-gray-100 dark:bg-gray-800 rounded-bl-none">
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      ></div>
+                )}
+
+                {/* User 메시지 */}
+                {message.role === "user" && (
+                  <div className="flex items-start justify-end gap-3 p-3 sm:p-4 bg-blue-500 text-white rounded-lg w-full self-end">
+                    <div className="flex flex-col items-end w-full">
+                      <div className="text-sm font-medium">나</div>
+                      <div className="prose dark:prose-invert break-words text-right">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                      <img src="/user.svg" alt={name} className="w-full h-full object-cover" />
                     </div>
                   </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* 입력 필드 영역 - 고정 위치 설정 */}
-          <div className="fixed bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 pb-safe">
-            {/* Suggested Questions */}
-            <div className="px-3 sm:px-4 pt-2 pb-1 bg-gray-50 dark:bg-gray-900">
-              <div className="flex justify-between items-center">
-                <p className="text-xs text-gray-500">추천 질문:</p>
-                <Button variant="ghost" size="icon" onClick={() => setShowSuggestedQuestions(!showSuggestedQuestions)}>
-                  {showSuggestedQuestions ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                </Button>
-              </div>
-              <div className={`flex flex-wrap gap-2 ${showSuggestedQuestions ? "" : "hidden"}`}>
-                {suggestedQuestions.length > 0 ? (
-                  suggestedQuestions.map((question, index) => (
-                    <button
-                      key={`suggested-${index}-${question.substring(0, 10)}`}
+          {/* 하단 입력 필드 및 추천 질문 영역 */}
+          <div className="absolute bottom-0 left-0 w-full bg-white dark:bg-gray-800 p-4 sm:p-6 border-t">
+            {/* 추천 질문 표시 여부에 따라 렌더링 */}
+            {showSuggestedQuestions && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium mb-2">추천 질문</h4>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedQuestions.map((question, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleQuestionClick(question)}
-                      className="text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-full px-3 py-1.5 text-left"
+                      disabled={isLoading || isGeneratingQuestions}
                     >
                       {question}
-                    </button>
-                  ))
-                ) : (
-                  <span className="text-sm text-gray-500">추천 질문이 없습니다</span>
-                )}
-                {isGeneratingQuestions && (
-                  <div className="text-sm bg-gray-100 dark:bg-gray-800 rounded-full px-3 py-1.5 flex items-center">
-                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                    질문 생성 중...
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 입력 폼 */}
-            <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900 chat-input-area">
-              <form onSubmit={customHandleSubmit} className="flex space-x-2">
-                <div className="flex items-center bg-white dark:bg-gray-800 rounded-full px-3 py-1.5 flex-1 border border-gray-200 dark:border-gray-700">
-                  <input
-                    ref={inputRef}
-                    value={input}
-                    onChange={handleInputChange}
-                    placeholder="사주에 대해 질문하세요..."
-                    className="flex-1 bg-transparent border-none focus:outline-none text-base"
-                    disabled={isLoading}
-                  />
-                  <Button
-                    type="submit"
-                    size="icon"
-                    className="rounded-full bg-blue-600 hover:bg-blue-700 text-white"
-                    disabled={isLoading || !input.trim()}
+                    </Button>
+                  ))}
+                  {/* 더보기 버튼 */}
+                  {/* <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowSuggestedQuestions(false)}
+                    className="h-8"
                   >
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                  </Button>
+                    <ChevronUp className="h-4 w-4" />
+                  </Button> */}
                 </div>
-              </form>
-              <p className="text-xs text-center text-gray-500 mt-1">
-                사주 채팅은 정확한 정보를 제공하기 위해 노력합니다.
-              </p>
-            </div>
+              </div>
+            )}
+
+            {/* <div className="mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSuggestedQuestions(true)}
+                className="h-8"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </div> */}
+
+            {/* 입력 필드 */}
+            <form onSubmit={customHandleSubmit} className="relative">
+              <input
+                type="text"
+                ref={inputRef}
+                value={input}
+                onChange={handleInputChange}
+                placeholder="질문을 입력하세요..."
+                className="w-full px-4 py-2 rounded-md border dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                disabled={isLoading}
+              />
+              <Button
+                type="submit"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </form>
           </div>
         </div>
       </CardContent>
