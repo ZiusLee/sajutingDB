@@ -231,7 +231,6 @@ export default function SajuChat({
   const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClientComponentClient()
-  const [hasShownPrompt, setHasShownPrompt] = useState(false)
 
   // Chat context
   const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
@@ -399,7 +398,7 @@ export default function SajuChat({
     if (!isLoggedIn && !hasShownLoginPrompt && questionCount > 0) {
       setLoginPromptMessage("채팅 내역을 저장하려면 로그인이 필요합니다. 로그인하시겠습니까?")
       setShowLoginPrompt(true)
-      setHasShownPrompt(true)
+      setHasShownLoginPrompt(true)
     } else {
       // Otherwise, just go back
       // 채팅 데이터 저장
@@ -473,7 +472,9 @@ export default function SajuChat({
       })
 
       if (!response.ok) {
-        throw new Error("Failed to generate suggested questions")
+        const errorData = await response.json()
+        console.error("Failed to generate suggested questions:", errorData)
+        throw new Error(`Failed to generate suggested questions: ${response.status} - ${JSON.stringify(errorData)}`)
       }
 
       const data = await response.json()
@@ -482,6 +483,7 @@ export default function SajuChat({
         // 새로운 질문으로 상태 업데이트
         setSuggestedQuestions(data.suggestedQuestions.slice(0, 2))
       } else {
+        console.warn("No suggested questions received, using default questions")
         // 기본 질문으로 폴백
         setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
       }
@@ -661,14 +663,6 @@ export default function SajuChat({
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <CardTitle className="text-lg">{getRoomTitle(roomType)}</CardTitle>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowSajuInfo(!showSajuInfo)}
-          className="w-8 h-8 rounded-full"
-        >
-          {showSajuInfo ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
       </CardHeader>
 
       <CardContent className="p-0">
