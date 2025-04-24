@@ -7,7 +7,7 @@ export default function Home() {
     <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md mx-auto">
         <CardHeader>
-          <CardTitle className="text-center text-2xl">사주핑 연애운 측정기 </CardTitle>
+          <CardTitle className="text-center text-2xl">사주핑 리포트</CardTitle>
         </CardHeader>
         <CardContent>
           <BirthDateFormClient />
