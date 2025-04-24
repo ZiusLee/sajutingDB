@@ -60,7 +60,7 @@ ${creative ? "이전 대화에서 언급되지 않은 새로운 주제나 관점
 
     // API 요청
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1",
       messages: [
         {
           role: "system",
