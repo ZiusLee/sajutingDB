@@ -55,6 +55,12 @@ export async function POST(req: Request) {
     // 사용자 메시지 배열에 시스템 메시지 추가
     const apiMessages = [{ role: "system", content: systemMessage }, ...messages]
 
+    let model = openai("gpt-4.1")
+
+    if (roomType === "personalized") {
+      model = openai("ft:gpt-4.1-2025-04-14:towinai::BP66DQ1v")
+    }
+
     // Daily Fortune Chatroom
     if (roomType === "daily-fortune") {
       // 오늘 날짜를 가져와 음력으로 변환
@@ -95,7 +101,7 @@ export async function POST(req: Request) {
       return result.toDataStreamResponse()
     } else {
       const result = streamText({
-        model: openai("gpt-4.1"),
+        model: model,
         messages: apiMessages,
         temperature: 0.8, // 낮춰서 더 정확한 답변 유도
         maxTokens: 4000, // 필요에 따라 토큰 수 조절

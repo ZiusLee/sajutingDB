@@ -5,6 +5,8 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getAdditionalInterpretation } from "@/lib/api-client"
+// 필요한 import 추가 (파일 상단)
+import { getLoveDetailedAnalysis } from "@/lib/api-client"
 import ReactMarkdown from "react-markdown"
 import { Loader2, MessageCircle, PlusCircle, Send, Users, Trash2, UserPlus, ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -183,6 +185,7 @@ export default function AdditionalQuestions({
     }
   }, [loadingCategory])
 
+  // handleCategoryClick 함수 수정 (약 라인 170 근처)
   const handleCategoryClick = async (category: string) => {
     // 이미 활성화된 카테고리인 경우 토글
     if (activeCategories.includes(category)) {
@@ -200,7 +203,15 @@ export default function AdditionalQuestions({
     setErrors({ ...errors, [category]: null })
 
     try {
-      const result = await getAdditionalInterpretation(saju, name, gender, model, category, relationshipStatus)
+      let result
+
+      // 연애운 상세 분석인 경우 다른 API 호출
+      if (category === "love-detailed-analysis") {
+        result = await getLoveDetailedAnalysis(saju, name, gender, relationshipStatus)
+      } else {
+        result = await getAdditionalInterpretation(saju, name, gender, model, category, relationshipStatus)
+      }
+
       setInterpretations({ ...interpretations, [category]: result.interpretation })
 
       if (result && result.interpretation) {
@@ -501,9 +512,17 @@ export default function AdditionalQuestions({
     // 사용자의 일주 추출
     const userIlju = `${dayStem}${dayBranch}`
 
+    // 모든 관계 상태에 공통으로 추가할 연애운 상세 분석 카테고리
+    const loveAnalysisCategory = {
+      id: "love-detailed-analysis",
+      title: `${userIlju}일주 연애운 상세 분석`,
+      description: "사주를 통해 연애 성향, 궁합, 운명적 인연에 대한 상세 분석을 알아보세요.",
+    }
+
     switch (relationshipStatus) {
       case "solo":
         return [
+          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
           {
             id: "solo-analysis",
             title: `${userIlju}일주 ${gender === "male" ? "남자" : "여자"} 솔로 원인분석`,
@@ -517,6 +536,7 @@ export default function AdditionalQuestions({
         ]
       case "flirting":
         return [
+          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
           {
             id: "flirting-strategy",
             title: `${userIlju}일주 썸 발전 전략`,
@@ -530,6 +550,7 @@ export default function AdditionalQuestions({
         ]
       case "dating":
         return [
+          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
           {
             id: "relationship-issues",
             title: `${userIlju}일주 연애 문제 해결책`,
@@ -543,6 +564,7 @@ export default function AdditionalQuestions({
         ]
       case "married":
         return [
+          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
           {
             id: "marriage-issues",
             title: `${userIlju}일주 결혼생활 문제 해결책`,
@@ -556,6 +578,7 @@ export default function AdditionalQuestions({
         ]
       default:
         return [
+          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
           {
             id: "relationship-issues",
             title: "연애에서의 문제 & 해결책",

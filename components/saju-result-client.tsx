@@ -261,14 +261,14 @@ ${interpretation}
           <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
             <div className="flex border-b border-gray-200 dark:border-gray-800">
               <button
-                onClick={() => setActiveTab("diagram")}
+                onClick={() => setActiveTab("interpretation")}
                 className={`flex-1 py-2 px-3 text-center text-sm font-medium ${
-                  activeTab === "diagram"
+                  activeTab === "interpretation"
                     ? "border-b-2 border-primary text-primary"
                     : "text-gray-500 dark:text-gray-400"
                 }`}
               >
-                사주 도표
+                나의 총운 리포트
               </button>
               <button
                 onClick={() => setActiveTab("interpretation")}
@@ -278,7 +278,7 @@ ${interpretation}
                     : "text-gray-500 dark:text-gray-400"
                 }`}
               >
-                상세 해석 (AI)
+                나의 총운 리포트
               </button>
             </div>
 
@@ -313,12 +313,12 @@ ${interpretation}
 
             {activeTab === "interpretation" && (
               <div className="p-3">
-                <h3 className="text-base font-medium mb-2">상세 해석 (AI)</h3>
+                <h3 className="text-base font-medium mb-2">나의 총운 리포트</h3>
 
                 {!interpretation && !isLoading && !error && (
                   <div className="flex flex-col items-center justify-center py-6 space-y-3">
-                    <p className="text-center text-muted-foreground">AI를 통한 상세 사주 해석을 받아보세요.</p>
-                    <Button onClick={fetchInterpretation}>상세 해석 받기</Button>
+                    <p className="text-center text-muted-foreground">AI를 통한 나의 총운 리포트를 받아보세요.</p>
+                    <Button onClick={fetchInterpretation}>총운 리포트 받기</Button>
                   </div>
                 )}
 
@@ -402,7 +402,7 @@ ${interpretation}
               사주 도표
             </TabsTrigger>
             <TabsTrigger value="interpretation" data-value="interpretation">
-              상세 해석 (AI)
+              나의 총운 리포트
             </TabsTrigger>
           </TabsList>
           <TabsContent value="diagram" className="mt-4">
@@ -439,8 +439,8 @@ ${interpretation}
               <CardContent className="p-4">
                 {!interpretation && !isLoading && !error && (
                   <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                    <p className="text-center text-muted-foreground">AI를 통한 상세 사주 해석을 받아보세요.</p>
-                    <Button onClick={fetchInterpretation}>상세 해석 받기</Button>
+                    <p className="text-center text-muted-foreground">AI를 통한 나의 총운 리포트를 받아보세요.</p>
+                    <Button onClick={fetchInterpretation}>총운 리포트 받기</Button>
                   </div>
                 )}
 

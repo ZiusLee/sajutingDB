@@ -58,7 +58,7 @@ const interestServices = [
 
 // 기타 서비스 옵션
 const services = [
-  { id: "daily-fortune", label: "데일리 운세 뉴스레터 받기 (무료)" },
+  { id: "daily-fortune", label: "데일리 운세 뉴스레터 ��기 (무료)" },
   { id: "daily-love", label: "데일리 연애운 뉴스레터 받기(무료)" },
   { id: "saju-dating", label: "사주기반 소개팅 받기 사주적 최고의 매칭이 있을때 (유료)" },
   { id: "ai-love-advice", label: "연애상담 AI 서비스 (초기무료)" },

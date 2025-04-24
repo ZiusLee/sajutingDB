@@ -89,11 +89,7 @@ const initialSuggestedQuestionsByType: Record<string, string[]> = {
     "제 사주에 맞는 배우자는 어떤 사람인가요?",
     "푸른 뱀의 해에 결혼 생활에서 주의해야 할 점이 있나요?",
   ],
-  personalized: [
-    "제 사주에서 가장 두드러진 특징은 무엇인가요?",
-    "2025년 을사년이 제 사주와 어떻게 상호작용하나요?",
-    "푸른 뱀의 해에 제 사주에 맞는 행운을 끌어당기는 방법이 있을까요?",
-  ],
+  personalized: ["그냥 너무 불안해요", "뭘 해야할지 잘 모르겠어요", "요즘 번아웃이 온것 같아요"],
   "daily-fortune": [
     `오늘(${formatTodayDate()})의 운세를 보시겠습니까?`,
     "오늘 하루를 어떻게 보내는 것이 좋을까요?",
@@ -113,6 +109,11 @@ const getInitialMessageByRoomType = (name: string, roomType: string): string => 
       return `안녕하세요, ${userName}님! 직업운에 대한 사주 상담을 시작해볼게요.
 
 ${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 취업, 이직, 승진, 직장 생활 등 직업과 관련된 질문을 해주시면 사주를 바탕으로 답변해드릴게요. 어떤 직업이 잘 맞는지, 언제 이직하면 좋을지 등 구체적인 질문을 해보세요.`
+
+    case "personalized":
+      return `안녕하세요, ${userName}님! 직업운에 대한 사주 상담을 시작해볼게요.
+
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 요즘은 뭐가 가장 고민되고 힘드신가요? 뭐든 편하게 얘기해주세요.`
 
     case "love":
       return `안녕하세요, ${userName}님! 애정운에 대한 사주 상담을 시작할게요.
@@ -156,7 +157,7 @@ const getRoomTitle = (roomType: string): string => {
     case "marriage":
       return "결혼운"
     case "personalized":
-      return "맞춤 상담"
+      return "고민상담"
     case "daily-fortune":
       return "오늘의 운세"
     case "general":
@@ -181,7 +182,7 @@ const getConsultantName = (roomType: string): string => {
     case "marriage":
       return "결혼 상담사"
     case "personalized":
-      return "맞춤 상담사"
+      return "고민 상담사"
     case "daily-fortune":
       return "AI 운세봇"
     case "general":
@@ -252,6 +253,7 @@ export default function SajuChat({
   const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClientComponentClient()
+  const [hasShownPrompt, setHasShownPrompt] = useState(false)
 
   // Chat context
   const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
@@ -423,7 +425,7 @@ export default function SajuChat({
     if (!isLoggedIn && !hasShownLoginPrompt && questionCount > 0) {
       setLoginPromptMessage("채팅 내역을 저장하려면 로그인이 필요합니다. 로그인하시겠습니까?")
       setShowLoginPrompt(true)
-      setHasShownLoginPrompt(true)
+      setHasShownPrompt(true)
     } else {
       // Otherwise, just go back
       // 채팅 데이터 저장
@@ -513,7 +515,7 @@ export default function SajuChat({
 
   // 메시지가 변경될 때마다 스크롤을 아래로 이동
   useEffect(() => {
-    if (messagesEndRef.current && chatContainerRef.current) {
+    if (messagesEndRef.current && chatContainerRef.current && !isLoading) {
       // 약간의 지연을 두고 스크롤 실행 (모바일에서 더 안정적)
       setTimeout(() => {
         const chatContainer = chatContainerRef.current

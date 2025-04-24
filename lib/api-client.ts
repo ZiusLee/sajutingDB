@@ -126,3 +126,34 @@ export async function getSajuInterpretation(saju: any) {
     throw error
   }
 }
+
+// 연애운 상세 분석을 위한 API 호출 함수 추가
+export async function getLoveDetailedAnalysis(saju: any, name: string, gender: string, relationshipStatus: string) {
+  try {
+    console.log("Requesting love detailed analysis")
+
+    const response = await fetch("/api/saju-interpretation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        saju,
+        name,
+        gender,
+        questionSet: "love-detailed",
+        relationshipStatus,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to get love detailed analysis")
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error fetching love detailed analysis:", error)
+    throw error
+  }
+}

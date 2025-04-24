@@ -34,7 +34,7 @@ import { ko } from "date-fns/locale"
 // 사용자의 사주에 맞는 맞춤 채팅방 제목 생성
 function getPersonalizedRoomTitle(saju: any, gender: string): string {
   // 사주 데이터를 분석하여 맞춤 제목 생성
-  // 예: 오행 분포, 일주, 성별 등을 고려
+  // ��: 오행 분포, 일주, 성별 등을 고려
 
   // 간단한 예시: 오행 분포에 따라 다른 제목 반환
   if (saju?.elements) {
@@ -368,7 +368,7 @@ export default function ChatListClient() {
         // 사용자의 사주에 맞는 맞춤 채팅방 추가
         const personalizedRoom: ChatRoom = {
           id: "personalized",
-          title: getPersonalizedRoomTitle(saju, gender),
+          title: "고민상담",
           description: "당신의 사주에 맞는 맞춤 상담",
           icon: getPersonalizedRoomIcon(dominantElement),
           lastMessage:
