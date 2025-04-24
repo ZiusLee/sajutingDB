@@ -63,6 +63,7 @@ export default function SajuResultClient({
   const [activeTab, setActiveTab] = useState("diagram")
   const router = useRouter()
   const [questionSet, setQuestionSet] = useState<string | null>(null)
+  const [imageError, setImageError] = useState(false)
 
   // 성별 정보 정규화
   const normalizedGender =
@@ -250,6 +251,11 @@ ${interpretation}
     )
   }
 
+  // 이미지 오류 처리 함수
+  const handleImageError = () => {
+    setImageError(true)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
@@ -261,14 +267,14 @@ ${interpretation}
           <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
             <div className="flex border-b border-gray-200 dark:border-gray-800">
               <button
-                onClick={() => setActiveTab("interpretation")}
+                onClick={() => setActiveTab("diagram")}
                 className={`flex-1 py-2 px-3 text-center text-sm font-medium ${
-                  activeTab === "interpretation"
+                  activeTab === "diagram"
                     ? "border-b-2 border-primary text-primary"
                     : "text-gray-500 dark:text-gray-400"
                 }`}
               >
-                나의 총운 리포트
+                사주 도표
               </button>
               <button
                 onClick={() => setActiveTab("interpretation")}
@@ -325,13 +331,20 @@ ${interpretation}
                 {isLoading && (
                   <div className="flex flex-col items-center justify-center py-6 space-y-3">
                     <div className="animate-float">
-                      <Image
-                        src="/images/sajuping_character.png"
-                        alt="사주핑 캐릭터"
-                        width={80}
-                        height={80}
-                        className="opacity-90"
-                      />
+                      {imageError ? (
+                        <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
+                          <span className="text-primary text-xl">🔮</span>
+                        </div>
+                      ) : (
+                        <Image
+                          src="/images/sajuping_character.png"
+                          alt="사주핑 캐릭터"
+                          width={80}
+                          height={80}
+                          className="opacity-90"
+                          onError={handleImageError}
+                        />
+                      )}
                     </div>
                     <div className="text-center space-y-1">
                       <p className="font-medium text-primary">{loadingStage}</p>
@@ -366,7 +379,7 @@ ${interpretation}
 
                 {interpretation && !isLoading && (
                   <div className="space-y-3">
-                    <div className="markdown-content text-sm">
+                    <div className="markdown-content text-sm prose dark:prose-invert max-w-none">
                       <ReactMarkdown>{interpretation}</ReactMarkdown>
                     </div>
                     <Separator className="my-3" />
@@ -447,13 +460,20 @@ ${interpretation}
                 {isLoading && (
                   <div className="flex flex-col items-center justify-center py-8 space-y-4">
                     <div className="animate-float">
-                      <Image
-                        src="/images/sajuping_character.png"
-                        alt="사주핑 캐릭터"
-                        width={100}
-                        height={100}
-                        className="opacity-90"
-                      />
+                      {imageError ? (
+                        <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center">
+                          <span className="text-primary text-2xl">🔮</span>
+                        </div>
+                      ) : (
+                        <Image
+                          src="/images/sajuping_character.png"
+                          alt="사주핑 캐릭터"
+                          width={100}
+                          height={100}
+                          className="opacity-90"
+                          onError={handleImageError}
+                        />
+                      )}
                     </div>
                     <div className="text-center space-y-2">
                       <p className="font-medium text-primary">{loadingStage}</p>
@@ -488,7 +508,7 @@ ${interpretation}
 
                 {interpretation && !isLoading && (
                   <div className="space-y-4">
-                    <div className="markdown-content">
+                    <div className="markdown-content prose dark:prose-invert max-w-none">
                       <ReactMarkdown>{interpretation}</ReactMarkdown>
                     </div>
                     <Separator className="my-4" />
