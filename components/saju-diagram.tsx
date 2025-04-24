@@ -164,7 +164,7 @@ export default function SajuDiagram({
   const dayMasterTextColor = saju.dayStem !== "?" ? getStemTextColor(saju.dayStem) : ""
 
   // 성별에 따른 텍스트 색상
-  const genderColor = gender === "male" ? "text-blue-500" : gender === "female" ? "text-red-500" : "text-gray-500"
+  const genderColor = gender === "male" ? "text-blue-500" : gender === "female" ? "text-pink-500" : "text-gray-500"
 
   // 이름 처리 로직 개선
   const displayName = name || "사용자"
@@ -194,7 +194,7 @@ export default function SajuDiagram({
 
       {/* 날짜 정보 */}
       <div className="space-y-1 text-base">
-        <p className={genderColor}>
+        <p className="text-gray-700 dark:text-gray-300">
           양 {solarYear}/{solarMonth}/{solarDay} {hour}:{minute}{" "}
           {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location}
         </p>
@@ -202,7 +202,7 @@ export default function SajuDiagram({
           음(평달) {lunarYear}/{lunarMonth}/{lunarDay} {hour}:{minute}{" "}
           {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location}
         </p>
-        <p className={genderColor}>
+        <p className="text-gray-700 dark:text-gray-300">
           양 {solarYear}/{solarMonth}/{solarDay} {Number(hour) - 1}:{Number(minute) + 28}{" "}
           {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location} (지역시 -32분)
         </p>

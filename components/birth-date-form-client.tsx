@@ -27,7 +27,7 @@ export default function BirthDateFormClient() {
   const [time, setTime] = useState<string>("")
   const [timeUnknown, setTimeUnknown] = useState(false)
   const [name, setName] = useState<string>("")
-  const [gender, setGender] = useState<string>("male")
+  const [gender, setGender] = useState<string>("female")
   const [relationshipStatus, setRelationshipStatus] = useState<string>("solo")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -441,15 +441,15 @@ export default function BirthDateFormClient() {
           <Label>성별</Label>
           <RadioGroup value={gender} onValueChange={setGender} className="flex space-x-4">
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="male" id="male" />
-              <Label htmlFor="male" className="cursor-pointer">
-                남성
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
               <RadioGroupItem value="female" id="female" />
               <Label htmlFor="female" className="cursor-pointer">
                 여성
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="male" id="male" />
+              <Label htmlFor="male" className="cursor-pointer">
+                남성
               </Label>
             </div>
           </RadioGroup>

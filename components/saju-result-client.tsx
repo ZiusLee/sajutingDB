@@ -62,6 +62,7 @@ export default function SajuResultClient({
   const [isMobile, setIsMobile] = useState(false)
   const [activeTab, setActiveTab] = useState("diagram")
   const router = useRouter()
+  const [questionSet, setQuestionSet] = useState<string | null>(null)
 
   // 성별 정보 정규화
   const normalizedGender =
@@ -187,7 +188,7 @@ export default function SajuResultClient({
     loadingAnimationRef.current = loadingInterval
 
     try {
-      const result = await getSajuInterpretation(saju)
+      const result = await getSajuInterpretation(saju, name, normalizedGender, relationshipStatus, questionSet)
       setInterpretation(result.interpretation)
 
       // Store the interpretation in localStorage

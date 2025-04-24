@@ -30,9 +30,6 @@ export async function POST(request: NextRequest) {
 3. 잠시 후 다시 시도해보세요.
 `
     }
-
-    console.log("Received interpretation request")
-
     // 요청 본문 파싱
     let requestData
     try {
@@ -48,7 +45,6 @@ export async function POST(request: NextRequest) {
       console.error("Missing saju data in request")
       return NextResponse.json({ error: "Missing saju data" }, { status: 400 })
     }
-
     // 사주 정보 추출
     const {
       yearStem,
@@ -62,15 +58,22 @@ export async function POST(request: NextRequest) {
       elements,
       yearAnimal,
       dayMaster,
+      yearStemSibseong,
+      monthStemSibseong,
+      dayStemSibseong,
+      hourStemSibseong,
+      yearBranchSibseong,
+      monthBranchSibseong,
+      dayBranchSibseong,
+      hourBranchSibseong,
     } = saju
 
     // 이름과 성별 정보 추가
-    const userName = name || "사용자"
-    const userGender = gender || "male"
-    const genderText = userGender === "male" ? "남성" : "여성"
+    const userName = name
+    const userGender = gender
 
     console.log(
-      `Processing request for ${userName} (${genderText}), questionSet: ${questionSet}, relationshipStatus: ${relationshipStatus}`,
+      `Processing request for ${userName}, questionSet: ${questionSet}, relationshipStatus: ${relationshipStatus}`,
     )
 
     // 관계 상태에 따른 추가 분석 지침
@@ -131,7 +134,7 @@ export async function POST(request: NextRequest) {
 오늘 날짜: ${new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}
 
 - 이름: ${userName}
-- 성별: ${genderText}
+- 성별: ${userGender}
 - 현재 관계 상태: ${
       relationshipStatus === "solo"
         ? "솔로"
