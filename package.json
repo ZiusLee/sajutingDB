@@ -71,8 +71,8 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "jsonwebtoken": "latest",
     "bcryptjs": "latest",
-    "openai": "latest",
-    "fast-xml-parser": "latest"
+    "fast-xml-parser": "latest",
+    "openai": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
