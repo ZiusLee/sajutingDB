@@ -126,8 +126,19 @@ export default async function ResultPage({
             <CardDescription className="text-center">
               양력: {solarYear}년 {solarMonth}월 {solarDay}일 {isTimeUnknown ? "(시간 미상)" : `${hour}시 ${minute}분`}
               <br />
-              음력: {lunarData.year}년 {lunarData.month}월 {lunarData.day}일{name && <br />}
-              {name && <>이름: {name}님</>}
+              음력: {lunarData.year}년 {lunarData.month}월 {lunarData.day}일
+              {name && (
+                <>
+                  <br />
+                  이름: {name}님
+                </>
+              )}
+              {gender && (
+                <>
+                  <br />
+                  {gender === "male" ? "남성" : "여성"}
+                </>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

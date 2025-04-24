@@ -12,6 +12,9 @@ interface SajuResultProps {
   lunarYear?: string
   lunarMonth?: string
   lunarDay?: string
+  name?: string
+  gender?: string
+  location?: string
 }
 
 export default function SajuResult({
@@ -25,6 +28,9 @@ export default function SajuResult({
   lunarYear = "",
   lunarMonth = "",
   lunarDay = "",
+  name = "",
+  gender = "",
+  location = "",
 }: SajuResultProps) {
   return (
     <SajuResultClient
@@ -38,6 +44,9 @@ export default function SajuResult({
       lunarYear={lunarYear}
       lunarMonth={lunarMonth}
       lunarDay={lunarDay}
+      name={name}
+      gender={gender}
+      location={location}
     />
   )
 }

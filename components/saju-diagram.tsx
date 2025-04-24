@@ -44,6 +44,13 @@ export default function SajuDiagram({
     unknown: "bg-gray-100 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-300 dark:text-gray-100",
   }
 
+  // 텍스트 색상만 추출하는 함수
+  const getTextColorClass = (elementColorClass: string) => {
+    // 텍스트 색상 클래스만 추출 (text-xxx-xxx 형식)
+    const textColorMatch = elementColorClass.match(/text-[a-z]+-[0-9]+/)
+    return textColorMatch ? textColorMatch[0] : "text-gray-800 dark:text-gray-300"
+  }
+
   // 간의 오행 매핑
   const stemElements = {
     갑: "wood",
@@ -86,6 +93,18 @@ export default function SajuDiagram({
     return elementColors[branchElements[branch as keyof typeof branchElements]]
   }
 
+  // 간의 오행 텍스트 색상 가져오기
+  const getStemTextColor = (stem: string) => {
+    if (stem === "?") return getTextColorClass(elementColors.unknown)
+    return getTextColorClass(elementColors[stemElements[stem as keyof typeof stemElements]])
+  }
+
+  // 지의 오행 텍스트 색상 가져오기
+  const getBranchTextColor = (branch: string) => {
+    if (branch === "?") return getTextColorClass(elementColors.unknown)
+    return getTextColorClass(elementColors[branchElements[branch as keyof typeof branchElements]])
+  }
+
   // 십이지지 동물 이름
   const branchAnimals = {
     자: "쥐",
@@ -116,18 +135,39 @@ export default function SajuDiagram({
     계: "검은",
   }
 
-  // 일주 동물 이름 가져오기
-  const getDayMasterAnimal = () => {
-    if (saju.dayStem === "?" || saju.dayBranch === "?") return ""
+  // 오행 이름
+  const elementNames = {
+    wood: "목(木)",
+    fire: "화(火)",
+    earth: "토(土)",
+    metal: "금(金)",
+    water: "수(水)",
+  }
+
+  // 일주 정보 가져오기
+  const getDayMasterInfo = () => {
+    if (saju.dayStem === "?" || saju.dayBranch === "?") return { colorName: "", animalName: "", element: "", ilju: "" }
 
     const colorName = stemColorNames[saju.dayStem as keyof typeof stemColorNames] || ""
     const animalName = branchAnimals[saju.dayBranch as keyof typeof branchAnimals] || ""
+    const element = stemElements[saju.dayStem as keyof typeof stemElements] || ""
+    const elementName = elementNames[element as keyof typeof elementNames] || ""
+    const ilju = `${saju.dayStem}${saju.dayBranch}`
 
-    return `${colorName}${animalName}`
+    return { colorName, animalName, element, elementName, ilju }
   }
+
+  // 일주 정보
+  const dayMasterInfo = getDayMasterInfo()
+
+  // 일주 텍스트 색상
+  const dayMasterTextColor = saju.dayStem !== "?" ? getStemTextColor(saju.dayStem) : ""
 
   // 성별에 따른 텍스트 색상
   const genderColor = gender === "male" ? "text-blue-500" : gender === "female" ? "text-red-500" : "text-gray-500"
+
+  // 이름 처리 로직 개선
+  const displayName = name || "사용자"
 
   return (
     <div className="space-y-4">
@@ -136,11 +176,19 @@ export default function SajuDiagram({
         <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-2xl">
           {branchAnimals[saju.yearBranch as keyof typeof branchAnimals] || "?"}
         </div>
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            {name || "사용자"}
-            {name && <span className="text-sm font-normal">({getDayMasterAnimal()})</span>}
-          </h2>
+        <div className="flex flex-col">
+          <h2 className="text-xl font-bold">{displayName}</h2>
+          {dayMasterInfo.ilju && (
+            <div className="flex flex-col">
+              <span className={`text-sm ${dayMasterTextColor}`}>
+                {dayMasterInfo.ilju}일주 ({dayMasterInfo.elementName})
+              </span>
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                {dayMasterInfo.colorName}
+                {dayMasterInfo.animalName}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -161,94 +209,126 @@ export default function SajuDiagram({
       </div>
 
       {/* 사주 표 */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-hidden shadow-md">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-gray-50 dark:bg-gray-800">
-              <th className="p-2 border-b border-r"></th>
-              <th className="p-2 border-b border-r text-center">생시</th>
-              <th className="p-2 border-b border-r text-center">생일</th>
-              <th className="p-2 border-b border-r text-center">생월</th>
-              <th className="p-2 border-b text-center">생년</th>
+            <tr className="bg-gray-100 dark:bg-gray-800">
+              <th className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600"></th>
+              <th className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">생시</th>
+              <th className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">생일</th>
+              <th className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">생월</th>
+              <th className="p-3 border-b-2 border-gray-300 dark:border-gray-600 text-center">생년</th>
             </tr>
           </thead>
           <tbody>
             {/* 천간 행 */}
             <tr>
-              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">천간</td>
-              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
-                <div className={`text-2xl font-bold ${timeUnknown ? "" : getStemColor(saju.hourStem)}`}>
-                  {timeUnknown ? "?" : saju.hourStem}
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 font-medium bg-gray-100 dark:bg-gray-800">
+                천간
+              </td>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${
+                  timeUnknown ? "text-gray-400" : getStemColor(saju.hourStem)
+                }`}
+              >
+                <div className={`text-2xl font-bold`}>{timeUnknown ? "?" : saju.hourStem}</div>
+                <div className={`text-xs ${timeUnknown ? "text-gray-400" : getStemTextColor(saju.hourStem)}`}>
+                  {timeUnknown ? "" : saju.hourStemHanja}
                 </div>
-                <div className="text-xs text-gray-500">{timeUnknown ? "" : saju.hourStemHanja}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
-                <div className={`text-2xl font-bold ${getStemColor(saju.dayStem)}`}>{saju.dayStem}</div>
-                <div className="text-xs text-gray-500">{saju.dayStemHanja}</div>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${getStemColor(saju.dayStem)}`}
+              >
+                <div className={`text-2xl font-bold`}>{saju.dayStem}</div>
+                <div className={`text-xs ${getStemTextColor(saju.dayStem)}`}>{saju.dayStemHanja}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
-                <div className={`text-2xl font-bold ${getStemColor(saju.monthStem)}`}>{saju.monthStem}</div>
-                <div className="text-xs text-gray-500">{saju.monthStemHanja}</div>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${getStemColor(saju.monthStem)}`}
+              >
+                <div className={`text-2xl font-bold`}>{saju.monthStem}</div>
+                <div className={`text-xs ${getStemTextColor(saju.monthStem)}`}>{saju.monthStemHanja}</div>
               </td>
-              <td className="p-2 border-b text-center">
-                <div className={`text-2xl font-bold ${getStemColor(saju.yearStem)}`}>{saju.yearStem}</div>
-                <div className="text-xs text-gray-500">{saju.yearStemHanja}</div>
+              <td
+                className={`p-3 border-b-2 border-gray-300 dark:border-gray-600 text-center ${getStemColor(saju.yearStem)}`}
+              >
+                <div className={`text-2xl font-bold`}>{saju.yearStem}</div>
+                <div className={`text-xs ${getStemTextColor(saju.yearStem)}`}>{saju.yearStemHanja}</div>
               </td>
             </tr>
 
             {/* 십성 행 */}
             <tr>
-              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">십성</td>
-              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 font-medium bg-gray-100 dark:bg-gray-800">
+                십성
+              </td>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${timeUnknown ? "text-gray-400" : ""}`}
+              >
                 <div>{timeUnknown ? "" : saju.hourStemSibseong}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.dayStemSibseong}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.monthStemSibseong}</div>
               </td>
-              <td className="p-2 border-b text-center">
+              <td className="p-3 border-b-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.yearStemSibseong}</div>
               </td>
             </tr>
 
             {/* 지지 행 */}
             <tr>
-              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">지지</td>
-              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
-                <div className={`text-2xl font-bold ${timeUnknown ? "" : getBranchColor(saju.hourBranch)}`}>
-                  {timeUnknown ? "?" : saju.hourBranch}
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 font-medium bg-gray-100 dark:bg-gray-800">
+                지지
+              </td>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${
+                  timeUnknown ? "text-gray-400" : getBranchColor(saju.hourBranch)
+                }`}
+              >
+                <div className={`text-2xl font-bold`}>{timeUnknown ? "?" : saju.hourBranch}</div>
+                <div className={`text-xs ${timeUnknown ? "text-gray-400" : getBranchTextColor(saju.hourBranch)}`}>
+                  {timeUnknown ? "" : saju.hourBranchHanja}
                 </div>
-                <div className="text-xs text-amber-600">{timeUnknown ? "" : saju.hourBranchHanja}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
-                <div className={`text-2xl font-bold ${getBranchColor(saju.dayBranch)}`}>{saju.dayBranch}</div>
-                <div className="text-xs text-amber-600">{saju.dayBranchHanja}</div>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${getBranchColor(saju.dayBranch)}`}
+              >
+                <div className={`text-2xl font-bold`}>{saju.dayBranch}</div>
+                <div className={`text-xs ${getBranchTextColor(saju.dayBranch)}`}>{saju.dayBranchHanja}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
-                <div className={`text-2xl font-bold ${getBranchColor(saju.monthBranch)}`}>{saju.monthBranch}</div>
-                <div className="text-xs text-amber-600">{saju.monthBranchHanja}</div>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${getBranchColor(saju.monthBranch)}`}
+              >
+                <div className={`text-2xl font-bold`}>{saju.monthBranch}</div>
+                <div className={`text-xs ${getBranchTextColor(saju.monthBranch)}`}>{saju.monthBranchHanja}</div>
               </td>
-              <td className="p-2 border-b text-center">
-                <div className={`text-2xl font-bold ${getBranchColor(saju.yearBranch)}`}>{saju.yearBranch}</div>
-                <div className="text-xs text-amber-600">{saju.yearBranchHanja}</div>
+              <td
+                className={`p-3 border-b-2 border-gray-300 dark:border-gray-600 text-center ${getBranchColor(saju.yearBranch)}`}
+              >
+                <div className={`text-2xl font-bold`}>{saju.yearBranch}</div>
+                <div className={`text-xs ${getBranchTextColor(saju.yearBranch)}`}>{saju.yearBranchHanja}</div>
               </td>
             </tr>
 
             {/* 십성 행 */}
             <tr>
-              <td className="p-2 border-b border-r font-medium bg-gray-50 dark:bg-gray-800">십성</td>
-              <td className={`p-2 border-b border-r text-center ${timeUnknown ? "text-gray-400" : ""}`}>
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 font-medium bg-gray-100 dark:bg-gray-800">
+                십성
+              </td>
+              <td
+                className={`p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center ${timeUnknown ? "text-gray-400" : ""}`}
+              >
                 <div>{timeUnknown ? "" : saju.hourBranchSibseong}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.dayBranchSibseong}</div>
               </td>
-              <td className="p-2 border-b border-r text-center">
+              <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.monthBranchSibseong}</div>
               </td>
-              <td className="p-2 border-b text-center">
+              <td className="p-3 border-b-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.yearBranchSibseong}</div>
               </td>
             </tr>

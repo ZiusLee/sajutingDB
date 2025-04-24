@@ -67,18 +67,21 @@ async function getSolarTermDateFromKASI(year: number, termIndex: number): Promis
 // 특정 연도의 절기 날짜 계산
 export async function calculateSolarTerms(year: number): Promise<Record<string, Date>> {
   const terms: Record<string, Date> = {}
+  const useLocalCalculation = process.env.USE_LOCAL_LUNAR_CALCULATION === "true"
 
   for (let i = 0; i < 24; i++) {
     let date: Date | null = null
 
-    // KASI API에서 절기 날짜 가져오기 시도
-    try {
-      date = await getSolarTermDateFromKASI(year, i)
-    } catch (e) {
-      console.error("KASI API 호출 실패, 로컬 계산으로 대체:", e)
+    // If not using local calculation, try KASI API
+    if (!useLocalCalculation) {
+      try {
+        date = await getSolarTermDateFromKASI(year, i)
+      } catch (e) {
+        console.error("KASI API 호출 실패, 로컬 계산으로 대체:", e)
+      }
     }
 
-    // KASI API에서 가져오지 못하면 로컬 계산 사용
+    // If KASI API failed or we're using local calculation, use local calculation
     if (!date) {
       date = getSolarTermDateLocal(year, i)
     }
@@ -91,20 +94,25 @@ export async function calculateSolarTerms(year: number): Promise<Record<string, 
 
 // 특정 연도와 절기 인덱스에 대한 날짜 계산 (로컬)
 function getSolarTermDateLocal(year: number, termIndex: number): Date {
-  // 절기 계산 공식 (근사값)
-  // 실제 정확한 계산은 천문학적 계산이 필요하지만, 이 함수는 근사값을 제공
+  // More accurate calculation for solar term dates
+  // These are the approximate Julian days for each solar term at J2000
+  const termJulianDays = [
+    19.6, 34.5, 49.4, 64.3, 79.3, 94.2, 109.1, 124.0, 139.0, 153.9, 168.8, 183.7, 198.6, 213.5, 228.5, 243.4, 258.3,
+    273.2, 288.1, 303.0, 318.0, 332.9, 347.8, 362.7,
+  ]
 
-  // 각 절기의 대략적인 날짜 (평균)
-  const termMonths = [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12]
-  const termDays = [6, 20, 4, 19, 6, 21, 5, 20, 6, 21, 6, 21, 7, 23, 8, 23, 8, 23, 8, 24, 7, 22, 7, 22]
+  // Calculate days since J2000 (January 1, 2000)
+  const daysPerYear = 365.2422
+  const yearsSinceJ2000 = year - 2000
+  const daysSinceJ2000 = yearsSinceJ2000 * daysPerYear
 
-  // 기본 날짜 설정
-  const date = new Date(year, termMonths[termIndex] - 1, termDays[termIndex])
+  // Calculate the Julian day for this solar term
+  const julianDay = daysSinceJ2000 + termJulianDays[termIndex]
 
-  // 연도에 따른 미세 조정 (실제 천문학적 계산을 단순화)
-  // 윤년 등의 영향을 고려한 간단한 보정
-  const yearOffset = Math.floor((year - 2000) / 4)
-  date.setDate(date.getDate() + (year % 4 === 0 ? -1 : 0) + (yearOffset % 2))
+  // Convert Julian day to date
+  // J2000 (January 1, 2000) is Julian day 2451545
+  const j2000 = new Date(2000, 0, 1)
+  const date = new Date(j2000.getTime() + julianDay * 24 * 60 * 60 * 1000)
 
   return date
 }

@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { Loader2, MessageSquare } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import ReactMarkdown from "react-markdown"
 import type { Saju } from "@/lib/saju"
@@ -15,6 +15,7 @@ import FeedbackButtons from "./feedback-buttons"
 import { Progress } from "@/components/ui/progress"
 import AdditionalQuestions from "./additional-questions"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 interface SajuResultClientProps {
   saju: Saju
@@ -56,6 +57,8 @@ export default function SajuResultClient({
   const [error, setError] = useState<string | null>(null)
   const [loadingStage, setLoadingStage] = useState("사주 분석 준비")
   const [loadingProgress, setLoadingProgress] = useState(0)
+  const [loadingMessages, setLoadingMessages] = useState<string[]>([])
+  const loadingAnimationRef = useRef<NodeJS.Timeout | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [activeTab, setActiveTab] = useState("diagram")
   const router = useRouter()
@@ -113,24 +116,75 @@ export default function SajuResultClient({
     setError(null)
     setLoadingProgress(0)
     setLoadingStage("사주 분석 준비")
+    setLoadingMessages([])
 
-    // 로딩 진행 상태 시뮬레이션
+    // 로딩 메시지 배열
+    const loadingStages = [
+      "사주 정보 확인 중...",
+      "사주팔자 분석 시작...",
+      "십성(十星) 분석 중...",
+      "일간(日干) 분석 중...",
+      "월지(月支) 확인 중...",
+      "오행(五行) 분석 중...",
+      "육친(六親) 관계 분석 중...",
+      "대운(大運) 계산 중...",
+      "신살(神殺) 확인 중...",
+      "사주 격국(格局) 분석 중...",
+      "명주(命主) 분석 중...",
+      "재성(財星) 분석 중...",
+      "관성(官星) 분석 중...",
+      "인성(印星) 분석 중...",
+      "식상(食傷) 분석 중...",
+      "비견(比肩) 분석 중...",
+      "사주 통합 분석 중...",
+      "운세 해석 생성 중...",
+      "최종 결과 정리 중...",
+    ]
+
+    // 메시지 추가 함수
+    const addLoadingMessage = (message: string) => {
+      setLoadingMessages((prev) => [...prev.slice(-4), message]) // 최대 5개 메시지만 유지
+    }
+
+    // 초기 메시지 추가
+    addLoadingMessage("사주 분석을 시작합니다...")
+
+    // 60초 동안 진행되는 로딩 바
+    const totalDuration = 60000 // 60초
+    const updateInterval = 500 // 0.5초마다 업데이트
+    const progressIncrement = (updateInterval / totalDuration) * 100
+    const messageInterval = 3000 // 3초마다 메시지 변경
+
+    let lastMessageTime = Date.now()
+    let currentMessageIndex = 0
+
     const loadingInterval = setInterval(() => {
       setLoadingProgress((prev) => {
-        const newProgress = prev + 1
+        const newProgress = prev + progressIncrement
 
         // 진행 단계에 따라 메시지 업데이트
-        if (newProgress === 20) {
-          setLoadingStage("사주 정보 확인 중")
-        } else if (newProgress === 40) {
-          setLoadingStage("운세 분석 중")
-        } else if (newProgress === 70) {
-          setLoadingStage("운세 분석 마무리")
+        if (newProgress >= 20 && newProgress < 40) {
+          setLoadingStage("사주 정보 분석 중")
+        } else if (newProgress >= 40 && newProgress < 70) {
+          setLoadingStage("운세 해석 생성 중")
+        } else if (newProgress >= 70) {
+          setLoadingStage("결과 정리 중")
+        }
+
+        // 주기적으로 메시지 추가
+        const now = Date.now()
+        if (now - lastMessageTime > messageInterval) {
+          lastMessageTime = now
+          const message = loadingStages[currentMessageIndex % loadingStages.length]
+          addLoadingMessage(message)
+          currentMessageIndex++
         }
 
         return Math.min(newProgress, 95) // 최대 95%까지만 진행 (API 응답 전)
       })
-    }, 300)
+    }, updateInterval)
+
+    loadingAnimationRef.current = loadingInterval
 
     try {
       const result = await getSajuInterpretation(saju)
@@ -140,14 +194,26 @@ export default function SajuResultClient({
       localStorage.setItem(storageKey, result.interpretation)
 
       setLoadingProgress(100) // 완료 시 100%로 설정
+      addLoadingMessage("분석 완료! 결과를 표시합니다.")
     } catch (err) {
       console.error("Error fetching interpretation:", err)
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
     } finally {
-      clearInterval(loadingInterval)
+      if (loadingAnimationRef.current) {
+        clearInterval(loadingAnimationRef.current)
+        loadingAnimationRef.current = null
+      }
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (loadingAnimationRef.current) {
+        clearInterval(loadingAnimationRef.current)
+      }
+    }
+  }, [])
 
   const handleCopyClick = () => {
     if (!interpretation) return
@@ -257,14 +323,33 @@ ${interpretation}
 
                 {isLoading && (
                   <div className="flex flex-col items-center justify-center py-6 space-y-3">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <div className="animate-float">
+                      <Image
+                        src="/images/sajuping_character.png"
+                        alt="사주핑 캐릭터"
+                        width={80}
+                        height={80}
+                        className="opacity-90"
+                      />
+                    </div>
                     <div className="text-center space-y-1">
                       <p className="font-medium text-primary">{loadingStage}</p>
                       <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
                     </div>
                     <div className="w-full max-w-xs mt-1">
                       <Progress value={loadingProgress} className="h-1.5" />
-                      <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgress}% 완료</p>
+                      <p className="text-xs text-center mt-1 text-muted-foreground">
+                        {loadingProgress.toFixed(0)}% 완료
+                      </p>
+                    </div>
+                    <div className="w-full max-w-xs mt-2 bg-muted/30 rounded-md p-2 h-24 overflow-y-auto">
+                      <div className="space-y-1 text-xs">
+                        {loadingMessages.map((message, index) => (
+                          <p key={index} className="text-muted-foreground">
+                            {message}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -360,10 +445,33 @@ ${interpretation}
 
                 {isLoading && (
                   <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <div className="animate-float">
+                      <Image
+                        src="/images/sajuping_character.png"
+                        alt="사주핑 캐릭터"
+                        width={100}
+                        height={100}
+                        className="opacity-90"
+                      />
+                    </div>
                     <div className="text-center space-y-2">
-                      <p className="font-medium text-primary">분석 중...</p>
+                      <p className="font-medium text-primary">{loadingStage}</p>
                       <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
+                    </div>
+                    <div className="w-full max-w-md mt-2">
+                      <Progress value={loadingProgress} className="h-2" />
+                      <p className="text-xs text-center mt-1 text-muted-foreground">
+                        {loadingProgress.toFixed(0)}% 완료
+                      </p>
+                    </div>
+                    <div className="w-full max-w-md mt-2 bg-muted/30 rounded-md p-3 h-32 overflow-y-auto">
+                      <div className="space-y-1.5 text-sm">
+                        {loadingMessages.map((message, index) => (
+                          <p key={index} className="text-muted-foreground">
+                            {message}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
