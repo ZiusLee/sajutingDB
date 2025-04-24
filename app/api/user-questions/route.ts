@@ -107,7 +107,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error("API 오류:", error)
+    console.error("API ��류:", error)
     return NextResponse.json({ error: "요청을 처리하는 중 오류가 발생했습니다." }, { status: 500 })
   }
 }

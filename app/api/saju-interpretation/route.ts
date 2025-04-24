@@ -39,7 +39,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 })
     }
 
-    const { saju, name, gender, questionSet = "basic", relationshipStatus = "solo" } = requestData
+    const {
+      saju,
+      name: requestName,
+      gender: requestGender,
+      questionSet = "basic",
+      relationshipStatus = "solo",
+    } = requestData
 
     if (!saju) {
       console.error("Missing saju data in request")
@@ -69,8 +75,9 @@ export async function POST(request: NextRequest) {
     } = saju
 
     // 이름과 성별 정보 추가
-    const userName = name
-    const userGender = gender
+    // Use requestName and requestGender if available, otherwise fallback to saju object
+    const userName = requestName || saju.name || "사용자"
+    const userGender = requestGender || saju.gender || "unknown"
 
     console.log(
       `Processing request for ${userName}, questionSet: ${questionSet}, relationshipStatus: ${relationshipStatus}`,
