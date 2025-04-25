@@ -9,7 +9,7 @@ import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Send, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, Send, ArrowLeft, ChevronDown, ChevronUp, RefreshCw } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
@@ -41,6 +41,26 @@ const useHideHeaderAndFooter = () => {
   }, [])
 }
 
+// 네트워크 상태 모니터링 훅
+const useNetworkStatus = () => {
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true)
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
+
+  return isOnline
+}
+
 interface SajuChatProps {
   saju: any
   name: string
@@ -54,51 +74,15 @@ interface SajuChatProps {
 
 // 초기 예상 질문 목록 (채팅방 유형별)
 const initialSuggestedQuestionsByType: Record<string, string[]> = {
-  general: [
-    "2025년 을사년에 제 운세는 어떤가요?",
-    "제 사주의 장점과 단점을 알려주세요.",
-    "제 사주에서 가장 강한 기운은 무엇인가요?",
-  ],
-  career: [
-    "제게 가장 잘 맞는 직업은 무엇인가요?",
-    "2025년 을사년에 이직하기 좋은 시기는 언제인가요?",
-    "푸른 뱀의 해에 승진 가능성이 높은 시기는 언제인가요?",
-  ],
-  love: [
-    "2025년 을사년에 제 연애운은 어떤가요?",
-    "푸른 뱀의 해에 좋은 인연을 만날 시기는 언제인가요?",
-    "제 사주에 맞는 이상적인 짝은 어떤 사람인가요?",
-  ],
-  health: [
-    "제 사주에서 주의해야 할 건강 문제는 무엇인가요?",
-    "2025년 을사년에 특별히 건강관리가 필요한 부분이 있나요?",
-    "제 체질에 맞는 운동은 무엇인가요?",
-  ],
-  yearly: [
-    "2025년 을사년에 특별히 주의해야 할 시기가 있나요?",
-    "을사년에 가장 운이 좋은 달은 언제인가요?",
-    "푸른 뱀의 해에 중요한 결정을 내리기 좋은 시기는 언제인가요?",
-  ],
-  business: [
-    "2025년 을사년에 사업 시작하기 좋은 시기는 언제인가요?",
-    "푸른 뱀의 해에 투자하기 좋은 분야는 무엇인가요?",
-    "을사년에 재물운을 높이는 방법이 있을까요?",
-  ],
-  marriage: [
-    "2025년 을사년에 결혼하기 좋은 시기는 언제인가요?",
-    "제 사주에 맞는 배우자는 어떤 사람인가요?",
-    "푸른 뱀의 해에 결혼 생활에서 주의해야 할 점이 있나요?",
-  ],
-  personalized: [
-    "요즘 제 고민이 있는데 어떻게 해결하면 좋을까요?",
-    "인간관계에 어려움을 겪고 있는데 제 사주가 원인일까요?",
-    "미래에 대한 불안감이 있는데 어떻게 극복할 수 있을까요?",
-  ],
-  "daily-fortune": [
-    `오늘(${formatTodayDate()})의 운세를 보시겠습니까?`,
-    "오늘 하루를 어떻게 보내는 것이 좋을까요?",
-    "오늘 저에게 행운을 가져다 줄 요소는 무엇인가요?",
-  ],
+  general: ["2025년 운세는 어떤가요?", "제 사주의 장단점은?", "가장 강한 기운은 무엇인가요?"],
+  career: ["저에게 맞는 직업은?", "이직 좋은 시기는?", "승진 가능성이 높은 때는?"],
+  love: ["올해 연애운은 어떤가요?", "좋은 인연 만날 시기는?", "이상적인 짝은 어떤 사람인가요?"],
+  health: ["주의할 건강 문제는?", "건강관리가 필요한 부분은?", "제 체질에 맞는 운동은?"],
+  yearly: ["올해 주의할 시기는?", "운이 좋은 달은 언제인가요?", "중요한 결정에 좋은 시기는?"],
+  business: ["사업 시작 좋은 시기는?", "투자하기 좋은 분야는?", "재물운을 높이는 방법은?"],
+  marriage: ["결혼 좋은 시기는?", "제게 맞는 배우자는?", "결혼생활 주의점은?"],
+  personalized: ["고민 해결 방법은?", "인간관계 개선 방법은?", "미래 불안감 극복법은?"],
+  "daily-fortune": [`오늘(${formatTodayDate()}) 운세는?`, "오늘 하루 보내는 팁은?", "오늘의 행운 요소는?"],
 }
 
 // Function to format today's date in M/d format
@@ -227,6 +211,9 @@ export default function SajuChat({
   // 상단 헤더 숨기기
   useHideHeaderAndFooter()
 
+  // 네트워크 상태 모니터링
+  const isOnline = useNetworkStatus()
+
   // 로그인 관련 상태
   const router = useRouter()
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
@@ -276,6 +263,8 @@ export default function SajuChat({
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
   const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true)
   const [showSajuInfo, setShowSajuInfo] = useState(false)
+  const [streamingError, setStreamingError] = useState<string | null>(null)
+  const [isRetrying, setIsRetrying] = useState(false)
 
   // Get saved chat session or create initial messages
   const savedSession = activeChatSession || getChatSession(sessionKey)
@@ -288,7 +277,7 @@ export default function SajuChat({
   ]
 
   // AI SDK의 useChat 훅 사용
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, error, reload } = useAIChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, error, reload, append } = useAIChat({
     api: "/api/saju-chat",
     initialMessages,
     body: {
@@ -331,33 +320,20 @@ export default function SajuChat({
 
       // 메시지가 완료되면 질문 생성 허용
       setShouldGenerateQuestions(true)
+
+      // 오류 상태 초기화
+      setStreamingError(null)
     },
     onError: (error) => {
       console.error("Chat error:", error)
 
-      // 오류 발생 시 사용자에게 알림
-      const errorMessage = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "죄송합니다. 응답을 생성하는 중에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+      // 오류 상태 설정
+      setStreamingError(error.message || "응답 생성 중 오류가 발생했습니다.")
+
+      // 네트워크 오류인 경우 특별 처리
+      if (error.message?.includes("network") || error.message?.includes("fetch")) {
+        setStreamingError("네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요.")
       }
-
-      // 오류 메시지를 채팅에 추가
-      const updatedMessages = [...messages, errorMessage]
-
-      // 세션 저장
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages: updatedMessages,
-        lastMessageTime: new Date().toISOString(),
-      }
-
-      saveChatSession(sessionKey, sessionData)
-      setActiveChatSession(sessionData)
 
       // 오류 발생 시에도 질문 생성 허용
       setShouldGenerateQuestions(true)
@@ -372,8 +348,38 @@ export default function SajuChat({
           })
         }, 100)
       }
+
+      // 오류 상태 초기화
+      setStreamingError(null)
     },
   })
+
+  // 재시도 핸들러
+  const handleRetry = useCallback(() => {
+    setIsRetrying(true)
+
+    // 마지막 사용자 메시지 찾기
+    const lastUserMessageIndex = [...messages].reverse().findIndex((msg) => msg.role === "user")
+
+    if (lastUserMessageIndex !== -1) {
+      const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
+
+      // 마지막 응답 제거 (오류가 있는 경우)
+      const messagesToKeep = messages.slice(0, messages.length - lastUserMessageIndex)
+
+      // 동일한 질문으로 다시 시도
+      append({
+        role: "user",
+        content: lastUserMessage.content,
+      })
+    } else {
+      // 사용자 메시지가 없는 경우 그냥 재시도
+      reload()
+    }
+
+    setIsRetrying(false)
+    setStreamingError(null)
+  }, [messages, append, reload])
 
   // 원래의 handleSubmit 함수 저장
   const originalHandleSubmit = handleSubmit
@@ -381,6 +387,12 @@ export default function SajuChat({
   // handleSubmit 함수 오버라이드
   const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    // 네트워크 연결 확인
+    if (!isOnline) {
+      setStreamingError("인터넷 연결이 없습니다. 연결 상태를 확인한 후 다시 시도해주세요.")
+      return
+    }
 
     // 질문 카운트 증가
     const newQuestionCount = questionCount + 1
@@ -402,6 +414,9 @@ export default function SajuChat({
 
     // 사용자가 질문을 제출하면 질문 생성 플래그를 false로 설정
     setShouldGenerateQuestions(false)
+
+    // 오류 상태 초기화
+    setStreamingError(null)
 
     // 원래의 handleSubmit 함수 호출
     originalHandleSubmit(e)
@@ -686,6 +701,13 @@ export default function SajuChat({
 
       <CardContent className="p-0">
         <div className="flex flex-col h-[calc(100vh-56px)]">
+          {/* 네트워크 상태 알림 */}
+          {!isOnline && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-2 text-sm text-center">
+              인터넷 연결이 끊겼습니다. 연결 상태를 확인해주세요.
+            </div>
+          )}
+
           {/* Collapsible Saju Info */}
           {showSajuInfo && (
             <div className="p-3 border-b animate-in fade-in slide-in-from-top duration-300">
@@ -738,8 +760,7 @@ export default function SajuChat({
             className="flex-1 overflow-y-auto pb-[140px] sm:pb-[160px]"
             style={{ scrollBehavior: "smooth" }}
           >
-            {/* 메시지 표시 영역 */}
-            <div className="px-3 sm:px-4 py-2 space-y-4">
+            <div className="p-3 sm:p-4 space-y-4">
               {messages.map((message, index) => (
                 <div
                   key={message.id || index}
@@ -778,21 +799,25 @@ export default function SajuChat({
                   </div>
                 </div>
               )}
-              {error && (
+
+              {/* 오류 메시지 및 재시도 버튼 */}
+              {streamingError && (
                 <div className="flex justify-center my-4">
-                  <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-lg p-3 text-sm flex flex-col items-center">
-                    <p>메시지 로딩 중 오류가 발생했습니다.</p>
+                  <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-lg p-3 text-sm flex flex-col items-center max-w-[85%]">
+                    <p>{streamingError}</p>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={reload}
-                      className="mt-2 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                      onClick={handleRetry}
+                      className="mt-2 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 flex items-center gap-1"
                     >
+                      <RefreshCw className="h-3 w-3" />
                       다시 시도
                     </Button>
                   </div>
                 </div>
               )}
+
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -851,7 +876,7 @@ export default function SajuChat({
                     type="submit"
                     size="icon"
                     className="rounded-full bg-blue-600 hover:bg-blue-700 text-white ml-2 h-8 w-8 flex items-center justify-center"
-                    disabled={isLoading || !input.trim()}
+                    disabled={isLoading || !input.trim() || !isOnline}
                   >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>

@@ -14,7 +14,6 @@ export async function POST(req: Request) {
         const userQuestion = messages[messages.length - 1].content
 
         // 질문 저장 API 호출 (비동기로 처리하고 결과를 기다리지 않음)
-        // 오류가 발생해도 무시하고 계속 진행
         fetch(`${req.headers.get("origin")}/api/user-questions`, {
           method: "POST",
           headers: {
@@ -26,11 +25,9 @@ export async function POST(req: Request) {
             question: userQuestion,
           }),
         }).catch((err) => {
-          // 오류 로깅만 하고 채팅 응답에는 영향을 주지 않음
           console.error("질문 저장 중 오류 (무시됨):", err)
         })
       } catch (saveError) {
-        // 질문 저장 중 오류가 발생해도 채팅은 계속 진행
         console.error("질문 저장 처리 중 오류 (무시됨):", saveError)
       }
     }
@@ -38,14 +35,33 @@ export async function POST(req: Request) {
     // 사주 정보를 문자열로 변환
     const sajuInfo = JSON.stringify(saju, null, 2)
 
+    // 마지막 사용자 질문 가져오기
+    const lastUserMessage =
+      messages.length > 0 && messages[messages.length - 1].role === "user" ? messages[messages.length - 1].content : ""
+
+    // 질문 복잡성 분석 (간단한 휴리스틱)
+    const isComplexQuestion =
+      lastUserMessage.includes("자세히") ||
+      lastUserMessage.includes("설명") ||
+      lastUserMessage.includes("분석") ||
+      lastUserMessage.includes("이유") ||
+      lastUserMessage.includes("왜") ||
+      lastUserMessage.length > 30
+
+    // 질문 유형에 따라 응답 길이 조정 지시
+    const responseLengthInstruction = isComplexQuestion
+      ? "질문이 복잡하거나 상세한 설명이 필요한 경우 자세히 답변해주세요. 최대 1000토큰까지 사용할 수 있습니다."
+      : "간단한 질문에는 간결하게 답변해주세요. 200-300토큰 정도면 충분합니다."
+
     // 시스템 메시지 생성
     const systemMessage = `당신은 최고의 사주팔자 전문가이자 심리 상담가 입니다. 사용자에게 친절하고 명확하게 답변해주세요.
-    1. 길고 상세하게 적어줘. 채팅에서 사주관련질문에 대한 답변은 1000토큰 정도로 적어줘.나머지는 유동적으로
+    1. ${responseLengthInstruction}
     2. 올해 을사년 2025년이라는 정보도 적극 활용하고, 이사람의 일주, 십성,월지용신 등 적극 활용해줘
     3. 그의 질문을 기반으로 대답해주는데 당신은 사주팔자 전문가이자 최고의 심리상담가이기도 해
+    4. 답변이 너무 길어지면 중요한 내용을 먼저 언급하고, 세부 사항은 나중에 설명해주세요.
 
     사용자 사주 정보:
-    ${JSON.stringify(saju, null, 2)}
+    ${sajuInfo}
     사용자 이름: ${name}
     성별: ${gender}
 
@@ -66,7 +82,7 @@ export async function POST(req: Request) {
       // 오늘 날짜를 가져와 음력으로 변환
       const today = new Date()
       const solarYear = today.getFullYear()
-      const solarMonth = today.getMonth() + 1 // JavaScript months are 0-indexed
+      const solarMonth = today.getMonth() + 1
       const solarDay = today.getDate()
 
       const lunarDate = solarToLunar(solarYear, solarMonth, solarDay)
@@ -87,31 +103,30 @@ export async function POST(req: Request) {
       - 건강운
       - 행운의 요소 (색깔, 장소, 물건)
 
-      답변은 친절하고 이해하기 쉽게 작성해주세요.`
+      답변은 친절하고 이해하기 쉽게 작성해주세요.
+      답변이 너무 길어지면 중요한 내용을 먼저 언급하고, 세부 사항은 나중에 설명해주세요.`
 
       const apiMessages = [{ role: "system", content: dailyFortunePrompt }, ...messages]
 
-      // Calculate dynamic token limit
-      const totalInputTokens = apiMessages.reduce((acc, msg) => acc + msg.content.length, 0)
-      const maxTokens = Math.max(500, Math.min(1500, 4000 - totalInputTokens)) // 토큰 제한 증가
+      // 질문 복잡성에 따라 토큰 제한 동적 조정
+      const maxTokens = isComplexQuestion ? 1000 : 800
 
       const result = streamText({
         model: openai("gpt-4.1"),
         messages: apiMessages,
-        temperature: 0.8,
+        temperature: 0.7, // 온도 약간 낮춤
         maxTokens: maxTokens,
       })
 
       return result.toDataStreamResponse()
     } else {
-      // Calculate dynamic token limit
-      const totalInputTokens = apiMessages.reduce((acc, msg) => acc + msg.content.length, 0)
-      const maxTokens = Math.max(500, Math.min(1500, 4000 - totalInputTokens)) // 토큰 제한 증가
+      // 질문 복잡성에 따라 토큰 제한 동적 조정
+      const maxTokens = isComplexQuestion ? 1000 : 800
 
       const result = streamText({
         model: model,
         messages: apiMessages,
-        temperature: 0.8,
+        temperature: 0.7, // 온도 약간 낮춤
         maxTokens: maxTokens,
       })
 

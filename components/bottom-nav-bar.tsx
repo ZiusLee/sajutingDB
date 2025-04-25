@@ -1,8 +1,6 @@
 "use client"
 
 import { useRouter, usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { MessageSquare, Calendar, User } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useToast } from "@/components/ui/use-toast"
@@ -50,16 +48,24 @@ export function BottomNavBar() {
   }, [supabase, toast])
 
   // Don't show on login or register pages or when not authenticated
+  // 또한 채팅 관련 페이지에서도 표시하지 않음 (임시 조치)
   if (
     isLoading ||
     !isAuthenticated ||
     pathname?.includes("/login") ||
     pathname?.includes("/register") ||
-    pathname?.includes("/reset-password")
+    pathname?.includes("/reset-password") ||
+    pathname?.includes("/saju-chat") || // 채팅 페이지에서는 표시하지 않음
+    pathname?.includes("/chat") // 채팅 페이지에서는 표시하지 않음
   ) {
     return null
   }
 
+  // 임시 조치: 모든 페이지에서 bottom nav bar를 표시하지 않음
+  // 나중에 채팅 UI가 수정되면 이 부분을 제거하고 원래대로 복원
+  return null
+
+  /* 원래 코드 (나중에 복원할 수 있도록 주석 처리)
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
       <div className="container flex justify-around items-center h-16">
@@ -107,4 +113,5 @@ export function BottomNavBar() {
       </div>
     </div>
   )
+  */
 }
