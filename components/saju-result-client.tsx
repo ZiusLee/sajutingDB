@@ -197,16 +197,36 @@ export default function SajuResultClient({
 
     try {
       const result = await getSajuInterpretation(saju, name, normalizedGender, relationshipStatus, questionSet)
-      setInterpretation(result.interpretation)
+
+      // 폴백 해석이 있는 경우 처리
+      if (result.fallbackInterpretation) {
+        setInterpretation(result.fallbackInterpretation)
+        toast({
+          title: "사주 해석 제한 시간 초과",
+          description: "기본 해석으로 대체되었습니다. 잠시 후 다시 시도해주세요.",
+          variant: "destructive",
+        })
+      } else {
+        setInterpretation(result.interpretation)
+      }
 
       // Store the interpretation in localStorage
-      localStorage.setItem(storageKey, result.interpretation)
+      if (result.interpretation || result.fallbackInterpretation) {
+        localStorage.setItem(storageKey, result.interpretation || result.fallbackInterpretation)
+      }
 
       setLoadingProgress(100) // 완료 시 100%로 설정
       addLoadingMessage("분석 완료! 결과를 표시합니다.")
     } catch (err) {
       console.error("Error fetching interpretation:", err)
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
+
+      // 오류 발생 시 사용자에게 알림
+      toast({
+        title: "사주 해석 오류",
+        description: "서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.",
+        variant: "destructive",
+      })
     } finally {
       if (loadingAnimationRef.current) {
         clearInterval(loadingAnimationRef.current)

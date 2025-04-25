@@ -2,8 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 
-// API 라우트의 타임아웃 설정을 60초로 변경
-export const maxDuration = 60
+// API 라우트의 타임아웃 설정을 90초로 변경
+export const maxDuration = 90
 
 // API 라우트의 오류 처리 및 로깅을 개선합니다
 export async function POST(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
 사주 해석을 가져오는 중 오류가 발생했습니다.
 
-## 기본적인 해석:
+## 기본적��� 해석:
 - 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
 - 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
 - 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
 4. 연애운 / 결혼운 💕 (올해 2025년 을사년 기준 달별로 얘기해줘, 혹은 달 몇개 묶어서)
 가까운 사람일수록 드러나는 애착 스타일, 사랑을 표현하고 받는 방식, 그리고 연애/결혼에서 중요하게 여기는 가치 등을 알려 주세요.
 연애에서 반복적으로 나타나는 문제 패턴, 이상적인 관계의 형태, 궁합이 잘 맞는 사람의 성향도 구체적으로 설명해 주세요.
-예: "가까운 사람일수록 말이 줄어드는 스타일이에요. 마음이 깊을수록 표현이 어려워지는 경향이 있죠."
+예: "가까운 사람일수록 말이 줄어드는 스���일이에요. 마음이 깊을수록 표현이 어려워지는 경향이 있죠."
 예: "감정적 지지와 일상의 루틴을 함께 만들어가는 사람과 잘 맞습니다."
 
 5. 건강운 🧘‍♂️

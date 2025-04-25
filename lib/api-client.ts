@@ -103,27 +103,53 @@ export async function getDetailedInterpretation(
   }
 }
 
-export async function getSajuInterpretation(saju: any) {
+// getSajuInterpretation 함수를 개선합니다
+
+// 기존 함수를 찾아 다음과 같이 수정합니다:
+export async function getSajuInterpretation(
+  saju: any,
+  name?: string,
+  gender?: string,
+  relationshipStatus?: string,
+  questionSet?: string | null,
+): Promise<any> {
   try {
     console.log("Requesting saju interpretation")
+    // 타임아웃 설정 추가 (30초)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
 
     const response = await fetch("/api/saju-interpretation", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ saju }),
+      body: JSON.stringify({
+        saju,
+        name,
+        gender,
+        relationshipStatus,
+        questionSet,
+      }),
+      signal: controller.signal,
     })
 
+    clearTimeout(timeoutId)
+
     if (!response.ok) {
-      throw new Error("Failed to get saju interpretation")
+      if (response.status === 504) {
+        throw new Error("사주 해석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.")
+      }
+      throw new Error(`Failed to get saju interpretation: ${response.status}`)
     }
 
-    const data = await response.json()
-    return data
+    return await response.json()
   } catch (error) {
     console.error("Error fetching saju interpretation:", error)
-    throw error
+    if (error.name === "AbortError") {
+      throw new Error("사주 해석 요청 시간이 초과되었습니다.")
+    }
+    throw new Error("Failed to get saju interpretation")
   }
 }
 
