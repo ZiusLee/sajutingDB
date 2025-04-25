@@ -15,7 +15,13 @@ export default function AuthCallbackPage() {
 
       if (code) {
         try {
-          await supabase.auth.exchangeCodeForSession(code)
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+          if (error) {
+            console.error("Error exchanging code for session:", error)
+            router.push("/login?error=callback_error")
+            return
+          }
 
           // Get user data after successful login
           const {
@@ -33,6 +39,9 @@ export default function AuthCallbackPage() {
             } else if (user.email) {
               localStorage.setItem("user_name", user.email.split("@")[0])
             }
+
+            // Update localStorage with the new session
+            localStorage.setItem("supabase.auth.token", JSON.stringify(data))
 
             // Redirect to home page or dashboard
             router.push("/")

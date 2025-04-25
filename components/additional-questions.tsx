@@ -17,7 +17,6 @@ import { getCompatibilityAnalysis } from "@/lib/api-client"
 import CompatibilityComparison from "@/components/compatibility-comparison"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink } from "@/components/ui/pagination"
 import {
-  addAdditionalQuestionToLocalStorage,
   saveCompatibilityResultToLocalStorage,
   savePartnerInfo,
   getSavedPartners,
@@ -213,19 +212,6 @@ export default function AdditionalQuestions({
       }
 
       setInterpretations({ ...interpretations, [category]: result.interpretation })
-
-      if (result && result.interpretation) {
-        // Store the additional question and answer in localStorage
-        const saved = addAdditionalQuestionToLocalStorage({
-          category: category,
-          question: category.startsWith("custom:") ? category.split("custom:")[1] : category,
-          answer: result.interpretation,
-          model: result.model || model,
-          responseTime: result.responseTime || "unknown",
-        })
-
-        console.log(`추가 질문 저장 ${saved ? "성공" : "실패"}: ${category}`)
-      }
     } catch (err) {
       console.error(`Error fetching interpretation for ${category}:`, err)
       setErrors({
@@ -250,19 +236,6 @@ export default function AdditionalQuestions({
     try {
       const result = await getAdditionalInterpretation(saju, name, gender, model, customCategoryId, relationshipStatus)
       setInterpretations({ ...interpretations, [customCategoryId]: result.interpretation })
-
-      // 사용자 정의 질문 저장
-      if (result && result.interpretation) {
-        const saved = addAdditionalQuestionToLocalStorage({
-          category: customCategoryId,
-          question: customQuestion,
-          answer: result.interpretation,
-          model: result.model || model,
-          responseTime: result.responseTime || "unknown",
-        })
-
-        console.log(`사용자 정의 질문 저장 ${saved ? "성공" : "실패"}: ${customQuestion}`)
-      }
     } catch (err) {
       console.error(`Error fetching interpretation for custom question:`, err)
       setErrors({

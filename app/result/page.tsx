@@ -7,6 +7,7 @@ import SajuResult from "@/components/saju-result"
 import SocialShareButtons from "@/components/social-share-buttons"
 import { notFound } from "next/navigation"
 import { BetaSignupForm } from "@/components/beta-signup-form"
+import { getSajuDataByUuid } from "@/lib/user-data-transfer"
 
 export default async function ResultPage({
   searchParams,
@@ -20,9 +21,84 @@ export default async function ResultPage({
     gender?: string
     saju?: string
     location?: string
+    uuid?: string
   }
 }) {
-  const { date, hour, minute, timeUnknown, name, gender, saju: sajuParam, location = "서울특별시" } = searchParams
+  const { date, hour, minute, timeUnknown, name, gender, saju: sajuParam, location = "서울특별시", uuid } = searchParams
+
+  // UUID로 사주 데이터 조회 (마이페이지에서 상세 보기로 접근한 경우)
+  if (uuid) {
+    try {
+      const sajuData = await getSajuDataByUuid(uuid)
+
+      if (!sajuData) {
+        throw new Error("사주 데이터를 찾을 수 없습니다.")
+      }
+
+      const { userData, sajuData: formattedSaju } = sajuData
+
+      return (
+        <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
+          <Card className="w-full mx-auto border-0 sm:border sm:max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center text-2xl">사주팔자 결과</CardTitle>
+              <CardDescription className="text-center">
+                {userData.name && <>이름: {userData.name}님</>}
+                {userData.name && userData.gender && <br />}
+                {userData.gender && <>{userData.gender === "male" ? "남성" : "여성"}</>}
+                <br />
+                양력: {formattedSaju.year}년 {formattedSaju.month}월 {formattedSaju.day}일
+                {formattedSaju.hour && ` ${formattedSaju.hour}시 ${formattedSaju.minute || "00"}분`}
+                <br />
+                음력: {formattedSaju.lunarYear}년 {formattedSaju.lunarMonth}월 {formattedSaju.lunarDay}일
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* 사주 결과 표시 */}
+              <div className="space-y-6">
+                <SajuResult
+                  saju={formattedSaju}
+                  timeUnknown={false}
+                  solarYear={formattedSaju.year}
+                  solarMonth={formattedSaju.month}
+                  solarDay={formattedSaju.day}
+                  hour={formattedSaju.hour || ""}
+                  minute={formattedSaju.minute || ""}
+                  lunarYear={formattedSaju.lunarYear}
+                  lunarMonth={formattedSaju.lunarMonth}
+                  lunarDay={formattedSaju.lunarDay}
+                  name={userData.name}
+                  gender={userData.gender}
+                  location={location}
+                  interpretation={formattedSaju.interpretation}
+                />
+
+                {/* 소셜미디어 공유 버튼 추가 */}
+                <div className="py-2">
+                  <SocialShareButtons />
+                </div>
+              </div>
+
+              {/* 베타서비스 신청 폼 */}
+              <div className="mb-6">
+                <BetaSignupForm />
+              </div>
+
+              {/* 마이페이지로 돌아가기 버튼 */}
+              <div className="flex justify-center">
+                <Button variant="outline" asChild>
+                  <Link href="/mypage">마이페이지로 돌아가기</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    } catch (error) {
+      console.error("Error fetching saju data by UUID:", error)
+      // 오류 시 아래 기본 로직으로 진행
+    }
+  }
 
   // 사주 파라미터가 있는 경우 (채팅 목록에서 돌아온 경우)
   if (sajuParam) {

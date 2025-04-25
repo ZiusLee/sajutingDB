@@ -3,11 +3,10 @@ import {
   saveSajuInfo,
   saveElements,
   saveInterpretation,
-  saveAdditionalQuestion,
   saveBetaApplication,
   saveCompatibilityAnalysis,
 } from "./db-service"
-import { supabase } from "./supabase-client"
+import { supabase, getSupabase } from "./supabase-client"
 import { v4 as uuidv4 } from "uuid"
 
 // 상대방 정보 인터페이스 정의
@@ -26,7 +25,7 @@ export interface PartnerInfo {
 }
 
 // 로컬 스토리지에서 사주 데이터를 가져와 데이터베이스에 저장하는 함수
-export async function syncLocalStorageToDatabase(): Promise<string | null> {
+export async function syncLocalStorageToDatabase(authUserId?: string | null): Promise<string | null> {
   try {
     // 로컬 스토리지에서 데이터 가져오기
     const tempSajuData = localStorage.getItem("tempSajuData")
@@ -40,6 +39,30 @@ export async function syncLocalStorageToDatabase(): Promise<string | null> {
     // 이미 userId가 있으면 그대로 반환
     if (sajuData.userId) {
       console.log("User ID already exists:", sajuData.userId)
+
+      // 로그인된 사용자인 경우 auth_user_id 연결 시도
+      if (authUserId) {
+        try {
+          console.log("Attempting to link existing user ID to auth user ID:", sajuData.userId, authUserId)
+          const supabaseClient = getSupabase()
+          const { data, error } = await supabaseClient
+            .from("users")
+            .update({ auth_user_id: authUserId })
+            .eq("id", sajuData.userId)
+            .select()
+
+          if (error) {
+            console.error("Error linking user ID to auth user ID:", error)
+          } else {
+            console.log("Successfully linked user ID to auth user ID:", data)
+          }
+        } catch (authError) {
+          console.error("Error updating auth_user_id:", authError)
+        }
+      } else {
+        console.log("No auth user ID provided, skipping auth_user_id update")
+      }
+
       return sajuData.userId
     }
 
@@ -49,6 +72,7 @@ export async function syncLocalStorageToDatabase(): Promise<string | null> {
 
     // API 라우트를 통해 데이터 저장
     try {
+      console.log("Saving user data to database with user ID:", userId, "auth user ID:", authUserId || "none")
       const response = await fetch("/api/save-user-data", {
         method: "POST",
         headers: {
@@ -56,6 +80,7 @@ export async function syncLocalStorageToDatabase(): Promise<string | null> {
         },
         body: JSON.stringify({
           userId,
+          authUserId, // 로그인된 사용자 ID 포함
           ...sajuData,
         }),
       })
@@ -75,7 +100,36 @@ export async function syncLocalStorageToDatabase(): Promise<string | null> {
       return userId
     } catch (apiError) {
       console.error("Error calling save-user-data API:", apiError)
-      return null
+
+      // API 호출 실패 시 직접 Supa  {
+      console.error("Error calling save-user-data API:", apiError)
+
+      // API 호출 실패 시 직접 Supabase 호출 시도
+      try {
+        console.log("Attempting direct Supabase insertion for user:", userId)
+        const supabaseClient = getSupabase()
+        const { data, error } = await supabaseClient
+          .from("users")
+          .insert({
+            id: userId,
+            name: sajuData.name || "Anonymous User",
+            gender: sajuData.gender || "unknown",
+            relationship_status: sajuData.relationshipStatus || "unknown",
+            auth_user_id: authUserId, // Include auth_user_id if available
+          })
+          .select()
+
+        if (error) {
+          console.error("Error with direct Supabase insertion:", error)
+          return null
+        }
+
+        console.log("Successfully inserted user directly with Supabase:", data)
+        return userId
+      } catch (supabaseError) {
+        console.error("Error with direct Supabase call:", supabaseError)
+        return null
+      }
     }
   } catch (error) {
     console.error("Error syncing data to database:", error)
@@ -171,25 +225,6 @@ async function saveRemainingData(userId: string, sajuData: any) {
     }
   }
 
-  // Save additional questions if available
-  if (sajuData.additionalQuestions && Array.isArray(sajuData.additionalQuestions)) {
-    for (const question of sajuData.additionalQuestions) {
-      try {
-        const questionId = await saveAdditionalQuestion({
-          userId,
-          questionCategory: question.category || "unknown",
-          questionText: question.question || "",
-          answerText: question.answer || "",
-          modelUsed: question.model || "unknown",
-          responseTime: question.responseTime || "unknown",
-        })
-        console.log("Additional question saved with ID:", questionId)
-      } catch (error) {
-        console.error("Error saving additional question:", error)
-      }
-    }
-  }
-
   // Save compatibility analyses if available
   if (sajuData.compatibilityAnalyses && Array.isArray(sajuData.compatibilityAnalyses)) {
     for (const analysis of sajuData.compatibilityAnalyses) {
@@ -250,44 +285,6 @@ export async function saveBetaApplicationData(userId: string, selectedServices: 
     return true
   } catch (error) {
     console.error("Error saving beta application data:", error)
-    return false
-  }
-}
-
-/**
- * Add additional question to localStorage
- */
-export function addAdditionalQuestionToLocalStorage(data: {
-  category: string
-  question: string
-  answer: string
-  model?: string
-  responseTime?: string
-}) {
-  try {
-    // 기존 데이터 가져오기
-    const existingDataStr = localStorage.getItem("additional_questions")
-    const existingData = existingDataStr ? JSON.parse(existingDataStr) : []
-
-    // 새 데이터 추가
-    const newData = {
-      ...data,
-      timestamp: Date.now(),
-    }
-
-    // 최대 20개까지만 저장 (오래된 것부터 삭제)
-    if (existingData.length >= 20) {
-      existingData.shift()
-    }
-
-    existingData.push(newData)
-
-    // 저장
-    localStorage.setItem("additional_questions", JSON.stringify(existingData))
-
-    return true
-  } catch (error) {
-    console.error("Error adding additional question to localStorage:", error)
     return false
   }
 }

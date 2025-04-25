@@ -104,3 +104,29 @@ export function loadSajuProfiles(): any[] {
     return []
   }
 }
+
+// Link anonymous user data to authenticated user
+export async function linkAnonymousDataToAuthUser(anonymousUserId: string, authUserId: string): Promise<boolean> {
+  try {
+    const response = await fetch("/api/link-user-data", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        anonymousUserId,
+        authUserId,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to link user data")
+    }
+
+    const result = await response.json()
+    return result.success
+  } catch (error) {
+    console.error("Error linking user data:", error)
+    return false
+  }
+}

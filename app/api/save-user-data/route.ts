@@ -1,128 +1,153 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server"
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-export async function POST(request: Request) {
+// 서버 측에서 서비스 롤 키를 사용하여 Supabase 클라이언트 생성
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// 서비스 롤 키가 없는 경우 에러 로깅
+if (!supabaseServiceKey) {
+  console.error("SUPABASE_SERVICE_ROLE_KEY is not defined")
+}
+
+const adminSupabase = createClient(supabaseUrl!, supabaseServiceKey!)
+
+export async function POST(request: NextRequest) {
   try {
-    const data = await request.json()
+    const userData = await request.json()
+    console.log("Received user data in API route:", userData)
 
-    // Create a server-side Supabase client with admin privileges
-    const supabase = createServerSupabaseClient()
+    // 사용자 ID 및 인증된 사용자 ID 추출
+    const userId = userData.userId
+    const authUserId = userData.authUserId
 
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser()
+    // 기존 사용자 확인
+    if (userData.email) {
+      const { data: existingUsers } = await adminSupabase.from("users").select("id").eq("email", userData.email)
 
-    console.log(authUser)
+      if (existingUsers && existingUsers.length > 0) {
+        const existingUserId = existingUsers[0].id
+        console.log("Found existing user with ID:", existingUserId)
 
-    // Insert user data
-    const { data: userData, error: userError } = await supabase
+        // 인증된 사용자 ID가 있는 경우 업데이트
+        if (authUserId) {
+          const { error: updateError } = await adminSupabase
+            .from("users")
+            .update({ auth_user_id: authUserId })
+            .eq("id", existingUserId)
+
+          if (updateError) {
+            console.error("Error updating auth_user_id:", updateError)
+          } else {
+            console.log("Updated auth_user_id for user:", existingUserId)
+          }
+        }
+
+        return NextResponse.json({ success: true, userId: existingUserId })
+      }
+    }
+
+    // 새 사용자 생성
+    const { data: newUser, error: userError } = await adminSupabase
       .from("users")
       .insert({
-        id: data.userId,
-        name: data.name || "Anonymous User",
-        gender: data.gender || "unknown",
-        relationship_status: data.relationshipStatus || "unknown",
+        id: userId,
+        name: userData.name || "Anonymous User",
+        email: userData.email || null,
+        gender: userData.gender || "unknown",
+        relationship_status: userData.relationshipStatus || "unknown",
         is_beta_applicant: false,
-        auth_user_id: authUser !== null ? authUser.id : null,
+        phone: userData.phone || null,
+        privacy_consent: userData.privacyConsent || false,
+        auth_user_id: authUserId, // 인증된 사용자 ID 저장
       })
-      .select()
+      .select("id")
+      .single()
 
     if (userError) {
-      console.error("Error inserting user data:", userError)
+      console.error("Error creating user:", userError)
       return NextResponse.json({ error: userError.message }, { status: 500 })
     }
 
-    // Insert birth info if provided
-    if (data.year && data.month && data.day) {
-      const { error: birthInfoError } = await supabase.from("birth_info").insert({
-        user_id: data.userId,
-        solar_year: data.year,
-        solar_month: data.month,
-        solar_day: data.day,
-        solar_hour: data.hour || null,
-        solar_minute: data.minute || null,
-        lunar_year: data.lunarYear,
-        lunar_month: data.lunarMonth,
-        lunar_day: data.lunarDay,
-        is_leap_month: false,
-        time_unknown: data.timeUnknown || false,
+    console.log("Created new user with ID:", newUser.id)
+
+    // 생년월일 정보 저장
+    if (userData.year && userData.month && userData.day) {
+      const { error: birthError } = await adminSupabase.from("birth_info").insert({
+        user_id: userId,
+        solar_year: Number.parseInt(userData.year),
+        solar_month: Number.parseInt(userData.month),
+        solar_day: Number.parseInt(userData.day),
+        solar_hour: userData.hour !== undefined ? Number.parseInt(userData.hour) : null,
+        solar_minute: userData.minute !== undefined ? Number.parseInt(userData.minute) : null,
+        lunar_year: Number.parseInt(userData.lunarYear || userData.year),
+        lunar_month: Number.parseInt(userData.lunarMonth || userData.month),
+        lunar_day: Number.parseInt(userData.lunarDay || userData.day),
+        is_leap_month: Boolean(userData.isLeapMonth),
+        time_unknown: userData.timeUnknown || userData.hour === undefined || userData.hour === null,
       })
 
-      if (birthInfoError) {
-        console.error("Error inserting birth info:", birthInfoError)
-        // Continue even if birth info insertion fails
+      if (birthError) {
+        console.error("Error saving birth info:", birthError)
       }
     }
 
-    // Insert saju info if provided
-    if (data.yearStem && data.yearBranch) {
-      const { data: sajuInfoData, error: sajuInfoError } = await supabase
+    // 사주 정보 저장
+    let sajuId = null
+    if (userData.yearStem && userData.yearBranch) {
+      const { data: saju, error: sajuError } = await adminSupabase
         .from("saju_info")
         .insert({
-          user_id: data.userId,
-          year_stem: data.yearStem,
-          year_branch: data.yearBranch,
-          year_stem_hanja: data.yearStemHanja || "",
-          year_branch_hanja: data.yearBranchHanja || "",
-          month_stem: data.monthStem,
-          month_branch: data.monthBranch,
-          month_stem_hanja: data.monthStemHanja || "",
-          month_branch_hanja: data.monthBranchHanja || "",
-          day_stem: data.dayStem,
-          day_branch: data.dayBranch,
-          day_stem_hanja: data.dayStemHanja || "",
-          day_branch_hanja: data.dayBranchHanja || "",
-          hour_stem: data.hourStem || "?",
-          hour_branch: data.hourBranch || "?",
-          hour_stem_hanja: data.hourStemHanja || "",
-          hour_branch_hanja: data.hourBranchHanja || "",
-          day_master: data.dayMaster || data.dayStem,
-          day_master_hanja: data.dayMasterHanja || "",
-          year_animal: data.yearAnimal || "",
+          user_id: userId,
+          year_stem: userData.yearStem,
+          year_branch: userData.yearBranch,
+          year_stem_hanja: userData.yearStemHanja || "",
+          year_branch_hanja: userData.yearBranchHanja || "",
+          month_stem: userData.monthStem,
+          month_branch: userData.monthBranch,
+          month_stem_hanja: userData.monthStemHanja || "",
+          month_branch_hanja: userData.monthBranchHanja || "",
+          day_stem: userData.dayStem,
+          day_branch: userData.dayBranch,
+          day_stem_hanja: userData.dayStemHanja || "",
+          day_branch_hanja: userData.dayBranchHanja || "",
+          hour_stem: userData.hourStem || "?",
+          hour_branch: userData.hourBranch || "?",
+          hour_stem_hanja: userData.hourStemHanja || "",
+          hour_branch_hanja: userData.hourBranchHanja || "",
+          day_master: userData.dayMaster || userData.dayStem,
+          day_master_hanja: userData.dayMasterHanja || "",
+          year_animal: userData.yearAnimal || "",
         })
-        .select()
+        .select("id")
+        .single()
 
-      if (sajuInfoError) {
-        console.error("Error inserting saju info:", sajuInfoError)
-        // Continue even if saju info insertion fails
-      } else if (sajuInfoData && sajuInfoData[0] && data.elements) {
-        // Insert elements if saju info was successfully inserted
-        const sajuId = sajuInfoData[0].id
-        const { error: elementsError } = await supabase.from("elements").insert({
-          saju_id: sajuId,
-          wood: data.elements.wood || 0,
-          fire: data.elements.fire || 0,
-          earth: data.elements.earth || 0,
-          metal: data.elements.metal || 0,
-          water: data.elements.water || 0,
-        })
-
-        if (elementsError) {
-          console.error("Error inserting elements:", elementsError)
-        }
+      if (sajuError) {
+        console.error("Error saving saju info:", sajuError)
+      } else {
+        sajuId = saju.id
       }
     }
 
-    // Insert interpretation if provided
-    if (data.interpretation) {
-      const { error: interpretationError } = await supabase.from("interpretations").insert({
-        user_id: data.userId,
-        basic_interpretation: data.interpretation,
-        model_used: data.model || "unknown",
-        response_time: data.responseTime || "N/A",
+    // 오행 정보 저장
+    if (sajuId && userData.elements) {
+      const { error: elementsError } = await adminSupabase.from("elements").insert({
+        saju_id: sajuId,
+        wood: userData.elements.wood || 0,
+        fire: userData.elements.fire || 0,
+        earth: userData.elements.earth || 0,
+        metal: userData.elements.metal || 0,
+        water: userData.elements.water || 0,
       })
 
-      if (interpretationError) {
-        console.error("Error inserting interpretation:", interpretationError)
+      if (elementsError) {
+        console.error("Error saving elements:", elementsError)
       }
     }
 
-    return NextResponse.json({ success: true, userId: data.userId })
+    return NextResponse.json({ success: true, userId })
   } catch (error) {
     console.error("Error in save-user-data API route:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error occurred" },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
   }
 }

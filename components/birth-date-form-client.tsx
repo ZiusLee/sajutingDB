@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -57,6 +57,33 @@ export default function BirthDateFormClient() {
 
   const { toast } = useToast()
   const router = useRouter()
+
+  // Find the useEffect hook that checks authentication or add it if it doesn't exist
+  // Add this useEffect after the state declarations and before the handleSubmit function
+
+  useEffect(() => {
+    // Check if user is authenticated with Supabase
+    const checkAuthAndLinkData = async () => {
+      try {
+        console.log("Checking authentication status...")
+        const supabaseClient = getSupabase()
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+
+        if (session && session.user) {
+          console.log("User is authenticated with Supabase:", session.user.id)
+          setAuthUser(session.user)
+        } else {
+          console.log("User is not authenticated with Supabase")
+        }
+      } catch (error) {
+        console.error("Error checking auth and linking data:", error)
+      }
+    }
+
+    checkAuthAndLinkData()
+  }, [])
 
   // 리다이렉트 처리
   // useEffect 삭제
@@ -194,7 +221,11 @@ export default function BirthDateFormClient() {
       // 데이터베이스에 즉시 저장 시도
       try {
         console.log("Attempting to save saju data to database...")
-        userId = await syncLocalStorageToDatabase()
+
+        // Pass authUserId to syncLocalStorageToDatabase
+        const authUserId = authUser?.id || null
+        userId = await syncLocalStorageToDatabase(authUserId)
+
         if (userId) {
           console.log("Successfully saved saju data to database with user ID:", userId)
           // 사용자 ID를 localStorage에 저장
@@ -202,11 +233,6 @@ export default function BirthDateFormClient() {
           storedData.userId = userId
           localStorage.setItem("tempSajuData", JSON.stringify(storedData))
           localStorage.setItem("user_id", userId) // Store user ID in standard location
-
-          // 전역 변수 업데이트
-          if (window.sajuFullData) {
-            window.sajuFullData.userId = userId
-          }
         } else {
           console.warn("Failed to get user ID when saving saju data")
         }

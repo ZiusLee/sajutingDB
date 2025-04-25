@@ -70,9 +70,9 @@
     "uuid": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
     "jsonwebtoken": "latest",
-    "bcryptjs": "latest",
     "fast-xml-parser": "latest",
-    "openai": "latest"
+    "openai": "latest",
+    "bcryptjs": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
