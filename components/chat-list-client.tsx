@@ -237,7 +237,7 @@ export default function ChatListClient() {
         const basicRooms: ChatRoom[] = [
           {
             id: "daily-fortune",
-            title: "오늘��� 운세",
+            title: "오늘의 운세 🍀",
             description: "오늘의 운세를 봅니다",
             icon: <Calendar className="h-5 w-5" />,
             lastMessage:

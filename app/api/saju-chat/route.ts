@@ -108,8 +108,8 @@ export async function POST(req: Request) {
 
       const apiMessages = [{ role: "system", content: dailyFortunePrompt }, ...messages]
 
-      // 질문 복잡성에 따라 토큰 제한 동적 조정
-      const maxTokens = isComplexQuestion ? 1000 : 800
+      // 질문 복잡성에 따라 토큰 제한 동적 조정하되, 더 높은 값 사용
+      const maxTokens = isComplexQuestion ? 2000 : 1500
 
       const result = streamText({
         model: openai("gpt-4.1"),
@@ -120,8 +120,8 @@ export async function POST(req: Request) {
 
       return result.toDataStreamResponse()
     } else {
-      // 질문 복잡성에 따라 토큰 제한 동적 조정
-      const maxTokens = isComplexQuestion ? 1000 : 800
+      // 질문 복잡성에 따라 토큰 제한 동적 조정하되, 더 높은 값 사용
+      const maxTokens = isComplexQuestion ? 2000 : 1500
 
       const result = streamText({
         model: model,
