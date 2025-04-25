@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { MessageSquare } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import ReactMarkdown from "react-markdown"
 import type { Saju } from "@/lib/saju"
 import SajuDiagram from "./saju-diagram"
@@ -71,6 +71,7 @@ export default function SajuResultClient({
   const router = useRouter()
   const [questionSet, setQuestionSet] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
+  const { toast } = useToast()
 
   // 성별 정보 정규화
   const normalizedGender =
@@ -258,7 +259,7 @@ ${timeUnknown ? "시간 미상" : ""}
 
 사주 해석:
 ${interpretation}
- `
+`
 
     navigator.clipboard.writeText(sajuInfo.trim())
     toast({

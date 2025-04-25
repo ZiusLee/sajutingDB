@@ -73,36 +73,6 @@ export async function fetchLunarDate(year: string, month: string, day: string) {
   }
 }
 
-export async function getDetailedInterpretation(
-  saju: any,
-  name: string,
-  gender: string,
-  questionSet: string,
-  relationshipStatus: string,
-) {
-  try {
-    console.log("Requesting detailed interpretation")
-
-    const response = await fetch("/api/saju-interpretation", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ saju, name, gender, questionSet, relationshipStatus }),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to get detailed interpretation")
-    }
-
-    const data = await response.json()
-    return data
-  } catch (error) {
-    console.error("Error fetching detailed interpretation:", error)
-    throw error
-  }
-}
-
 // getSajuInterpretation 함수를 개선합니다
 
 // 기존 함수를 찾아 다음과 같이 수정합니다:
@@ -115,9 +85,9 @@ export async function getSajuInterpretation(
 ): Promise<any> {
   try {
     console.log("Requesting saju interpretation")
-    // 타임아웃 설정 추가 (30초)
+    // 타임아웃 설정 추가 (90초)
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    const timeoutId = setTimeout(() => controller.abort(), 90000)
 
     const response = await fetch("/api/saju-interpretation", {
       method: "POST",
