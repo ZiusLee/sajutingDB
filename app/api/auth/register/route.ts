@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { sign } from "jsonwebtoken"
-import { createUser, getUserByEmail } from "@/lib/user-service"
+import { createSajuSession, getSajuSessionByEmail } from "@/lib/user-service"
 import { migrateUserData } from "@/lib/migration-utils"
 import { transferAnonymousDataToUser } from "@/lib/user-data-transfer"
 import { createClient } from "@/utils/supabase/server"
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
 
     try {
       // 이메일 중복 확인
-      const existingUser = await getUserByEmail(email)
-      if (existingUser) {
+      const existingSession = await getSajuSessionByEmail(email)
+      if (existingSession) {
         return NextResponse.json(
           {
             success: false,
@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // Create the user in our custom table with the auth_user_id
-      const user = await createUser({
+      // Create the session in our custom table with the auth_user_id
+      const session = await createSajuSession({
         email,
         password,
         name,
@@ -78,11 +78,11 @@ export async function POST(req: NextRequest) {
       })
 
       // JWT 토큰 생성
-      const token = sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" })
+      const token = sign({ userId: session.id, email: session.email }, JWT_SECRET, { expiresIn: "7d" })
 
       // Transfer anonymous data to authenticated user
       try {
-        await transferAnonymousDataToUser(user.id)
+        await transferAnonymousDataToUser(session.id)
       } catch (transferError) {
         console.error("Error transferring anonymous data:", transferError)
         // Continue with registration even if transfer fails
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
       // 로컬 데이터 마이그레이션 (비동기로 처리)
       let migrationResult = false
       try {
-        migrationResult = await migrateUserData(user.id)
+        migrationResult = await migrateUserData(session.id)
       } catch (migrationError) {
         console.error("데이터 마이그레이션 오류:", migrationError)
         // 마이그레이션 실패해도 회원가입은 계속 진행
@@ -110,9 +110,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          id: session.id,
+          email: session.email,
+          name: session.name,
         },
         migration: migrationResult,
         redirectTo: "/chat-list", // 하이픈 사용 (파일 시스템 기반 라우팅에 맞춤)

@@ -65,9 +65,9 @@ export async function POST(req: NextRequest) {
       try {
         const updated = await updateAuthUserId(localUserId, user.id)
         if (updated) {
-          console.log(`User ${localUserId} linked with auth user ${user.id}`)
+          console.log(`Session ${localUserId} linked with auth user ${user.id}`)
         } else {
-          console.warn(`Failed to link user ${localUserId} with auth user ${user.id}`)
+          console.warn(`Failed to link session ${localUserId} with auth user ${user.id}`)
         }
       } catch (updateError) {
         console.error("Error updating auth_user_id:", updateError)

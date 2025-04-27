@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: latest
-        version: 1.3.19(zod@3.24.1)
+        version: 1.3.20(zod@3.24.1)
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.9.1(react-hook-form@7.54.1(react@19.0.0))
@@ -106,7 +106,7 @@ importers:
         version: 2.49.4
       ai:
         specifier: latest
-        version: 4.3.9(react@19.0.0)(zod@3.24.1)
+        version: 4.3.10(react@19.0.0)(zod@3.24.1)
       autoprefixer:
         specifier: ^10.4.20
         version: 10.4.20(postcss@8.0.0)
@@ -154,7 +154,7 @@ importers:
         version: 4.96.0(ws@8.18.1)(zod@3.24.1)
       pg:
         specifier: latest
-        version: 8.15.5(pg-native@3.4.5)
+        version: 8.15.6(pg-native@3.4.5)
       pg-native:
         specifier: latest
         version: 3.4.5
@@ -222,8 +222,8 @@ importers:
 
 packages:
 
-  '@ai-sdk/openai@1.3.19':
-    resolution: {integrity: sha512-VB0ZutZwb6LJBIAV5pJZsSuL3O+GeTAeG4OifRpf014nJF/QlbZIWDvEWfcTq65d85fO/vg1NTv8jVKYRi+JFQ==}
+  '@ai-sdk/openai@1.3.20':
+    resolution: {integrity: sha512-/DflUy7ROG9k6n6YTXMBFPbujBKnbGY58f3CwvicLvDar9nDAloVnUWd3LUoOxpSVnX8vtQ7ngxF52SLWO6RwQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.0.0
@@ -1385,8 +1385,8 @@ packages:
     resolution: {integrity: sha512-kja8j7PjmncONqaTsB8fQ+wE2mSU2DJ9D4XKoJ5PFWIdRMa6SLSN1ff4mOr4jCbfRSsxR4keIiySJU0N9T5hIQ==}
     engines: {node: '>= 8.0.0'}
 
-  ai@4.3.9:
-    resolution: {integrity: sha512-P2RpV65sWIPdUlA4f1pcJ11pB0N1YmqPVLEmC4j8WuBwKY0L3q9vGhYPh0Iv+spKHKyn0wUbMfas+7Z6nTfS0g==}
+  ai@4.3.10:
+    resolution: {integrity: sha512-jw+ahNu+T4SHj9gtraIKtYhanJI6gj2IZ5BFcfEHgoyQVMln5a5beGjzl/nQSX6FxyLqJ/UBpClRa279EEKK/Q==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -1666,8 +1666,8 @@ packages:
   ecdsa-sig-formatter@1.0.11:
     resolution: {integrity: sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==}
 
-  electron-to-chromium@1.5.142:
-    resolution: {integrity: sha512-Ah2HgkTu/9RhTDNThBtzu2Wirdy4DC9b0sMT1pUhbkZQ5U/iwmE+PHZX1MpjD5IkJCc2wSghgGG/B04szAx07w==}
+  electron-to-chromium@1.5.143:
+    resolution: {integrity: sha512-QqklJMOFBMqe46k8iIOwA9l2hz57V2OKMmP5eSWcUvwx+mASAsbU+wkF1pHjn9ZVSBPrsYWr4/W/95y5SwYg2g==}
 
   embla-carousel-react@8.5.1:
     resolution: {integrity: sha512-z9Y0K84BJvhChXgqn2CFYbfEi6AwEr+FFVVKm/MqbTQ2zIzO1VQri6w67LcfpVF0AjbhwVMywDZqY4alYkjW5w==}
@@ -2201,8 +2201,8 @@ packages:
   pg-native@3.4.5:
     resolution: {integrity: sha512-X6fwcza2fuYdAWll48Cj0Xa9ikvfaLWjbKmNWZ7iC6caEMMeN7mpFtSEDjS2HgPxhCEHEjlhE7v1jLyM1k+4kA==}
 
-  pg-pool@3.9.5:
-    resolution: {integrity: sha512-DxyAlOgvUzRFpFAZjbCc8fUfG7BcETDHgepFPf724B0i08k9PAiZV1tkGGgQIL0jbMEuR9jW1YN7eX+WgXxCsQ==}
+  pg-pool@3.9.6:
+    resolution: {integrity: sha512-rFen0G7adh1YmgvrmE5IPIqbb+IgEzENUm+tzm6MLLDSlPRoZVhzU1WdML9PV2W5GOdRA9qBKURlbt1OsXOsPw==}
     peerDependencies:
       pg: '>=8.0'
 
@@ -2213,8 +2213,8 @@ packages:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
 
-  pg@8.15.5:
-    resolution: {integrity: sha512-EpAhHFQc+aH9VfeffWIVC+XXk6lmAhS9W1FxtxcPXs94yxhrI1I6w/zkWfIOII/OkBv3Be04X3xMOj0kQ78l6w==}
+  pg@8.15.6:
+    resolution: {integrity: sha512-yvao7YI3GdmmrslNVsZgx9PfntfWrnXwtR+K/DjI0I/sTKif4Z623um+sjVZ1hk5670B+ODjvHDAckKdjmPTsg==}
     engines: {node: '>= 8.0.0'}
     peerDependencies:
       pg-native: '>=3.0.1'
@@ -2734,7 +2734,7 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/openai@1.3.19(zod@3.24.1)':
+  '@ai-sdk/openai@1.3.20(zod@3.24.1)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.7(zod@3.24.1)
@@ -3883,7 +3883,7 @@ snapshots:
     dependencies:
       humanize-ms: 1.2.1
 
-  ai@4.3.9(react@19.0.0)(zod@3.24.1):
+  ai@4.3.10(react@19.0.0)(zod@3.24.1):
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.7(zod@3.24.1)
@@ -3953,7 +3953,7 @@ snapshots:
   browserslist@4.24.4:
     dependencies:
       caniuse-lite: 1.0.30001715
-      electron-to-chromium: 1.5.142
+      electron-to-chromium: 1.5.143
       node-releases: 2.0.19
       update-browserslist-db: 1.1.3(browserslist@4.24.4)
 
@@ -4142,7 +4142,7 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
-  electron-to-chromium@1.5.142: {}
+  electron-to-chromium@1.5.143: {}
 
   embla-carousel-react@8.5.1(react@19.0.0):
     dependencies:
@@ -4801,9 +4801,9 @@ snapshots:
       libpq: 1.8.14
       pg-types: 2.2.0
 
-  pg-pool@3.9.5(pg@8.15.5(pg-native@3.4.5)):
+  pg-pool@3.9.6(pg@8.15.6(pg-native@3.4.5)):
     dependencies:
-      pg: 8.15.5(pg-native@3.4.5)
+      pg: 8.15.6(pg-native@3.4.5)
 
   pg-protocol@1.9.5: {}
 
@@ -4815,10 +4815,10 @@ snapshots:
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
 
-  pg@8.15.5(pg-native@3.4.5):
+  pg@8.15.6(pg-native@3.4.5):
     dependencies:
       pg-connection-string: 2.8.5
-      pg-pool: 3.9.5(pg@8.15.5(pg-native@3.4.5))
+      pg-pool: 3.9.6(pg@8.15.6(pg-native@3.4.5))
       pg-protocol: 1.9.5
       pg-types: 2.2.0
       pgpass: 1.0.5

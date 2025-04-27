@@ -23,33 +23,36 @@ export async function POST(request: NextRequest) {
 
     // 기존 사용자 확인
     if (userData.email) {
-      const { data: existingUsers } = await adminSupabase.from("users").select("id").eq("email", userData.email)
+      const { data: existingSessions } = await adminSupabase
+        .from("saju_sessions")
+        .select("id")
+        .eq("email", userData.email)
 
-      if (existingUsers && existingUsers.length > 0) {
-        const existingUserId = existingUsers[0].id
-        console.log("Found existing user with ID:", existingUserId)
+      if (existingSessions && existingSessions.length > 0) {
+        const existingSessionId = existingSessions[0].id
+        console.log("Found existing session with ID:", existingSessionId)
 
         // 인증된 사용자 ID가 있는 경우 업데이트
         if (authUserId) {
           const { error: updateError } = await adminSupabase
-            .from("users")
+            .from("saju_sessions")
             .update({ auth_user_id: authUserId })
-            .eq("id", existingUserId)
+            .eq("id", existingSessionId)
 
           if (updateError) {
-            console.error("Error updating auth_user_id:", updateError)
+            console.error("Error linking session ID to auth user ID:", updateError)
           } else {
-            console.log("Updated auth_user_id for user:", existingUserId)
+            console.log("Updated auth_user_id for session:", existingSessionId)
           }
         }
 
-        return NextResponse.json({ success: true, userId: existingUserId })
+        return NextResponse.json({ success: true, userId: existingSessionId })
       }
     }
 
-    // 새 사용자 생성
-    const { data: newUser, error: userError } = await adminSupabase
-      .from("users")
+    // 새 세션 생성
+    const { data: newSession, error: sessionError } = await adminSupabase
+      .from("saju_sessions")
       .insert({
         id: userId,
         name: userData.name || "Anonymous User",
@@ -64,12 +67,12 @@ export async function POST(request: NextRequest) {
       .select("id")
       .single()
 
-    if (userError) {
-      console.error("Error creating user:", userError)
-      return NextResponse.json({ error: userError.message }, { status: 500 })
+    if (sessionError) {
+      console.error("Error creating session:", sessionError)
+      return NextResponse.json({ error: sessionError.message }, { status: 500 })
     }
 
-    console.log("Created new user with ID:", newUser.id)
+    console.log("Created new session with ID:", newSession.id)
 
     // 생년월일 정보 저장
     if (userData.year && userData.month && userData.day) {

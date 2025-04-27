@@ -7,7 +7,7 @@ import SajuResult from "@/components/saju-result"
 import SocialShareButtons from "@/components/social-share-buttons"
 import { notFound } from "next/navigation"
 import { BetaSignupForm } from "@/components/beta-signup-form"
-import { getSajuDataByUuid } from "@/lib/user-data-transfer"
+import { getSajuDataByUuid } from "@/lib/saju-session-service"
 
 export default async function ResultPage({
   searchParams,

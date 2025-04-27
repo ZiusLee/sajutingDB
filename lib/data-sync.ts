@@ -46,7 +46,7 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
           console.log("Attempting to link existing user ID to auth user ID:", sajuData.userId, authUserId)
           const supabaseClient = getSupabase()
           const { data, error } = await supabaseClient
-            .from("users")
+            .from("saju_sessions")
             .update({ auth_user_id: authUserId })
             .eq("id", sajuData.userId)
             .select()
@@ -101,15 +101,12 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
     } catch (apiError) {
       console.error("Error calling save-user-data API:", apiError)
 
-      // API 호출 실패 시 직접 Supa  {
-      console.error("Error calling save-user-data API:", apiError)
-
       // API 호출 실패 시 직접 Supabase 호출 시도
       try {
         console.log("Attempting direct Supabase insertion for user:", userId)
         const supabaseClient = getSupabase()
         const { data, error } = await supabaseClient
-          .from("users")
+          .from("saju_sessions")
           .insert({
             id: userId,
             name: sajuData.name || "Anonymous User",

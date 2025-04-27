@@ -1,31 +1,35 @@
 import { supabase } from "./supabase-client"
 
 /**
- * Update auth_user_id in the users table
+ * Update auth_user_id in the saju_sessions table
  */
-export async function updateAuthUserId(userId: string, authUserId: string): Promise<boolean> {
+export async function updateAuthUserId(sessionId: string, authUserId: string): Promise<boolean> {
   try {
-    console.log(`Updating auth_user_id for user ${userId} to ${authUserId}`)
+    console.log(`Updating auth_user_id for session ${sessionId} to ${authUserId}`)
 
-    // First check if the user exists
-    const { data: existingUser, error: checkError } = await supabase.from("users").select("*").eq("id", userId).single()
+    // First check if the session exists
+    const { data: existingSession, error: checkError } = await supabase
+      .from("saju_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single()
 
     if (checkError) {
-      console.error("Error checking user existence:", checkError)
+      console.error("Error checking session existence:", checkError)
       return false
     }
 
-    console.log("Found existing user:", existingUser)
+    console.log("Found existing session:", existingSession)
 
     // Update the auth_user_id
-    const { error } = await supabase.from("users").update({ auth_user_id: authUserId }).eq("id", userId)
+    const { error } = await supabase.from("saju_sessions").update({ auth_user_id: authUserId }).eq("id", sessionId)
 
     if (error) {
       console.error("Error updating auth_user_id:", error)
       return false
     }
 
-    console.log(`Successfully updated auth_user_id for user ${userId} to ${authUserId}`)
+    console.log(`Successfully updated auth_user_id for session ${sessionId} to ${authUserId}`)
     return true
   } catch (error) {
     console.error("Error in updateAuthUserId:", error)
@@ -303,30 +307,33 @@ export async function saveCompatibilityAnalysis(compatibilityAnalysis: {
  */
 export async function getUserProfilesByAuthId(authUserId: string): Promise<any[]> {
   try {
-    // First get all users with this auth_user_id
-    const { data: users, error: usersError } = await supabase
-      .from("users")
+    // First get all sessions with this auth_user_id
+    const { data: sessions, error: sessionsError } = await supabase
+      .from("saju_sessions")
       .select("id, name, gender")
       .eq("auth_user_id", authUserId)
 
-    if (usersError || !users || users.length === 0) {
-      console.error("Error getting users by auth_user_id or no users found:", usersError)
+    if (sessionsError || !sessions || sessions.length === 0) {
+      console.error("Error getting sessions by auth_user_id or no sessions found:", sessionsError)
       return []
     }
 
-    console.log(`Found ${users.length} users with auth_user_id ${authUserId}:`, users)
+    console.log(`Found ${sessions.length} sessions with auth_user_id ${authUserId}:`, sessions)
 
-    // Get all birth info for these users
-    const userIds = users.map((user) => user.id)
-    const { data: birthInfos, error: birthError } = await supabase.from("birth_info").select("*").in("user_id", userIds)
+    // Get all birth info for these sessions
+    const sessionIds = sessions.map((session) => session.id)
+    const { data: birthInfos, error: birthError } = await supabase
+      .from("birth_info")
+      .select("*")
+      .in("user_id", sessionIds)
 
     if (birthError) {
       console.error("Error getting birth info:", birthError)
       return []
     }
 
-    // Get all saju info for these users
-    const { data: sajuInfos, error: sajuError } = await supabase.from("saju_info").select("*").in("user_id", userIds)
+    // Get all saju info for these sessions
+    const { data: sajuInfos, error: sajuError } = await supabase.from("saju_info").select("*").in("user_id", sessionIds)
 
     if (sajuError) {
       console.error("Error getting saju info:", sajuError)
@@ -334,14 +341,14 @@ export async function getUserProfilesByAuthId(authUserId: string): Promise<any[]
     }
 
     // Combine the data into profiles
-    const profiles = users.map((user) => {
-      const birthInfo = birthInfos?.find((bi) => bi.user_id === user.id) || null
-      const sajuInfo = sajuInfos?.find((si) => si.user_id === user.id) || null
+    const profiles = sessions.map((session) => {
+      const birthInfo = birthInfos?.find((bi) => bi.user_id === session.id) || null
+      const sajuInfo = sajuInfos?.find((si) => si.user_id === session.id) || null
 
       return {
-        id: user.id,
-        name: user.name || "Unknown",
-        gender: user.gender || "unknown",
+        id: session.id,
+        name: session.name || "Unknown",
+        gender: session.gender || "unknown",
         birthYear: birthInfo?.solar_year?.toString() || "",
         birthMonth: birthInfo?.solar_month?.toString().padStart(2, "0") || "",
         birthDay: birthInfo?.solar_day?.toString().padStart(2, "0") || "",
@@ -352,7 +359,7 @@ export async function getUserProfilesByAuthId(authUserId: string): Promise<any[]
         lunarDay: birthInfo?.lunar_day?.toString().padStart(2, "0") || "",
         timeUnknown: birthInfo?.time_unknown || false,
         isDefault: false, // Default value, can be updated later
-        createdAt: user.created_at || new Date().toISOString(),
+        createdAt: session.created_at || new Date().toISOString(),
         saju: sajuInfo || null,
       }
     })

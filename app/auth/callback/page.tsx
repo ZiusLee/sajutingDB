@@ -2,11 +2,12 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabase } from "@/lib/supabase-client"
 
 export default function AuthCallbackPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  // Use our singleton Supabase instance
+  const supabase = getSupabase()
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -15,6 +16,7 @@ export default function AuthCallbackPage() {
 
       if (code) {
         try {
+          console.log("Exchanging code for session...")
           const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
           if (error) {
@@ -23,12 +25,14 @@ export default function AuthCallbackPage() {
             return
           }
 
+          console.log("Session exchange successful, getting user data...")
           // Get user data after successful login
           const {
             data: { user },
           } = await supabase.auth.getUser()
 
           if (user) {
+            console.log("User authenticated:", user.id)
             // Store user info in localStorage if needed
             localStorage.setItem("user_authenticated", "true")
             localStorage.setItem("user_id", user.id)
@@ -40,16 +44,65 @@ export default function AuthCallbackPage() {
               localStorage.setItem("user_name", user.email.split("@")[0])
             }
 
-            // Update localStorage with the new session
-            localStorage.setItem("supabase.auth.token", JSON.stringify(data))
+            // Link user data if needed
+            await linkUserDataIfNeeded(user.id)
 
             // Redirect to home page or dashboard
             router.push("/")
+          } else {
+            console.error("No user found after authentication")
+            router.push("/login?error=no_user")
           }
         } catch (error) {
           console.error("Error exchanging code for session:", error)
           router.push("/login?error=callback_error")
         }
+      } else {
+        console.error("No code found in URL")
+        router.push("/login?error=no_code")
+      }
+    }
+
+    // Helper function to link user data if needed
+    const linkUserDataIfNeeded = async (authUserId: string) => {
+      try {
+        // Check if the user already has linked data
+        const { data: existingUser, error: userError } = await supabase
+          .from("saju_sessions")
+          .select("id")
+          .eq("auth_user_id", authUserId)
+          .single()
+
+        if (userError && userError.code !== "PGRST116") {
+          console.error("Error checking for existing user:", userError)
+          return
+        }
+
+        // If user already has linked data, no need to proceed
+        if (existingUser) {
+          console.log("User already has linked data:", existingUser.id)
+          return
+        }
+
+        // Check if there's a user ID in localStorage that needs to be linked
+        const localUserId = localStorage.getItem("user_id")
+        if (localUserId && localUserId !== authUserId) {
+          console.log(`Linking local user ID ${localUserId} to auth user ID ${authUserId}`)
+
+          // Update the auth_user_id for the session
+          const { error } = await supabase
+            .from("saju_sessions")
+            .update({ auth_user_id: authUserId })
+            .eq("id", localUserId)
+
+          if (error) {
+            console.error("Error linking user data:", error)
+          } else {
+            console.log("Successfully linked user data")
+          }
+        }
+      } catch (error) {
+        console.error("Error in linkUserDataIfNeeded:", error)
       }
     }
 

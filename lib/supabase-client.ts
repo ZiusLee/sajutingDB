@@ -1,4 +1,15 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+// Create a singleton instance of the Supabase client
+let supabaseInstance: SupabaseClient | null = null
+
+export function getSupabase() {
+  if (!supabaseInstance) {
+    supabaseInstance = createClientComponentClient()
+  }
+  return supabaseInstance
+}
 
 // Initialize the Supabase client with environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://tqrwktpmyylxyhgsrwlo.supabase.co"
@@ -6,37 +17,8 @@ const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxcndrdHBteXlseHloZ3Nyd2xvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTEzNzA1NzYsImV4cCI6MjAyNjk0NjU3Nn0.Yd_6UO8X_XCZGjopPWbNxIEaW_yXONTkGPJlG_LBHV0"
 
-// Global variable to store the Supabase client instance
-let supabaseInstance: ReturnType<typeof createClient> | null = null
-
 // Cache for file URLs to prevent duplicate fetches
 const fileUrlCache: Record<string, string> = {}
-
-// For client-side usage (singleton pattern)
-export function getSupabase() {
-  if (typeof window === "undefined") {
-    // Server-side: create a new instance each time
-    return createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    })
-  }
-
-  // Client-side: use singleton pattern
-  if (!supabaseInstance) {
-    console.log("Creating new Supabase client instance")
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        storageKey: "sajuping_supabase_auth",
-      },
-    })
-  }
-  return supabaseInstance
-}
 
 // Export the supabase client for backward compatibility
 // Use a getter to ensure we're always using the singleton
@@ -71,6 +53,7 @@ export async function getFileUrl(bucket: string, path: string): Promise<string> 
 }
 
 // Type definitions for our database tables
+// Update the User interface to reflect the new table name
 export interface User {
   id?: string
   name: string
@@ -78,7 +61,18 @@ export interface User {
   gender: string
   relationship_status: string
   is_beta_applicant: boolean
-  auth_user_id?: string // Add this new field
+  auth_user_id?: string
+}
+
+// Change to SajuSession interface to match the new table name
+export interface SajuSession {
+  id?: string
+  name: string
+  email?: string
+  gender: string
+  relationship_status: string
+  is_beta_applicant: boolean
+  auth_user_id?: string // Link to Supabase Auth user
 }
 
 export interface BirthInfo {

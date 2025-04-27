@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Calendar, Clock, LogOut, Star, Eye, Link } from "lucide-react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { getAllUserProfiles, getChatHistory, setDefaultUserProfile } from "@/lib/user-data-transfer"
+import { getSupabase } from "@/lib/supabase-client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
 import ManualDataLink from "@/components/manual-data-link"
@@ -55,8 +54,8 @@ export default function MyPage() {
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null)
   const [activeTab, setActiveTab] = useState("profiles")
   const [showDataLink, setShowDataLink] = useState(false)
-  // Replace the existing supabase client with the server component client
-  const supabase = createClientComponentClient()
+  // Use our singleton Supabase instance
+  const supabase = getSupabase()
 
   // 로그인 상태 확인 및 데이터 로드
   useEffect(() => {
@@ -131,90 +130,151 @@ export default function MyPage() {
       try {
         setIsLoading(true)
         // Get the current user ID
-        const userId = localStorage.getItem("user_id")
-        const authId = localStorage.getItem("supabase.auth.token")
+        const { data: userData } = await supabase.auth.getUser()
+        const authUserId = userData?.user?.id
 
-        console.log("Loading user data with user ID:", userId)
-        console.log("Auth ID from localStorage:", authId)
+        console.log("Loading user data with auth user ID:", authUserId)
 
-        // Try to load profiles with both IDs to ensure we get all data
-        let profiles = await getAllUserProfiles()
+        if (!authUserId) {
+          console.error("No authenticated user found")
+          return
+        }
 
-        // If no profiles found, try to fetch directly from Supabase
-        if (profiles.length === 0) {
-          console.log("No profiles found in localStorage, fetching from Supabase...")
+        // Fetch profiles directly from Supabase
+        const { data: sessionData, error: sessionError } = await supabase
+          .from("saju_sessions")
+          .select(`
+            *,
+            birth_info(*),
+            saju_info(*)
+          `)
+          .eq("auth_user_id", authUserId)
 
-          // Fetch profiles directly from Supabase
-          const supabase = createClientComponentClient()
-          const {
-            data: { session },
-          } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.error("Error fetching session data from Supabase:", sessionError)
+          throw sessionError
+        }
 
-          if (session && session.user) {
-            console.log("Fetching profiles for auth user:", session.user.id)
+        let profiles: UserProfile[] = []
 
-            // First try to find users with matching auth_user_id
-            const { data: userData, error: userError } = await supabase
-              .from("users")
+        if (sessionData && sessionData.length > 0) {
+          console.log(`Found ${sessionData.length} sessions with matching auth_user_id`)
+
+          // Convert Supabase data to profile format
+          profiles = sessionData.map((session) => {
+            const birthInfo = session.birth_info?.[0] || {}
+            const sajuInfo = session.saju_info?.[0] || {}
+
+            return {
+              id: session.id,
+              name: session.name || "Unknown",
+              gender: session.gender || "unknown",
+              birthYear: birthInfo.solar_year?.toString() || "",
+              birthMonth: birthInfo.solar_month?.toString().padStart(2, "0") || "",
+              birthDay: birthInfo.solar_day?.toString().padStart(2, "0") || "",
+              birthHour: birthInfo.solar_hour?.toString().padStart(2, "0") || "00",
+              birthMinute: birthInfo.solar_minute?.toString().padStart(2, "0") || "00",
+              lunarYear: birthInfo.lunar_year?.toString() || "",
+              lunarMonth: birthInfo.lunar_month?.toString().padStart(2, "0") || "",
+              lunarDay: birthInfo.lunar_day?.toString().padStart(2, "0") || "",
+              timeUnknown: birthInfo.time_unknown || false,
+              isDefault: session.is_default || false,
+              createdAt: session.created_at || new Date().toISOString(),
+              saju: {
+                yearStem: sajuInfo.year_stem || "",
+                yearBranch: sajuInfo.year_branch || "",
+                monthStem: sajuInfo.month_stem || "",
+                monthBranch: sajuInfo.month_branch || "",
+                dayStem: sajuInfo.day_stem || "",
+                dayBranch: sajuInfo.day_branch || "",
+                hourStem: sajuInfo.hour_stem || "",
+                hourBranch: sajuInfo.hour_branch || "",
+                year: birthInfo.solar_year || "",
+                month: birthInfo.solar_month || "",
+                day: birthInfo.solar_day || "",
+                hour: birthInfo.solar_hour || "",
+                minute: birthInfo.solar_minute || "",
+                lunarYear: birthInfo.lunar_year || "",
+                lunarMonth: birthInfo.lunar_month || "",
+                lunarDay: birthInfo.lunar_day || "",
+              },
+            }
+          })
+        } else {
+          console.log("No sessions found with matching auth_user_id, checking for unlinked sessions")
+
+          // If no profiles found with auth_user_id, check if there are any unlinked profiles
+          // that match the user's ID in localStorage
+          const localUserId = localStorage.getItem("user_id")
+
+          if (localUserId && localUserId !== authUserId) {
+            console.log(`Checking for sessions with ID ${localUserId}`)
+
+            const { data: unlinkedData, error: unlinkedError } = await supabase
+              .from("saju_sessions")
               .select(`
                 *,
                 birth_info(*),
                 saju_info(*)
               `)
-              .eq("auth_user_id", session.user.id)
+              .eq("id", localUserId)
 
-            if (userError) {
-              console.error("Error fetching user data from Supabase:", userError)
-              throw userError
-            }
+            if (unlinkedError) {
+              console.error("Error fetching unlinked session data:", unlinkedError)
+            } else if (unlinkedData && unlinkedData.length > 0) {
+              console.log(`Found ${unlinkedData.length} unlinked sessions, linking to auth user`)
 
-            if (userData && userData.length > 0) {
-              console.log(`Found ${userData.length} users with matching auth_user_id`)
+              // Link the unlinked session to the authenticated user
+              const { error: updateError } = await supabase
+                .from("saju_sessions")
+                .update({ auth_user_id: authUserId })
+                .eq("id", localUserId)
 
-              // Convert Supabase data to profile format
-              profiles = userData.map((user) => {
-                const birthInfo = user.birth_info?.[0] || {}
-                const sajuInfo = user.saju_info?.[0] || {}
+              if (updateError) {
+                console.error("Error linking session to auth user:", updateError)
+              } else {
+                console.log("Successfully linked session to auth user")
 
-                return {
-                  id: user.id,
-                  name: user.name || "Unknown",
-                  gender: user.gender || "unknown",
-                  birthYear: birthInfo.solar_year?.toString() || "",
-                  birthMonth: birthInfo.solar_month?.toString().padStart(2, "0") || "",
-                  birthDay: birthInfo.solar_day?.toString().padStart(2, "0") || "",
-                  birthHour: birthInfo.solar_hour?.toString().padStart(2, "0") || "00",
-                  birthMinute: birthInfo.solar_minute?.toString().padStart(2, "0") || "00",
-                  lunarYear: birthInfo.lunar_year?.toString() || "",
-                  lunarMonth: birthInfo.lunar_month?.toString().padStart(2, "0") || "",
-                  lunarDay: birthInfo.lunar_day?.toString().padStart(2, "0") || "",
-                  timeUnknown: birthInfo.time_unknown || false,
-                  isDefault: user.is_default || false,
-                  createdAt: user.created_at || new Date().toISOString(),
-                  saju: {
-                    yearStem: sajuInfo.year_stem || "",
-                    yearBranch: sajuInfo.year_branch || "",
-                    monthStem: sajuInfo.month_stem || "",
-                    monthBranch: sajuInfo.month_branch || "",
-                    dayStem: sajuInfo.day_stem || "",
-                    dayBranch: sajuInfo.day_branch || "",
-                    hourStem: sajuInfo.hour_stem || "",
-                    hourBranch: sajuInfo.hour_branch || "",
-                    year: birthInfo.solar_year || "",
-                    month: birthInfo.solar_month || "",
-                    day: birthInfo.solar_day || "",
-                    hour: birthInfo.solar_hour || "",
-                    minute: birthInfo.solar_minute || "",
-                    lunarYear: birthInfo.lunar_year || "",
-                    lunarMonth: birthInfo.lunar_month || "",
-                    lunarDay: birthInfo.lunar_day || "",
-                  },
-                }
-              })
+                // Convert the unlinked data to profiles
+                profiles = unlinkedData.map((session) => {
+                  const birthInfo = session.birth_info?.[0] || {}
+                  const sajuInfo = session.saju_info?.[0] || {}
 
-              // Set the first profile as default if none is marked
-              if (profiles.length > 0) {
-                profiles[0].isDefault = true
+                  return {
+                    id: session.id,
+                    name: session.name || "Unknown",
+                    gender: session.gender || "unknown",
+                    birthYear: birthInfo.solar_year?.toString() || "",
+                    birthMonth: birthInfo.solar_month?.toString().padStart(2, "0") || "",
+                    birthDay: birthInfo.solar_day?.toString().padStart(2, "0") || "",
+                    birthHour: birthInfo.solar_hour?.toString().padStart(2, "0") || "00",
+                    birthMinute: birthInfo.solar_minute?.toString().padStart(2, "0") || "00",
+                    lunarYear: birthInfo.lunar_year?.toString() || "",
+                    lunarMonth: birthInfo.lunar_month?.toString().padStart(2, "0") || "",
+                    lunarDay: birthInfo.lunar_day?.toString().padStart(2, "0") || "",
+                    timeUnknown: birthInfo.time_unknown || false,
+                    isDefault: session.is_default || false,
+                    createdAt: session.created_at || new Date().toISOString(),
+                    saju: {
+                      yearStem: sajuInfo.year_stem || "",
+                      yearBranch: sajuInfo.year_branch || "",
+                      monthStem: sajuInfo.month_stem || "",
+                      monthBranch: sajuInfo.month_branch || "",
+                      dayStem: sajuInfo.day_stem || "",
+                      dayBranch: sajuInfo.day_branch || "",
+                      hourStem: sajuInfo.hour_stem || "",
+                      hourBranch: sajuInfo.hour_branch || "",
+                      year: birthInfo.solar_year || "",
+                      month: birthInfo.solar_month || "",
+                      day: birthInfo.solar_day || "",
+                      hour: birthInfo.solar_hour || "",
+                      minute: birthInfo.solar_minute || "",
+                      lunarYear: birthInfo.lunar_year || "",
+                      lunarMonth: birthInfo.lunar_month || "",
+                      lunarDay: birthInfo.lunar_day || "",
+                    },
+                  }
+                })
               }
             }
           }
@@ -230,13 +290,24 @@ export default function MyPage() {
         }
 
         // Show data link component if no profiles found
-        if (profiles.length === 0) {
-          setShowDataLink(true)
-        }
+        setShowDataLink(profiles.length === 0)
 
         // Load chat history
-        const sessions = await getChatHistory()
-        setChatSessions(sessions)
+        try {
+          const { data: chatRoomsData, error: chatRoomsError } = await supabase
+            .from("chat_rooms")
+            .select("*")
+            .eq("user_id", authUserId)
+            .order("created_at", { ascending: false })
+
+          if (chatRoomsError) {
+            console.error("Error fetching chat rooms:", chatRoomsError)
+          } else if (chatRoomsData) {
+            setChatSessions(chatRoomsData)
+          }
+        } catch (chatError) {
+          console.error("Error loading chat history:", chatError)
+        }
       } catch (error) {
         console.error("Error loading user data:", error)
         toast({
@@ -325,25 +396,38 @@ export default function MyPage() {
   // 기본 프로필로 설정
   const handleSetDefaultProfile = async (profile: UserProfile) => {
     try {
-      const success = await setDefaultUserProfile(profile.id)
-      if (success) {
-        // 프로필 목록 업데이트
-        const updatedProfiles = userProfiles.map((p) => ({
-          ...p,
-          isDefault: p.id === profile.id,
-        }))
-        setUserProfiles(updatedProfiles)
-        toast({
-          title: "기본 프로필 설정 완료",
-          description: `${profile.name}님의 사주가 기본 프로필로 설정되었습니다.`,
-        })
-      } else {
-        toast({
-          title: "기본 프로필 설정 실패",
-          description: "프로필 설정 중 오류가 발생했습니다. 다시 시도해주세요.",
-          variant: "destructive",
-        })
+      // Update the profile in Supabase
+      const { error: resetError } = await supabase
+        .from("saju_sessions")
+        .update({ is_default: false })
+        .eq("auth_user_id", (await supabase.auth.getUser()).data.user?.id)
+
+      if (resetError) {
+        console.error("Error resetting default profiles:", resetError)
+        throw resetError
       }
+
+      const { error: updateError } = await supabase
+        .from("saju_sessions")
+        .update({ is_default: true })
+        .eq("id", profile.id)
+
+      if (updateError) {
+        console.error("Error setting default profile:", updateError)
+        throw updateError
+      }
+
+      // Update the UI
+      const updatedProfiles = userProfiles.map((p) => ({
+        ...p,
+        isDefault: p.id === profile.id,
+      }))
+
+      setUserProfiles(updatedProfiles)
+      toast({
+        title: "기본 프로필 설정 완료",
+        description: `${profile.name}님의 사주가 기본 프로필로 설정되었습니다.`,
+      })
     } catch (error) {
       console.error("Error setting default profile:", error)
       toast({

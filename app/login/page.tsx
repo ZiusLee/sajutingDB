@@ -3,19 +3,20 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SajuLogo } from "@/components/saju-logo"
 import { Card, CardContent } from "@/components/ui/card"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { getSupabase } from "@/lib/supabase-client"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -23,26 +24,63 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [isResetMode, setIsResetMode] = useState(false)
-  const supabase = createClientComponentClient()
+  // Use our singleton Supabase instance
+  const supabase = getSupabase()
+
+  // Check for error params
+  useEffect(() => {
+    const errorParam = searchParams.get("error")
+    if (errorParam) {
+      switch (errorParam) {
+        case "callback_error":
+          setError("로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.")
+          break
+        case "no_user":
+          setError("사용자 정보를 찾을 수 없습니다. 다시 시도해주세요.")
+          break
+        case "no_code":
+          setError("인증 코드가 없습니다. 다시 시도해주세요.")
+          break
+        default:
+          setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.")
+      }
+    }
+  }, [searchParams])
 
   // Check if user is already logged in
   useEffect(() => {
     const checkUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (data.user) {
-        router.push("/")
+      try {
+        console.log("Checking if user is already logged in...")
+        const { data, error } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error("Error checking session:", error)
+          return
+        }
+
+        if (data.session) {
+          console.log("User already logged in, redirecting...")
+          router.push("/")
+        } else {
+          console.log("No active session found")
+        }
+      } catch (err) {
+        console.error("Error checking user:", err)
       }
     }
 
     checkUser()
   }, [router, supabase.auth])
 
+  // Rest of the component remains the same...
   // Handle Kakao login
   const handleKakaoLogin = async () => {
     setIsLoading(true)
     setError("")
 
     try {
+      console.log("Starting Kakao login...")
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
@@ -50,8 +88,12 @@ export default function LoginPage() {
         },
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Kakao login error:", error)
+        throw error
+      }
 
+      console.log("Kakao login initiated, waiting for redirect...")
       // The redirect will be handled by Supabase
     } catch (err) {
       console.error("카카오 로그인 오류:", err)
@@ -79,13 +121,18 @@ export default function LoginPage() {
     }
 
     try {
+      console.log("Starting email login...")
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Email login error:", error)
+        throw error
+      }
 
+      console.log("Email login successful:", data.user?.id)
       // Store user info in localStorage for compatibility with existing code
       if (data.user) {
         localStorage.setItem("user_authenticated", "true")
@@ -134,6 +181,7 @@ export default function LoginPage() {
     }
   }
 
+  // Rest of the component remains the same...
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* 헤더 */}

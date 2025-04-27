@@ -237,7 +237,7 @@ export default function BirthDateFormClient() {
           console.warn("Failed to get user ID when saving saju data")
         }
       } catch (dbError) {
-        console.error("Failed to save saju data to database:", dbError)
+        console.error("Failed tosave saju data to database:", dbError)
         // 실패해도 계속 진행 (나중에 다시 시도)
       }
 
@@ -413,7 +413,7 @@ export default function BirthDateFormClient() {
   }
 
   // Function to update auth_user_id in the database
-  const updateUserAuthId = async (userId: string) => {
+  const updateUserAuthId = async (sessionId: string) => {
     try {
       // Check if user is authenticated with Supabase Auth
       const supabaseClient = getSupabase()
@@ -423,20 +423,20 @@ export default function BirthDateFormClient() {
 
       if (session && session.user) {
         const authUserId = session.user.id
-        console.log("Updating user auth_user_id:", userId, "with auth user ID:", authUserId)
+        console.log("Updating saju session auth_user_id:", sessionId, "with auth user ID:", authUserId)
 
-        // Update the user record with the auth_user_id
-        const success = await updateAuthUserId(userId, authUserId)
+        // Update the saju_sessions record with the auth_user_id
+        const success = await updateAuthUserId(sessionId, authUserId)
 
         if (success) {
-          console.log("Successfully updated auth_user_id for user:", userId)
+          console.log("Successfully updated auth_user_id for saju session:", sessionId)
           toast({
             title: "계정 연결 완료",
             description: "사용자 계정이 성공적으로 연결되었습니다.",
             duration: 3000,
           })
         } else {
-          console.error("Failed to update auth_user_id for user:", userId)
+          console.error("Failed to update auth_user_id for saju session:", sessionId)
         }
       } else {
         console.log("User not authenticated with Supabase Auth, skipping auth_user_id update")
