@@ -71,9 +71,11 @@ export async function POST(req: Request) {
     // 사용자 메시지 배열에 시스템 메시지 추가
     const apiMessages = [{ role: "system", content: systemMessage }, ...messages]
 
-    let model = openai("gpt-4.1")
+    // GPT-4.1 Mini 모델로 변경
+    let model = openai("gpt-4.1-mini")
 
     if (roomType === "personalized") {
+      // 개인화된 상담은 파인튜닝 모델 사용 (변경하지 않음)
       model = openai("ft:gpt-4.1-2025-04-14:towinai::BP66DQ1v")
     }
 
@@ -112,7 +114,7 @@ export async function POST(req: Request) {
       const maxTokens = isComplexQuestion ? 2000 : 1500
 
       const result = streamText({
-        model: openai("gpt-4.1"),
+        model: openai("gpt-4.1-mini"), // 여기도 Mini 모델로 변경
         messages: apiMessages,
         temperature: 0.7, // 온도 약간 낮춤
         maxTokens: maxTokens,
@@ -124,7 +126,7 @@ export async function POST(req: Request) {
       const maxTokens = isComplexQuestion ? 2000 : 1500
 
       const result = streamText({
-        model: model,
+        model: model, // 위에서 설정한 모델 사용 (기본은 gpt-4.1-mini)
         messages: apiMessages,
         temperature: 0.7, // 온도 약간 낮춤
         maxTokens: maxTokens,
