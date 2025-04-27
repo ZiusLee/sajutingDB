@@ -10,8 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Link, Loader2 } from "lucide-react"
 import { getSupabase } from "@/lib/supabase-client"
+import { toast } from "sonner"
 
-export default function ManualDataLink() {
+interface ManualDataLinkProps {
+  onSuccess?: () => void
+}
+
+export default function ManualDataLink({ onSuccess }: ManualDataLinkProps) {
   const [sessionId, setSessionId] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,6 +89,18 @@ export default function ManualDataLink() {
       setError("데이터 연결 중 오류가 발생했습니다.")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  if (success) {
+    toast({
+      title: "데이터 연결 성공",
+      description: "사주 데이터가 성공적으로 연결되었습니다.",
+    })
+
+    // Call the onSuccess callback if provided
+    if (onSuccess) {
+      onSuccess()
     }
   }
 

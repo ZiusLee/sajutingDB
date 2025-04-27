@@ -21,7 +21,7 @@ const interestServices = [
   {
     id: "compatibility",
     label: "정교한 궁합 해석",
-    description: "두 사람의 사주를 심층 분석하여 궁합 점수와 상세한 해석을 제공합니다.",
+    description: "두 ���람의 사주를 심층 분석하여 궁합 점수와 상세한 해석을 제공합니다.",
   },
   {
     id: "love-advice",

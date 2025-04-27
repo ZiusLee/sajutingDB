@@ -7,19 +7,23 @@ export async function updateAuthUserId(sessionId: string, authUserId: string): P
   try {
     console.log(`Updating auth_user_id for session ${sessionId} to ${authUserId}`)
 
-    // First check if the session exists
-    const { data: existingSession, error: checkError } = await supabase
+    // First check if the session exists without using .single()
+    const { data: existingSessions, error: checkError } = await supabase
       .from("saju_sessions")
       .select("*")
       .eq("id", sessionId)
-      .single()
 
     if (checkError) {
       console.error("Error checking session existence:", checkError)
       return false
     }
 
-    console.log("Found existing session:", existingSession)
+    if (!existingSessions || existingSessions.length === 0) {
+      console.error("No session found with ID:", sessionId)
+      return false
+    }
+
+    console.log("Found existing sessions:", existingSessions.length)
 
     // Update the auth_user_id
     const { error } = await supabase.from("saju_sessions").update({ auth_user_id: authUserId }).eq("id", sessionId)
