@@ -416,6 +416,68 @@ ${interpretation}
                     <Separator className="my-3" />
                     <FeedbackButtons contentType="saju-interpretation" contentId={saju.dayStem + saju.dayBranch} />
 
+                    {/* Donation Section - Mobile */}
+                    <div className="mt-6 p-3 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
+                      <div className="flex flex-col items-center">
+                        <h3 className="text-lg font-bold mb-3">복채 주면 운이 더 좋아진다냥!</h3>
+                        <img
+                          src="/images/donation-cat.png"
+                          alt="복채 고양이"
+                          className="w-32 h-32 object-contain mb-3"
+                        />
+                        <div className="text-center space-y-1 text-xs dark:text-gray-200">
+                          <p>사주 다 보고 나면,오늘 운이 조금 더 잘 풀렸으면 좋겠다냥~ 🐾</p>
+                          <p>복채를 살짝 내면, 진짜 조~용히 복 하나가 따라붙는다냥. 🎁</p>
+                          <p>아무도 모르게, 딱! 오늘 하루, 좋은 기운이 너랑 함께할 거다냥! 🍀😽</p>
+                          <div className="mt-3 font-medium text-sm">
+                            <p className="text-base">토스뱅크</p>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText("1001-8576-5363")
+                                  const copyBtn = document.getElementById("copy-account-btn-mobile")
+                                  if (copyBtn) {
+                                    copyBtn.classList.add("text-green-600")
+                                    copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-check"><polyline points="20 6 9 17 4 12"/></svg>`
+                                    setTimeout(() => {
+                                      copyBtn.classList.remove("text-green-600")
+                                      copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`
+                                    }, 2000)
+                                  }
+                                  toast({
+                                    title: "계좌번호 복사 완료",
+                                    description: "계좌번호가 클립보드에 복사되었습니다.",
+                                  })
+                                }}
+                                className="text-base font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+                                aria-label="계좌번호 복사"
+                              >
+                                1001-8576-5363
+                                <span id="copy-account-btn-mobile" className="ml-1 inline-flex items-center">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="lucide lucide-copy"
+                                  >
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                  </svg>
+                                </span>
+                              </button>
+                            </div>
+                            <p className="text-base mt-1">사주핑 (선현국)</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Add chat button to interpretation tab - Mobile */}
                     <Button className="w-full flex items-center justify-center gap-2 mt-4" onClick={navigateToChatList}>
                       <MessageSquare className="h-4 w-4" />
