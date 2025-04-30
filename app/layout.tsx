@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://sajuping.ai"),
   openGraph: {
     title: "사주핑 - AI 사주로 보는 애정운",
-    description: "명리학 기반 정밀분석 사주팔자",
+    description: "명리학 기반 정밀���석 사주팔자",
     url: "https://sajuping.ai",
     siteName: "사주핑",
     images: [

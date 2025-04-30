@@ -617,9 +617,9 @@ ${interpretation}
                           className="w-48 h-48 object-contain mb-4"
                         />
                         <div className="text-center space-y-2 text-xs dark:text-gray-200">
-                          <p>사주 다 보고 나면,오늘 운이 조금 더 잘 풀렸으면 좋겠다냥~ 🐾</p>
-                          <p>복채를 살짝 내면, 진짜 조~용히 복 하나가 따라붙는다냥. 🎁</p>
-                          <p>아무도 모르게, 딱! 오늘 하루, 좋은 기운이 너랑 함께할 거다냥! 🍀😽</p>
+                          <p>사주 보고 나서, 오늘 운이 더 잘 풀렸으면 좋겠다냥~ 🐾</p>
+                          <p>복채를 살짝~ 내면 복 하나가 따라붙는다냥 🎁😽</p>
+                          <p>오늘 하루 좋은 기운이 너랑 함께할 거다냥!🍀</p>
                           <div className="mt-4 font-medium text-base">
                             <p className="text-lg">토스뱅크</p>
                             <div className="flex items-center justify-center gap-1 mt-1">
