@@ -131,7 +131,7 @@ ${currentYear}년은 푸른 뱀의 해로, 음(陰)의 목(木) 기운과 뱀의
     default:
       return `안녕하세요, ${userName}님! 사주팔자를 기반으로 인생의 중요한 시기와 방향성에 대해 상담해드리는 AI 상담사입니다. 
 
-${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 음(陰)의 목(木) 기운과 뱀의 지혜로운 에너지가 함께하��� 해로, 결혼 시기, 성공 시기, 연애 시기, 일이 풀리는 시기 등 구체적인 질문을 해주시면 사주를 바탕으로 답변해드리겠습니다. ${currentYear}년 을사년의 운세와 앞으로의 인생 흐름에 대해 궁금한 점이 있으시면 무엇이든 물어보세요!`
+${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 음(陰)의 목(木) 기운과 뱀의 지혜로운 에너지가 함께하는 해로, 결혼 시기, 성공 시기, 연애 시기, 일이 풀리는 시기 등 구체적인 질문을 해주시면 사주를 바탕으로 답변해드리겠습니다. ${currentYear}년 을사년의 운세와 앞으로의 인생 흐름에 대해 궁금한 점이 있으시면 무엇이든 물어보세요!`
   }
 }
 
@@ -424,41 +424,45 @@ export default function SajuChat({
 
   // 뒤로가기 핸들러 - 채팅 데이터 저장 후 뒤로가기
   const handleBackWithSave = () => {
-    // If not logged in and hasn't shown prompt yet, show login prompt
-    if (!isLoggedIn && !hasShownLoginPrompt && questionCount > 0) {
-      setLoginPromptMessage("채팅 내역을 저장하려면 로그인이 필요합니다. 로그인하시겠습니까?")
-      setShowLoginPrompt(true)
-      setHasShownLoginPrompt(true)
-    } else {
-      // Otherwise, just go back
-      // 채팅 데이터 저장
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages,
-        lastMessageTime: new Date().toISOString(),
+    try {
+      // 채팅 데이터 저장 (오류가 발생해도 계속 진행)
+      try {
+        const sessionData = {
+          saju,
+          name,
+          gender,
+          interpretation: initialInterpretation,
+          roomType,
+          messages,
+          lastMessageTime: new Date().toISOString(),
+        }
+        saveChatSession(sessionKey, sessionData)
+      } catch (saveError) {
+        console.error("채팅 세션 저장 중 오류:", saveError)
       }
 
-      saveChatSession(sessionKey, sessionData)
-
-      // 채팅 리스트로 이동 - 필요한 모든 파라미터 포함
-      if (saju) {
-        const sajuParam = encodeURIComponent(JSON.stringify(saju))
-        const nameParam = encodeURIComponent(name || "")
-        const genderParam = encodeURIComponent(gender || "")
-        const interpretationParam = encodeURIComponent(initialInterpretation || "")
-
-        // 채팅 리스트 페이지로 이동하면서 필요한 모든 파라미터 전달
-        router.push(
-          `/chat-list?saju=${sajuParam}&name=${nameParam}&gender=${genderParam}&interpretation=${interpretationParam}`,
+      // 채팅 리스트에서 사용할 사주 정보를 localStorage에 저장
+      try {
+        localStorage.setItem(
+          "last_chat_saju_data",
+          JSON.stringify({
+            saju,
+            name,
+            gender,
+            interpretation: initialInterpretation,
+            timestamp: new Date().getTime(),
+          }),
         )
-      } else {
-        // 사주 데이터가 없는 경우 (비정상적인 상황)
-        router.push("/")
+      } catch (storageError) {
+        console.error("사주 데이터 저장 중 오류:", storageError)
       }
+
+      // 채팅 리스트 페이지로 이동
+      window.location.href = "/chat-list"
+    } catch (error) {
+      console.error("뒤로가기 처리 중 오류:", error)
+      // 오류가 발생해도 기본 경로로 이동
+      window.location.href = "/"
     }
   }
 

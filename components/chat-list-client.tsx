@@ -197,212 +197,258 @@ export default function ChatListClient() {
     try {
       setIsLoading(true)
 
+      // URL 파라미터에서 사주 정보 가져오기 시도
       const sajuParam = searchParams.get("saju")
       const name = searchParams.get("name") || ""
       const gender = searchParams.get("gender") || ""
       const interpretation = searchParams.get("interpretation") || ""
       const returnPath = searchParams.get("returnPath") || "/"
 
-      console.log("Received parameters:", { name, gender, sajuParam }) // 디버깅 로그 추가
+      // URL 파라미터가 없으면 localStorage에서 가져오기 시도
+      let saju, userName, userGender, userInterpretation
 
       if (!sajuParam) {
-        setError("사주 정보가 없습니다.")
-        setIsLoading(false)
-        return
-      }
+        console.log("No saju parameter found, trying localStorage")
 
-      try {
-        const saju = JSON.parse(sajuParam)
-        console.log("Parsed saju data:", saju) // 디버깅 로그 추가
-        const data = { saju, name, gender, interpretation, returnPath }
+        try {
+          const lastChatData = localStorage.getItem("last_chat_saju_data")
+          if (lastChatData) {
+            const parsedData = JSON.parse(lastChatData)
 
-        // 상태 업데이트는 한 번에 처리
-        setChatData(data)
+            // 데이터가 1시간 이내인지 확인 (오래된 데이터는 사용하지 않음)
+            const dataAge = Date.now() - parsedData.timestamp
+            const isRecent = dataAge < 3600000 // 1시간 = 3600000ms
 
-        // 채팅방 데이터 생성
-        const userName = name || "사용자"
-
-        // 오행 정보 가져오기
-        const elements = saju.elements || {}
-        const dominantElement = Object.entries(elements).reduce(
-          (max, [element, count]) => (count > max.count ? { element, count } : max),
-          { element: "", count: 0 },
-        ).element
-
-        // localStorage에서 저장된 채팅 데이터 불러오기 - Updated to be user-specific
-        const savedChatData = loadChatDataFromLocalStorage(name, saju)
-        console.log("Loaded chat data from localStorage:", savedChatData) // 디버깅 로그 추가
-
-        // 기본 채팅방 데이터
-        const basicRooms: ChatRoom[] = [
-          {
-            id: "daily-fortune",
-            title: "오늘의 운세 🍀",
-            description: "오늘의 운세를 봅니다",
-            icon: <Calendar className="h-5 w-5" />,
-            lastMessage:
-              savedChatData["daily-fortune"]?.messages?.length > 1
-                ? savedChatData["daily-fortune"].messages[
-                    savedChatData["daily-fortune"].messages.length - 1
-                  ].content.substring(0, 30) + "..."
-                : `오늘(${todayDate})의 운세를 보시겠습니까?`,
-            time: savedChatData["daily-fortune"]?.lastMessageTime
-              ? new Date(savedChatData["daily-fortune"].lastMessageTime)
-              : new Date(Date.now() - 1000 * 60 * 15), // 15분 전
-            unread: savedChatData["daily-fortune"]?.messages?.length > 0,
-            color: "bg-blue-500",
-          },
-          {
-            id: "love",
-            title: "애정운",
-            description: "연애, 인연, 만남에 관한 상담",
-            icon: <Heart className="h-5 w-5" />,
-            lastMessage:
-              savedChatData.love?.messages?.length > 1
-                ? savedChatData.love.messages[savedChatData.love.messages.length - 1].content.substring(0, 30) + "..."
-                : "당신의 인연에 대해 알려드릴게요",
-            time: savedChatData.love?.lastMessageTime
-              ? new Date(savedChatData.love.lastMessageTime)
-              : new Date(Date.now() - 1000 * 60 * 5), // 5분 전
-            unread: savedChatData.love?.messages?.length > 0,
-            color: "bg-pink-500",
-          },
-          {
-            id: "career",
-            title: "직업운",
-            description: "직업, 취업, 이직, 승진 등에 관한 상담",
-            icon: <Briefcase className="h-5 w-5" />,
-            lastMessage:
-              savedChatData.career?.messages?.length > 1
-                ? savedChatData.career.messages[savedChatData.career.messages.length - 1].content.substring(0, 30) +
-                  "..."
-                : `${userName}님에게 맞는 직업을 알려드릴게요!`,
-            time: savedChatData.career?.lastMessageTime
-              ? new Date(savedChatData.career.lastMessageTime)
-              : new Date(Date.now() - 1000 * 60 * 30), // 30분 전
-            unread: savedChatData.career?.messages?.length > 0,
-            color: "bg-indigo-500",
-          },
-          {
-            id: "health",
-            title: "건강운",
-            description: "건강, 체질, 주의해야 할 질병에 관한 상담",
-            icon: <Activity className="h-5 w-5" />,
-            lastMessage:
-              savedChatData.health?.messages?.length > 1
-                ? savedChatData.health.messages[savedChatData.health.messages.length - 1].content.substring(0, 30) +
-                  "..."
-                : "건강 관리에 대한 조언을 드립니다",
-            time: savedChatData.health?.lastMessageTime
-              ? new Date(savedChatData.health.lastMessageTime)
-              : new Date(Date.now() - 1000 * 60 * 60 * 2), // 2시간 전
-            unread: savedChatData.health?.messages?.length > 0,
-            color: "bg-green-500",
-          },
-          {
-            id: "compatibility",
-            title: "속궁합 풀이",
-            description: "상대방과의 속궁합을 알아보는 상담",
-            icon: <Heart className="h-5 w-5" />,
-            lastMessage: "곧 열릴 예정입니다! 기대해 주세요.",
-            time: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5시간 전
-            unread: false,
-            color: "bg-gray-500", // 잠긴 방은 회색으로 표시
-          },
-          {
-            id: "business",
-            title: "사업운",
-            description: "사업, 재테크, 투자에 관한 상담",
-            icon: <TrendingUp className="h-5 w-5" />,
-            lastMessage:
-              savedChatData.business?.messages?.length > 1
-                ? savedChatData.business.messages[savedChatData.business.messages.length - 1].content.substring(0, 30) +
-                  "..."
-                : "사업 성공의 비결을 알려드리겠습니다!",
-            time: savedChatData.business?.lastMessageTime
-              ? new Date(savedChatData.business.lastMessageTime)
-              : new Date(Date.now() - 1000 * 60 * 60 * 3), // 3시간 전
-            unread: savedChatData.business?.messages?.length > 0,
-            color: "bg-emerald-500",
-          },
-          {
-            id: "marriage",
-            title: "결혼운",
-            description: "결혼, 부부관계, 가정에 관한 상담",
-            icon: <BellRing className="h-5 w-5" />,
-            lastMessage:
-              savedChatData.marriage?.messages?.length > 1
-                ? savedChatData.marriage.messages[savedChatData.marriage.messages.length - 1].content.substring(0, 30) +
-                  "..."
-                : "결혼 생활의 행복을 위한 조언",
-            time: savedChatData.marriage?.lastMessageTime
-              ? new Date(savedChatData.marriage.lastMessageTime)
-              : new Date(Date.now() - 1000 * 60 * 60 * 4), // 4시간 전
-            unread: savedChatData.marriage?.messages?.length > 0,
-            color: "bg-purple-500",
-          },
-          {
-            id: "yearly",
-            title: "올해운 상담",
-            description: "2025년 을사년 운세에 관한 상담",
-            icon: <Calendar className="h-5 w-5" />,
-            lastMessage:
-              savedChatData.yearly?.messages?.length > 1
-                ? savedChatData.yearly.messages[savedChatData.yearly.messages.length - 1].content.substring(0, 30) +
-                  "..."
-                : "2025년 을사년 운세를 알려드립니다",
-            time: savedChatData.yearly?.lastMessageTime
-              ? new Date(savedChatData.yearly.lastMessageTime)
-              : new Date(Date.now() - 1000 * 60 * 60 * 5), // 5시간 전
-            unread: savedChatData.yearly?.messages?.length > 0,
-            color: "bg-amber-500",
-          },
-          {
-            id: "general",
-            title: "종합 운세 상담",
-            description: "나의 사주팔자에 대해 자유롭게 대화하기",
-            icon: <MessageCircle className="h-5 w-5" />,
-            lastMessage:
-              savedChatData.general?.messages?.length > 1
-                ? savedChatData.general.messages[savedChatData.general.messages.length - 1].content.substring(0, 30) +
-                  "..."
-                : `${userName}님의 사주에 대해 무엇이든 물어보세요!`,
-            time: savedChatData.general?.lastMessageTime ? new Date(savedChatData.general.lastMessageTime) : new Date(),
-            unread: false,
-            color: "bg-blue-500",
-          },
-        ]
-
-        // 사용자의 사주에 맞는 맞춤 채팅방 추가
-        const personalizedRoom: ChatRoom = {
-          id: "personalized",
-          title: "고민상담",
-          description: "당신의 사주에 맞는 맞춤 상담",
-          icon: getPersonalizedRoomIcon(dominantElement),
-          lastMessage:
-            savedChatData.personalized?.messages?.length > 1
-              ? savedChatData.personalized.messages[savedChatData.personalized.messages.length - 1].content.substring(
-                  0,
-                  30,
-                ) + "..."
-              : `${userName}님만을 위한 맞춤 상담을 시작하세요`,
-          time: savedChatData.personalized?.lastMessageTime
-            ? new Date(savedChatData.personalized.lastMessageTime)
-            : new Date(Date.now() - 1000 * 60 * 60 * 6), // 6시간 전
-          unread: false,
-          color: getPersonalizedColor(dominantElement),
+            if (isRecent) {
+              console.log("Using recent saju data from localStorage")
+              saju = parsedData.saju
+              userName = parsedData.name || ""
+              userGender = parsedData.gender || ""
+              userInterpretation = parsedData.interpretation || ""
+            } else {
+              console.log("Stored saju data is too old, not using it")
+              setError("사주 정보가 없습니다. 메인 페이지로 이동합니다.")
+              setTimeout(() => {
+                window.location.href = "/"
+              }, 2000)
+              return
+            }
+          } else {
+            console.log("No stored saju data found")
+            setError("사주 정보가 없습니다. 메인 페이지로 이동합니다.")
+            setTimeout(() => {
+              window.location.href = "/"
+            }, 2000)
+            return
+          }
+        } catch (storageError) {
+          console.error("Error reading from localStorage:", storageError)
+          setError("사주 정보를 불러오는 중 오류가 발생했습니다.")
+          return
         }
-
-        // 맞춤 채팅방을 목록 맨 위에 추가 (중복 제거)
-        setChatRooms([personalizedRoom, ...basicRooms])
-      } catch (parseError) {
-        console.error("Error parsing saju data:", parseError)
-        setError("사주 데이터 형식이 올바르지 않습니다.")
+      } else {
+        // URL 파라미터에서 가져온 정보 사용
+        try {
+          saju = JSON.parse(sajuParam)
+          userName = name
+          userGender = gender
+          userInterpretation = interpretation
+        } catch (parseError) {
+          console.error("Error parsing saju data:", parseError)
+          setError("사주 데이터 형식이 올바르지 않습니다.")
+          return
+        }
       }
+
+      console.log("Using saju data:", { saju, userName, userGender }) // 디버깅 로그 추가
+
+      // 상태 업데이트
+      const data = {
+        saju,
+        name: userName,
+        gender: userGender,
+        interpretation: userInterpretation,
+        returnPath,
+      }
+      setChatData(data)
+
+      // 채팅방 데이터 생성
+      const displayName = userName || "사용자"
+
+      // 오행 정보 가져오기
+      const elements = saju.elements || {}
+      const dominantElement = Object.entries(elements).reduce(
+        (max, [element, count]) => (count > max.count ? { element, count } : max),
+        { element: "", count: 0 },
+      ).element
+
+      // localStorage에서 저장된 채팅 데이터 불러오기
+      const savedChatData = loadChatDataFromLocalStorage(userName, saju)
+      console.log("Loaded chat data from localStorage:", savedChatData) // 디버깅 로그 추가
+
+      // 기본 채팅방 데이터
+      const basicRooms: ChatRoom[] = [
+        {
+          id: "daily-fortune",
+          title: "오늘의 운세 🍀",
+          description: "오늘의 운세를 봅니다",
+          icon: <Calendar className="h-5 w-5" />,
+          lastMessage:
+            savedChatData["daily-fortune"]?.messages?.length > 1
+              ? savedChatData["daily-fortune"].messages[
+                  savedChatData["daily-fortune"].messages.length - 1
+                ].content.substring(0, 30) + "..."
+              : `오늘(${todayDate})의 운세를 보시겠습니까?`,
+          time: savedChatData["daily-fortune"]?.lastMessageTime
+            ? new Date(savedChatData["daily-fortune"].lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 15), // 15분 전
+          unread: savedChatData["daily-fortune"]?.messages?.length > 0,
+          color: "bg-blue-500",
+        },
+        {
+          id: "love",
+          title: "애정운",
+          description: "연애, 인연, 만남에 관한 상담",
+          icon: <Heart className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.love?.messages?.length > 1
+              ? savedChatData.love.messages[savedChatData.love.messages.length - 1].content.substring(0, 30) + "..."
+              : "당신의 인연에 대해 알려드릴게요",
+          time: savedChatData.love?.lastMessageTime
+            ? new Date(savedChatData.love.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 5), // 5분 전
+          unread: savedChatData.love?.messages?.length > 0,
+          color: "bg-pink-500",
+        },
+        {
+          id: "career",
+          title: "직업운",
+          description: "직업, 취업, 이직, 승진 등에 관한 상담",
+          icon: <Briefcase className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.career?.messages?.length > 1
+              ? savedChatData.career.messages[savedChatData.career.messages.length - 1].content.substring(0, 30) + "..."
+              : `${displayName}님에게 맞는 직업을 알려드릴게요!`,
+          time: savedChatData.career?.lastMessageTime
+            ? new Date(savedChatData.career.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 30), // 30분 전
+          unread: savedChatData.career?.messages?.length > 0,
+          color: "bg-indigo-500",
+        },
+        {
+          id: "health",
+          title: "건강운",
+          description: "건강, 체질, 주의해야 할 질병에 관한 상담",
+          icon: <Activity className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.health?.messages?.length > 1
+              ? savedChatData.health.messages[savedChatData.health.messages.length - 1].content.substring(0, 30) + "..."
+              : "건강 관리에 대한 조언을 드립니다",
+          time: savedChatData.health?.lastMessageTime
+            ? new Date(savedChatData.health.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 60 * 2), // 2시간 전
+          unread: savedChatData.health?.messages?.length > 0,
+          color: "bg-green-500",
+        },
+        {
+          id: "compatibility",
+          title: "속궁합 풀이",
+          description: "상대방과의 속궁합을 알아보는 상담",
+          icon: <Heart className="h-5 w-5" />,
+          lastMessage: "곧 열릴 예정입니다! 기대해 주세요.",
+          time: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5시간 전
+          unread: false,
+          color: "bg-gray-500", // 잠긴 방은 회색으로 표시
+        },
+        {
+          id: "business",
+          title: "사업운",
+          description: "사업, 재테크, 투자에 관한 상담",
+          icon: <TrendingUp className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.business?.messages?.length > 1
+              ? savedChatData.business.messages[savedChatData.business.messages.length - 1].content.substring(0, 30) +
+                "..."
+              : "사업 성공의 비결을 알려드리겠습니다!",
+          time: savedChatData.business?.lastMessageTime
+            ? new Date(savedChatData.business.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 60 * 3), // 3시간 전
+          unread: savedChatData.business?.messages?.length > 0,
+          color: "bg-emerald-500",
+        },
+        {
+          id: "marriage",
+          title: "결혼운",
+          description: "결혼, 부부관계, 가정에 관한 상담",
+          icon: <BellRing className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.marriage?.messages?.length > 1
+              ? savedChatData.marriage.messages[savedChatData.marriage.messages.length - 1].content.substring(0, 30) +
+                "..."
+              : "결혼 생활의 행복을 위한 조언",
+          time: savedChatData.marriage?.lastMessageTime
+            ? new Date(savedChatData.marriage.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 60 * 4), // 4시간 전
+          unread: savedChatData.marriage?.messages?.length > 0,
+          color: "bg-purple-500",
+        },
+        {
+          id: "yearly",
+          title: "올해운 상담",
+          description: "2025년 을사년 운세에 관한 상담",
+          icon: <Calendar className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.yearly?.messages?.length > 1
+              ? savedChatData.yearly.messages[savedChatData.yearly.messages.length - 1].content.substring(0, 30) + "..."
+              : "2025년 을사년 운세를 알려드립니다",
+          time: savedChatData.yearly?.lastMessageTime
+            ? new Date(savedChatData.yearly.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 60 * 5), // 5시간 전
+          unread: savedChatData.yearly?.messages?.length > 0,
+          color: "bg-amber-500",
+        },
+        {
+          id: "general",
+          title: "종합 운세 상담",
+          description: "나의 사주팔자에 대해 자유롭게 대화하기",
+          icon: <MessageCircle className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.general?.messages?.length > 1
+              ? savedChatData.general.messages[savedChatData.general.messages.length - 1].content.substring(0, 30) +
+                "..."
+              : `${displayName}님의 사주에 대해 무엇이든 물어보세요!`,
+          time: savedChatData.general?.lastMessageTime ? new Date(savedChatData.general.lastMessageTime) : new Date(),
+          unread: false,
+          color: "bg-blue-500",
+        },
+      ]
+
+      // 사용자의 사주에 맞는 맞춤 채팅방 추가
+      const personalizedRoom: ChatRoom = {
+        id: "personalized",
+        title: "고민상담",
+        description: "당신의 사주에 맞는 맞춤 상담",
+        icon: getPersonalizedRoomIcon(dominantElement),
+        lastMessage:
+          savedChatData.personalized?.messages?.length > 1
+            ? savedChatData.personalized.messages[savedChatData.personalized.messages.length - 1].content.substring(
+                0,
+                30,
+              ) + "..."
+            : `${displayName}님만을 위한 맞춤 상담을 시작하세요`,
+        time: savedChatData.personalized?.lastMessageTime
+          ? new Date(savedChatData.personalized.lastMessageTime)
+          : new Date(Date.now() - 1000 * 60 * 60 * 6), // 6시간 전
+        unread: false,
+        color: getPersonalizedColor(dominantElement),
+      }
+
+      // 맞춤 채팅방을 목록 맨 위에 추가 (중복 제거)
+      setChatRooms([personalizedRoom, ...basicRooms])
+      setIsLoading(false)
     } catch (error) {
       console.error("Error loading chat data:", error)
       setError("데이터를 불러오는 중 오류가 발생했습니다.")
-    } finally {
       setIsLoading(false)
     }
   }, [searchParams, todayDate])
