@@ -4,8 +4,9 @@ export async function getAdditionalInterpretation(
   saju: any,
   name: string,
   gender: string,
+  model: string,
   questionCategory: string,
-  relationshipStatus: string,
+  relationshipStatus = "solo",
 ) {
   try {
     console.log("Requesting additional interpretation")
@@ -15,7 +16,7 @@ export async function getAdditionalInterpretation(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ saju, name, gender, questionCategory, relationshipStatus }),
+      body: JSON.stringify({ saju, name, gender, model, questionCategory, relationshipStatus }),
     })
 
     if (!response.ok) {
@@ -73,9 +74,8 @@ export async function fetchLunarDate(year: string, month: string, day: string) {
   }
 }
 
-// getSajuInterpretation 함수를 개선합니다
+// getSajuInterpretation 함수를 수정하여 오류 처리를 개선합니다.
 
-// 기존 함수를 찾아 다음과 같이 수정합니다:
 export async function getSajuInterpretation(
   saju: any,
   name?: string,
@@ -84,7 +84,13 @@ export async function getSajuInterpretation(
   questionSet?: string | null,
 ): Promise<any> {
   try {
-    console.log("Requesting saju interpretation")
+    console.log("Requesting saju interpretation with params:", {
+      name,
+      gender,
+      relationshipStatus,
+      questionSet,
+    })
+
     // 타임아웃 설정 추가 (90초)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 90000)
@@ -106,20 +112,167 @@ export async function getSajuInterpretation(
 
     clearTimeout(timeoutId)
 
+    // 응답 상태 코드 로깅 추가
+    console.log("API response status:", response.status)
+
+    // 응답이 JSON이 아닐 경우를 대비한 처리
+    const responseText = await response.text()
+    console.log("API response length:", responseText.length)
+
     if (!response.ok) {
-      if (response.status === 504) {
-        throw new Error("사주 해석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.")
+      console.error("API response error:", response.status, responseText.substring(0, 200) + "...")
+
+      if (response.status === 504 || response.status === 500) {
+        console.log("Returning fallback interpretation due to server error")
+        return {
+          fallbackInterpretation: `
+# 사주 해석 오류
+
+사주 해석을 가져오는 중 서버 오류가 발생했습니다.
+
+## 기본적인 해석:
+- 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
+- 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: 서버 오류 (${response.status})
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 인터넷 연결을 확인해보세요.
+3. 잠시 후 다시 시도해보세요.
+`,
+          error: `서버 오류: ${response.status}`,
+        }
       }
-      throw new Error(`Failed to get saju interpretation: ${response.status}`)
+
+      throw new Error(`API 응답 오류: ${response.status}`)
     }
 
-    return await response.json()
+    // 응답 텍스트가 비어있는지 확인
+    if (!responseText || responseText.trim() === "") {
+      console.error("Empty API response")
+      return {
+        fallbackInterpretation: `
+# 사주 해석 오류
+
+사주 해석 결과가 비어있습니다.
+
+## 기본적인 해석:
+- 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
+- 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 잠시 후 다시 시도해보세요.
+`,
+        error: "빈 응답 데이터",
+      }
+    }
+
+    // JSON 파싱 시도
+    try {
+      const data = JSON.parse(responseText)
+      return data
+    } catch (parseError) {
+      console.error("Error parsing API response:", parseError)
+
+      // 응답이 JSON이 아닌 경우 (HTML 오류 페이지 등)
+      return {
+        fallbackInterpretation: `
+# 사주 해석 오류
+
+사주 해석 결과를 처리하는 중 오류가 발생했습니다.
+
+## 기본적인 해석:
+- 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
+- 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: 응답 데이터 처리 오류
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 잠시 후 다시 시도해보세요.
+`,
+        error: "응답 데이터 처리 오류",
+      }
+    }
   } catch (error) {
     console.error("Error fetching saju interpretation:", error)
+
+    // 타임아웃 오류 처리
     if (error.name === "AbortError") {
-      throw new Error("사주 해석 요청 시간이 초과되었습니다.")
+      return {
+        fallbackInterpretation: `
+# 사주 해석 시간 초과
+
+사주 해석 요청 시간이 초과되었습니다.
+
+## 기본적인 해석:
+- 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
+- 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 인터넷 연결을 확인해보세요.
+3. 잠시 후 다시 시도해보세요.
+`,
+        error: "사주 해석 요청 시간이 초과되었습니다.",
+      }
     }
-    throw new Error("Failed to get saju interpretation")
+
+    // 네트워크 오류 처리
+    if (error.message && error.message.includes("fetch")) {
+      return {
+        fallbackInterpretation: `
+# 사주 해석 네트워크 오류
+
+사주 해석을 가져오는 중 네트워크 오류가 발생했습니다.
+
+## 기본적인 해석:
+- 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
+- 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
+
+## 문제 해결 방법:
+1. 인터넷 연결을 확인해보세요.
+2. 페이지를 새로고침하고 다시 시도해보세요.
+3. 잠시 후 다시 시도해보세요.
+`,
+        error: "네트워크 오류",
+      }
+    }
+
+    // 기타 오류 처리
+    return {
+      fallbackInterpretation: `
+# 사주 해석 오류
+
+사주 해석을 가져오는 중 오류가 발생했습니다.
+
+## 기본적인 해석:
+- 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
+- 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: ${error instanceof Error ? error.message : "알 수 없는 오류"}
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 인터넷 연결을 확인해보세요.
+3. 잠시 후 다시 시도해보세요.
+`,
+      error: error instanceof Error ? error.message : "알 수 없는 오류",
+    }
   }
 }
 

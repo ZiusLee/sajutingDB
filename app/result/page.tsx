@@ -5,7 +5,6 @@ import { getLunarDate } from "@/lib/api"
 import { calculateSaju } from "@/lib/saju"
 import SajuResult from "@/components/saju-result"
 import SocialShareButtons from "@/components/social-share-buttons"
-import { notFound } from "next/navigation"
 import { BetaSignupForm } from "@/components/beta-signup-form"
 import { getSajuDataByUuid } from "@/lib/saju-session-service"
 
@@ -25,6 +24,28 @@ export default async function ResultPage({
   }
 }) {
   const { date, hour, minute, timeUnknown, name, gender, saju: sajuParam, location = "서울특별시", uuid } = searchParams
+
+  // If no parameters are provided, show a message and link to home
+  if (!date && !uuid && !sajuParam) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-center text-2xl">사주 정보 필요</CardTitle>
+            <CardDescription className="text-center">사주 결과를 보려면 필요한 정보를 입력해주세요.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-center">사주 정보가 없습니다. 홈페이지로 이동하여 사주 정보를 입력해주세요.</p>
+            <div className="flex justify-center">
+              <Button asChild>
+                <Link href="/">홈으로 이동</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   // UUID로 사주 데이터 조회 (마이페이지에서 상세 보기로 접근한 경우)
   if (uuid) {
@@ -157,7 +178,24 @@ export default async function ResultPage({
 
   // 기존 로직 (직접 날짜 파라미터로 접근한 경우)
   if (!date || !hour || !minute) {
-    notFound()
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-center text-2xl">필수 정보 누락</CardTitle>
+            <CardDescription className="text-center">사주 결과를 보려면 날짜와 시간 정보가 필요합니다.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-center">날짜, 시간 정보가 누락되었습니다. 홈페이지로 이동하여 정보를 입력해주세요.</p>
+            <div className="flex justify-center">
+              <Button asChild>
+                <Link href="/">홈으로 이동</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   const solarYear = date.substring(0, 4)

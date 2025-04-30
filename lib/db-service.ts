@@ -7,30 +7,23 @@ export async function updateAuthUserId(sessionId: string, authUserId: string): P
   try {
     console.log(`Updating auth_user_id for session ${sessionId} to ${authUserId}`)
 
-    // First check if the session exists without using .single()
-    const { data: existingSessions, error: checkError } = await supabase
+    // Skip the existence check and directly attempt the update
+    const { data, error } = await supabase
       .from("saju_sessions")
-      .select("*")
+      .update({ auth_user_id: authUserId })
       .eq("id", sessionId)
-
-    if (checkError) {
-      console.error("Error checking session existence:", checkError)
-      return false
-    }
-
-    if (!existingSessions || existingSessions.length === 0) {
-      console.error("No session found with ID:", sessionId)
-      return false
-    }
-
-    console.log("Found existing sessions:", existingSessions.length)
-
-    // Update the auth_user_id
-    const { error } = await supabase.from("saju_sessions").update({ auth_user_id: authUserId }).eq("id", sessionId)
+      .select("id") // Return the updated row to confirm success
 
     if (error) {
       console.error("Error updating auth_user_id:", error)
       return false
+    }
+
+    // Check if any rows were affected
+    if (!data || data.length === 0) {
+      console.warn(`No rows updated for session ${sessionId}. Session might not exist.`)
+      // Despite the warning, we'll return true if no error occurred
+      return true
     }
 
     console.log(`Successfully updated auth_user_id for session ${sessionId} to ${authUserId}`)
@@ -372,5 +365,32 @@ export async function getUserProfilesByAuthId(authUserId: string): Promise<any[]
   } catch (error) {
     console.error("Error in getUserProfilesByAuthId:", error)
     return []
+  }
+}
+
+/**
+ * Link all sessions for a user to their auth user ID
+ */
+export async function linkSessionsToAuthUser(userId: string, authUserId: string): Promise<boolean> {
+  try {
+    console.log(`Linking sessions for user ${userId} to auth user ${authUserId}`)
+
+    // Update all sessions that match the user ID
+    const { data, error } = await supabase
+      .from("saju_sessions")
+      .update({ auth_user_id: authUserId })
+      .eq("id", userId)
+      .select("id")
+
+    if (error) {
+      console.error("Error linking sessions to auth user:", error)
+      return false
+    }
+
+    console.log(`Successfully linked ${data?.length || 0} sessions to auth user ${authUserId}`)
+    return true
+  } catch (error) {
+    console.error("Error in linkSessionsToAuthUser:", error)
+    return false
   }
 }

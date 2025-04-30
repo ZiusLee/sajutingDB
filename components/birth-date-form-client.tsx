@@ -435,6 +435,26 @@ export default function BirthDateFormClient() {
             description: "사용자 계정이 성공적으로 연결되었습니다.",
             duration: 3000,
           })
+
+          // Verify the update was successful by checking the database
+          const { data, error } = await supabaseClient
+            .from("saju_sessions")
+            .select("auth_user_id")
+            .eq("id", sessionId)
+            .single()
+
+          if (error) {
+            console.error("Error verifying auth_user_id update:", error)
+          } else if (data && data.auth_user_id === authUserId) {
+            console.log("Verified auth_user_id was updated correctly in database")
+          } else {
+            console.warn(
+              "auth_user_id may not have been updated correctly. Expected:",
+              authUserId,
+              "Got:",
+              data?.auth_user_id,
+            )
+          }
         } else {
           console.error("Failed to update auth_user_id for saju session:", sessionId)
         }

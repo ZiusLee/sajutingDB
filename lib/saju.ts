@@ -405,7 +405,7 @@ function countElements(
     water: 0,
   }
 
-  // 간의 오행 계산
+  // 간의 오행 계��
   elements[STEM_ELEMENTS[yearStem as keyof typeof STEM_ELEMENTS]]++
   elements[STEM_ELEMENTS[monthStem as keyof typeof STEM_ELEMENTS]]++
   elements[STEM_ELEMENTS[dayStem as keyof typeof STEM_ELEMENTS]]++

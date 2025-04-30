@@ -1,16 +1,12 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Link, Loader2 } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { toast } from "@/components/ui/use-toast"
 import { getSupabase } from "@/lib/supabase-client"
-import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
 
 interface ManualDataLinkProps {
   onSuccess?: () => void
@@ -19,142 +15,94 @@ interface ManualDataLinkProps {
 export default function ManualDataLink({ onSuccess }: ManualDataLinkProps) {
   const [sessionId, setSessionId] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const supabase = getSupabase()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleLink = async () => {
+    if (!sessionId.trim()) {
+      toast({
+        title: "세션 ID 필요",
+        description: "연결할 세션 ID를 입력해주세요.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
-    setError(null)
-    setSuccess(null)
 
     try {
-      if (!sessionId.trim()) {
-        setError("세션 ID를 입력해주세요.")
-        return
-      }
-
-      // Get the current auth user
-      const supabase = getSupabase()
+      // Get current auth user
       const { data: userData } = await supabase.auth.getUser()
+      const authUserId = userData?.user?.id
 
-      if (!userData.user) {
-        setError("로그인이 필요합니다.")
+      if (!authUserId) {
+        toast({
+          title: "인증 오류",
+          description: "로그인된 사용자를 찾을 수 없습니다.",
+          variant: "destructive",
+        })
         return
       }
 
-      const authUserId = userData.user.id
+      // Update the session with the auth user ID
+      const { error } = await supabase.from("saju_sessions").update({ auth_user_id: authUserId }).eq("id", sessionId)
 
-      // Check if the session exists
-      const { data: sessionData, error: sessionError } = await supabase
-        .from("saju_sessions")
-        .select("id, auth_user_id")
-        .eq("id", sessionId)
-        .single()
-
-      if (sessionError) {
-        console.error("Error checking session:", sessionError)
-        setError("해당 세션 ID를 찾을 수 없습니다.")
+      if (error) {
+        console.error("Error linking session:", error)
+        toast({
+          title: "연결 실패",
+          description: `세션 연결 중 오류가 발생했습니다: ${error.message}`,
+          variant: "destructive",
+        })
         return
       }
 
-      // Check if the session is already linked to another user
-      if (sessionData.auth_user_id && sessionData.auth_user_id !== authUserId) {
-        setError("이 세션은 이미 다른 사용자와 연결되어 있습니다.")
-        return
-      }
+      toast({
+        title: "연결 성공",
+        description: "세션이 성공적으로 연결되었습니다.",
+      })
 
-      // Link the session to the current user
-      const { error: updateError } = await supabase
-        .from("saju_sessions")
-        .update({ auth_user_id: authUserId })
-        .eq("id", sessionId)
-
-      if (updateError) {
-        console.error("Error linking session:", updateError)
-        setError("데이터 연결에 실패했습니다.")
-        return
-      }
-
-      setSuccess("데이터가 성공적으로 연결되었습니다. 페이지를 새로고침하여 확인하세요.")
-      // Clear the input
+      // Clear input
       setSessionId("")
 
-      // Reload the page after a short delay
-      setTimeout(() => {
-        window.location.reload()
-      }, 2000)
+      // Call success callback
+      if (onSuccess) {
+        onSuccess()
+      }
     } catch (error) {
-      console.error("Error linking data:", error)
-      setError("데이터 연결 중 오류가 발생했습니다.")
+      console.error("Error in manual link:", error)
+      toast({
+        title: "연결 실패",
+        description: `세션 연결 중 오류가 발생했습니다: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  if (success) {
-    toast({
-      title: "데이터 연결 성공",
-      description: "사주 데이터가 성공적으로 연결되었습니다.",
-    })
-
-    // Call the onSuccess callback if provided
-    if (onSuccess) {
-      onSuccess()
     }
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>데이터 수동 연결</CardTitle>
-        <CardDescription>이전에 생성한 사주 데이터를 현재 계정에 연결하려면 세션 ID를 입력하세요.</CardDescription>
+        <CardTitle>세션 수동 연결</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="sessionId">세션 ID</Label>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            기존 사주 프로필의 세션 ID를 입력하여 현재 계정에 연결할 수 있습니다.
+          </p>
+          <div className="flex gap-2">
             <Input
-              id="sessionId"
+              placeholder="세션 ID 입력"
               value={sessionId}
               onChange={(e) => setSessionId(e.target.value)}
-              placeholder="예: 550e8400-e29b-41d4-a716-446655440000"
-              className="w-full"
+              className="flex-1"
             />
-            <p className="text-xs text-muted-foreground">
-              세션 ID는 사주 결과 페이지 URL의 uuid 파라미터에서 찾을 수 있습니다.
-            </p>
+            <Button onClick={handleLink} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              연결
+            </Button>
           </div>
-
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                연결 중...
-              </>
-            ) : (
-              <>
-                <Link className="mr-2 h-4 w-4" />
-                데이터 연결하기
-              </>
-            )}
-          </Button>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>오류</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {success && (
-            <Alert variant="default" className="bg-green-50 border-green-200">
-              <AlertTitle>성공</AlertTitle>
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
-        </form>
+        </div>
       </CardContent>
     </Card>
   )

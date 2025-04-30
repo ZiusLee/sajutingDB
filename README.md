@@ -70,7 +70,7 @@ This completes the renaming of the file and updating all references to it. The n
 
 
 
-```ts file="lib/migration-utils.ts"
+\`\`\`ts file="lib/migration-utils.ts"
 [v0-no-op-code-block-prefix]import { supabase } from "./supabase-client"
 
 /**

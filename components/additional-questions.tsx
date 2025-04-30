@@ -8,7 +8,7 @@ import { getAdditionalInterpretation } from "@/lib/api-client"
 // 필요한 import 추가 (파일 상단)
 import { getLoveDetailedAnalysis } from "@/lib/api-client"
 import ReactMarkdown from "react-markdown"
-import { Loader2, MessageCircle, PlusCircle, Send, Users, Trash2, UserPlus, ChevronDown } from "lucide-react"
+import { Loader2, MessageCircle, Users, Trash2, UserPlus, ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -485,85 +485,14 @@ export default function AdditionalQuestions({
     // 사용자의 일주 추출
     const userIlju = `${dayStem}${dayBranch}`
 
-    // 모든 관계 상태에 공통으로 추가할 연애운 상세 분석 카테고리
-    const loveAnalysisCategory = {
-      id: "love-detailed-analysis",
-      title: `${userIlju}일주 연애운 상세 분석`,
-      description: "사주를 통해 연애 성향, 궁합, 운명적 인연에 대한 상세 분석을 알아보세요.",
-    }
-
-    switch (relationshipStatus) {
-      case "solo":
-        return [
-          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
-          {
-            id: "solo-analysis",
-            title: `${userIlju}일주 ${gender === "male" ? "남자" : "여자"} 솔로 원인분석`,
-            description: "사주를 통해 솔로인 원인과 개선 방법을 알아보세요.",
-          },
-          {
-            id: "dating-strategy",
-            title: "사주를 활용한 연애 전략",
-            description: "사주를 통해 연애를 성공적으로 이끌어갈 수 있는 전략을 알아보세요.",
-          },
-        ]
-      case "flirting":
-        return [
-          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
-          {
-            id: "flirting-strategy",
-            title: `${userIlju}일주 썸 발전 전략`,
-            description: "현재 썸 타는 관계를 연애로 발전시키기 위한 전략을 알아보세요.",
-          },
-          {
-            id: "dating-strategy",
-            title: "사주를 활용한 연애 전략",
-            description: "사주를 통해 연애를 성공적으로 이끌어갈 수 있는 전략을 알아보세요.",
-          },
-        ]
-      case "dating":
-        return [
-          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
-          {
-            id: "relationship-issues",
-            title: `${userIlju}일주 연애 문제 해결책`,
-            description: "연애 중 겪을 수 있는 문제와 해결 방법에 대한 사주 해석을 확인하세요.",
-          },
-          {
-            id: "dating-strategy",
-            title: "사주를 활용한 연애 전략",
-            description: "사주를 통해 연애를 성공적으로 이끌어갈 수 있는 전략을 알아보세요.",
-          },
-        ]
-      case "married":
-        return [
-          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
-          {
-            id: "marriage-issues",
-            title: `${userIlju}일주 결혼생활 문제 해결책`,
-            description: "결혼 생활에서 겪을 수 있는 문제와 해결 방법에 대한 사주 해석을 확인하세요.",
-          },
-          {
-            id: "marriage-strategy",
-            title: `${userIlju}일주 결혼생활 전략`,
-            description: "사주를 통해 결혼생활을 행복하게 이끌어갈 수 있는 전략을 알아보세요.",
-          },
-        ]
-      default:
-        return [
-          loveAnalysisCategory, // 연애운 상세 분석 카테고리 추가
-          {
-            id: "relationship-issues",
-            title: "연애에서의 문제 & 해결책",
-            description: "연애 중 겪을 수 있는 문제와 해결 방법에 대한 사주 해석을 확인하세요.",
-          },
-          {
-            id: "dating-strategy",
-            title: "사주를 활용한 연애 전략",
-            description: "사주를 통해 연애를 성공적으로 이끌어갈 수 있는 전략을 알아보세요.",
-          },
-        ]
-    }
+    // 연애운 상세 분석 카테고리만 반환
+    return [
+      {
+        id: "love-detailed-analysis",
+        title: `${userIlju}일주 연애운 상세 분석`,
+        description: "사주를 통해 연애 성향, 궁합, 운명적 인연에 대한 상세 분석을 알아보세요.",
+      },
+    ]
   }
 
   // 카테고리 정보 가져오기
@@ -845,7 +774,7 @@ export default function AdditionalQuestions({
     },
     {
       id: "questions",
-      title: "추가 질문",
+      title: "연애운 분석",
       content: (
         <div className="space-y-3">
           {categories.map((category) => (
@@ -916,131 +845,6 @@ export default function AdditionalQuestions({
         </div>
       ),
     },
-    {
-      id: "custom",
-      title: "나만의 질문",
-      content: (
-        <div className="space-y-4">
-          {/* 나만의 추가 질문 버튼 */}
-          <div className="w-full">
-            {!showCustomInput ? (
-              <button
-                onClick={() => {
-                  setShowCustomInput(true)
-                  setTimeout(() => customInputRef.current?.focus(), 100)
-                }}
-                className="w-full text-left rounded-2xl px-4 py-3 transition-all shadow hover:shadow-md 
-               bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700
-               flex items-start gap-3 relative overflow-visible group"
-              >
-                <div
-                  className="flex items-center justify-center rounded-full p-2 
-               bg-primary/10 text-primary dark:bg-primary/20 flex-shrink-0"
-                >
-                  <PlusCircle className="h-5 w-5" />
-                </div>
-
-                <div className="flex flex-col overflow-hidden">
-                  <span className="font-medium text-base truncate">나만의 추가 질문하기</span>
-                  <span className="text-xs mt-1 line-clamp-2 text-muted-foreground">
-                    궁금한 내용을 직접 질문하고 사주 기반 답변을 받아보세요.
-                  </span>
-                </div>
-              </button>
-            ) : (
-              <Card className="p-2 shadow-md">
-                <div className="flex items-center gap-2">
-                  <Input
-                    ref={customInputRef}
-                    value={customQuestion}
-                    onChange={(e) => setCustomQuestion(e.target.value)}
-                    placeholder="궁금한 내용을 질문해보세요..."
-                    className="flex-1"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        handleCustomQuestionSubmit()
-                      }
-                    }}
-                    disabled={loadingCategory !== null}
-                  />
-                  <Button
-                    onClick={handleCustomQuestionSubmit}
-                    disabled={!customQuestion.trim() || loadingCategory !== null}
-                    size="icon"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={() => setShowCustomInput(false)}
-                    variant="outline"
-                    size="icon"
-                    disabled={loadingCategory !== null && loadingCategory.startsWith("custom:")}
-                  >
-                    ✕
-                  </Button>
-                </div>
-                {loadingCategory && loadingCategory.startsWith("custom:") && (
-                  <div className="mt-2 text-center">
-                    <p className="text-xs text-primary font-medium">질문 분석 중...</p>
-                    <Progress value={loadingProgress} className="h-1 mt-1" />
-                  </div>
-                )}
-              </Card>
-            )}
-          </div>
-
-          {/* 사용자 정의 질문 결과 표시 */}
-          {customQuestions.map(
-            (item) =>
-              activeCategories.includes(item.id) && (
-                <div key={item.id} className="w-full">
-                  <div className="bg-primary/90 text-white rounded-xl sm:rounded-2xl px-4 py-3 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center rounded-full p-2 bg-white/20 flex-shrink-0">
-                        <MessageCircle className="h-5 w-5" />
-                      </div>
-
-                      <div className="flex flex-col overflow-hidden">
-                        <span className="font-medium text-base">나의 질문</span>
-                        <span className="text-sm mt-1 text-white/80">{item.question}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 mb-4 bg-white dark:bg-gray-950 rounded-xl p-2 sm:p-4">
-                    {loadingCategory === item.id ? (
-                      <div className="flex flex-col items-center justify-center py-5 sm:py-8 space-y-3 sm:space-y-4">
-                        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                        <div className="text-center space-y-2">
-                          <p className="font-medium text-primary">{loadingStage}</p>
-                          <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
-                        </div>
-
-                        <div className="w-full max-w-xs mt-2">
-                          <Progress value={loadingProgress} className="h-1.5" />
-                          <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgress}% 완료</p>
-                        </div>
-                      </div>
-                    ) : errors[item.id] ? (
-                      <div className="text-red-500 text-sm">
-                        <p>오류가 발생했습니다: {errors[item.id]}</p>
-                        <p className="mt-2">다시 시도해주세요.</p>
-                      </div>
-                    ) : item.answer ? (
-                      <div className="markdown-content">
-                        <ReactMarkdown>{item.answer || ""}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">해석을 불러올 수 없습니다.</p>
-                    )}
-                  </div>
-                </div>
-              ),
-          )}
-        </div>
-      ),
-    },
   ]
 
   // 현재 페이지에 해당하는 컨텐츠 가져오기
@@ -1083,7 +887,7 @@ export default function AdditionalQuestions({
 
       <div className="mb-4">
         <Pagination className="w-full">
-          <PaginationContent className="w-full grid grid-cols-3 gap-1">
+          <PaginationContent className="w-full grid grid-cols-2 gap-1">
             {allContent.map((content, index) => (
               <PaginationItem key={content.id} className="w-full">
                 <PaginationLink
@@ -1464,112 +1268,6 @@ export default function AdditionalQuestions({
             )}
           </div>
         ))}
-
-        {/* 나만의 추가 질문 버튼 */}
-        <div className="w-full">
-          {!showCustomInput ? (
-            <button
-              onClick={() => {
-                setShowCustomInput(true)
-                setTimeout(() => customInputRef.current?.focus(), 100)
-              }}
-              className="w-full text-left rounded-2xl px-4 py-3 transition-all shadow hover:shadow-md 
-               bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700
-               flex items-start gap-3 relative overflow-visible group"
-            >
-              <div
-                className="flex items-center justify-center rounded-full p-2 
-               bg-primary/10 text-primary dark:bg-primary/20 flex-shrink-0"
-              >
-                <PlusCircle className="h-5 w-5" />
-              </div>
-
-              <div className="flex flex-col overflow-hidden">
-                <span className="font-medium text-base truncate">나만의 추가 질문하기</span>
-                <span className="text-xs mt-1 line-clamp-2 text-muted-foreground">
-                  궁금한 내용을 직접 질문하고 사주 기반 답변을 받아보세요.
-                </span>
-              </div>
-            </button>
-          ) : (
-            <Card className="p-2 shadow-md">
-              <div className="flex items-center gap-2">
-                <Input
-                  ref={customInputRef}
-                  value={customQuestion}
-                  onChange={(e) => setCustomQuestion(e.target.value)}
-                  placeholder="궁금한 내용을 질문해보세요..."
-                  className="flex-1"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      handleCustomQuestionSubmit()
-                    }
-                  }}
-                />
-                <Button
-                  onClick={handleCustomQuestionSubmit}
-                  disabled={!customQuestion.trim() || loadingCategory !== null}
-                  size="icon"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-                <Button onClick={() => setShowCustomInput(false)} variant="outline" size="icon">
-                  ✕
-                </Button>
-              </div>
-            </Card>
-          )}
-        </div>
-
-        {/* 사용자 정의 질문 결과 표시 */}
-        {customQuestions.map(
-          (item) =>
-            activeCategories.includes(item.id) && (
-              <div key={item.id} className="w-full">
-                <div className="bg-primary/90 text-white rounded-xl sm:rounded-2xl px-4 py-3 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center rounded-full p-2 bg-white/20 flex-shrink-0">
-                      <MessageCircle className="h-5 w-5" />
-                    </div>
-
-                    <div className="flex flex-col overflow-hidden">
-                      <span className="font-medium text-base">나의 질문</span>
-                      <span className="text-sm mt-1 text-white/80">{item.question}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-2 mb-4 bg-white dark:bg-gray-950 rounded-xl p-2 sm:p-4">
-                  {loadingCategory === item.id ? (
-                    <div className="flex flex-col items-center justify-center py-5 sm:py-8 space-y-3 sm:space-y-4">
-                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                      <div className="text-center space-y-2">
-                        <p className="font-medium text-primary">{loadingStage}</p>
-                        <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
-                      </div>
-
-                      <div className="w-full max-w-xs mt-2">
-                        <Progress value={loadingProgress} className="h-1.5" />
-                        <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgress}% 완료</p>
-                      </div>
-                    </div>
-                  ) : errors[item.id] ? (
-                    <div className="text-red-500 text-sm">
-                      <p>오류가 발생했습니다: {errors[item.id]}</p>
-                      <p className="mt-2">다시 시도해주세요.</p>
-                    </div>
-                  ) : item.answer ? (
-                    <div className="markdown-content">
-                      <ReactMarkdown>{item.answer || ""}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">해석을 불러올 수 없습니다.</p>
-                  )}
-                </div>
-              </div>
-            ),
-        )}
       </div>
     </div>
   )

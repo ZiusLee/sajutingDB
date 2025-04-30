@@ -30,13 +30,20 @@ export async function POST(request: NextRequest) {
 3. 잠시 후 다시 시도해보세요.
 `
     }
+
     // 요청 본문 파싱
     let requestData
     try {
       requestData = await request.json()
     } catch (parseError) {
       console.error("Error parsing request JSON:", parseError)
-      return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 })
+      return NextResponse.json(
+        {
+          fallbackInterpretation: createFallbackInterpretation(parseError),
+          error: "Invalid JSON in request body",
+        },
+        { status: 400 },
+      )
     }
 
     const {
@@ -49,8 +56,15 @@ export async function POST(request: NextRequest) {
 
     if (!saju) {
       console.error("Missing saju data in request")
-      return NextResponse.json({ error: "Missing saju data" }, { status: 400 })
+      return NextResponse.json(
+        {
+          fallbackInterpretation: createFallbackInterpretation(new Error("Missing saju data")),
+          error: "Missing saju data",
+        },
+        { status: 400 },
+      )
     }
+
     // 사주 정보 추출
     const {
       yearStem,
@@ -159,9 +173,9 @@ export async function POST(request: NextRequest) {
 - 년주: ${yearStem}${yearBranch} (십성: ${yearStemSibseong}, ${yearBranchSibseong})
 - 월주: ${monthStem}${monthBranch} (십성: ${monthStemSibseong}, ${monthBranchSibseong})
 - 일주: ${dayStem}${dayBranch} (일간: ${dayMaster}) (십성: ${dayStemSibseong}, ${dayBranchSibseong})
-- 시주: ${hourStem}${hourBranch} (십성: ${hourStemSibseong}, ${hourBranchSibseong})
+- 시주: ${hourStem || ""}${hourBranch || ""} ${hourStem ? `(십성: ${hourStemSibseong}, ${hourBranchSibseong})` : "(시간 미상)"}
 - 띠: ${yearAnimal}
-- 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
+- 오행 분포: 목(${elements?.wood || 0}), 화(${elements?.fire || 0}), 토(${elements?.earth || 0}), 금(${elements?.metal || 0}), 수(${elements?.water || 0})
 
 🌟 나의 총운을 통해 인생의 테마를 들여다보기 아래 모든 운의 설명은 일간 일주 십성 기반으로 설명해주세요
 
@@ -226,9 +240,9 @@ export async function POST(request: NextRequest) {
 - 년주: ${yearStem}${yearBranch} (십성: ${yearStemSibseong}, ${yearBranchSibseong})
 - 월주: ${monthStem}${monthBranch} (십성: ${monthStemSibseong}, ${monthBranchSibseong})
 - 일주: ${dayStem}${dayBranch} (일간: ${dayMaster}) (십성: ${dayStemSibseong}, ${dayBranchSibseong})
-- 시주: ${hourStem}${hourBranch} (십성: ${hourStemSibseong}, ${hourBranchSibseong})
+- 시주: ${hourStem || ""}${hourBranch || ""} ${hourStem ? `(십성: ${hourStemSibseong}, ${hourBranchSibseong})` : "(시간 미상)"}
 - 띠: ${yearAnimal}
-- 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
+- 오행 분포: 목(${elements?.wood || 0}), 화(${elements?.fire || 0}), 토(${elements?.earth || 0}), 금(${elements?.metal || 0}), 수(${elements?.water || 0})
 
 # 나라는 사람의 연애운을 구체적으로 알기위해 🔮
 
@@ -276,29 +290,48 @@ ${relationshipGuidance}
       // OpenAI API 키 확인
       if (!process.env.OPENAI_API_KEY) {
         console.error("OPENAI_API_KEY is not defined")
-        throw new Error("OpenAI API key is missing")
+        return NextResponse.json(
+          {
+            fallbackInterpretation: createFallbackInterpretation(new Error("OpenAI API key is missing")),
+            error: "OpenAI API key is missing",
+          },
+          { status: 500 },
+        )
       }
 
-      const { text } = await generateText({
-        model: openai("gpt-4.1-mini"), // Changed from gpt-4.1 to gpt-4.1-mini
-        prompt: prompt,
-        temperature: 0.8,
-        maxTokens: 3500,
-        apiKey: process.env.OPENAI_API_KEY,
-        system:
-          "당신은 사주팔자 전문가입니다. 사주에 대한 해석과 궁합이 좋은 사주 조합을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요. 적절한 이모지를 사용하여 가독성을 높여주세요. 특히 연애운의 흐름에 대해서는 일관성 있게 답변해주세요. 같은 사주에 대해서는 항상 동일한 시기를 연애운이 강하거나 약한 시기로 제시해야 합니다. 연애운 예측은 사주의 일간, 오행 분석, 대운을 기반으로 체계적으로 도출해주세요",
-      })
+      try {
+        const { text } = await generateText({
+          model: openai("gpt-4.1-mini"), // Changed from gpt-4.1 to gpt-4.1-mini
+          prompt: prompt,
+          temperature: 0.8,
+          maxTokens: 3500,
+          apiKey: process.env.OPENAI_API_KEY,
+          system:
+            "당신은 사주팔자 전문가입니다. 사주에 대한 해석과 궁합이 좋은 사주 조합을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요. 적절한 이모지를 사용하여 가독성을 높여주세요. 특히 연애운의 흐름에 대해서는 일관성 있게 답변해주세요. 같은 사주에 대해서는 항상 동일한 시기를 연애운이 강하거나 약한 시기로 제시해야 합니다. 연애운 예측은 사주의 일간, 오행 분석, 대운을 기반으로 체계적으로 도출해주세요.",
+        })
 
-      interpretation = text
-      responseTime = Date.now() - startTime
-      console.log(`OpenAI response generated in ${responseTime}ms`)
+        interpretation = text
+        responseTime = Date.now() - startTime
+        console.log(`OpenAI response generated in ${responseTime}ms`)
 
-      // 응답 반환
-      return NextResponse.json({
-        interpretation,
-        model: "openai",
-        responseTime: `${responseTime}ms`,
-      })
+        // 응답 반환
+        return NextResponse.json({
+          interpretation,
+          model: "openai",
+          responseTime: `${responseTime}ms`,
+        })
+      } catch (openaiError) {
+        console.error("Error calling OpenAI API:", openaiError)
+
+        // OpenAI API 오류 시 폴백 해석 반환
+        return NextResponse.json(
+          {
+            fallbackInterpretation: createFallbackInterpretation(openaiError),
+            error: openaiError instanceof Error ? openaiError.message : "Unknown OpenAI API error",
+          },
+          { status: 500 },
+        )
+      }
     } catch (error) {
       console.error("Error generating interpretation:", error)
 
@@ -315,6 +348,7 @@ ${relationshipGuidance}
     console.error("Unhandled error in API route:", error)
     return NextResponse.json(
       {
+        fallbackInterpretation: createFallbackInterpretation(error),
         error: "Internal server error",
       },
       { status: 500 },
