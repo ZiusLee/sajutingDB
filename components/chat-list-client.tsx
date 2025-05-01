@@ -480,7 +480,7 @@ export default function ChatListClient() {
     // Create a session identifier for this specific user
     const sessionIdentifier = `${chatData.name}_${chatData.saju.year}${chatData.saju.month}${chatData.saju.day}_${chatData.gender}`
 
-    // 채팅 페이지로 이동하면서 선택한 채팅방 유형 전달
+    // 채팅 페이지로 이동하��서 선택한 채팅방 유형 전달
     try {
       // Store the current saju data in localStorage
       localStorage.setItem(

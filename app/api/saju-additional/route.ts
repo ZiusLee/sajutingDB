@@ -137,7 +137,7 @@ ${relationshipContext}
 
 - 이름: ${userName}
 - 성별: ${genderText}
-- 현재 관계 상태: 썸타는 중
+- 현재 관계 상태: 썸타��� 중
 - 년주: ${yearStem}${yearBranch}
 - 월주: ${monthStem}${monthBranch}
 - 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})

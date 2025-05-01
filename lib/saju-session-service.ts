@@ -29,41 +29,15 @@ export async function getUserSajuProfiles() {
       console.log(`Initial check found ${sessionCheck?.length || 0} sessions with auth_user_id ${authUserId}`)
     }
 
-    // Query saju_sessions with a join to birth_info and saju_info
+    // Simplified query - just fetch basic saju_sessions data without joins
+    console.log("Executing simplified query for auth_user_id:", authUserId)
     const { data: sessions, error: sessionsError } = await supabase
       .from("saju_sessions")
-      .select(`
-        id,
-        name,
-        gender,
-        email,
-        created_at,
-        is_default,
-        auth_user_id,
-        birth_info (
-          id,
-          solar_year,
-          solar_month,
-          solar_day,
-          solar_hour,
-          solar_minute,
-          lunar_year,
-          lunar_month,
-          lunar_day,
-          time_unknown
-        ),
-        saju_info (
-          year_stem,
-          year_branch,
-          month_stem,
-          month_branch,
-          day_stem,
-          day_branch,
-          hour_stem,
-          hour_branch
-        )
-      `)
+      .select("id, name, gender, email, created_at, auth_user_id")
       .eq("auth_user_id", authUserId)
+
+    console.log("Simplified query result:", sessions)
+    console.log("Simplified query error:", sessionsError)
 
     if (sessionsError) {
       console.error("Error fetching saju sessions:", sessionsError)
@@ -76,36 +50,32 @@ export async function getUserSajuProfiles() {
       return { profiles: [], authUserId }
     }
 
-    // Map the data to our profile format
+    // Map the data to our profile format with placeholder values for missing join data
     const profiles = sessions.map((session) => {
-      const birthInfo = session.birth_info?.[0] || {}
-      const sajuInfo = session.saju_info?.[0] || {}
-
       return {
         id: session.id,
         name: session.name || "무명",
         gender: session.gender || "unknown",
-        birthYear: birthInfo.solar_year?.toString() || "",
-        birthMonth: birthInfo.solar_month?.toString().padStart(2, "0") || "",
-        birthDay: birthInfo.solar_day?.toString().padStart(2, "0") || "",
-        birthHour: birthInfo.solar_hour?.toString().padStart(2, "0") || "",
-        birthMinute: birthInfo.solar_minute?.toString().padStart(2, "0") || "",
-        lunarYear: birthInfo.lunar_year?.toString() || "",
-        lunarMonth: birthInfo.lunar_month?.toString().padStart(2, "0") || "",
-        lunarDay: birthInfo.lunar_day?.toString() || "",
-        timeUnknown: birthInfo.time_unknown || false,
-        isDefault: session.is_default || false,
+        birthYear: "N/A", // Placeholder since we don't have birth_info
+        birthMonth: "N/A",
+        birthDay: "N/A",
+        birthHour: "N/A",
+        birthMinute: "N/A",
+        lunarYear: "N/A",
+        lunarMonth: "N/A",
+        lunarDay: "N/A",
+        timeUnknown: false,
         createdAt: session.created_at || new Date().toISOString(),
-        birthInfoId: birthInfo.id, // Include the birth_info.id
+        birthInfoId: null, // No birth_info.id available
         saju: {
-          yearStem: sajuInfo.year_stem || "",
-          yearBranch: sajuInfo.year_branch || "",
-          monthStem: sajuInfo.month_stem || "",
-          monthBranch: sajuInfo.month_branch || "",
-          dayStem: sajuInfo.day_stem || "",
-          dayBranch: sajuInfo.day_branch || "",
-          hourStem: sajuInfo.hour_stem || "",
-          hourBranch: sajuInfo.hour_branch || "",
+          yearStem: "N/A",
+          yearBranch: "N/A",
+          monthStem: "N/A",
+          monthBranch: "N/A",
+          dayStem: "N/A",
+          dayBranch: "N/A",
+          hourStem: "N/A",
+          hourBranch: "N/A",
         },
       }
     })
@@ -115,50 +85,6 @@ export async function getUserSajuProfiles() {
   } catch (error) {
     console.error("Error in getUserSajuProfiles:", error)
     return { profiles: [], authUserId: null }
-  }
-}
-
-/**
- * Set a profile as the default profile
- * @param profileId The ID of the profile to set as default
- */
-export async function setDefaultProfile(profileId: string): Promise<boolean> {
-  try {
-    const supabase = createClientComponentClient()
-    const { data: userData } = await supabase.auth.getUser()
-
-    if (!userData.user) {
-      console.log("No authenticated user found")
-      return false
-    }
-
-    const authUserId = userData.user.id
-    console.log(`Setting profile ${profileId} as default for user ${authUserId}`)
-
-    // First, reset all profiles for this user
-    const { error: resetError } = await supabase
-      .from("saju_sessions")
-      .update({ is_default: false })
-      .eq("auth_user_id", authUserId)
-
-    if (resetError) {
-      console.error("Error resetting default profiles:", resetError)
-      return false
-    }
-
-    // Then set the selected profile as default
-    const { error: updateError } = await supabase.from("saju_sessions").update({ is_default: true }).eq("id", profileId)
-
-    if (updateError) {
-      console.error("Error setting default profile:", updateError)
-      return false
-    }
-
-    console.log(`Successfully set profile ${profileId} as default`)
-    return true
-  } catch (error) {
-    console.error("Error in setDefaultProfile:", error)
-    return false
   }
 }
 

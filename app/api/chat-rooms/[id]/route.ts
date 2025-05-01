@@ -52,7 +52,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const existingChatRoom = await getChatRoomById(chatRoomId)
 
     if (!existingChatRoom) {
-      return NextResponse.json({ success: false, message: "채팅방을 찾을 수 없습니다." }, { status: 404 })
+      return NextResponse.json({ success: false, message: "채팅방��� 찾을 수 없습니다." }, { status: 404 })
     }
 
     // 권한 확인

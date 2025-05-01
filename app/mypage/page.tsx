@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Calendar, Clock, LogOut, Eye, LinkIcon, RefreshCw, Star, Bug } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, LogOut, Eye, LinkIcon, RefreshCw, Bug } from "lucide-react"
 import { getSupabase } from "@/lib/supabase-client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input"
 import ManualDataLink from "@/components/manual-data-link"
 import {
   getUserSajuProfiles,
-  setDefaultProfile,
   findAndLinkSessions,
   linkSessionToUser,
   debugCheckSessions,
@@ -32,7 +31,6 @@ interface SajuProfile {
   birthMinute: string
   timeUnknown: boolean
   createdAt: string
-  isDefault: boolean
   birthInfoId?: string
   saju: {
     yearStem: string
@@ -54,7 +52,6 @@ export default function MyPage() {
   const [authUserId, setAuthUserId] = useState<string | null>(null)
   const [sajuProfiles, setSajuProfiles] = useState<SajuProfile[]>([])
   const [showDataLink, setShowDataLink] = useState(false)
-  const [settingDefault, setSettingDefault] = useState<string | null>(null)
   const [isLinking, setIsLinking] = useState(false)
   const [debugInfo, setDebugInfo] = useState<any>(null)
   const [directLinkId, setDirectLinkId] = useState("")
@@ -129,40 +126,6 @@ export default function MyPage() {
       description: "프로필 데이터를 다시 불러오고 있습니다.",
     })
     await loadUserData()
-  }
-
-  // Set default profile
-  const handleSetDefault = async (profileId: string) => {
-    try {
-      setSettingDefault(profileId)
-      const success = await setDefaultProfile(profileId)
-
-      if (success) {
-        toast({
-          title: "기본 프로필 설정 완료",
-          description: "선택한 프로필이 기본 프로필로 설정되었습니다.",
-        })
-
-        // Update local state to reflect the change
-        setSajuProfiles((prev) =>
-          prev.map((profile) => ({
-            ...profile,
-            isDefault: profile.id === profileId,
-          })),
-        )
-      } else {
-        throw new Error("기본 프로필 설정에 실패했습니다.")
-      }
-    } catch (error) {
-      console.error("Error setting default profile:", error)
-      toast({
-        title: "기본 프로필 설정 오류",
-        description: "기본 프로필을 설정하는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    } finally {
-      setSettingDefault(null)
-    }
   }
 
   // View profile details
@@ -506,16 +469,11 @@ export default function MyPage() {
               </div>
               <div className="grid gap-4">
                 {sajuProfiles.map((profile) => (
-                  <Card key={profile.id} className={`overflow-hidden ${profile.isDefault ? "border-primary" : ""}`}>
+                  <Card key={profile.id} className="overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <div>
                         <CardTitle className="text-sm font-medium leading-none flex items-center gap-2">
                           {profile.name}
-                          {profile.isDefault && (
-                            <Badge variant="default" className="ml-2">
-                              기본
-                            </Badge>
-                          )}
                         </CardTitle>
                         <CardDescription className="text-xs mt-1">
                           {profile.saju.yearStem}
@@ -550,27 +508,6 @@ export default function MyPage() {
                     </CardContent>
                     <CardContent>
                       <div className="flex justify-end gap-2">
-                        {!profile.isDefault && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSetDefault(profile.id)}
-                            disabled={settingDefault === profile.id}
-                            className="gap-1"
-                          >
-                            {settingDefault === profile.id ? (
-                              <>
-                                <div className="animate-spin h-4 w-4 border-b-2 border-current rounded-full"></div>
-                                설정 중...
-                              </>
-                            ) : (
-                              <>
-                                <Star className="h-4 w-4" />
-                                기본으로 설정
-                              </>
-                            )}
-                          </Button>
-                        )}
                         <Button
                           variant="outline"
                           size="sm"
