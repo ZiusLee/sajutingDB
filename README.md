@@ -1,4 +1,4 @@
-# 사주팅 (Saju-ting)
+# 사주핑 (Sajuping)
 
 ## Database Schema
 
