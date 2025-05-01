@@ -29,15 +29,54 @@ export async function getUserSajuProfiles() {
       console.log(`Initial check found ${sessionCheck?.length || 0} sessions with auth_user_id ${authUserId}`)
     }
 
-    // Simplified query - just fetch basic saju_sessions data without joins
-    console.log("Executing simplified query for auth_user_id:", authUserId)
+    // Query saju_sessions with proper joins to get all related data
+    console.log("Executing full query with joins for auth_user_id:", authUserId)
     const { data: sessions, error: sessionsError } = await supabase
       .from("saju_sessions")
-      .select("id, name, gender, email, created_at, auth_user_id")
+      .select(`
+        id,
+        name,
+        gender,
+        email,
+        created_at,
+        auth_user_id,
+        is_default,
+        birth_info (
+          id,
+          solar_year,
+          solar_month,
+          solar_day,
+          solar_hour,
+          solar_minute,
+          lunar_year,
+          lunar_month,
+          lunar_day,
+          time_unknown
+        ),
+        saju_info (
+          id,
+          year_stem,
+          year_branch,
+          month_stem,
+          month_branch,
+          day_stem,
+          day_branch,
+          hour_stem,
+          hour_branch,
+          year_stem_sibseong,
+          month_stem_sibseong,
+          day_stem_sibseong,
+          hour_stem_sibseong,
+          year_branch_sibseong,
+          month_branch_sibseong,
+          day_branch_sibseong,
+          hour_branch_sibseong
+        )
+      `)
       .eq("auth_user_id", authUserId)
 
-    console.log("Simplified query result:", sessions)
-    console.log("Simplified query error:", sessionsError)
+    console.log("Full query result:", sessions)
+    console.log("Full query error:", sessionsError)
 
     if (sessionsError) {
       console.error("Error fetching saju sessions:", sessionsError)
@@ -50,32 +89,45 @@ export async function getUserSajuProfiles() {
       return { profiles: [], authUserId }
     }
 
-    // Map the data to our profile format with placeholder values for missing join data
+    // Map the data to our profile format
     const profiles = sessions.map((session) => {
+      // Get the first birth_info and saju_info records if they exist
+      const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
+      const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
+
       return {
         id: session.id,
         name: session.name || "무명",
         gender: session.gender || "unknown",
-        birthYear: "N/A", // Placeholder since we don't have birth_info
-        birthMonth: "N/A",
-        birthDay: "N/A",
-        birthHour: "N/A",
-        birthMinute: "N/A",
-        lunarYear: "N/A",
-        lunarMonth: "N/A",
-        lunarDay: "N/A",
-        timeUnknown: false,
+        birthYear: birthInfo?.solar_year?.toString() || "N/A",
+        birthMonth: birthInfo?.solar_month?.toString().padStart(2, "0") || "N/A",
+        birthDay: birthInfo?.solar_day?.toString().padStart(2, "0") || "N/A",
+        birthHour: birthInfo?.solar_hour?.toString().padStart(2, "0") || "N/A",
+        birthMinute: birthInfo?.solar_minute?.toString().padStart(2, "0") || "N/A",
+        lunarYear: birthInfo?.lunar_year?.toString() || "N/A",
+        lunarMonth: birthInfo?.lunar_month?.toString().padStart(2, "0") || "N/A",
+        lunarDay: birthInfo?.lunar_day?.toString() || "N/A",
+        timeUnknown: birthInfo?.time_unknown || false,
         createdAt: session.created_at || new Date().toISOString(),
-        birthInfoId: null, // No birth_info.id available
+        birthInfoId: birthInfo?.id || null,
+        isDefault: session.is_default || false,
         saju: {
-          yearStem: "N/A",
-          yearBranch: "N/A",
-          monthStem: "N/A",
-          monthBranch: "N/A",
-          dayStem: "N/A",
-          dayBranch: "N/A",
-          hourStem: "N/A",
-          hourBranch: "N/A",
+          yearStem: sajuInfo?.year_stem || "N/A",
+          yearBranch: sajuInfo?.year_branch || "N/A",
+          monthStem: sajuInfo?.month_stem || "N/A",
+          monthBranch: sajuInfo?.month_branch || "N/A",
+          dayStem: sajuInfo?.day_stem || "N/A",
+          dayBranch: sajuInfo?.day_branch || "N/A",
+          hourStem: sajuInfo?.hour_stem || "N/A",
+          hourBranch: sajuInfo?.hour_branch || "N/A",
+          yearStemSibseong: sajuInfo?.year_stem_sibseong || "",
+          monthStemSibseong: sajuInfo?.month_stem_sibseong || "",
+          dayStemSibseong: sajuInfo?.day_stem_sibseong || "",
+          hourStemSibseong: sajuInfo?.hour_stem_sibseong || "",
+          yearBranchSibseong: sajuInfo?.year_branch_sibseong || "",
+          monthBranchSibseong: sajuInfo?.month_branch_sibseong || "",
+          dayBranchSibseong: sajuInfo?.day_branch_sibseong || "",
+          hourBranchSibseong: sajuInfo?.hour_branch_sibseong || "",
         },
       }
     })
@@ -448,5 +500,193 @@ export async function debugCheckSessions(authUserId: string) {
   } catch (error) {
     console.error("Error in debugCheckSessions:", error)
     return { success: false, sessions: [] }
+  }
+}
+
+/**
+ * Get all saju sessions for a user
+ */
+export async function getUserSajuSessions(authUserId: string): Promise<any[]> {
+  try {
+    const supabase = createClientComponentClient()
+
+    const { data, error } = await supabase
+      .from("saju_sessions")
+      .select("*")
+      .eq("auth_user_id", authUserId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching saju sessions:", error)
+      return []
+    }
+
+    return data || []
+  } catch (error) {
+    console.error("Error in getUserSajuSessions:", error)
+    return []
+  }
+}
+
+/**
+ * Set a saju session as the default for a user
+ */
+export async function setDefaultSajuSession(authUserId: string, sessionId: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient()
+
+    // First, reset all sessions for this user to not be default
+    const { error: resetError } = await supabase
+      .from("saju_sessions")
+      .update({ is_default: false })
+      .eq("auth_user_id", authUserId)
+
+    if (resetError) {
+      console.error("Error resetting default sessions:", resetError)
+      return false
+    }
+
+    // Then set the specified session as default
+    const { error: updateError } = await supabase
+      .from("saju_sessions")
+      .update({ is_default: true })
+      .eq("id", sessionId)
+      .eq("auth_user_id", authUserId)
+
+    if (updateError) {
+      console.error("Error setting default session:", updateError)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in setDefaultSajuSession:", error)
+    return false
+  }
+}
+
+/**
+ * Get the default saju session for a user
+ */
+export async function getDefaultSajuSession(authUserId: string): Promise<any | null> {
+  try {
+    const supabase = createClientComponentClient()
+
+    const { data, error } = await supabase
+      .from("saju_sessions")
+      .select("*")
+      .eq("auth_user_id", authUserId)
+      .eq("is_default", true)
+      .single()
+
+    if (error) {
+      console.error("Error getting default saju session:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error in getDefaultSajuSession:", error)
+    return null
+  }
+}
+
+/**
+ * Get a saju profile by session ID
+ */
+export async function getSajuProfileBySessionId(sessionId: string): Promise<any | null> {
+  try {
+    const supabase = createClientComponentClient()
+
+    const { data, error } = await supabase
+      .from("saju_sessions")
+      .select(`
+        id,
+        name,
+        gender,
+        created_at,
+        birth_info (
+          id,
+          solar_year,
+          solar_month,
+          solar_day,
+          solar_hour,
+          solar_minute,
+          lunar_year,
+          lunar_month,
+          lunar_day,
+          time_unknown
+        ),
+        saju_info (
+          year_stem,
+          year_branch,
+          month_stem,
+          month_branch,
+          day_stem,
+          day_branch,
+          hour_stem,
+          hour_branch,
+          year_stem_hanja,
+          year_branch_hanja,
+          month_stem_hanja,
+          month_branch_hanja,
+          day_stem_hanja,
+          day_branch_hanja,
+          hour_stem_hanja,
+          hour_branch_hanja,
+          day_master,
+          day_master_hanja
+        )
+      `)
+      .eq("id", sessionId)
+      .single()
+
+    if (error) {
+      console.error("Error getting saju profile by session ID:", error)
+      return null
+    }
+
+    const birthInfo = data?.birth_info?.[0] || {}
+    const sajuInfo = data?.saju_info?.[0] || {}
+
+    return {
+      id: data.id,
+      name: data.name || "Unknown",
+      gender: data.gender || "unknown",
+      birthYear: birthInfo.solar_year?.toString() || "",
+      birthMonth: birthInfo.solar_month?.toString().padStart(2, "0") || "",
+      birthDay: birthInfo.solar_day?.toString().padStart(2, "0") || "",
+      birthHour: birthInfo.solar_hour?.toString().padStart(2, "0") || "00",
+      birthMinute: birthInfo.solar_minute?.toString().padStart(2, "0") || "00",
+      lunarYear: birthInfo.lunar_year?.toString() || "",
+      lunarMonth: birthInfo.lunar_month?.toString().padStart(2, "0") || "",
+      lunarDay: birthInfo.lunar_day?.toString().padStart(2, "0") || "",
+      timeUnknown: birthInfo.time_unknown || false,
+      createdAt: data.created_at || new Date().toISOString(),
+      saju: {
+        yearStem: sajuInfo.year_stem || "",
+        yearBranch: sajuInfo.year_branch || "",
+        monthStem: sajuInfo.month_stem || "",
+        monthBranch: sajuInfo.month_branch || "",
+        dayStem: sajuInfo.day_stem || "",
+        dayBranch: sajuInfo.day_branch || "",
+        hourStem: sajuInfo.hour_stem || "",
+        hourBranch: sajuInfo.hour_branch || "",
+        yearStemHanja: sajuInfo.year_stem_hanja || "",
+        yearBranchHanja: sajuInfo.year_branch_hanja || "",
+        monthStemHanja: sajuInfo.month_stem_hanja || "",
+        monthBranchHanja: sajuInfo.month_branch_hanja || "",
+        dayStemHanja: sajuInfo.day_stem_hanja || "",
+        dayBranchHanja: sajuInfo.day_branch_hanja || "",
+        hourStemHanja: sajuInfo.hour_stem_hanja || "",
+        hourBranchHanja: sajuInfo.hour_branch_hanja || "",
+        dayMaster: sajuInfo.day_master || "",
+        dayMasterHanja: sajuInfo.day_master_hanja || "",
+        elements: { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+      },
+    }
+  } catch (error) {
+    console.error("Error in getSajuProfileBySessionId:", error)
+    return null
   }
 }

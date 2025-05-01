@@ -2,8 +2,8 @@ import { query, withTransaction } from "./db"
 
 export interface ChatRoom {
   id: number
-  user_id: number
-  saju_profile_id: number | null
+  user_id: string
+  saju_session_id: string | null
   room_type: string
   title: string | null
   created_at: Date
@@ -13,39 +13,50 @@ export interface ChatRoom {
 export interface Message {
   id: number
   chat_room_id: number
+  saju_session_id: string | null
   role: string
   content: string
   created_at: Date
 }
 
 export interface ChatRoomInput {
-  user_id: number
-  saju_profile_id?: number
+  user_id: string
+  saju_session_id?: string
   room_type: string
   title?: string
 }
 
 export interface MessageInput {
   chat_room_id: number
+  saju_session_id?: string
   role: string
   content: string
 }
 
 // 채팅방 생성
 export async function createChatRoom(roomData: ChatRoomInput): Promise<ChatRoom> {
-  const { user_id, saju_profile_id, room_type, title } = roomData
+  const { user_id, saju_session_id, room_type, title } = roomData
 
   const result = await query(
-    "INSERT INTO chat_rooms (user_id, saju_profile_id, room_type, title) VALUES ($1, $2, $3, $4) RETURNING *",
-    [user_id, saju_profile_id || null, room_type, title || null],
+    "INSERT INTO chat_rooms (user_id, saju_session_id, room_type, title) VALUES ($1, $2, $3, $4) RETURNING *",
+    [user_id, saju_session_id || null, room_type, title || null],
   )
 
   return result.rows[0]
 }
 
 // 사용자 ID로 채팅방 목록 조회
-export async function getChatRoomsByUserId(userId: number): Promise<ChatRoom[]> {
+export async function getChatRoomsByUserId(userId: string): Promise<ChatRoom[]> {
   const result = await query("SELECT * FROM chat_rooms WHERE user_id = $1 ORDER BY updated_at DESC", [userId])
+
+  return result.rows
+}
+
+// 사주 세션 ID로 채팅방 목록 조회
+export async function getChatRoomsBySajuSessionId(sajuSessionId: string): Promise<ChatRoom[]> {
+  const result = await query("SELECT * FROM chat_rooms WHERE saju_session_id = $1 ORDER BY updated_at DESC", [
+    sajuSessionId,
+  ])
 
   return result.rows
 }
@@ -92,13 +103,12 @@ export async function deleteChatRoom(id: number): Promise<boolean> {
 
 // 메시지 생성
 export async function createMessage(messageData: MessageInput): Promise<Message> {
-  const { chat_room_id, role, content } = messageData
+  const { chat_room_id, saju_session_id, role, content } = messageData
 
-  const result = await query("INSERT INTO messages (chat_room_id, role, content) VALUES ($1, $2, $3) RETURNING *", [
-    chat_room_id,
-    role,
-    content,
-  ])
+  const result = await query(
+    "INSERT INTO messages (chat_room_id, saju_session_id, role, content) VALUES ($1, $2, $3, $4) RETURNING *",
+    [chat_room_id, saju_session_id || null, role, content],
+  )
 
   // 채팅방의 updated_at 업데이트
   await query("UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [chat_room_id])
@@ -109,6 +119,15 @@ export async function createMessage(messageData: MessageInput): Promise<Message>
 // 채팅방 ID로 메시지 목록 조회
 export async function getMessagesByChatRoomId(chatRoomId: number): Promise<Message[]> {
   const result = await query("SELECT * FROM messages WHERE chat_room_id = $1 ORDER BY created_at ASC", [chatRoomId])
+
+  return result.rows
+}
+
+// 사주 세션 ID로 메시지 목록 조회
+export async function getMessagesBySajuSessionId(sajuSessionId: string): Promise<Message[]> {
+  const result = await query("SELECT * FROM messages WHERE saju_session_id = $1 ORDER BY created_at ASC", [
+    sajuSessionId,
+  ])
 
   return result.rows
 }
@@ -133,8 +152,8 @@ export async function createMultipleMessages(
 
     for (const message of messages) {
       const result = await client.query(
-        "INSERT INTO messages (chat_room_id, role, content) VALUES ($1, $2, $3) RETURNING *",
-        [chatRoomId, message.role, message.content],
+        "INSERT INTO messages (chat_room_id, saju_session_id, role, content) VALUES ($1, $2, $3, $4) RETURNING *",
+        [chatRoomId, message.saju_session_id || null, message.role, message.content],
       )
 
       createdMessages.push(result.rows[0])

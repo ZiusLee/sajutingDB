@@ -30,15 +30,6 @@ export function MainNav() {
         >
           소개
         </Link>
-        <Link
-          href="/chat-list"
-          className={cn(
-            "flex items-center text-sm font-medium transition-colors hover:text-foreground/80 sm:text-base",
-            pathname?.startsWith("/chat") ? "text-foreground" : "text-foreground/60",
-          )}
-        >
-          채팅
-        </Link>
       </nav>
     </div>
   )

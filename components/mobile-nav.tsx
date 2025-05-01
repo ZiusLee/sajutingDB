@@ -47,16 +47,6 @@ export function MobileNav() {
             소개
           </Link>
           <Link
-            href="/chat-list"
-            className={cn(
-              "hover:text-foreground/80 transition-colors",
-              pathname?.startsWith("/chat") ? "text-foreground" : "text-foreground/60",
-            )}
-            onClick={() => setOpen(false)}
-          >
-            채팅
-          </Link>
-          <Link
             href="/login"
             className={cn(
               "hover:text-foreground/80 transition-colors",

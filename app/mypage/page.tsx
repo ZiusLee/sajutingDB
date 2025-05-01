@@ -32,6 +32,9 @@ interface SajuProfile {
   timeUnknown: boolean
   createdAt: string
   birthInfoId?: string
+  lunarYear?: string
+  lunarMonth?: string
+  lunarDay?: string
   saju: {
     yearStem: string
     yearBranch: string
@@ -41,6 +44,31 @@ interface SajuProfile {
     dayBranch: string
     hourStem: string
     hourBranch: string
+    yearStemSibseong?: string
+    monthStemSibseong?: string
+    dayStemSibseong?: string
+    hourStemSibseong?: string
+    yearBranchSibseong?: string
+    monthBranchSibseong?: string
+    dayBranchSibseong?: string
+    hourBranchSibseong?: string
+    yearStemHanja?: string
+    yearBranchHanja?: string
+    monthStemHanja?: string
+    monthBranchHanja?: string
+    dayStemHanja?: string
+    dayBranchHanja?: string
+    hourStemHanja?: string
+    hourBranchHanja?: string
+    elements?: {
+      wood: number
+      fire: number
+      earth: number
+      metal: number
+      water: number
+    }
+    dayMaster?: string
+    dayMasterHanja?: string
   }
 }
 
@@ -128,11 +156,71 @@ export default function MyPage() {
     await loadUserData()
   }
 
-  // View profile details
+  // View profile details - 이미 로드된 데이터를 사용하여 상세 페이지로 이동
   const handleViewDetails = (profile: SajuProfile) => {
-    // Use the birthInfoId if available, otherwise fall back to the session ID
-    const uuid = profile.birthInfoId || profile.id
-    router.push(`/result?uuid=${uuid}`)
+    // 이미 로드된 데이터를 URL 파라미터로 인코딩하여 전달
+    const sajuData = {
+      // 사주 정보
+      yearStem: profile.saju.yearStem,
+      yearBranch: profile.saju.yearBranch,
+      monthStem: profile.saju.monthStem,
+      monthBranch: profile.saju.monthBranch,
+      dayStem: profile.saju.dayStem,
+      dayBranch: profile.saju.dayBranch,
+      hourStem: profile.saju.hourStem,
+      hourBranch: profile.saju.hourBranch,
+
+      // 십성 정보
+      yearStemSibseong: profile.saju.yearStemSibseong || "",
+      monthStemSibseong: profile.saju.monthStemSibseong || "",
+      dayStemSibseong: profile.saju.dayStemSibseong || "",
+      hourStemSibseong: profile.saju.hourStemSibseong || "",
+      yearBranchSibseong: profile.saju.yearBranchSibseong || "",
+      monthBranchSibseong: profile.saju.monthBranchSibseong || "",
+      dayBranchSibseong: profile.saju.dayBranchSibseong || "",
+      hourBranchSibseong: profile.saju.hourBranchSibseong || "",
+
+      // 한자 정보
+      yearStemHanja: profile.saju.yearStemHanja || "",
+      yearBranchHanja: profile.saju.yearBranchHanja || "",
+      monthStemHanja: profile.saju.monthStemHanja || "",
+      monthBranchHanja: profile.saju.monthBranchHanja || "",
+      dayStemHanja: profile.saju.dayStemHanja || "",
+      dayBranchHanja: profile.saju.dayBranchHanja || "",
+      hourStemHanja: profile.saju.hourStemHanja || "",
+      hourBranchHanja: profile.saju.hourBranchHanja || "",
+
+      // 오행 정보
+      elements: profile.saju.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+
+      // 일주 정보
+      dayMaster: profile.saju.dayMaster || profile.saju.dayStem,
+      dayMasterHanja: profile.saju.dayMasterHanja || "",
+
+      // 양력 정보
+      year: profile.birthYear,
+      month: profile.birthMonth,
+      day: profile.birthDay,
+      hour: profile.birthHour,
+      minute: profile.birthMinute,
+
+      // 음력 정보 (있을 경우에만)
+      lunarYear: profile.lunarYear || profile.birthYear, // 음력 정보가 없으면 양력 정보로 대체
+      lunarMonth: profile.lunarMonth || profile.birthMonth,
+      lunarDay: profile.lunarDay || profile.birthDay,
+
+      // 시간 미상 여부
+      timeUnknown: profile.timeUnknown,
+    }
+
+    // URL 파라미터로 데이터 전달
+    const encodedSaju = encodeURIComponent(JSON.stringify(sajuData))
+    router.push(`/result?saju=${encodedSaju}&name=${encodeURIComponent(profile.name)}&gender=${profile.gender}`)
+  }
+
+  // Navigate to result page when clicking on a profile card
+  const handleProfileClick = (profile: SajuProfile) => {
+    handleViewDetails(profile)
   }
 
   // Find and link all sessions
@@ -469,7 +557,11 @@ export default function MyPage() {
               </div>
               <div className="grid gap-4">
                 {sajuProfiles.map((profile) => (
-                  <Card key={profile.id} className="overflow-hidden">
+                  <Card
+                    key={profile.id}
+                    className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => handleProfileClick(profile)}
+                  >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <div>
                         <CardTitle className="text-sm font-medium leading-none flex items-center gap-2">
@@ -511,7 +603,10 @@ export default function MyPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewDetails(profile)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewDetails(profile)
+                          }}
                           className="gap-1"
                         >
                           <Eye className="h-4 w-4" />

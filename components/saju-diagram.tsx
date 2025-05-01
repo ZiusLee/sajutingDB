@@ -46,6 +46,11 @@ export default function SajuDiagram({
 
   // 텍스트 색상만 추출하는 함수
   const getTextColorClass = (elementColorClass: string) => {
+    // Check if elementColorClass is undefined or null
+    if (!elementColorClass) {
+      return "text-gray-800 dark:text-gray-300"
+    }
+
     // 텍스트 색상 클래스만 추출 (text-xxx-xxx 형식)
     const textColorMatch = elementColorClass.match(/text-[a-z]+-[0-9]+/)
     return textColorMatch ? textColorMatch[0] : "text-gray-800 dark:text-gray-300"
@@ -83,26 +88,28 @@ export default function SajuDiagram({
 
   // 간의 오행 색상 가져오기
   const getStemColor = (stem: string) => {
-    if (stem === "?") return elementColors.unknown
-    return elementColors[stemElements[stem as keyof typeof stemElements]]
+    if (stem === "?" || !stem) return elementColors.unknown
+    return elementColors[stemElements[stem as keyof typeof stemElements] || "unknown"]
   }
 
   // 지의 오행 색상 가져오기
   const getBranchColor = (branch: string) => {
-    if (branch === "?") return elementColors.unknown
-    return elementColors[branchElements[branch as keyof typeof branchElements]]
+    if (branch === "?" || !branch) return elementColors.unknown
+    return elementColors[branchElements[branch as keyof typeof branchElements] || "unknown"]
   }
 
   // 간의 오행 텍스트 색상 가져오기
   const getStemTextColor = (stem: string) => {
-    if (stem === "?") return getTextColorClass(elementColors.unknown)
-    return getTextColorClass(elementColors[stemElements[stem as keyof typeof stemElements]])
+    if (stem === "?" || !stem) return getTextColorClass(elementColors.unknown)
+    const element = stemElements[stem as keyof typeof stemElements]
+    return getTextColorClass(elementColors[element || "unknown"])
   }
 
   // 지의 오행 텍스트 색상 가져오기
   const getBranchTextColor = (branch: string) => {
-    if (branch === "?") return getTextColorClass(elementColors.unknown)
-    return getTextColorClass(elementColors[branchElements[branch as keyof typeof branchElements]])
+    if (branch === "?" || !branch) return getTextColorClass(elementColors.unknown)
+    const element = branchElements[branch as keyof typeof branchElements]
+    return getTextColorClass(elementColors[element || "unknown"])
   }
 
   // 십이지지 동물 이름
