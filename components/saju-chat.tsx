@@ -136,27 +136,26 @@ ${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 음(陰)�
 }
 
 // 채팅방 유형별 제목
-const getRoomTitle = (roomType: string): string => {
+function getRoomTitle(roomType: string): string {
   switch (roomType) {
-    case "career":
-      return "직업운"
-    case "love":
-      return "애정운"
-    case "health":
-      return "건강운"
-    case "yearly":
-      return "올해운 상담"
-    case "business":
-      return "사업운"
-    case "marriage":
-      return "결혼운"
-    case "personalized":
-      return "고민상담"
-    case "daily-fortune":
-      return "오늘의 운세"
     case "general":
+      return "일반 상담"
+    case "career":
+      return "직업/진로 상담"
+    case "marriage":
+      return "결혼/연애 상담"
+    case "health":
+      return "건강 상담"
+    case "business":
+      return "사업운 상담"
+    case "fitness":
+      return "운동코치 치코쌤"
+    case "diet":
+      return "식단코치 단식쌤"
+    case "cheerup":
+      return "응원냥이 치즈"
     default:
-      return "사주 채팅 상담"
+      return "사주 상담"
   }
 }
 
@@ -210,6 +209,75 @@ const getModelBadgeText = (roomType: string): string | null => {
     default:
       return null
   }
+}
+
+// Update the getInitialMessage function to include initial messages for the new room types
+function getInitialMessage(roomType: string): string {
+  switch (roomType) {
+    case "general":
+      return "안녕하세요! 사주와 관련된 질문이 있으신가요?"
+    case "career":
+      return "안녕하세요! 직업이나 진로에 관한 상담을 도와드릴게요."
+    case "marriage":
+      return "안녕하세요! 결혼이나 연애에 관한 상담을 도와드릴게요."
+    case "health":
+      return "안녕하세요! 건강에 관한 상담을 도와드릴게요."
+    case "business":
+      return "안녕하세요! 사업이나 재테크에 관한 상담을 도와드릴게요."
+    case "fitness":
+      return "안녕하세요! 운동코치 치코쌤입니다. 운동과 피트니스에 관한 상담을 도와드릴게요. 어떤 운동 목표가 있으신가요?"
+    case "diet":
+      return "안녕하세요! 식단코치 단식쌤입니다. 건강한 식단과 영양에 관한 상담을 도와드릴게요. 어떤 식단 목표가 있으신가요?"
+    case "cheerup":
+      return "안녕하냥! 응원냥이 치즈예요! 오늘 힘든 일이 있었나요? 무슨 일이든 털어놓으세요, 제가 응원해드릴게요!"
+    default:
+      return "안녕하세요! 무엇을 도와드릴까요?"
+  }
+}
+
+// Update the getSpecializedModelBadge function to include badges for the new room types
+function getSpecializedModelBadge(roomType: string): React.ReactNode {
+  const specializedRoomTypes = ["career", "marriage", "health", "business", "fitness", "diet", "cheerup"]
+
+  if (!specializedRoomTypes.includes(roomType)) {
+    return null
+  }
+
+  let badgeText = ""
+  let badgeColor = ""
+
+  switch (roomType) {
+    case "career":
+      badgeText = "직업 특화 모델"
+      badgeColor = "bg-blue-500"
+      break
+    case "marriage":
+      badgeText = "연애 특화 모델"
+      badgeColor = "bg-pink-500"
+      break
+    case "health":
+      badgeText = "건강 특화 모델"
+      badgeColor = "bg-green-500"
+      break
+    case "business":
+      badgeText = "사업 특화 모델"
+      badgeColor = "bg-amber-500"
+      break
+    case "fitness":
+      badgeText = "운동 특화 모델"
+      badgeColor = "bg-purple-500"
+      break
+    case "diet":
+      badgeText = "식단 특화 모델"
+      badgeColor = "bg-emerald-500"
+      break
+    case "cheerup":
+      badgeText = "응원 특화 모델"
+      badgeColor = "bg-rose-500"
+      break
+  }
+
+  return <span className={`${badgeColor} text-white text-xs px-2 py-1 rounded-full ml-2`}>{badgeText}</span>
 }
 
 export default function SajuChat({

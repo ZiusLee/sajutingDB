@@ -44,7 +44,7 @@ export default function SajuDiagram({
     unknown: "bg-gray-100 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-300 dark:text-gray-100",
   }
 
-  // 텍스트 색상만 추출하는 함수
+  // 텍스트 색상�� 추출하는 함수
   const getTextColorClass = (elementColorClass: string) => {
     // Check if elementColorClass is undefined or null
     if (!elementColorClass) {

@@ -4,21 +4,7 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import {
-  ArrowLeft,
-  MessageCircle,
-  Calendar,
-  Briefcase,
-  Heart,
-  Activity,
-  TrendingUp,
-  BellRing,
-  Sparkles,
-  Brain,
-  Compass,
-  Lightbulb,
-  Loader2,
-} from "lucide-react"
+import { ArrowLeft, MessageCircle, Calendar, Briefcase, Heart, Activity, TrendingUp, BellRing, Sparkles, Brain, Compass, Lightbulb, Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -480,7 +466,7 @@ export default function ChatListClient() {
     // Create a session identifier for this specific user
     const sessionIdentifier = `${chatData.name}_${chatData.saju.year}${chatData.saju.month}${chatData.saju.day}_${chatData.gender}`
 
-    // 채팅 페이지로 이동하��서 선택한 채팅방 유형 전달
+    // 채팅 페이지로 이동하서 선택한 채팅방 유형 전달
     try {
       // Store the current saju data in localStorage
       localStorage.setItem(
@@ -536,6 +522,63 @@ export default function ChatListClient() {
       router.push("/")
     }
   }
+
+  // Update the ChatListClient component to include the new chat rooms
+
+  // Find the section where chat room options are defined and update it to include the new rooms
+  // This might look something like:
+
+  // Replace or update the chatRoomOptions array with:
+  const chatRoomOptions = [
+    {
+      id: "general",
+      name: "일반 상담",
+      description: "사주와 관련된 일반적인 질문을 할 수 있습니다.",
+      icon: "💬",
+    },
+    {
+      id: "career",
+      name: "직업/진로",
+      description: "직업, 진로, 취업에 관한 상담을 할 수 있습니다.",
+      icon: "💼",
+    },
+    {
+      id: "marriage",
+      name: "결혼/연애",
+      description: "결혼, 연애, 인간관계에 관한 상담을 할 수 있습니다.",
+      icon: "💕",
+    },
+    {
+      id: "health",
+      name: "건강",
+      description: "건강, 체질, 질병에 관한 상담을 할 수 있습니다.",
+      icon: "🏥",
+    },
+    {
+      id: "business",
+      name: "사업운",
+      description: "사업, 재테크, 투자에 관한 상담을 할 수 있습니다.",
+      icon: "💰",
+    },
+    {
+      id: "fitness",
+      name: "운동코치 치코쌤",
+      description: "운동, 피트니스에 관한 상담을 할 수 있습니다.",
+      icon: "💪",
+    },
+    {
+      id: "diet",
+      name: "식단코치 단식쌤",
+      description: "식단, 영양에 관한 상담을 할 수 있습니다.",
+      icon: "🥗",
+    },
+    {
+      id: "cheerup",
+      name: "응원냥이 치즈",
+      description: "힘든 일이 있을 때 위로와 응원을 받을 수 있습니다.",
+      icon: "😺",
+    },
+  ]
 
   return (
     <div className="flex flex-col h-screen bg-background">

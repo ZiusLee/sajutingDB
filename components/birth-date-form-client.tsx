@@ -395,7 +395,7 @@ export default function BirthDateFormClient() {
       hour = Number.parseInt(input.substring(0, 2), 10)
       minute = Number.parseInt(input.substring(2), 10)
     }
-    // 1-2자리 숫자인 경우 (예: "23")
+    // 1-2자리 숫자인 ���우 (예: "23")
     else {
       hour = Number.parseInt(input, 10)
       minute = 0

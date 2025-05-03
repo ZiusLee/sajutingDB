@@ -688,7 +688,7 @@ export default function AdditionalQuestions({
                               className="h-4 w-4 rounded border-gray-300 text-pink-500"
                             />
                             <Label htmlFor="timeUnknown" className="text-sm font-normal cursor-pointer">
-                              시간 모름
+                              ���간 모름
                             </Label>
                           </div>
                         </div>
