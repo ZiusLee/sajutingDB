@@ -4,6 +4,20 @@ import { solarToLunar } from "@/lib/lunar-calendar"
 
 export const runtime = "edge"
 
+// Add a function to select the appropriate model based on room type
+function getModelForRoomType(roomType: string): string {
+  switch (roomType) {
+    case "career":
+      return "ft:gpt-4.1-mini-2025-04-14:towinai::BSGiM5km"
+    case "marriage":
+      return "ft:gpt-4.1-mini-2025-04-14:towinai:marriage:BSGijgJ5"
+    case "health":
+      return "ft:gpt-4.1-mini-2025-04-14:towinai:health:BSGjioE0"
+    default:
+      return "gpt-4o" // Default model for other room types
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { messages, saju, name, gender, initialInterpretation, roomType, userId } = await req.json()
@@ -36,7 +50,7 @@ export async function POST(req: Request) {
     const sajuInfo = JSON.stringify(saju, null, 2)
 
     // 모델 선택 및 시스템 메시지 설정
-    let model = openai("gpt-4.1-mini") // 기본 모델은 gpt-4.1-mini
+    let model = openai(getModelForRoomType(roomType)) // 기본 모델은 gpt-4.1-mini
     let systemMessage = ""
     let apiMessages = []
 

@@ -198,6 +198,20 @@ const generateChatSessionKey = (name: string, saju: any, roomType: string) => {
   return `chat_${name}_${birthYear}${birthMonth}${birthDay}${birthHour}_${gender}_${roomType}`
 }
 
+// Add a function to get model badge text based on room type
+const getModelBadgeText = (roomType: string): string | null => {
+  switch (roomType) {
+    case "career":
+      return "전문 직업 상담 모델"
+    case "marriage":
+      return "전문 결혼 상담 모델"
+    case "health":
+      return "전문 건강 상담 모델"
+    default:
+      return null
+  }
+}
+
 export default function SajuChat({
   saju,
   name,
@@ -696,7 +710,14 @@ export default function SajuChat({
         <Button variant="ghost" size="icon" onClick={handleBackWithSave} className="mr-2">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle className="text-lg">{getRoomTitle(roomType)}</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-lg">{getRoomTitle(roomType)}</CardTitle>
+          {getModelBadgeText(roomType) && (
+            <span className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs px-2 py-0.5 rounded-full">
+              {getModelBadgeText(roomType)}
+            </span>
+          )}
+        </div>
         <Button variant="ghost" size="sm" onClick={() => setShowSajuInfo(!showSajuInfo)}>
           사주도표
           {showSajuInfo ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
