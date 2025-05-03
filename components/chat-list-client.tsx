@@ -21,7 +21,7 @@ import {
   Dumbbell,
   Utensils,
   Cat,
-} from "lucide-icon"
+} from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -627,9 +627,6 @@ export default function ChatListClient() {
                 <AvatarFallback className={`${room.color} text-white`}>{room.icon}</AvatarFallback>
               </Avatar>
 
-              <div  text-white`}>{room.icon}</AvatarFallback>
-              </Avatar>
-
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline">
                   <h3 className="font-medium truncate">
@@ -661,44 +658,40 @@ export default function ChatListClient() {
                       </svg>
                       {room.lastMessage}
                     </span>
-                  )
-  : (
+                  ) : (
                     room.lastMessage
-                  )
-}
-</p>
+                  )}
+                </p>
               </div>
 
-{
-  room.unread && (
-    <div className="ml-2 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">N</div>
-  )
-}
-</div>
+              {room.unread && (
+                <div className="ml-2 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
+                  N
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
 
-{
-  /* 로그인 경고 다이얼로그 */
-}
-;<Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>데이터 저장 안내</DialogTitle>
-      <DialogDescription>
-        이 페이지를 나가면 지금까지의 사주 데이터가 저장되지 않을 수 있습니다. 데이터를 안전하게 저장하려면 로그인이
-        필요합니다.
-      </DialogDescription>
-    </DialogHeader>
-    <DialogFooter className="flex flex-col sm:flex-row gap-2">
-      <Button variant="outline" onClick={continueWithoutLogin}>
-        \ 계속 진행하기
-      </Button>
-      <Button onClick={goToLogin}>로그인하기</Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-</div>
+      {/* 로그인 경고 다이얼로그 */}
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>데이터 저장 안내</DialogTitle>
+            <DialogDescription>
+              이 페이지를 나가면 지금까지의 사주 데이터가 저장되지 않을 수 있습니다. 데이터를 안전하게 저장하려면
+              로그인이 필요합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={continueWithoutLogin}>
+              계속 진행하기
+            </Button>
+            <Button onClick={goToLogin}>로그인하기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
