@@ -73,7 +73,8 @@
     "openai": "latest",
     "jsonwebtoken": "latest",
     "bcryptjs": "latest",
-    "@ai-sdk/deepseek": "latest"
+    "@ai-sdk/deepseek": "latest",
+    "lucide-icon": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

@@ -4,7 +4,24 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, MessageCircle, Calendar, Briefcase, Heart, Activity, TrendingUp, BellRing, Sparkles, Brain, Compass, Lightbulb, Loader2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  MessageCircle,
+  Calendar,
+  Briefcase,
+  Heart,
+  Activity,
+  TrendingUp,
+  BellRing,
+  Sparkles,
+  Brain,
+  Compass,
+  Lightbulb,
+  Loader2,
+  Dumbbell,
+  Utensils,
+  Cat,
+} from "lucide-icon"
 import {
   Dialog,
   DialogContent,
@@ -336,6 +353,56 @@ export default function ChatListClient() {
           unread: savedChatData.health?.messages?.length > 0,
           color: "bg-green-500",
         },
+        // 새로운 채팅방: 운동코치 치코쌤
+        {
+          id: "fitness",
+          title: "운동코치 치코쌤",
+          description: "운동, 피트니스에 관한 상담",
+          icon: <Dumbbell className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.fitness?.messages?.length > 1
+              ? savedChatData.fitness.messages[savedChatData.fitness.messages.length - 1].content.substring(0, 30) +
+                "..."
+              : "오늘은 어떤 운동을 해볼까요? 함께 시작해봐요!",
+          time: savedChatData.fitness?.lastMessageTime
+            ? new Date(savedChatData.fitness.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 45), // 45분 전
+          unread: savedChatData.fitness?.messages?.length > 0,
+          color: "bg-purple-500",
+        },
+        // 새로운 채팅방: 식단코치 단식쌤
+        {
+          id: "diet",
+          title: "식단코치 단식쌤",
+          description: "식단, 영양에 관한 상담",
+          icon: <Utensils className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.diet?.messages?.length > 1
+              ? savedChatData.diet.messages[savedChatData.diet.messages.length - 1].content.substring(0, 30) + "..."
+              : "건강한 식단으로 활기찬 하루를 시작해볼까요?",
+          time: savedChatData.diet?.lastMessageTime
+            ? new Date(savedChatData.diet.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 50), // 50분 전
+          unread: savedChatData.diet?.messages?.length > 0,
+          color: "bg-emerald-500",
+        },
+        // 새로운 채팅방: 응원냥이 치즈
+        {
+          id: "cheerup",
+          title: "응원냥이 치즈",
+          description: "위로와 응원이 필요할 때",
+          icon: <Cat className="h-5 w-5" />,
+          lastMessage:
+            savedChatData.cheerup?.messages?.length > 1
+              ? savedChatData.cheerup.messages[savedChatData.cheerup.messages.length - 1].content.substring(0, 30) +
+                "..."
+              : "힘든 일이 있으신가요? 치즈가 응원해드릴게요!",
+          time: savedChatData.cheerup?.lastMessageTime
+            ? new Date(savedChatData.cheerup.lastMessageTime)
+            : new Date(Date.now() - 1000 * 60 * 55), // 55분 전
+          unread: savedChatData.cheerup?.messages?.length > 0,
+          color: "bg-rose-500",
+        },
         {
           id: "compatibility",
           title: "속궁합 풀이",
@@ -523,63 +590,6 @@ export default function ChatListClient() {
     }
   }
 
-  // Update the ChatListClient component to include the new chat rooms
-
-  // Find the section where chat room options are defined and update it to include the new rooms
-  // This might look something like:
-
-  // Replace or update the chatRoomOptions array with:
-  const chatRoomOptions = [
-    {
-      id: "general",
-      name: "일반 상담",
-      description: "사주와 관련된 일반적인 질문을 할 수 있습니다.",
-      icon: "💬",
-    },
-    {
-      id: "career",
-      name: "직업/진로",
-      description: "직업, 진로, 취업에 관한 상담을 할 수 있습니다.",
-      icon: "💼",
-    },
-    {
-      id: "marriage",
-      name: "결혼/연애",
-      description: "결혼, 연애, 인간관계에 관한 상담을 할 수 있습니다.",
-      icon: "💕",
-    },
-    {
-      id: "health",
-      name: "건강",
-      description: "건강, 체질, 질병에 관한 상담을 할 수 있습니다.",
-      icon: "🏥",
-    },
-    {
-      id: "business",
-      name: "사업운",
-      description: "사업, 재테크, 투자에 관한 상담을 할 수 있습니다.",
-      icon: "💰",
-    },
-    {
-      id: "fitness",
-      name: "운동코치 치코쌤",
-      description: "운동, 피트니스에 관한 상담을 할 수 있습니다.",
-      icon: "💪",
-    },
-    {
-      id: "diet",
-      name: "식단코치 단식쌤",
-      description: "식단, 영양에 관한 상담을 할 수 있습니다.",
-      icon: "🥗",
-    },
-    {
-      id: "cheerup",
-      name: "응원냥이 치즈",
-      description: "힘든 일이 있을 때 위로와 응원을 받을 수 있습니다.",
-      icon: "😺",
-    },
-  ]
-
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* 헤더 */}
@@ -617,6 +627,9 @@ export default function ChatListClient() {
                 <AvatarFallback className={`${room.color} text-white`}>{room.icon}</AvatarFallback>
               </Avatar>
 
+              <div  text-white`}>{room.icon}</AvatarFallback>
+              </Avatar>
+
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline">
                   <h3 className="font-medium truncate">
@@ -648,40 +661,44 @@ export default function ChatListClient() {
                       </svg>
                       {room.lastMessage}
                     </span>
-                  ) : (
+                  )
+  : (
                     room.lastMessage
-                  )}
-                </p>
+                  )
+}
+</p>
               </div>
 
-              {room.unread && (
-                <div className="ml-2 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
-                  N
-                </div>
-              )}
-            </div>
+{
+  room.unread && (
+    <div className="ml-2 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">N</div>
+  )
+}
+</div>
           ))}
         </div>
       )}
 
-      {/* 로그인 경고 다이얼로그 */}
-      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>데이터 저장 안내</DialogTitle>
-            <DialogDescription>
-              이 페이지를 나가면 지금까지의 사주 데이터가 저장되지 않을 수 있습니다. 데이터를 안전하게 저장하려면
-              로그인이 필요합니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={continueWithoutLogin}>
-              계속 진행하기
-            </Button>
-            <Button onClick={goToLogin}>로그인하기</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+{
+  /* 로그인 경고 다이얼로그 */
+}
+;<Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>데이터 저장 안내</DialogTitle>
+      <DialogDescription>
+        이 페이지를 나가면 지금까지의 사주 데이터가 저장되지 않을 수 있습니다. 데이터를 안전하게 저장하려면 로그인이
+        필요합니다.
+      </DialogDescription>
+    </DialogHeader>
+    <DialogFooter className="flex flex-col sm:flex-row gap-2">
+      <Button variant="outline" onClick={continueWithoutLogin}>
+        \ 계속 진행하기
+      </Button>
+      <Button onClick={goToLogin}>로그인하기</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+</div>
   )
 }
