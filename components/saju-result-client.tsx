@@ -17,6 +17,7 @@ import AdditionalQuestions from "./additional-questions"
 // 추가: useSearchParams 임포트
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
+import DaeunDiagram from "./daeun-diagram"
 
 interface SajuResultClientProps {
   saju: Saju
@@ -338,6 +339,18 @@ ${interpretation}
                   location={location}
                 />
 
+                {/* 대운 다이어그램 추가 */}
+                <DaeunDiagram
+                  saju={saju}
+                  gender={normalizedGender}
+                  solarYear={solarYear}
+                  solarMonth={solarMonth}
+                  solarDay={solarDay}
+                  hour={hour}
+                  minute={minute}
+                  timeUnknown={timeUnknown}
+                />
+
                 {/* Add chat button to diagram tab - Mobile */}
                 <div className="mt-6">
                   <Button className="w-full flex items-center justify-center gap-2" onClick={navigateToChatList}>
@@ -528,6 +541,18 @@ ${interpretation}
                   lunarMonth={lunarMonth}
                   lunarDay={lunarDay}
                   location={location}
+                />
+
+                {/* 대운 다이어그램 추가 */}
+                <DaeunDiagram
+                  saju={saju}
+                  gender={normalizedGender}
+                  solarYear={solarYear}
+                  solarMonth={solarMonth}
+                  solarDay={solarDay}
+                  hour={hour}
+                  minute={minute}
+                  timeUnknown={timeUnknown}
                 />
 
                 {/* Add chat button to diagram tab - Desktop */}

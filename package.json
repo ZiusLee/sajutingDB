@@ -69,7 +69,6 @@
     "pg": "latest",
     "uuid": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
-    "fast-xml-parser": "latest",
     "openai": "latest",
     "jsonwebtoken": "latest",
     "bcryptjs": "latest",

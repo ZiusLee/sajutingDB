@@ -1,5 +1,7 @@
 "use client"
 
+import { solarToLunar } from "./lunar-calendar"
+
 export async function getAdditionalInterpretation(
   saju: any,
   name: string,
@@ -58,19 +60,52 @@ export async function getCompatibilityAnalysis(userInfo: any, partnerInfo: any, 
 // Function to fetch lunar date information
 export async function fetchLunarDate(year: string, month: string, day: string) {
   try {
-    console.log(`Fetching lunar date for ${year}-${month}-${day}`)
-    const response = await fetch(`/api/lunar-date?year=${year}&month=${month}&day=${day}`)
+    console.log(`Getting lunar date for ${year}-${month}-${day}`)
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch lunar date: ${response.statusText}`)
+    // 로컬 계산 먼저 수행
+    const yearNum = Number.parseInt(year)
+    const monthNum = Number.parseInt(month)
+    const dayNum = Number.parseInt(day)
+
+    // 로컬 계산 결과
+    const lunarDate = solarToLunar(yearNum, monthNum, dayNum)
+
+    const localResult = {
+      year: lunarDate.year.toString(),
+      month: lunarDate.month.toString().padStart(2, "0"),
+      day: lunarDate.day.toString().padStart(2, "0"),
+      isLeapMonth: lunarDate.isLeapMonth,
+      monthStem: lunarDate.monthStem,
+      monthBranch: lunarDate.monthBranch,
     }
 
-    const lunarData = await response.json()
-    console.log("Lunar data response:", lunarData)
-    return lunarData
+    console.log("Calculated lunar date locally:", localResult)
+    return localResult
+
+    // API 호출 코드는 제거하고 로컬 계산만 사용
   } catch (error) {
-    console.error("Error fetching lunar date:", error)
-    throw error
+    console.error("Error calculating lunar date:", error)
+
+    // 오류 발생 시에도 기본 로컬 계산 시도
+    try {
+      const yearNum = Number.parseInt(year)
+      const monthNum = Number.parseInt(month)
+      const dayNum = Number.parseInt(day)
+
+      const lunarDate = solarToLunar(yearNum, monthNum, dayNum)
+
+      return {
+        year: lunarDate.year.toString(),
+        month: lunarDate.month.toString().padStart(2, "0"),
+        day: lunarDate.day.toString().padStart(2, "0"),
+        isLeapMonth: lunarDate.isLeapMonth,
+        monthStem: lunarDate.monthStem,
+        monthBranch: lunarDate.monthBranch,
+      }
+    } catch (fallbackError) {
+      console.error("Critical error in lunar calculation:", fallbackError)
+      throw new Error("Failed to calculate lunar date")
+    }
   }
 }
 
@@ -259,7 +294,7 @@ export async function getSajuInterpretation(
 
 ## 기본적인 해석:
 - 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
-- 오행의 균형에 따라 삶의 방향성��� 달라질 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
 - 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
 
 ## 오류 정보:

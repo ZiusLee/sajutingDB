@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { fetchLunarDate } from "@/lib/api-client"
 import { calculateSaju } from "@/lib/saju"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -135,12 +134,7 @@ export default function BirthDateFormClient() {
       let lunarData
 
       try {
-        // 음력 날짜 정보 가져오기 (API 호출)
-        lunarData = await fetchLunarDate(year, month, day)
-      } catch (apiError) {
-        console.error("API error, falling back to local calculation:", apiError)
-
-        // API 호출 실패 시 로컬 계산으로 대체
+        // 로컬 계산 사용 (API 호출 없음)
         const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
 
         lunarData = {
@@ -151,6 +145,13 @@ export default function BirthDateFormClient() {
           monthStem: localLunarDate.monthStem,
           monthBranch: localLunarDate.monthBranch,
         }
+
+        console.log("Using local lunar calculation:", lunarData)
+      } catch (calcError) {
+        console.error("Error in local lunar calculation:", calcError)
+        setError("음력 날짜 계산 중 오류가 발생했습니다. 다시 시도해주세요.")
+        setIsSubmitting(false)
+        return
       }
 
       setLunarDate(lunarData)
@@ -395,7 +396,7 @@ export default function BirthDateFormClient() {
       hour = Number.parseInt(input.substring(0, 2), 10)
       minute = Number.parseInt(input.substring(2), 10)
     }
-    // 1-2자리 숫자인 ���우 (예: "23")
+    // 1-2자리 숫자인 우 (예: "23")
     else {
       hour = Number.parseInt(input, 10)
       minute = 0

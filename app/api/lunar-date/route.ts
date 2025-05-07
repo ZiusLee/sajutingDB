@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getLunarDate } from "@/lib/api"
 import { solarToLunar } from "@/lib/lunar-calendar"
 
 export async function GET(request: NextRequest) {
@@ -14,23 +13,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
     }
 
-    console.log(`Fetching lunar date for ${year}-${month}-${day}`)
-    const lunarDate = await getLunarDate(year, month, day)
+    console.log(`Calculating lunar date for ${year}-${month}-${day}`)
 
-    if (!lunarDate) {
-      console.warn("API failed, using local calculation")
-      const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
+    // 로컬 계산만 사용
+    const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
 
-      return NextResponse.json({
-        year: localLunarDate.year.toString(),
-        month: localLunarDate.month.toString().padStart(2, "0"),
-        day: localLunarDate.day.toString().padStart(2, "0"),
-        isLeapMonth: localLunarDate.isLeapMonth,
-      })
+    const result = {
+      year: localLunarDate.year.toString(),
+      month: localLunarDate.month.toString().padStart(2, "0"),
+      day: localLunarDate.day.toString().padStart(2, "0"),
+      isLeapMonth: localLunarDate.isLeapMonth,
+      monthStem: localLunarDate.monthStem,
+      monthBranch: localLunarDate.monthBranch,
     }
 
-    console.log("Lunar date result:", lunarDate)
-    return NextResponse.json(lunarDate)
+    console.log("Lunar date result (local calculation):", result)
+    return NextResponse.json(result)
   } catch (error: any) {
     console.error("Error in API route:", error)
     return NextResponse.json(
