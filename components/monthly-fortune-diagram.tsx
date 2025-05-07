@@ -43,7 +43,9 @@ export default function MonthlyFortuneDiagram({ year }: MonthlyFortuneDiagramPro
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex justify-between items-center">
           <span>월운(月運) 흐름</span>
-          <span className="text-sm font-normal text-muted-foreground">{year}년</span>
+          <span className="text-sm font-normal text-muted-foreground">
+            <span className={year === getCurrentYear() ? "" : "font-medium text-foreground"}>{year}년</span>
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent>

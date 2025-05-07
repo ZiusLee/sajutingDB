@@ -42,6 +42,8 @@ export default function DaeunDiagram({
   const [selectedDaeunIndex, setSelectedDaeunIndex] = useState<number | null>(null)
   const [debugInfo, setDebugInfo] = useState<string>("")
   const [birthYear, setBirthYear] = useState<number | null>(null)
+  // 상태 변수 추가: selectedYear
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
 
   useEffect(() => {
     try {
@@ -126,7 +128,16 @@ export default function DaeunDiagram({
     return { startYear, endYear }
   }
 
+  // getSelectedYearRange 함수 아래에 handleYearSelect 함수 추가
+  const handleYearSelect = (year: number) => {
+    setSelectedYear(year)
+  }
+
   const { startYear, endYear } = getSelectedYearRange()
+
+  const handleDaeunSelect = (index: number) => {
+    setSelectedDaeunIndex(index)
+  }
 
   return (
     <>
@@ -147,13 +158,9 @@ export default function DaeunDiagram({
                   <div
                     key={index}
                     className={`p-2 rounded-md cursor-pointer hover:bg-primary/5 ${
-                      index === currentDaeunIndex ? "bg-primary/10 border border-primary/30" : ""
-                    } ${
-                      selectedDaeunIndex === index && index !== currentDaeunIndex
-                        ? "bg-secondary/10 border border-secondary/30"
-                        : ""
+                      selectedDaeunIndex === index ? "bg-primary/10 border border-primary/30" : ""
                     }`}
-                    onClick={() => setSelectedDaeunIndex(index)}
+                    onClick={() => handleDaeunSelect(index)}
                   >
                     <div className="text-lg font-semibold">
                       <span className={`${getStemColor(pillar.stem)} mr-1`}>{pillar.stemKorean}</span>
@@ -168,13 +175,9 @@ export default function DaeunDiagram({
                   <div
                     key={index}
                     className={`p-1 cursor-pointer hover:bg-primary/5 ${
-                      index === currentDaeunIndex ? "font-medium" : "text-muted-foreground"
-                    } ${
-                      selectedDaeunIndex === index && index !== currentDaeunIndex
-                        ? "font-medium text-secondary-foreground"
-                        : ""
+                      selectedDaeunIndex === index ? "font-medium text-foreground" : "text-muted-foreground"
                     }`}
-                    onClick={() => setSelectedDaeunIndex(index)}
+                    onClick={() => handleDaeunSelect(index)}
                   >
                     <div>
                       {pillar.startAge}~{pillar.endAge}세
@@ -217,11 +220,13 @@ export default function DaeunDiagram({
           endYear={endYear}
           birthYear={birthYear || undefined}
           selectedDaeunIndex={selectedDaeunIndex}
+          onYearSelect={handleYearSelect}
+          selectedYear={selectedYear}
         />
       )}
 
       {/* 현재 연도의 월운 다이어그램 */}
-      {selectedDaeunIndex !== null && startYear > 0 && <MonthlyFortuneDiagram year={new Date().getFullYear()} />}
+      {selectedDaeunIndex !== null && startYear > 0 && <MonthlyFortuneDiagram year={selectedYear} />}
     </>
   )
 }

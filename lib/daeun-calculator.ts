@@ -165,7 +165,7 @@ export function calculateDaeunPillars(
       stem: STEMS[0],
       branch: BRANCHES[0],
       stemHanja: STEMS[0],
-      branchHanja: BRANCHES[0],
+      branchHanja: STEMS[0],
       stemKorean: KR_STEMS[0],
       branchKorean: KR_BRANCHES[0],
     })
@@ -391,10 +391,10 @@ export function getCurrentDaeunIndex(
   return 0 // 기본값
 }
 
-// 현재 나이 계산 (한국식)
+// 현재 나이 계산 (만나이)
 export function calculateKoreanAge(birthYear: number): number {
   const currentYear = new Date().getFullYear()
-  return currentYear - birthYear + 1
+  return currentYear - birthYear
 }
 
 // 디버그 함수 - 대운세수 계산 과정 출력

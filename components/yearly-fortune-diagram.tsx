@@ -14,6 +14,8 @@ interface YearlyFortuneDiagramProps {
   endYear: number
   birthYear?: number
   selectedDaeunIndex?: number
+  onYearSelect?: (year: number) => void
+  selectedYear?: number
 }
 
 export default function YearlyFortuneDiagram({
@@ -21,6 +23,8 @@ export default function YearlyFortuneDiagram({
   endYear,
   birthYear,
   selectedDaeunIndex = 0,
+  onYearSelect,
+  selectedYear = getCurrentYear(),
 }: YearlyFortuneDiagramProps) {
   const [yearlyFortunes, setYearlyFortunes] = useState<any[]>([])
   const [currentYear, setCurrentYear] = useState<number>(getCurrentYear())
@@ -30,6 +34,12 @@ export default function YearlyFortuneDiagram({
     const fortunes = calculateYearlyFortune(startYear, endYear)
     setYearlyFortunes(fortunes)
   }, [startYear, endYear])
+
+  const handleYearClick = (year: number) => {
+    if (onYearSelect) {
+      onYearSelect(year)
+    }
+  }
 
   if (yearlyFortunes.length === 0) {
     return (
@@ -61,9 +71,10 @@ export default function YearlyFortuneDiagram({
               {yearlyFortunes.map((fortune, index) => (
                 <div
                   key={index}
-                  className={`p-2 rounded-md ${
-                    fortune.year === currentYear ? "bg-primary/10 border border-primary/30" : ""
+                  className={`p-2 rounded-md cursor-pointer hover:bg-primary/5 ${
+                    fortune.year === selectedYear ? "bg-primary/10 border border-primary/30" : ""
                   }`}
+                  onClick={() => handleYearClick(fortune.year)}
                 >
                   <div className="text-lg font-semibold">
                     <span className={`${getStemElementColor(fortune.stem)} mr-1`}>{fortune.stemKorean}</span>
@@ -77,10 +88,13 @@ export default function YearlyFortuneDiagram({
               {yearlyFortunes.map((fortune, index) => (
                 <div
                   key={index}
-                  className={`p-1 ${fortune.year === currentYear ? "font-medium" : "text-muted-foreground"}`}
+                  className={`p-1 cursor-pointer hover:bg-primary/5 ${
+                    fortune.year === selectedYear ? "font-medium text-foreground" : "text-muted-foreground"
+                  }`}
+                  onClick={() => handleYearClick(fortune.year)}
                 >
                   <div>{fortune.year}년</div>
-                  <div className="text-xs">{birthYear ? `${fortune.year - birthYear + 1}세` : ""}</div>
+                  <div className="text-xs">{birthYear ? `${fortune.year - birthYear}세` : ""}</div>
                 </div>
               ))}
             </div>
@@ -91,7 +105,7 @@ export default function YearlyFortuneDiagram({
 
         <div className="text-xs text-muted-foreground space-y-1">
           <p>※ 세운은 해당 연도의 운세를 나타냅니다.</p>
-          <p>※ 현재 연도는 강조 표시됩니다.</p>
+          <p>※ 연도를 클릭하면 해당 연도의 월운을 확인할 수 있습니다.</p>
           <p>※ 대운과 세운을 함께 고려하면 더 정확한 운세를 파악할 수 있습니다.</p>
         </div>
       </CardContent>
