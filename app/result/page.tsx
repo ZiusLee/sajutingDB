@@ -7,7 +7,6 @@ import SajuResult from "@/components/saju-result"
 import SocialShareButtons from "@/components/social-share-buttons"
 import { BetaSignupForm } from "@/components/beta-signup-form"
 import { getSajuDataByUuid } from "@/lib/saju-session-service"
-import DaeunDiagram from "@/components/daeun-diagram"
 
 export default async function ResultPage({
   searchParams,
@@ -93,18 +92,6 @@ export default async function ResultPage({
                   gender={userData.gender}
                   location={location}
                   interpretation={formattedSaju.interpretation}
-                />
-
-                {/* 대운 다이어그램 추가 */}
-                <DaeunDiagram
-                  saju={formattedSaju}
-                  gender={userData.gender}
-                  solarYear={formattedSaju.year}
-                  solarMonth={formattedSaju.month}
-                  solarDay={formattedSaju.day}
-                  hour={formattedSaju.hour || ""}
-                  minute={formattedSaju.minute || ""}
-                  timeUnknown={false}
                 />
 
                 {/* 소셜미디어 공유 버튼 추가 */}
@@ -212,27 +199,6 @@ export default async function ResultPage({
                   name={name}
                   gender={gender}
                   location={location}
-                />
-
-                {/* 대운 다이어그램 추가 */}
-                <DaeunDiagram
-                  saju={{
-                    yearStem: sajuData.yearStem,
-                    yearBranch: sajuData.yearBranch,
-                    monthStem: sajuData.monthStem,
-                    monthBranch: sajuData.monthBranch,
-                    dayStem: sajuData.dayStem,
-                    dayBranch: sajuData.dayBranch,
-                    hourStem: sajuData.hourStem,
-                    hourBranch: sajuData.hourBranch,
-                  }}
-                  gender={gender}
-                  solarYear={sajuData.year}
-                  solarMonth={sajuData.month}
-                  solarDay={sajuData.day}
-                  hour={sajuData.hour || ""}
-                  minute={sajuData.minute || ""}
-                  timeUnknown={sajuData.timeUnknown || false}
                 />
 
                 {/* 소셜미디어 공유 버튼 추가 */}
@@ -358,18 +324,6 @@ export default async function ResultPage({
                 name={name}
                 gender={gender}
                 location={location}
-              />
-
-              {/* 대운 다이어그램 추가 */}
-              <DaeunDiagram
-                saju={saju}
-                gender={gender}
-                solarYear={solarYear}
-                solarMonth={solarMonth}
-                solarDay={solarDay}
-                hour={hour || ""}
-                minute={minute || ""}
-                timeUnknown={isTimeUnknown}
               />
 
               {/* 소셜미디어 공유 버튼 추가 */}
