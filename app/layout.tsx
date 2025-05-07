@@ -2,13 +2,15 @@ import type React from "react"
 import type { Metadata } from "next"
 import ClientLayout from "./client"
 
+// 메타데이터 제목과 설명을 변경합니다
+
 export const metadata: Metadata = {
-  title: "사주핑 - AI 사주로 보는 애정운",
-  description: "명리학 기반 정밀분석 사주팔자",
+  title: "사주핑 – 무속의 맛, 알고리즘의 향",
+  description: "사주핑 – 무속의 맛, 알고리즘의 향",
   metadataBase: new URL("https://sajuping.ai"),
   openGraph: {
-    title: "사주핑 - AI 사주로 보는 애정운",
-    description: "명리학 기반 정밀���석 사주팔자",
+    title: "사주핑 – 무속의 맛, 알고리즘의 향",
+    description: "사주핑 – 무속의 맛, 알고리즘의 향",
     url: "https://sajuping.ai",
     siteName: "사주핑",
     images: [
@@ -24,8 +26,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "사주핑 - AI 사주로 보는 애정운",
-    description: "명리학 기반 정밀분석 사주팔자",
+    title: "사주핑 – 무속의 맛, 알고리즘의 향",
+    description: "사주핑 – 무속의 맛, 알고리즘의 향",
     images: [
       "https://kuzwrrihvbbwliuotead.supabase.co/storage/v1/object/sign/sajuping/sajuping_character.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJzYWp1cGluZy9zYWp1cGluZ19jaGFyYWN0ZXIucG5nIiwiaWF0IjoxNzQzMDUwOTI0LCJleHAiOjE4Mzc2NTg5MjR9.QPkgNVnK9onLyzlseM_9f0YuDsrwwjKhOOwFFAb6B0A",
     ],
