@@ -121,23 +121,37 @@ export function calculateDaeunAge(
   // 해당 월의 절입일
   const currentSolarTerm = getSolarTerm(birthMonth)
 
-  // 생일이 절입일보다 같거나 늦은 경우
-  if (birthDay >= currentSolarTerm.day) {
+  // 생일이 절입일보다 늦은 경우
+  if (birthDay > currentSolarTerm.day) {
     const dayDiff = daysBetween(birthYear, birthMonth, currentSolarTerm.day, birthYear, birthMonth, birthDay)
     return Math.round(dayDiff / 3)
   }
-  // 생일이 절입일보다 빠른 경우 -> 1세 고정
+  // 생일이 절입일과 같거나 빠른 경우 -> 1세 고정
   else {
     return 1
   }
 }
 
-// 대운 주기 계산 함수
-export function calculateDaeunCycles(daeunAge: number, count = 8): number[] {
+// 대운 주기 계산 함수 - 대운세수에 따라 동적으로 계산
+export function calculateDaeunCycles(daeunAge: number): any[] {
+  // 대운세수가 없으면 기본값 1 사용
+  const daeunAgeValue = daeunAge || 1
+
+  // 대운세수가 10인 경우 특별 처리 (0-9세부터 시작)
+  const startAge = daeunAgeValue === 10 ? 0 : daeunAgeValue
+
+  // 8개의 대운 주기 생성 (각 10년)
   const cycles = []
-  for (let i = 0; i < count; i++) {
-    cycles.push(daeunAge + i * 10)
+  for (let i = 0; i < 8; i++) {
+    // 대운세수가 10인 경우 0, 10, 20, ... 으로 시작
+    // 그 외의 경우 daeunAge, daeunAge+10, daeunAge+20, ... 으로 시작
+    const cycleStartAge = startAge + i * 10
+    cycles.push({
+      startAge: cycleStartAge,
+      endAge: cycleStartAge + 9, // 항상 9년 후에 끝남
+    })
   }
+
   return cycles
 }
 
@@ -165,7 +179,7 @@ export function calculateDaeunPillars(
       stem: STEMS[0],
       branch: BRANCHES[0],
       stemHanja: STEMS[0],
-      branchHanja: STEMS[0],
+      branchHanja: BRANCHES[0],
       stemKorean: KR_STEMS[0],
       branchKorean: KR_BRANCHES[0],
     })
@@ -276,8 +290,8 @@ export function calculateDaeunInfo(
 
   // 대운 간지에 나이 정보 추가
   const pillars = rawPillars.map((pillar, index) => {
-    const startAge = cycles[index]
-    const endAge = index < cycles.length - 1 ? cycles[index + 1] - 1 : startAge + 9
+    const startAge = cycles[index].startAge
+    const endAge = cycles[index].endAge
     const startYear = birthYear + startAge
 
     // 대운 시작 시기 계산 (출생시간이 있는 경우)
@@ -409,13 +423,13 @@ export function debugDaeunCalculation(
   result += `해당 월 절입일: ${birthMonth}월 ${currentSolarTerm.day}일 (${currentSolarTerm.name})\n`
   result += `대운 방향: ${direction === "forward" ? "순행" : "역행"}\n\n`
 
-  if (birthDay >= currentSolarTerm.day) {
+  if (birthDay > currentSolarTerm.day) {
     const dayDiff = daysBetween(birthYear, birthMonth, currentSolarTerm.day, birthYear, birthMonth, birthDay)
-    result += `생일 ≥ 절입일 → (생일 - 절입일) ÷ 3 계산\n`
+    result += `생일 > 절입일 → (생일 - 절입일) ÷ 3 계산\n`
     result += `일수 차이: ${dayDiff}일\n`
     result += `대운세수 계산: ${dayDiff} ÷ 3 = ${Math.round(dayDiff / 3)}세\n`
   } else {
-    result += `생일 < 절입일 → 1세 고정 (명리학 규칙)\n`
+    result += `생일 ≤ 절입일 → 1세 고정 (명리학 규칙)\n`
     result += `대운세수: 1세\n`
   }
 

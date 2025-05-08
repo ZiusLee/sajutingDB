@@ -122,6 +122,48 @@ export default function SajuResultClient({
     }
   }, [interpretation, isLoading])
 
+  // 대운세수 업데이트 이벤트 처리 함수 개선
+  useEffect(() => {
+    // 대운세수 업데이트 이벤트 리스너 추가
+    const handleDaeunAgeUpdate = (event: any) => {
+      // 사주 객체 업데이트
+      const { sajuId, daeunAge } = event.detail
+
+      console.log(`Received daeunAgeUpdated event: sajuId=${sajuId}, daeunAge=${daeunAge}`)
+
+      // 현재 사주 객체 복사
+      const updatedSaju = { ...saju, daeunAge }
+
+      // 로컬 스토리지에 업데이트된 사주 저장
+      try {
+        const sajuKey = `saju_info_${sajuId}`
+        localStorage.setItem(sajuKey, JSON.stringify(updatedSaju))
+      } catch (error) {
+        console.error("Error updating localStorage:", error)
+      }
+
+      // 페이지 리로드 (필요한 경우)
+      // window.location.reload()
+
+      // 또는 상태 업데이트로 컴포넌트 리렌더링 (더 효율적)
+      toast({
+        title: "대운세수 업데이트",
+        description: "대운세수가 업데이트되었습니다. 변경사항을 확인하려면 페이지를 새로고침하세요.",
+        action: (
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            새로고침
+          </Button>
+        ),
+      })
+    }
+
+    window.addEventListener("daeunAgeUpdated", handleDaeunAgeUpdate)
+
+    return () => {
+      window.removeEventListener("daeunAgeUpdated", handleDaeunAgeUpdate)
+    }
+  }, [saju, toast])
+
   const fetchInterpretation = async () => {
     setIsLoading(true)
     setError(null)

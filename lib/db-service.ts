@@ -105,6 +105,7 @@ export async function saveSajuInfo(sajuInfo: {
   dayMaster: string
   dayMasterHanja: string
   yearAnimal: string
+  daeunAge?: number
 }): Promise<string | null> {
   try {
     const { data, error } = await supabase
@@ -130,6 +131,7 @@ export async function saveSajuInfo(sajuInfo: {
         day_master: sajuInfo.dayMaster,
         day_master_hanja: sajuInfo.dayMasterHanja,
         year_animal: sajuInfo.yearAnimal,
+        daeun_age: sajuInfo.daeunAge,
       })
       .select("id")
       .single()
@@ -391,6 +393,25 @@ export async function linkSessionsToAuthUser(userId: string, authUserId: string)
     return true
   } catch (error) {
     console.error("Error in linkSessionsToAuthUser:", error)
+    return false
+  }
+}
+
+/**
+ * Update daeun age for a saju info record
+ */
+export async function updateDaeunAge(sajuId: string, daeunAge: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("saju_info").update({ daeun_age: daeunAge }).eq("id", sajuId)
+
+    if (error) {
+      console.error("Error updating daeun age:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in updateDaeunAge:", error)
     return false
   }
 }

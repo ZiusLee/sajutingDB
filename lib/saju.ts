@@ -131,7 +131,7 @@ const SIBSEONG = {
     무: "겁재",
     기: "비견",
     경: "상관",
-    신: "���신",
+    신: "식신",
     임: "정재",
     계: "편재",
   },
@@ -273,6 +273,7 @@ export interface Saju {
   monthBranchSibseong: string
   dayBranchSibseong: string
   hourBranchSibseong: string
+  daeunAge?: number
 }
 
 // 입춘 날짜 (평균적으로 2월 4일경)
@@ -405,7 +406,7 @@ function countElements(
     water: 0,
   }
 
-  // 간의 오행 계��
+  // 간의 오행 계
   elements[STEM_ELEMENTS[yearStem as keyof typeof STEM_ELEMENTS]]++
   elements[STEM_ELEMENTS[monthStem as keyof typeof STEM_ELEMENTS]]++
   elements[STEM_ELEMENTS[dayStem as keyof typeof STEM_ELEMENTS]]++

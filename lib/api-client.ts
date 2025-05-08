@@ -341,3 +341,61 @@ export async function getLoveDetailedAnalysis(saju: any, name: string, gender: s
     throw error
   }
 }
+
+// 대운세수 업데이트 함수 개선
+export async function updateSajuDaeunAge(sajuId: string, daeunAge: number): Promise<boolean> {
+  try {
+    console.log(`Updating daeun age for saju ID ${sajuId} to ${daeunAge}`)
+
+    const response = await fetch(`/api/saju-info/${sajuId}/daeun-age`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ daeunAge }),
+      // 캐시 방지
+      cache: "no-store",
+    })
+
+    // 응답 로깅
+    console.log(`API response status: ${response.status}`)
+
+    const data = await response.json()
+    console.log("API response:", data)
+
+    if (!response.ok) {
+      console.error("Update daeun age error:", data.error || "Unknown error")
+      return false
+    }
+
+    // 성공 시 로컬 스토리지에 저장
+    if (typeof window !== "undefined") {
+      try {
+        // 현재 사주 정보 가져오기
+        const sajuKey = `saju_info_${sajuId}`
+        const storedSaju = localStorage.getItem(sajuKey)
+
+        if (storedSaju) {
+          // 저장된 사주 정보가 있으면 업데이트
+          const sajuData = JSON.parse(storedSaju)
+          sajuData.daeunAge = daeunAge
+          localStorage.setItem(sajuKey, JSON.stringify(sajuData))
+        }
+
+        // 대운세수만 별도로 저장
+        localStorage.setItem(`daeun_age_${sajuId}`, daeunAge.toString())
+
+        // 세션 스토리지에도 저장 (페이지 새로고침 시에도 유지)
+        sessionStorage.setItem(`daeun_age_${sajuId}`, daeunAge.toString())
+      } catch (storageError) {
+        console.error("Error updating localStorage:", storageError)
+        // 로컬 스토리지 오류는 무시하고 계속 진행
+      }
+    }
+
+    return data.success === true
+  } catch (error) {
+    console.error("Error updating daeun age:", error)
+    return false
+  }
+}
