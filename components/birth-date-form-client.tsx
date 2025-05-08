@@ -11,7 +11,6 @@ import { calculateSaju } from "@/lib/saju"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Loader2 } from "lucide-react"
-import { solarToLunar } from "@/lib/lunar-calendar"
 import { Input } from "@/components/ui/input"
 // 파일 상단에 import 추가
 import { syncLocalStorageToDatabase } from "@/lib/data-sync"
@@ -20,6 +19,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getSupabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
+import { fetchLunarDate } from "@/lib/api-client" // Import the fetchLunarDate function
 
 export default function BirthDateFormClient() {
   const [birthdate, setBirthdate] = useState("")
@@ -134,21 +134,11 @@ export default function BirthDateFormClient() {
       let lunarData
 
       try {
-        // 로컬 계산 사용 (API 호출 없음)
-        const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
-
-        lunarData = {
-          year: localLunarDate.year.toString(),
-          month: localLunarDate.month.toString().padStart(2, "0"),
-          day: localLunarDate.day.toString().padStart(2, "0"),
-          isLeapMonth: localLunarDate.isLeapMonth,
-          monthStem: localLunarDate.monthStem,
-          monthBranch: localLunarDate.monthBranch,
-        }
-
-        console.log("Using local lunar calculation:", lunarData)
+        // Use the API client to fetch lunar date - UPDATED
+        lunarData = await fetchLunarDate(year, month, day)
+        console.log("Fetched lunar date from API:", lunarData)
       } catch (calcError) {
-        console.error("Error in local lunar calculation:", calcError)
+        console.error("Error in lunar date calculation:", calcError)
         setError("음력 날짜 계산 중 오류가 발생했습니다. 다시 시도해주세요.")
         setIsSubmitting(false)
         return
@@ -238,15 +228,58 @@ export default function BirthDateFormClient() {
           console.warn("Failed to get user ID when saving saju data")
         }
       } catch (dbError) {
-        console.error("Failed tosave saju data to database:", dbError)
+        console.error("Failed to save saju data to database:", dbError)
         // 실패해도 계속 진행 (나중에 다시 시도)
       }
 
-      // Construct the URL with the required parameters
-      const url = `/result?date=${birthdate}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}`
+      // 사주 데이터를 URL 파라미터로 전달
+      const sajuDataParam = encodeURIComponent(
+        JSON.stringify({
+          yearStem: sajuResult.yearStem,
+          yearBranch: sajuResult.yearBranch,
+          monthStem: sajuResult.monthStem,
+          monthBranch: sajuResult.monthBranch,
+          dayStem: sajuResult.dayStem,
+          dayBranch: sajuResult.dayBranch,
+          hourStem: sajuResult.hourStem,
+          hourBranch: sajuResult.hourBranch,
+          yearStemSibseong: sajuResult.yearStemSibseong,
+          monthStemSibseong: sajuResult.monthStemSibseong,
+          dayStemSibseong: sajuResult.dayStemSibseong,
+          hourStemSibseong: sajuResult.hourStemSibseong,
+          yearBranchSibseong: sajuResult.yearBranchSibseong,
+          monthBranchSibseong: sajuResult.monthBranchSibseong,
+          dayBranchSibseong: sajuResult.dayBranchSibseong,
+          hourBranchSibseong: sajuResult.hourBranchSibseong,
+          yearStemHanja: sajuResult.yearStemHanja,
+          yearBranchHanja: sajuResult.yearBranchHanja,
+          monthStemHanja: sajuResult.monthStemHanja,
+          monthBranchHanja: sajuResult.monthBranchHanja,
+          dayStemHanja: sajuResult.dayStemHanja,
+          dayBranchHanja: sajuResult.dayBranchHanja,
+          hourStemHanja: sajuResult.hourStemHanja,
+          hourBranchHanja: sajuResult.hourBranchHanja,
+          elements: sajuResult.elements,
+          dayMaster: sajuResult.dayMaster,
+          dayMasterHanja: sajuResult.dayMasterHanja,
+          daeunAge: sajuResult.daeunAge, // Add daeunAge
+          year: year,
+          month: month,
+          day: day,
+          hour: hour.toString(),
+          minute: minute.toString(),
+          lunarYear: lunarData.year,
+          lunarMonth: lunarData.month,
+          lunarDay: lunarData.day,
+          timeUnknown: timeUnknown,
+          profileId: userId || null,
+        }),
+      )
 
-      // Navigate to the result page
-      router.push(url)
+      // 결과 페이지로 이동
+      router.push(
+        `/result?saju=${sajuDataParam}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}`,
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
       console.error("Error:", err)
@@ -590,7 +623,7 @@ export default function BirthDateFormClient() {
                 양력: {birthdate.substring(0, 4)}년 {birthdate.substring(4, 6)}월 {birthdate.substring(6, 8)}일{" "}
                 {timeUnknown ? "(시간 미상)" : ""}
                 <br />
-                {/* 음력: {lunarDate.year}년 {lunarDate.month}월 {lunarDate.day}일 */}
+                음력: {lunarDate.year}년 {lunarDate.month}월 {lunarDate.day}일
               </p>
             </div>
           </CardContent>

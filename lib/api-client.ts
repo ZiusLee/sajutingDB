@@ -57,36 +57,34 @@ export async function getCompatibilityAnalysis(userInfo: any, partnerInfo: any, 
   }
 }
 
-// Function to fetch lunar date information
+// Function to fetch lunar date information - UPDATED to use API endpoint
 export async function fetchLunarDate(year: string, month: string, day: string) {
   try {
     console.log(`Getting lunar date for ${year}-${month}-${day}`)
 
-    // 로컬 계산 먼저 수행
-    const yearNum = Number.parseInt(year)
-    const monthNum = Number.parseInt(month)
-    const dayNum = Number.parseInt(day)
+    // Use the API endpoint instead of local calculation
+    const response = await fetch(`/api/lunar-date?year=${year}&month=${month}&day=${day}`)
 
-    // 로컬 계산 결과
-    const lunarDate = solarToLunar(yearNum, monthNum, dayNum)
-
-    const localResult = {
-      year: lunarDate.year.toString(),
-      month: lunarDate.month.toString().padStart(2, "0"),
-      day: lunarDate.day.toString().padStart(2, "0"),
-      isLeapMonth: lunarDate.isLeapMonth,
-      monthStem: lunarDate.monthStem,
-      monthBranch: lunarDate.monthBranch,
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`)
     }
 
-    console.log("Calculated lunar date locally:", localResult)
-    return localResult
+    const data = await response.json()
+    console.log("API lunar date response:", data)
 
-    // API 호출 코드는 제거하고 로컬 계산만 사용
+    return {
+      year: data.year,
+      month: data.month,
+      day: data.day,
+      isLeapMonth: data.isLeapMonth,
+      monthStem: data.monthStem,
+      monthBranch: data.monthBranch,
+    }
   } catch (error) {
-    console.error("Error calculating lunar date:", error)
+    console.error("Error fetching lunar date from API:", error)
 
-    // 오류 발생 시에도 기본 로컬 계산 시도
+    // Fallback to local calculation if API fails
+    console.warn("Falling back to local lunar calculation...")
     try {
       const yearNum = Number.parseInt(year)
       const monthNum = Number.parseInt(month)
@@ -157,7 +155,8 @@ export async function getSajuInterpretation(
     if (!response.ok) {
       console.error("API response error:", response.status, responseText.substring(0, 200) + "...")
 
-      if (response.status === 504 || response.status === 500) {
+      // 500 오류 및 기타 서버 오류 처리 개선
+      if (response.status === 500 || response.status === 504) {
         console.log("Returning fallback interpretation due to server error")
         return {
           fallbackInterpretation: `
