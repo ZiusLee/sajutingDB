@@ -471,8 +471,12 @@ export default function SajuChat({
         lastMessageTime: newTime.toISOString(),
       }
 
-      saveChatSession(currentSessionKey, sessionData)
-      setActiveChatSession(sessionData)
+      try {
+        saveChatSession(currentSessionKey, sessionData)
+        setActiveChatSession(sessionData)
+      } catch (saveError) {
+        console.error("Error saving chat session:", saveError)
+      }
 
       // 메시지가 완료되면 질문 생성 허용
       setShouldGenerateQuestions(true)
@@ -480,14 +484,15 @@ export default function SajuChat({
       // 오류 상태 초기화
       setStreamingError(null)
     },
-    onError: (error) => {
-      console.error("Chat error:", error)
+    onError: (err) => {
+      console.error("Chat error details:", err)
 
       // 오류 상태 설정
-      setStreamingError(error.message || "응답 생성 중 오류가 발생했습니다.")
+      const errorMessage = err?.message || "응답 생성 중 오류가 발생했습니다."
+      setStreamingError(errorMessage)
 
       // 네트워크 오류인 경우 특별 처리
-      if (error.message?.includes("network") || error.message?.includes("fetch")) {
+      if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
         setStreamingError("네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요.")
       }
 
@@ -513,28 +518,30 @@ export default function SajuChat({
   // 재시도 핸들러
   const handleRetry = useCallback(() => {
     setIsRetrying(true)
-
-    // 마지막 사용자 메시지 찾기
-    const lastUserMessageIndex = [...messages].reverse().findIndex((msg) => msg.role === "user")
-
-    if (lastUserMessageIndex !== -1) {
-      const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
-
-      // 마지막 응답 제거 (오류가 있는 경우)
-      const messagesToKeep = messages.slice(0, messages.length - lastUserMessageIndex)
-
-      // 동일한 질문으로 다시 시도
-      append({
-        role: "user",
-        content: lastUserMessage.content,
-      })
-    } else {
-      // 사용자 메시지가 없는 경우 그냥 재시도
-      reload()
-    }
-
-    setIsRetrying(false)
     setStreamingError(null)
+
+    try {
+      // 마지막 사용자 메시지 찾기
+      const lastUserMessageIndex = [...messages].reverse().findIndex((msg) => msg.role === "user")
+
+      if (lastUserMessageIndex !== -1) {
+        const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
+
+        // 동일한 질문으로 다시 시도
+        append({
+          role: "user",
+          content: lastUserMessage.content,
+        })
+      } else {
+        // 사용자 메시지가 없는 경우 그냥 재시도
+        reload()
+      }
+    } catch (retryError) {
+      console.error("Error during retry:", retryError)
+      setStreamingError("재시도 중 오류가 발생했습니다. 페이지를 새로고침해 주세요.")
+    } finally {
+      setIsRetrying(false)
+    }
   }, [messages, append, reload])
 
   // 원래의 handleSubmit 함수 저장
@@ -725,6 +732,14 @@ export default function SajuChat({
       }
     }
   }, [messages, isGeneratingQuestions, generateNewSuggestedQuestions, shouldGenerateQuestions])
+
+  // Add this useEffect after other useEffect hooks
+  useEffect(() => {
+    if (error) {
+      console.error("AI SDK error detected:", error)
+      setStreamingError(error.message || "채팅 응답을 생성하는 중 오류가 발생했습니다.")
+    }
+  }, [error])
 
   // Extract 오행 (five elements) data from saju
   const extractFiveElements = () => {
