@@ -32,6 +32,11 @@ export const metadata: Metadata = {
       "https://kuzwrrihvbbwliuotead.supabase.co/storage/v1/object/sign/sajuping/sajuping_character.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJzYWp1cGluZy9zYWp1cGluZ19jaGFyYWN0ZXIucG5nIiwiaWF0IjoxNzQzMDUwOTI0LCJleHAiOjE4Mzc2NTg5MjR9.QPkgNVnK9onLyzlseM_9f0YuDsrwwjKhOOwFFAb6B0A",
     ],
   },
+  verification: {
+    other: {
+      "naver-site-verification": ["51500e7d49fe759a7c2eec8ca177fea25c602782"],
+    },
+  },
     generator: 'v0.dev'
 }
 
