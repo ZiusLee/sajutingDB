@@ -155,8 +155,12 @@ export function calculateDaeunAge(
 // 대운 주기 계산 함수
 export function calculateDaeunCycles(daeunAge: number, count = 8): number[] {
   const cycles = []
+
+  // Special case: if daeunAge is 10, start from 0 instead of 10
+  const startAge = daeunAge === 10 ? 0 : daeunAge
+
   for (let i = 0; i < count; i++) {
-    cycles.push(daeunAge + i * 10)
+    cycles.push(startAge + i * 10)
   }
   return cycles
 }

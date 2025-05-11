@@ -8,12 +8,9 @@ import {
   getCurrentDaeunIndex,
   getStemColor,
   getBranchColor,
-  debugDaeunCalculation,
   getDaeunDirection,
 } from "@/lib/daeun-calculator"
 import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Info } from "lucide-react"
 
 interface DaeunDiagramProps {
   saju: Saju
@@ -39,7 +36,6 @@ export default function DaeunDiagram({
   const [error, setError] = useState<string | null>(null)
   const [daeunInfo, setDaeunInfo] = useState<any>(null)
   const [currentDaeunIndex, setCurrentDaeunIndex] = useState(0)
-  const [showDebug, setShowDebug] = useState(false)
   const [debugInfo, setDebugInfo] = useState<string>("")
 
   useEffect(() => {
@@ -61,10 +57,6 @@ export default function DaeunDiagram({
 
       // 대운 방향 결정
       const direction = getDaeunDirection(saju.yearStem, normalizedGender)
-
-      // 디버그 정보 생성
-      const debug = debugDaeunCalculation(birthYear, birthMonth, birthDay, direction)
-      setDebugInfo(debug)
 
       // 대운 정보 계산
       const info = calculateDaeunInfo(saju, birthYear, birthMonth, birthDay, normalizedGender, birthHour, birthMinute)
@@ -118,10 +110,6 @@ export default function DaeunDiagram({
         <CardTitle className="text-lg flex justify-between items-center">
           <span>대운(大運) 흐름</span>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setShowDebug(!showDebug)}>
-              <Info className="h-4 w-4 mr-1" />
-              <span className="text-xs">계산 정보</span>
-            </Button>
             <span className="text-sm font-normal text-muted-foreground">
               {daeunInfo.direction === "forward" ? "순행(→)" : "역행(←)"} · 대운세수: {daeunInfo.daeunAge}세
             </span>
@@ -129,12 +117,6 @@ export default function DaeunDiagram({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {showDebug && (
-          <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-md text-xs font-mono whitespace-pre-wrap">
-            {debugInfo}
-          </div>
-        )}
-
         <div className="overflow-x-auto">
           <div className="min-w-max">
             <div className="grid grid-cols-8 gap-1 text-center mb-2">

@@ -69,6 +69,8 @@ export default function SajuResultClient({
     const tabParam = searchParams.get("tab")
     return tabParam === "interpretation" ? "interpretation" : "diagram"
   })
+  // 탭 참조를 위한 ref 추가
+  const tabsRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const [questionSet, setQuestionSet] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
@@ -288,6 +290,22 @@ ${interpretation}
     setImageError(true)
   }
 
+  // 총운 리포트 탭으로 이동하는 함수
+  const navigateToInterpretationTab = () => {
+    if (isMobile) {
+      setActiveTab("interpretation")
+      // 모바일에서는 페이지 상단으로 스크롤
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } else {
+      // 데스크톱에서는 상태를 변경하고 탭 컴포넌트의 value를 업데이트
+      setActiveTab("interpretation")
+      // 탭 요소가 있으면 해당 요소로 스크롤
+      if (tabsRef.current) {
+        tabsRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
@@ -350,6 +368,16 @@ ${interpretation}
                   minute={minute}
                   timeUnknown={timeUnknown}
                 />
+
+                <div className="mt-4 mb-2">
+                  <Button
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2"
+                    onClick={navigateToInterpretationTab}
+                  >
+                    <span>나의 총운 리포트 보기</span>
+                  </Button>
+                </div>
 
                 {/* Add chat button to diagram tab - Mobile */}
                 <div className="mt-6">
@@ -515,7 +543,7 @@ ${interpretation}
           </div>
         </div>
       ) : (
-        <Tabs defaultValue={activeTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" ref={tabsRef}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="diagram" data-value="diagram">
               사주 도표
@@ -554,6 +582,16 @@ ${interpretation}
                   minute={minute}
                   timeUnknown={timeUnknown}
                 />
+
+                <div className="mt-4 mb-2">
+                  <Button
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2"
+                    onClick={navigateToInterpretationTab}
+                  >
+                    <span>나의 총운 리포트 보기</span>
+                  </Button>
+                </div>
 
                 {/* Add chat button to diagram tab - Desktop */}
                 <div className="mt-6">
