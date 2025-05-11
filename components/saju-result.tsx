@@ -1,5 +1,5 @@
-import SajuResultClient from "./saju-result-client"
 import type { Saju } from "@/lib/saju"
+import SajuResultClient from "./saju-result-client"
 
 interface SajuResultProps {
   saju: Saju
@@ -14,10 +14,7 @@ interface SajuResultProps {
   lunarDay?: string
   name?: string
   gender?: string
-  model?: string
-  relationshipStatus?: string
   location?: string
-  sajuId?: string // 추가: sajuId 속성
 }
 
 export default function SajuResult({
@@ -33,10 +30,7 @@ export default function SajuResult({
   lunarDay = "",
   name = "",
   gender = "",
-  model = "",
-  relationshipStatus = "",
-  location = "서울특별시",
-  sajuId, // 추가: sajuId 속성
+  location = "",
 }: SajuResultProps) {
   return (
     <SajuResultClient
@@ -52,10 +46,7 @@ export default function SajuResult({
       lunarDay={lunarDay}
       name={name}
       gender={gender}
-      model={model}
-      relationshipStatus={relationshipStatus}
       location={location}
-      sajuId={sajuId} // 추가: sajuId 속성 전달
     />
   )
 }

@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Calendar, Clock, LogOut, Eye, LinkIcon, RefreshCw, Bug, Star, StarOff } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, LogOut, Eye, LinkIcon, RefreshCw, Bug } from "lucide-react"
 import { getSupabase } from "@/lib/supabase-client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
@@ -17,12 +17,7 @@ import {
   findAndLinkSessions,
   linkSessionToUser,
   debugCheckSessions,
-  setDefaultSajuSession,
-  getDefaultSajuSession,
-  getSajuProfileBySessionId,
 } from "@/lib/saju-session-service"
-import DaeunDiagram from "@/components/daeun-diagram"
-import type { Saju } from "@/lib/saju"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -40,7 +35,6 @@ interface SajuProfile {
   lunarYear?: string
   lunarMonth?: string
   lunarDay?: string
-  isDefault?: boolean
   saju: {
     yearStem: string
     yearBranch: string
@@ -75,7 +69,6 @@ interface SajuProfile {
     }
     dayMaster?: string
     dayMasterHanja?: string
-    daeunAge?: number
   }
 }
 
@@ -90,12 +83,10 @@ export default function MyPage() {
   const [isLinking, setIsLinking] = useState(false)
   const [debugInfo, setDebugInfo] = useState<any>(null)
   const [directLinkId, setDirectLinkId] = useState("")
-  const [defaultProfile, setDefaultProfile] = useState<SajuProfile | null>(null)
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const supabase = getSupabase()
 
-  // Load user data function - useCallback으로 감싸서 안정적인 참조 유지
-  const loadUserData = useCallback(async () => {
+  // Load user data function
+  const loadUserData = async () => {
     try {
       setIsLoading(true)
 
@@ -121,20 +112,6 @@ export default function MyPage() {
       // Get all saju profiles
       const { profiles } = await getUserSajuProfiles()
       setSajuProfiles(profiles)
-
-      // Get default profile
-      if (userData.user?.id) {
-        const defaultSession = await getDefaultSajuSession(userData.user.id)
-        if (defaultSession) {
-          const defaultProfileData = await getSajuProfileBySessionId(defaultSession.id)
-          if (defaultProfileData) {
-            setDefaultProfile(defaultProfileData)
-          }
-        } else if (profiles.length > 0) {
-          // If no default is set but profiles exist, use the first one
-          setDefaultProfile(profiles[0])
-        }
-      }
     } catch (error) {
       console.error("Error loading user data:", error)
       toast({
@@ -145,36 +122,12 @@ export default function MyPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [router, supabase]) // 의존성 배열에서 authUserId 제거
+  }
 
-  // 대운세수 업데이트 이벤트 처리 함수
-  const handleDaeunAgeUpdate = useCallback(
-    async (event: CustomEvent) => {
-      const { sajuId, daeunAge } = event.detail || {}
-      console.log(`Received daeunAgeUpdated event: sajuId=${sajuId}, daeunAge=${daeunAge}`)
-
-      // 프로필 데이터 다시 로드
-      await loadUserData()
-
-      toast({
-        title: "대운세수 업데이트",
-        description: "대운세수가 성공적으로 업데이트되었습니다.",
-      })
-    },
-    [loadUserData, toast],
-  )
-
-  // Load data on mount and set up event listener
+  // Load data on mount
   useEffect(() => {
     loadUserData()
-
-    // 대운세수 업데이트 이벤트 리스너 추가 (한 번만)
-    window.addEventListener("daeunAgeUpdated", handleDaeunAgeUpdate as EventListener)
-
-    return () => {
-      window.removeEventListener("daeunAgeUpdated", handleDaeunAgeUpdate as EventListener)
-    }
-  }, [loadUserData, handleDaeunAgeUpdate]) // 의존성 배열에 안정적인 함수 참조만 포함
+  }, [router, supabase])
 
   // 로그아웃 처리
   const handleLogout = async () => {
@@ -244,25 +197,6 @@ export default function MyPage() {
       dayMaster: profile.saju.dayMaster || profile.saju.dayStem,
       dayMasterHanja: profile.saju.dayMasterHanja || "",
 
-      // 대운세수 정보 - 로컬 스토리지에서 최신 값 확인
-      daeunAge: (() => {
-        try {
-          // 로컬 스토리지에서 최신 대운세수 확인
-          const savedDaeunAge = localStorage.getItem(`daeun_age_${profile.id}`)
-          if (savedDaeunAge) {
-            const parsedAge = Number.parseInt(savedDaeunAge, 10)
-            if (!isNaN(parsedAge) && parsedAge > 0) {
-              console.log("Using saved daeun age for result page:", parsedAge)
-              return parsedAge
-            }
-          }
-        } catch (e) {
-          console.error("Error reading daeun age from localStorage:", e)
-        }
-        // 저장된 값이 없으면 프로필의 대운세수 사용
-        return profile.saju.daeunAge
-      })(),
-
       // 양력 정보
       year: profile.birthYear,
       month: profile.birthMonth,
@@ -277,9 +211,6 @@ export default function MyPage() {
 
       // 시간 미상 여부
       timeUnknown: profile.timeUnknown,
-
-      // 프로필 ID 추가 (결과 페이지에서 대운세수 업데이트 시 필요)
-      profileId: profile.id,
     }
 
     // URL 파라미터로 데이터 전달
@@ -483,50 +414,6 @@ export default function MyPage() {
     }
   }
 
-  // 대표 사주 설정
-  const handleSetDefaultProfile = async (profile: SajuProfile) => {
-    if (!authUserId) return
-
-    try {
-      toast({
-        title: "대표 사주 설정 중...",
-        description: "대표 사주를 설정하고 있습니다.",
-      })
-
-      const success = await setDefaultSajuSession(authUserId, profile.id)
-
-      if (success) {
-        // Update local state
-        setSajuProfiles((prev) =>
-          prev.map((p) => ({
-            ...p,
-            isDefault: p.id === profile.id,
-          })),
-        )
-        setDefaultProfile(profile)
-
-        toast({
-          title: "대표 사주 설정 완료",
-          description: `${profile.name}님의 사주가 대표 사주로 설정되었습니다.`,
-        })
-      } else {
-        throw new Error("대표 사주 설정에 실패했습니다.")
-      }
-    } catch (error) {
-      console.error("Error setting default profile:", error)
-      toast({
-        title: "대표 사주 설정 오류",
-        description: "대표 사주를 설정하는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // 연도 선택 핸들러
-  const handleYearSelect = (year: number) => {
-    setSelectedYear(year)
-  }
-
   return (
     <div className="container mx-auto py-8 px-4 pb-20">
       <div className="flex items-center mb-6">
@@ -563,45 +450,6 @@ export default function MyPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* 대표 사주 운세 정보 */}
-      {defaultProfile && (
-        <Card className="mb-8 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-yellow-500" />
-              <span>대표 사주 운세 정보</span>
-            </CardTitle>
-            <CardDescription>
-              {defaultProfile.name}님의 {defaultProfile.birthYear}년 {defaultProfile.birthMonth}월{" "}
-              {defaultProfile.birthDay}일 사주
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* 대운 다이어그램 */}
-              <DaeunDiagram
-                saju={defaultProfile.saju as Saju}
-                gender={defaultProfile.gender}
-                solarYear={defaultProfile.birthYear}
-                solarMonth={defaultProfile.birthMonth}
-                solarDay={defaultProfile.birthDay}
-                hour={defaultProfile.birthHour}
-                minute={defaultProfile.birthMinute}
-                timeUnknown={defaultProfile.timeUnknown}
-                sajuId={defaultProfile.id}
-              />
-
-              <div className="flex justify-center mt-4">
-                <Button onClick={() => handleViewDetails(defaultProfile)} className="gap-2">
-                  <Eye className="h-4 w-4" />
-                  상세 운세 보기
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Debug Info */}
       {debugInfo && (
@@ -711,16 +559,13 @@ export default function MyPage() {
                 {sajuProfiles.map((profile) => (
                   <Card
                     key={profile.id}
-                    className={`overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${
-                      profile.isDefault ? "border-primary/50 bg-primary/5" : ""
-                    }`}
+                    className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => handleProfileClick(profile)}
                   >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <div>
                         <CardTitle className="text-sm font-medium leading-none flex items-center gap-2">
                           {profile.name}
-                          {profile.isDefault && <Star className="h-4 w-4 text-yellow-500" />}
                         </CardTitle>
                         <CardDescription className="text-xs mt-1">
                           {profile.saju.yearStem}
@@ -766,27 +611,6 @@ export default function MyPage() {
                         >
                           <Eye className="h-4 w-4" />
                           상세 보기
-                        </Button>
-                        <Button
-                          variant={profile.isDefault ? "default" : "outline"}
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleSetDefaultProfile(profile)
-                          }}
-                          className="gap-1"
-                        >
-                          {profile.isDefault ? (
-                            <>
-                              <Star className="h-4 w-4" />
-                              대표 사주
-                            </>
-                          ) : (
-                            <>
-                              <StarOff className="h-4 w-4" />
-                              대표로 설정
-                            </>
-                          )}
                         </Button>
                       </div>
                     </CardContent>

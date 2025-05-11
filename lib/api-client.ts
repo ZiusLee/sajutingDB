@@ -1,7 +1,5 @@
 "use client"
 
-import { solarToLunar } from "./lunar-calendar"
-
 export async function getAdditionalInterpretation(
   saju: any,
   name: string,
@@ -57,53 +55,22 @@ export async function getCompatibilityAnalysis(userInfo: any, partnerInfo: any, 
   }
 }
 
-// Function to fetch lunar date information - UPDATED to use API endpoint
+// Function to fetch lunar date information
 export async function fetchLunarDate(year: string, month: string, day: string) {
   try {
-    console.log(`Getting lunar date for ${year}-${month}-${day}`)
-
-    // Use the API endpoint instead of local calculation
+    console.log(`Fetching lunar date for ${year}-${month}-${day}`)
     const response = await fetch(`/api/lunar-date?year=${year}&month=${month}&day=${day}`)
 
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`)
+      throw new Error(`Failed to fetch lunar date: ${response.statusText}`)
     }
 
-    const data = await response.json()
-    console.log("API lunar date response:", data)
-
-    return {
-      year: data.year,
-      month: data.month,
-      day: data.day,
-      isLeapMonth: data.isLeapMonth,
-      monthStem: data.monthStem,
-      monthBranch: data.monthBranch,
-    }
+    const lunarData = await response.json()
+    console.log("Lunar data response:", lunarData)
+    return lunarData
   } catch (error) {
-    console.error("Error fetching lunar date from API:", error)
-
-    // Fallback to local calculation if API fails
-    console.warn("Falling back to local lunar calculation...")
-    try {
-      const yearNum = Number.parseInt(year)
-      const monthNum = Number.parseInt(month)
-      const dayNum = Number.parseInt(day)
-
-      const lunarDate = solarToLunar(yearNum, monthNum, dayNum)
-
-      return {
-        year: lunarDate.year.toString(),
-        month: lunarDate.month.toString().padStart(2, "0"),
-        day: lunarDate.day.toString().padStart(2, "0"),
-        isLeapMonth: lunarDate.isLeapMonth,
-        monthStem: lunarDate.monthStem,
-        monthBranch: lunarDate.monthBranch,
-      }
-    } catch (fallbackError) {
-      console.error("Critical error in lunar calculation:", fallbackError)
-      throw new Error("Failed to calculate lunar date")
-    }
+    console.error("Error fetching lunar date:", error)
+    throw error
   }
 }
 
@@ -155,8 +122,7 @@ export async function getSajuInterpretation(
     if (!response.ok) {
       console.error("API response error:", response.status, responseText.substring(0, 200) + "...")
 
-      // 500 오류 및 기타 서버 오류 처리 개선
-      if (response.status === 500 || response.status === 504) {
+      if (response.status === 504 || response.status === 500) {
         console.log("Returning fallback interpretation due to server error")
         return {
           fallbackInterpretation: `
@@ -293,7 +259,7 @@ export async function getSajuInterpretation(
 
 ## 기본적인 해석:
 - 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
-- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성��� 달라질 수 있습니다.
 - 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
 
 ## 오류 정보:
@@ -338,63 +304,5 @@ export async function getLoveDetailedAnalysis(saju: any, name: string, gender: s
   } catch (error) {
     console.error("Error fetching love detailed analysis:", error)
     throw error
-  }
-}
-
-// 대운세수 업데이트 함수 개선
-export async function updateSajuDaeunAge(sajuId: string, daeunAge: number): Promise<boolean> {
-  try {
-    console.log(`Updating daeun age for saju ID ${sajuId} to ${daeunAge}`)
-
-    const response = await fetch(`/api/saju-info/${sajuId}/daeun-age`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ daeunAge }),
-      // 캐시 방지
-      cache: "no-store",
-    })
-
-    // 응답 로깅
-    console.log(`API response status: ${response.status}`)
-
-    const data = await response.json()
-    console.log("API response:", data)
-
-    if (!response.ok) {
-      console.error("Update daeun age error:", data.error || "Unknown error")
-      return false
-    }
-
-    // 성공 시 로컬 스토리지에 저장
-    if (typeof window !== "undefined") {
-      try {
-        // 현재 사주 정보 가져오기
-        const sajuKey = `saju_info_${sajuId}`
-        const storedSaju = localStorage.getItem(sajuKey)
-
-        if (storedSaju) {
-          // 저장된 사주 정보가 있으면 업데이트
-          const sajuData = JSON.parse(storedSaju)
-          sajuData.daeunAge = daeunAge
-          localStorage.setItem(sajuKey, JSON.stringify(sajuData))
-        }
-
-        // 대운세수만 별도로 저장
-        localStorage.setItem(`daeun_age_${sajuId}`, daeunAge.toString())
-
-        // 세션 스토리지에도 저장 (페이지 새로고침 시에도 유지)
-        sessionStorage.setItem(`daeun_age_${sajuId}`, daeunAge.toString())
-      } catch (storageError) {
-        console.error("Error updating localStorage:", storageError)
-        // 로컬 스토리지 오류는 무시하고 계속 진행
-      }
-    }
-
-    return data.success === true
-  } catch (error) {
-    console.error("Error updating daeun age:", error)
-    return false
   }
 }

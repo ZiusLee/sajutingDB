@@ -35,7 +35,6 @@ interface SajuResultClientProps {
   model?: string
   relationshipStatus?: string
   location?: string
-  sajuId?: string // 추가: sajuId 속성
 }
 
 export default function SajuResultClient({
@@ -54,7 +53,6 @@ export default function SajuResultClient({
   model = "",
   relationshipStatus = "",
   location = "서울특별시",
-  sajuId, // 추가: sajuId 속성
 }: SajuResultClientProps) {
   const [interpretation, setInterpretation] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -75,8 +73,6 @@ export default function SajuResultClient({
   const [questionSet, setQuestionSet] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   const { toast } = useToast()
-  // 추가: 대운세수 변경 시 사주 객체 업데이트를 위한 상태
-  const [localSaju, setLocalSaju] = useState<Saju>(saju)
 
   // 성별 정보 정규화
   const normalizedGender =
@@ -104,12 +100,6 @@ export default function SajuResultClient({
     }
   }, [])
 
-  // 사주 정보가 변경되면 로컬 상태 업데이트
-  useEffect(() => {
-    console.log("Saju prop updated:", saju.daeunAge)
-    setLocalSaju(saju)
-  }, [saju])
-
   // Check for stored interpretation on mount
   useEffect(() => {
     const storedInterpretation = localStorage.getItem(storageKey)
@@ -131,47 +121,6 @@ export default function SajuResultClient({
       fetchInterpretation()
     }
   }, [interpretation, isLoading])
-
-  // 대운세수 업데이트 이벤트 처리 함수 개선
-  useEffect(() => {
-    // 대운세수 업데이트 이벤트 리스너 추가
-    const handleDaeunAgeUpdate = (event: any) => {
-      // 사주 객체 업데이트
-      const { sajuId: updatedSajuId, daeunAge } = event.detail
-
-      console.log(`Received daeunAgeUpdated event: sajuId=${updatedSajuId}, daeunAge=${daeunAge}`)
-
-      // 현재 사주 객체 복사
-      const updatedSaju = { ...localSaju, daeunAge }
-
-      // 로컬 상태 업데이트
-      setLocalSaju(updatedSaju)
-
-      // 로컬 스토리지에 업데이트된 사주 저장
-      try {
-        const sajuKey = `saju_info_${updatedSajuId}`
-        localStorage.setItem(sajuKey, JSON.stringify(updatedSaju))
-      } catch (error) {
-        console.error("Error updating localStorage:", error)
-      }
-
-      toast({
-        title: "대운세수 업데이트",
-        description: "대운세수가 업데이트되었습니다.",
-        action: (
-          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-            새로고침
-          </Button>
-        ),
-      })
-    }
-
-    window.addEventListener("daeunAgeUpdated", handleDaeunAgeUpdate)
-
-    return () => {
-      window.removeEventListener("daeunAgeUpdated", handleDaeunAgeUpdate)
-    }
-  }, [localSaju, toast])
 
   const fetchInterpretation = async () => {
     setIsLoading(true)
@@ -249,7 +198,7 @@ export default function SajuResultClient({
     loadingAnimationRef.current = loadingInterval
 
     try {
-      const result = await getSajuInterpretation(localSaju, name, normalizedGender, relationshipStatus, questionSet)
+      const result = await getSajuInterpretation(saju, name, normalizedGender, relationshipStatus, questionSet)
 
       // 폴백 해석이 있는 경우 처리
       if (result.fallbackInterpretation) {
@@ -309,8 +258,8 @@ export default function SajuResultClient({
 ${timeUnknown ? "시간 미상" : ""}
 양력: ${solarYear}년 ${solarMonth}월 ${solarDay}일 ${hour ? `${hour}시 ${minute}분` : ""}
 음력: ${lunarYear}년 ${lunarMonth}월 ${lunarDay}일
-천간: ${localSaju.yearStem} ${localSaju.monthStem} ${localSaju.dayStem} ${localSaju.hourStem || ""}
-지지: ${localSaju.yearBranch} ${localSaju.monthBranch} ${localSaju.dayBranch} ${localSaju.hourBranch || ""}
+천간: ${saju.yearStem} ${saju.monthStem} ${saju.dayStem} ${saju.hourStem || ""}
+지지: ${saju.yearBranch} ${saju.monthBranch} ${saju.dayBranch} ${saju.hourBranch || ""}
 
 사주 해석:
 ${interpretation}
@@ -326,7 +275,7 @@ ${interpretation}
   // 채팅방 목록으로 이동
   const navigateToChatList = () => {
     // Prepare saju data for the chat list
-    const sajuData = JSON.stringify(localSaju)
+    const sajuData = JSON.stringify(saju)
 
     // Navigate to chat list with all necessary parameters
     router.push(
@@ -337,21 +286,6 @@ ${interpretation}
   // 이미지 오류 처리 함수
   const handleImageError = () => {
     setImageError(true)
-  }
-
-  // 대운세수 변경 처리 함수
-  const handleDaeunAgeChange = (newDaeunAge: number) => {
-    // 로컬 상태 업데이트
-    setLocalSaju((prev) => ({
-      ...prev,
-      daeunAge: newDaeunAge,
-    }))
-
-    // 토스트 메시지 표시
-    toast({
-      title: "대운세수 업데이트",
-      description: "대운세수가 성공적으로 업데이트되었습니다.",
-    })
   }
 
   return (
@@ -390,7 +324,7 @@ ${interpretation}
               <div className="p-3">
                 <h3 className="text-base font-medium mb-2">사주 도표</h3>
                 <SajuDiagram
-                  saju={localSaju}
+                  saju={saju}
                   timeUnknown={timeUnknown}
                   name={name}
                   gender={normalizedGender}
@@ -405,9 +339,9 @@ ${interpretation}
                   location={location}
                 />
 
-                {/* 대운 다이어그램 추가 - sajuId 전달 */}
+                {/* 대운 다이어그램 추가 */}
                 <DaeunDiagram
-                  saju={localSaju}
+                  saju={saju}
                   gender={normalizedGender}
                   solarYear={solarYear}
                   solarMonth={solarMonth}
@@ -415,8 +349,6 @@ ${interpretation}
                   hour={hour}
                   minute={minute}
                   timeUnknown={timeUnknown}
-                  sajuId={sajuId} // 추가: sajuId 전달
-                  onDaeunAgeChange={handleDaeunAgeChange} // 추가: 대운세수 변경 핸들러
                 />
 
                 {/* Add chat button to diagram tab - Mobile */}
@@ -495,10 +427,7 @@ ${interpretation}
                       <ReactMarkdown>{interpretation}</ReactMarkdown>
                     </div>
                     <Separator className="my-3" />
-                    <FeedbackButtons
-                      contentType="saju-interpretation"
-                      contentId={localSaju.dayStem + localSaju.dayBranch}
-                    />
+                    <FeedbackButtons contentType="saju-interpretation" contentId={saju.dayStem + saju.dayBranch} />
 
                     {/* Donation Section - Mobile */}
                     <div className="mt-6 p-3 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
@@ -571,7 +500,7 @@ ${interpretation}
                     {/* 추가 질문 섹션 - 모바일 */}
                     <div id="additional-questions-mobile" className="mt-6">
                       <AdditionalQuestions
-                        saju={localSaju}
+                        saju={saju}
                         name={name}
                         gender={normalizedGender}
                         model={model}
@@ -599,7 +528,7 @@ ${interpretation}
             <Card>
               <CardContent className="p-4">
                 <SajuDiagram
-                  saju={localSaju}
+                  saju={saju}
                   timeUnknown={timeUnknown}
                   name={name}
                   gender={normalizedGender}
@@ -614,9 +543,9 @@ ${interpretation}
                   location={location}
                 />
 
-                {/* 대운 다이어그램 추가 - sajuId 전달 */}
+                {/* 대운 다이어그램 추가 */}
                 <DaeunDiagram
-                  saju={localSaju}
+                  saju={saju}
                   gender={normalizedGender}
                   solarYear={solarYear}
                   solarMonth={solarMonth}
@@ -624,8 +553,6 @@ ${interpretation}
                   hour={hour}
                   minute={minute}
                   timeUnknown={timeUnknown}
-                  sajuId={sajuId} // 추가: sajuId 전달
-                  onDaeunAgeChange={handleDaeunAgeChange} // 추가: 대운세수 변경 핸들러
                 />
 
                 {/* Add chat button to diagram tab - Desktop */}
@@ -703,10 +630,7 @@ ${interpretation}
                       <ReactMarkdown>{interpretation}</ReactMarkdown>
                     </div>
                     <Separator className="my-4" />
-                    <FeedbackButtons
-                      contentType="saju-interpretation"
-                      contentId={localSaju.dayStem + localSaju.dayBranch}
-                    />
+                    <FeedbackButtons contentType="saju-interpretation" contentId={saju.dayStem + saju.dayBranch} />
 
                     {/* Donation Section */}
                     <div className="mt-8 p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
@@ -778,7 +702,7 @@ ${interpretation}
 
                     <div id="additional-questions">
                       <AdditionalQuestions
-                        saju={localSaju}
+                        saju={saju}
                         name={name}
                         gender={normalizedGender}
                         model={model}
