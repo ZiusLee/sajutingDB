@@ -7,23 +7,30 @@ export const runtime = "edge"
 // Update the getModelForRoomType function to include the new room types and their models
 
 function getModelForRoomType(roomType: string): string {
-  switch (roomType) {
-    case "career":
-      return "ft:gpt-4o:towinai::8Lw0rYK6"
-    case "marriage":
-      return "ft:gpt-4o:towinai::8Lw1Qvs2"
-    case "health":
-      return "ft:gpt-4o:towinai::8Lw1jMRB"
-    case "business":
-      return "ft:gpt-4.1-mini-2025-04-14:towinai:business-fortune:BT2vHalT"
-    case "fitness":
-      return "ft:gpt-4.1-mini-2025-04-14:towinai:fitness:BT2tqzzK"
-    case "diet":
-      return "ft:gpt-4.1-mini-2025-04-14:towinai:diet:BT2u7e4r"
-    case "cheerup":
-      return "ft:gpt-4.1-mini-2025-04-14:towinai:cheerup:BT2vdflg"
-    default:
-      return "gpt-4o"
+  try {
+    switch (roomType) {
+      case "career":
+        return "ft:gpt-4o:towinai::8Lw0rYK6"
+      case "marriage":
+        return "ft:gpt-4o:towinai::8Lw1Qvs2"
+      case "health":
+        // Fallback to standard model if the fine-tuned model is causing issues
+        return "gpt-4o"
+      case "business":
+        return "ft:gpt-4.1-mini-2025-04-14:towinai:business-fortune:BT2vHalT"
+      case "fitness":
+        return "ft:gpt-4.1-mini-2025-04-14:towinai::BUpEktsZ"
+      case "diet":
+        return "ft:gpt-4.1-mini-2025-04-14:towinai::BUpEr9EK"
+      case "cheerup":
+        return "ft:gpt-4.1-mini-2025-04-14:towinai::BUpCk8Ir"
+      default:
+        return "gpt-4o"
+    }
+  } catch (error) {
+    console.error("Error in getModelForRoomType:", error)
+    // Fallback to a reliable model if there's any error
+    return "gpt-4o"
   }
 }
 
@@ -59,7 +66,8 @@ export async function POST(req: Request) {
     const sajuInfo = JSON.stringify(saju, null, 2)
 
     // 모델 선택 및 시스템 메시지 설정
-    let model = openai(getModelForRoomType(roomType)) // 기본 모델은 gpt-4.1-mini
+    const modelName = getModelForRoomType(roomType)
+    let model = openai(modelName)
     let systemMessage = ""
     let apiMessages = []
 
@@ -275,21 +283,33 @@ ${sajuInfo}
     // 사용자 메시지 배열에 시스템 메시지 추가
     apiMessages = [{ role: "system", content: systemMessage }, ...messages]
 
-    // maxTokens 값을 2000으로 변경합니다
-    // 기존 maxTokens 값(4000 또는 다른 값)을 찾아 2000으로 변경합니다
+    try {
+      const result = streamText({
+        model: model,
+        messages: apiMessages,
+        temperature: 0.7,
+        maxTokens: 2000, // 토큰 제한을 크게 늘려 충분히 긴 응답 허용
+      })
 
-    const result = streamText({
-      model: model,
-      messages: apiMessages,
-      temperature: 0.7,
-      maxTokens: 2000, // 토큰 제한을 크게 늘려 충분히 긴 응답 허용
-    })
+      // 스트리밍 응답 생성
+      return result.toDataStreamResponse()
+    } catch (streamError) {
+      console.error("Error in streamText:", streamError)
 
-    // 스트리밍 응답 생성
-    return result.toDataStreamResponse()
+      // Try again with a fallback model if there's an error with the streaming
+      const fallbackModel = openai("gpt-4o")
+      const fallbackResult = streamText({
+        model: fallbackModel,
+        messages: apiMessages,
+        temperature: 0.7,
+        maxTokens: 2000,
+      })
+
+      return fallbackResult.toDataStreamResponse()
+    }
   } catch (error) {
     console.error("Error in saju-chat API:", error)
-    return new Response(JSON.stringify({ error: "Failed to process request" }), {
+    return new Response(JSON.stringify({ error: "Failed to process request", details: error.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     })

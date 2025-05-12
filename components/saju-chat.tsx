@@ -471,8 +471,12 @@ export default function SajuChat({
         lastMessageTime: newTime.toISOString(),
       }
 
-      saveChatSession(currentSessionKey, sessionData)
-      setActiveChatSession(sessionData)
+      try {
+        saveChatSession(currentSessionKey, sessionData)
+        setActiveChatSession(sessionData)
+      } catch (saveError) {
+        console.error("Error saving chat session:", saveError)
+      }
 
       // 메시지가 완료되면 질문 생성 허용
       setShouldGenerateQuestions(true)
@@ -484,12 +488,22 @@ export default function SajuChat({
       console.error("Chat error:", error)
 
       // 오류 상태 설정
-      setStreamingError(error.message || "응답 생성 중 오류가 발생했습니다.")
+      let errorMessage = "응답 생성 중 오류가 발생했습니다."
 
-      // 네트워크 오류인 경우 특별 처리
-      if (error.message?.includes("network") || error.message?.includes("fetch")) {
-        setStreamingError("네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요.")
+      if (error.message) {
+        errorMessage = error.message
+
+        // 네트워크 오류인 경우 특별 처리
+        if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요."
+        } else if (error.message.includes("timeout")) {
+          errorMessage = "요청 시간이 초과되었습니다. 다시 시도해주세요."
+        } else if (error.message.includes("model")) {
+          errorMessage = "AI 모델 로딩 중 오류가 발생했습니다. 다시 시도해주세요."
+        }
       }
+
+      setStreamingError(errorMessage)
 
       // 오류 발생 시에도 질문 생성 허용
       setShouldGenerateQuestions(true)
@@ -513,28 +527,30 @@ export default function SajuChat({
   // 재시도 핸들러
   const handleRetry = useCallback(() => {
     setIsRetrying(true)
-
-    // 마지막 사용자 메시지 찾기
-    const lastUserMessageIndex = [...messages].reverse().findIndex((msg) => msg.role === "user")
-
-    if (lastUserMessageIndex !== -1) {
-      const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
-
-      // 마지막 응답 제거 (오류가 있는 경우)
-      const messagesToKeep = messages.slice(0, messages.length - lastUserMessageIndex)
-
-      // 동일한 질문으로 다시 시도
-      append({
-        role: "user",
-        content: lastUserMessage.content,
-      })
-    } else {
-      // 사용자 메시지가 없는 경우 그냥 재시도
-      reload()
-    }
-
-    setIsRetrying(false)
     setStreamingError(null)
+
+    try {
+      // 마지막 사용자 메시지 찾기
+      const lastUserMessageIndex = [...messages].reverse().findIndex((msg) => msg.role === "user")
+
+      if (lastUserMessageIndex !== -1) {
+        const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
+
+        // 동일한 질문으로 다시 시도
+        append({
+          role: "user",
+          content: lastUserMessage.content,
+        })
+      } else {
+        // 사용자 메시지가 없는 경우 그냥 재시도
+        reload()
+      }
+    } catch (error) {
+      console.error("Error in retry handler:", error)
+      setStreamingError("재시도 중 오류가 발생했습니다. 페이지를 새로고침해주세요.")
+    } finally {
+      setIsRetrying(false)
+    }
   }, [messages, append, reload])
 
   // 원래의 handleSubmit 함수 저장
