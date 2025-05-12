@@ -335,44 +335,103 @@ function findSajuInManseryeok(
   return null
 }
 
+// 시간 기준 타입 정의
+export type TimeStandard = "동경135도" | "동경127.5도" | "서머타임"
+
 // 시간 지지 결정 (Hour Branch)
-function getHourBranch(hour: number, minute: number): string {
+function getHourBranch(hour: number, minute: number, timeStandard: TimeStandard = "동경135도"): string {
   // 정확한 시간 경계 처리
   const totalHours = hour + minute / 60
 
-  // 동추원만세력 기준 시간 범위 설정
-  // 경계 시간(1:00, 3:00 등)은 이전 시간대에 포함
-  // 23:00-1:00 자(子)시
-  if ((totalHours >= 23 && totalHours <= 24) || (totalHours >= 0 && totalHours <= 1)) return "자"
-  // 1:00-3:00 축(丑)시
-  if (totalHours > 1 && totalHours <= 3) return "축"
-  // 3:00-5:00 인(寅)시
-  if (totalHours > 3 && totalHours <= 5) return "인"
-  // 5:00-7:00 묘(卯)시
-  if (totalHours > 5 && totalHours <= 7) return "묘"
-  // 7:00-9:00 진(辰)시
-  if (totalHours > 7 && totalHours <= 9) return "진"
-  // 9:00-11:00 사(巳)시
-  if (totalHours > 9 && totalHours <= 11) return "사"
-  // 11:00-13:00 오(午)시
-  if (totalHours > 11 && totalHours <= 13) return "오"
-  // 13:00-15:00 미(未)시
-  if (totalHours > 13 && totalHours <= 15) return "미"
-  // 15:00-17:00 신(申)시
-  if (totalHours > 15 && totalHours <= 17) return "신"
-  // 17:00-19:00 유(酉)시
-  if (totalHours > 17 && totalHours <= 19) return "유"
-  // 19:00-21:00 술(戌)시
-  if (totalHours > 19 && totalHours <= 21) return "술"
-  // 21:00-23:00 해(亥)시
-  if (totalHours > 21 && totalHours < 23) return "해"
+  // 시간 기준에 따른 시간 범위 설정
+  if (timeStandard === "동경135도") {
+    // 동경 135도 표준시 (한국 표준시, UTC+9)
+    // 23:30-01:30 자(子)시
+    if ((totalHours >= 23.5 && totalHours <= 24) || (totalHours >= 0 && totalHours < 1.5)) return "자"
+    // 01:30-03:30 축(丑)시
+    if (totalHours >= 1.5 && totalHours < 3.5) return "축"
+    // 03:30-05:30 인(寅)시
+    if (totalHours >= 3.5 && totalHours < 5.5) return "인"
+    // 05:30-07:30 묘(卯)시
+    if (totalHours >= 5.5 && totalHours < 7.5) return "묘"
+    // 07:30-09:30 진(辰)시
+    if (totalHours >= 7.5 && totalHours < 9.5) return "진"
+    // 09:30-11:30 사(巳)시
+    if (totalHours >= 9.5 && totalHours < 11.5) return "사"
+    // 11:30-13:30 오(午)시
+    if (totalHours >= 11.5 && totalHours < 13.5) return "오"
+    // 13:30-15:30 미(未)시
+    if (totalHours >= 13.5 && totalHours < 15.5) return "미"
+    // 15:30-17:30 신(申)시
+    if (totalHours >= 15.5 && totalHours < 17.5) return "신"
+    // 17:30-19:30 유(酉)시
+    if (totalHours >= 17.5 && totalHours < 19.5) return "유"
+    // 19:30-21:30 술(戌)시
+    if (totalHours >= 19.5 && totalHours < 21.5) return "술"
+    // 21:30-23:30 해(亥)시
+    if (totalHours >= 21.5 && totalHours < 23.5) return "해"
+  } else if (timeStandard === "동경127.5도") {
+    // 동경 127.5도 표준시
+    // 23:00-01:00 자(子)시
+    if ((totalHours >= 23 && totalHours <= 24) || (totalHours >= 0 && totalHours < 1)) return "자"
+    // 01:00-03:00 축(丑)시
+    if (totalHours >= 1 && totalHours < 3) return "축"
+    // 03:00-05:00 인(寅)시
+    if (totalHours >= 3 && totalHours < 5) return "인"
+    // 05:00-07:00 묘(卯)시
+    if (totalHours >= 5 && totalHours < 7) return "묘"
+    // 07:00-09:00 진(辰)시
+    if (totalHours >= 7 && totalHours < 9) return "진"
+    // 09:00-11:00 사(巳)시
+    if (totalHours >= 9 && totalHours < 11) return "사"
+    // 11:00-13:00 오(午)시
+    if (totalHours >= 11 && totalHours < 13) return "오"
+    // 13:00-15:00 미(未)시
+    if (totalHours >= 13 && totalHours < 15) return "미"
+    // 15:00-17:00 신(申)시
+    if (totalHours >= 15 && totalHours < 17) return "신"
+    // 17:00-19:00 유(酉)시
+    if (totalHours >= 17 && totalHours < 19) return "유"
+    // 19:00-21:00 술(戌)시
+    if (totalHours >= 19 && totalHours < 21) return "술"
+    // 21:00-23:00 해(亥)시
+    if (totalHours >= 21 && totalHours < 23) return "해"
+  } else if (timeStandard === "서머타임") {
+    // 서머타임 적용 시간 (동경 135도 + 서머타임)
+    // 00:30-02:30 자(子)시
+    if (totalHours >= 0.5 && totalHours < 2.5) return "자"
+    // 02:30-04:30 축(丑)시
+    if (totalHours >= 2.5 && totalHours < 4.5) return "축"
+    // 04:30-06:30 인(寅)시
+    if (totalHours >= 4.5 && totalHours < 6.5) return "인"
+    // 06:30-08:30 묘(卯)시
+    if (totalHours >= 6.5 && totalHours < 8.5) return "묘"
+    // 08:30-10:30 진(辰)시
+    if (totalHours >= 8.5 && totalHours < 10.5) return "진"
+    // 10:30-12:30 사(巳)시
+    if (totalHours >= 10.5 && totalHours < 12.5) return "사"
+    // 12:30-14:30 오(午)시
+    if (totalHours >= 12.5 && totalHours < 14.5) return "오"
+    // 14:30-16:30 미(未)시
+    if (totalHours >= 14.5 && totalHours < 16.5) return "미"
+    // 16:30-18:30 신(申)시
+    if (totalHours >= 16.5 && totalHours < 18.5) return "신"
+    // 18:30-20:30 유(酉)시
+    if (totalHours >= 18.5 && totalHours < 20.5) return "유"
+    // 20:30-22:30 술(戌)시
+    if (totalHours >= 20.5 && totalHours < 22.5) return "술"
+    // 22:30-00:30 해(亥)시
+    if ((totalHours >= 22.5 && totalHours <= 24) || (totalHours >= 0 && totalHours < 0.5)) return "해"
+  }
 
-  return "자" // 기본값
+  // 기본값 (동경 135도 표준시 기준)
+  console.warn(`시간 범위를 벗어났습니다: ${hour}:${minute}, 기본값 '자'를 반환합니다.`)
+  return "자"
 }
 
 // 시간 간 계산 (Hour Stem)
-function getHourStem(dayStem: string, hour: number, minute: number): string {
-  const hourBranch = getHourBranch(hour, minute)
+function getHourStem(dayStem: string, hour: number, minute: number, timeStandard: TimeStandard = "동경135도"): string {
+  const hourBranch = getHourBranch(hour, minute, timeStandard)
 
   // 일간(日干)에 따른 자시(子時) 시작 천간
   const startStemIndex = DAY_TO_HOUR_STEM_MAP[dayStem]
@@ -818,12 +877,13 @@ export function calculateSaju(
   isLeapMonth = false,
   apiMonthStem?: string,
   apiMonthBranch?: string,
+  timeStandard: TimeStandard = "동경135도",
 ): any {
   // 문자열을 숫자로 변환
   const numLunarYear = typeof lunarYear === "string" ? Number.parseInt(lunarYear, 10) : lunarYear
 
   console.log(
-    `Calculate Saju for Lunar: ${numLunarYear}, Solar: ${solarYear}-${solarMonth}-${solarDay}, Time: ${hour}:${minute}, Gender: ${gender}, Name: ${name}, TimeUnknown: ${timeUnknown}, IsLeapMonth: ${isLeapMonth}`,
+    `Calculate Saju for Lunar: ${numLunarYear}, Solar: ${solarYear}-${solarMonth}-${solarDay}, Time: ${hour}:${minute}, Gender: ${gender}, Name: ${name}, TimeUnknown: ${timeUnknown}, IsLeapMonth: ${isLeapMonth}, TimeStandard: ${timeStandard}`,
   )
 
   // 만세력 데이터에서 사주 정보 찾기
@@ -873,9 +933,9 @@ export function calculateSaju(
     hourStem = "?"
     hourBranch = "?"
   } else {
-    // Calculate hour pillar as usual
-    hourBranch = getHourBranch(hour, minute)
-    hourStem = getHourStem(dayStem, hour, minute)
+    // Calculate hour pillar as usual with the specified time standard
+    hourBranch = getHourBranch(hour, minute, timeStandard)
+    hourStem = getHourStem(dayStem, hour, minute, timeStandard)
   }
 
   console.log(
@@ -929,6 +989,7 @@ export function calculateSaju(
     gender,
     name,
     timeUnknown,
+    timeStandard,
     yearStemSibseong: calculateSibseong(dayStem, yearStem),
     monthStemSibseong: calculateSibseong(dayStem, monthStem),
     dayStemSibseong: calculateSibseong(dayStem, dayStem),
@@ -940,5 +1001,71 @@ export function calculateSaju(
       hourBranch !== "?"
         ? calculateSibseong(dayStem, BRANCH_TO_STEM_MAP[hourBranch as keyof typeof BRANCH_TO_STEM_MAP])
         : "",
+  }
+}
+
+// 시간 기준에 따른 시간 범위 정보 반환 함수 추가
+export function getTimeRangeInfo(timeStandard: TimeStandard = "동경135도"): {
+  name: string
+  description: string
+  ranges: { branch: string; start: string; end: string }[]
+} {
+  if (timeStandard === "동경135도") {
+    return {
+      name: "동경 135도 표준시",
+      description: "한국 표준시(UTC+9)에 해당하는 시간 기준입니다.",
+      ranges: [
+        { branch: "자", start: "23:30", end: "01:30" },
+        { branch: "축", start: "01:30", end: "03:30" },
+        { branch: "인", start: "03:30", end: "05:30" },
+        { branch: "묘", start: "05:30", end: "07:30" },
+        { branch: "진", start: "07:30", end: "09:30" },
+        { branch: "사", start: "09:30", end: "11:30" },
+        { branch: "오", start: "11:30", end: "13:30" },
+        { branch: "미", start: "13:30", end: "15:30" },
+        { branch: "신", start: "15:30", end: "17:30" },
+        { branch: "유", start: "17:30", end: "19:30" },
+        { branch: "술", start: "19:30", end: "21:30" },
+        { branch: "해", start: "21:30", end: "23:30" },
+      ],
+    }
+  } else if (timeStandard === "동경127.5도") {
+    return {
+      name: "동경 127.5도 표준시",
+      description: "중국 동부 지역에 해당하는 시간 기준입니다.",
+      ranges: [
+        { branch: "자", start: "23:00", end: "01:00" },
+        { branch: "축", start: "01:00", end: "03:00" },
+        { branch: "인", start: "03:00", end: "05:00" },
+        { branch: "묘", start: "05:00", end: "07:00" },
+        { branch: "진", start: "07:00", end: "09:00" },
+        { branch: "사", start: "09:00", end: "11:00" },
+        { branch: "오", start: "11:00", end: "13:00" },
+        { branch: "미", start: "13:00", end: "15:00" },
+        { branch: "신", start: "15:00", end: "17:00" },
+        { branch: "유", start: "17:00", end: "19:00" },
+        { branch: "술", start: "19:00", end: "21:00" },
+        { branch: "해", start: "21:00", end: "23:00" },
+      ],
+    }
+  } else {
+    return {
+      name: "서머타임 적용",
+      description: "서머타임이 적용된 지역의 시간 기준입니다.",
+      ranges: [
+        { branch: "자", start: "00:30", end: "02:30" },
+        { branch: "축", start: "02:30", end: "04:30" },
+        { branch: "인", start: "04:30", end: "06:30" },
+        { branch: "묘", start: "06:30", end: "08:30" },
+        { branch: "진", start: "08:30", end: "10:30" },
+        { branch: "사", start: "10:30", end: "12:30" },
+        { branch: "오", start: "12:30", end: "14:30" },
+        { branch: "미", start: "14:30", end: "16:30" },
+        { branch: "신", start: "16:30", end: "18:30" },
+        { branch: "유", start: "18:30", end: "20:30" },
+        { branch: "술", start: "20:30", end: "22:30" },
+        { branch: "해", start: "22:30", end: "00:30" },
+      ],
+    }
   }
 }

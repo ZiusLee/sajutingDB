@@ -5,22 +5,22 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { fetchLunarDate } from "@/lib/api-client"
-import { calculateSaju } from "@/lib/saju"
 import { Card, CardContent } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2 } from "lucide-react"
-import { solarToLunar } from "@/lib/lunar-calendar"
 import { Input } from "@/components/ui/input"
-// 파일 상단에 import 추가
-import { syncLocalStorageToDatabase } from "@/lib/data-sync"
-import confetti from "canvas-confetti"
-import { useToast } from "@/components/ui/use-toast"
+import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { InfoIcon, Loader2, AlertCircle } from "lucide-react"
+import { fetchLunarDate } from "@/lib/api-client"
+import { calculateSaju, type TimeStandard } from "@/lib/saju"
+import { solarToLunar } from "@/lib/lunar-calendar"
+import { syncLocalStorageToDatabase } from "@/lib/data-sync"
+import { useToast } from "@/components/ui/use-toast"
 import { getSupabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
+import { CitySearch } from "@/components/city-search"
+import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 export default function BirthDateFormClient() {
   const [birthdate, setBirthdate] = useState("")
@@ -54,9 +54,16 @@ export default function BirthDateFormClient() {
   const [betaEmail, setBetaEmail] = useState<string>("")
   const [betaPhone, setBetaPhone] = useState<string>("")
   const [showSuccessDialog, setShowSuccessDialog] = useState<boolean>(false)
+  const [birthCityId, setBirthCityId] = useState<string>(DEFAULT_CITY_ID) // 기본값: 서울
 
   const { toast } = useToast()
   const router = useRouter()
+
+  // 선택된 도시에 따른 시간 기준 가져오기
+  const getTimeStandardFromCity = (): TimeStandard => {
+    const cityData = getCityById(birthCityId)
+    return cityData?.timeStandard || "동경135도" // 기본값: 동경135도
+  }
 
   // Find the useEffect hook that checks authentication or add it if it doesn't exist
   // Add this useEffect after the state declarations and before the handleSubmit function
@@ -84,9 +91,6 @@ export default function BirthDateFormClient() {
 
     checkAuthAndLinkData()
   }, [])
-
-  // 리다이렉트 처리
-  // useEffect 삭제
 
   // This part is different.
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,6 +120,10 @@ export default function BirthDateFormClient() {
     setLunarDate(null)
     setDetailedInterpretation(null)
     setIsLoadingInterpretation(false)
+
+    // 선택된 도시에 따른 시간 기준 가져오기
+    const timeStandard = getTimeStandardFromCity()
+    const cityData = getCityById(birthCityId)
 
     // Declare sajuResult outside the try block
     let sajuResult: any
@@ -171,6 +179,7 @@ export default function BirthDateFormClient() {
         lunarData.isLeapMonth,
         lunarData.monthStem,
         lunarData.monthBranch,
+        timeStandard,
       )
 
       // handleSubmit 함수 내에서 사주 계산 후 데이터베이스에 저장하는 코드 추가
@@ -189,6 +198,8 @@ export default function BirthDateFormClient() {
         hour,
         minute,
         timeUnknown,
+        timeStandard,
+        birthCityId,
         lunarYear: Number.parseInt(lunarData.year),
         lunarMonth: Number.parseInt(lunarData.month),
         lunarDay: Number.parseInt(lunarData.day),
@@ -197,9 +208,8 @@ export default function BirthDateFormClient() {
         monthStem: sajuResult.monthStem,
         monthBranch: sajuResult.monthBranch,
         dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.dayBranch,
+        dayBranch: sajuResult.hourBranch,
         hourStem: sajuResult.hourStem,
-        hourBranch: sajuResult.hourBranch,
         elements: sajuResult.elements,
         interpretation: sajuResult.interpretation,
         yearStemSibseong: sajuResult.yearStemSibseong,
@@ -242,7 +252,7 @@ export default function BirthDateFormClient() {
       }
 
       // Construct the URL with the required parameters
-      const url = `/result?date=${birthdate}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}`
+      const url = `/result?date=${birthdate}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}&birthCityId=${encodeURIComponent(birthCityId)}`
 
       // Navigate to the result page
       router.push(url)
@@ -261,6 +271,8 @@ export default function BirthDateFormClient() {
             gender: gender,
             interpretation: detailedInterpretation || "",
             returnPath: router.asPath,
+            timeStandard: getTimeStandardFromCity(),
+            birthCityId,
           }),
         )
 
@@ -327,13 +339,6 @@ export default function BirthDateFormClient() {
         throw new Error(errorData.error || "베타 신청 중 오류가 발생했습니다.")
       }
 
-      // Trigger confetti effect
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-      })
-
       // Show success dialog
       setShowSuccessDialog(true)
 
@@ -395,7 +400,7 @@ export default function BirthDateFormClient() {
       hour = Number.parseInt(input.substring(0, 2), 10)
       minute = Number.parseInt(input.substring(2), 10)
     }
-    // 1-2자리 숫자인 ���우 (예: "23")
+    // 1-2자리 숫자인 경우 (예: "23")
     else {
       hour = Number.parseInt(input, 10)
       minute = 0
@@ -466,6 +471,9 @@ export default function BirthDateFormClient() {
     }
   }
 
+  // 선택된 도시 정보 가져오기
+  const selectedCity = getCityById(birthCityId)
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -501,21 +509,37 @@ export default function BirthDateFormClient() {
           </RadioGroup>
         </div>
 
-        {/* Add relationship status */}
+        {/* 태어난 도시 선택 */}
         <div className="space-y-2">
-          <Label htmlFor="relationshipStatus">현재 연애 현황</Label>
-          <Select value={relationshipStatus} onValueChange={setRelationshipStatus}>
-            <SelectTrigger id="relationshipStatus" className="w-full">
-              <SelectValue placeholder="관계 상태 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="solo">솔로</SelectItem>
-              <SelectItem value="flirting">썸타는 중</SelectItem>
-              <SelectItem value="dating">연애 중</SelectItem>
-              <SelectItem value="married">결혼 중</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">현재 관계 상태에 맞는 맞춤형 사주 분석을 제공합니다.</p>
+          <Label htmlFor="birthCity">태어난 도시</Label>
+          <CitySearch value={birthCityId} onChange={setBirthCityId} />
+          <div className="flex items-center mt-1 text-xs text-muted-foreground">
+            {selectedCity && (
+              <>
+                <span>
+                  현재 선택: {selectedCity.city}, {selectedCity.country} (UTC{selectedCity.utcOffset >= 0 ? "+" : ""}
+                  {selectedCity.utcOffset})
+                </span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 p-0 ml-1"
+                      type="button"
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <InfoIcon className="h-4 w-4" />
+                      <span className="sr-only">도시 선택 안내</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-3 text-sm">
+                    <p>태어난 도시를 바탕으로 시간이 자동 계산됩니다</p>
+                  </PopoverContent>
+                </Popover>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2">
