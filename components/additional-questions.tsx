@@ -516,7 +516,10 @@ export default function AdditionalQuestions({
         <div className="w-full mb-6">
           <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl p-0.5 shadow-lg">
             <button
-              onClick={() => setShowCompatibilityForm(!showCompatibilityForm)}
+              onClick={(e) => {
+                e.preventDefault()
+                setShowCompatibilityForm(!showCompatibilityForm)
+              }}
               className={`w-full text-left rounded-2xl px-4 py-3 transition-all 
        ${showCompatibilityForm ? "bg-transparent text-white" : "bg-background hover:bg-background/90"}
        flex items-start gap-3 relative overflow-visible group`}
@@ -688,7 +691,7 @@ export default function AdditionalQuestions({
                               className="h-4 w-4 rounded border-gray-300 text-pink-500"
                             />
                             <Label htmlFor="timeUnknown" className="text-sm font-normal cursor-pointer">
-                              ���간 모름
+                              시간 모름
                             </Label>
                           </div>
                         </div>
@@ -885,6 +888,268 @@ export default function AdditionalQuestions({
         </p>
       </div>
 
+      {/* 다른 사람과의 궁합 알아보기 버튼 - 모바일 */}
+      <div className="w-full mb-6">
+        <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl p-0.5 shadow-lg">
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              setShowCompatibilityForm(!showCompatibilityForm)
+            }}
+            className={`w-full text-left rounded-2xl px-4 py-3 transition-all 
+       ${showCompatibilityForm ? "bg-transparent text-white" : "bg-background hover:bg-background/90"}
+       flex items-start gap-3 relative overflow-visible group`}
+          >
+            <div
+              className={`flex items-center justify-center rounded-full p-2 
+       ${showCompatibilityForm ? "bg-white/20 text-white" : "bg-pink-100 text-pink-600"} flex-shrink-0`}
+            >
+              <Users className="h-5 w-5" />
+            </div>
+
+            <div className="flex flex-col overflow-hidden">
+              <span className={`font-medium text-base truncate ${showCompatibilityForm ? "text-white" : ""}`}>
+                다른 사람과의 궁합 알아보기
+              </span>
+              <span
+                className={`text-xs mt-1 line-clamp-2 
+         ${showCompatibilityForm ? "text-white/80" : "text-muted-foreground"}`}
+              >
+                특정 사람과의 궁합을 분석하고 상세한 해석을 받아보세요.
+              </span>
+            </div>
+          </button>
+        </div>
+
+        {showCompatibilityForm && (
+          <div className="mt-4 mb-6">
+            <div className="bg-white dark:bg-gray-950 rounded-xl sm:rounded-2xl shadow-sm sm:border sm:border-pink-100 p-4 sm:p-6">
+              <h3 className="font-medium text-xl mb-4 text-center">궁합 분석</h3>
+
+              {!compatibilityResult ? (
+                <form onSubmit={handleCompatibilitySubmit} className="space-y-5">
+                  <div className="space-y-4">
+                    <div className="mb-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSavedPartners(!showSavedPartners)}
+                        className="flex items-center justify-center gap-1 w-full sm:w-auto"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        저장된 상대방
+                        <ChevronDown className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+
+                    {/* 저장된 상대방 목록 */}
+                    {showSavedPartners && savedPartners.length > 0 && (
+                      <div className="bg-gray-50 dark:bg-gray-800 rounded-md p-2 mb-3 max-h-48 overflow-y-auto">
+                        <p className="text-xs text-muted-foreground mb-2">저장된 상대방 목록</p>
+                        <div className="space-y-1">
+                          {savedPartners.map((partner) => (
+                            <div
+                              key={partner.id}
+                              className="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                              onClick={() => handleSelectPartner(partner)}
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{partner.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {partner.gender === "male" ? "남성" : "여성"} | {partner.year}년 {partner.month}월{" "}
+                                  {partner.day}일
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={(e) => handleDeletePartner(partner.id!, partner.name, e)}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="partnerName" className="text-base">
+                        상대방 이름
+                      </Label>
+                      <Input
+                        id="partnerName"
+                        value={partnerName}
+                        onChange={(e) => setPartnerName(e.target.value)}
+                        placeholder="상대방 이름을 입력하세요"
+                        className="border-pink-100 focus-visible:ring-pink-500 dark:border-pink-800"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-base">상대방 성별</Label>
+                      <RadioGroup value={partnerGender} onValueChange={setPartnerGender} className="flex space-x-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="male" id="partner-male-mobile" className="text-pink-500" />
+                          <Label htmlFor="partner-male-mobile" className="cursor-pointer">
+                            남성
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="female" id="partner-female-mobile" className="text-pink-500" />
+                          <Label htmlFor="partner-female-mobile" className="cursor-pointer">
+                            여성
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-base">상대방 생년월일</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Select value={partnerYear} onValueChange={setPartnerYear}>
+                          <SelectTrigger className="border-pink-100 focus-visible:ring-pink-500 dark:border-pink-800">
+                            <SelectValue placeholder="연도" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {years.map((y) => (
+                              <SelectItem key={`mobile-${y}`} value={y}>
+                                {y}년
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Select value={partnerMonth} onValueChange={setPartnerMonth}>
+                          <SelectTrigger className="border-pink-100 focus-visible:ring-pink-500 dark:border-pink-800">
+                            <SelectValue placeholder="월" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {months.map((m) => (
+                              <SelectItem key={`mobile-${m}`} value={m}>
+                                {Number.parseInt(m)}월
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Select value={partnerDay} onValueChange={setPartnerDay}>
+                          <SelectTrigger className="border-pink-100 focus-visible:ring-pink-500 dark:border-pink-800">
+                            <SelectValue placeholder="일" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {days.map((d) => (
+                              <SelectItem key={`mobile-${d}`} value={d}>
+                                {Number.parseInt(d)}일
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label
+                          htmlFor="partnerTime-mobile"
+                          className={`text-base ${partnerTimeUnknown ? "text-muted-foreground" : ""}`}
+                        >
+                          상대방 태어난 시간
+                        </Label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="timeUnknown-mobile"
+                            checked={partnerTimeUnknown}
+                            onChange={(e) => setPartnerTimeUnknown(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-pink-500"
+                          />
+                          <Label htmlFor="timeUnknown-mobile" className="text-sm font-normal cursor-pointer">
+                            시간 모름
+                          </Label>
+                        </div>
+                      </div>
+                      <Input
+                        id="partnerTime-mobile"
+                        value={partnerTime}
+                        onChange={(e) => setPartnerTime(e.target.value)}
+                        placeholder="2330 또는 23:30 형식으로 입력"
+                        disabled={partnerTimeUnknown}
+                        className={`border-pink-100 focus-visible:ring-pink-500 dark:border-pink-800 ${partnerTimeUnknown ? "bg-muted" : ""}`}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        24시간 형식으로 입력하세요. 예) 오후 11시 30분 {"->"} 2330 또는 23:30
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mt-4">
+                    <Label className="text-base">현재 관계 상태</Label>
+                    <Select value={partnerRelationshipStatus} onValueChange={setPartnerRelationshipStatus}>
+                      <SelectTrigger className="border-pink-100 focus-visible:ring-pink-500 dark:border-pink-800">
+                        <SelectValue placeholder="관계 상태 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unknown">선택 안함</SelectItem>
+                        <SelectItem value="solo">솔로 (처음 만남)</SelectItem>
+                        <SelectItem value="flirting">썸 타는 중</SelectItem>
+                        <SelectItem value="dating">연애 중</SelectItem>
+                        <SelectItem value="married">결혼 중</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      현재 관계 상태에 맞는 맞춤형 궁합 분석을 제공합니다.
+                    </p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full mt-6 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white dark:text-white"
+                    disabled={isAnalyzingCompatibility}
+                    size="lg"
+                  >
+                    {isAnalyzingCompatibility ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        궁합 분석 중...
+                      </>
+                    ) : (
+                      "궁합 분석하기"
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  {/* 사주 비교 표시 */}
+                  {partnerSaju && (
+                    <CompatibilityComparison
+                      userSaju={saju}
+                      partnerSaju={partnerSaju}
+                      userName={name || "나"}
+                      partnerName={partnerName}
+                    />
+                  )}
+
+                  <CompatibilityResultCardComponent
+                    result={compatibilityResult}
+                    onReset={() => {
+                      setCompatibilityResult(null)
+                      setPartnerSaju(null)
+                    }}
+                  />
+                </div>
+              )}
+
+              {compatibilityError && (
+                <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">{compatibilityError}</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="mb-4">
         <Pagination className="w-full">
           <PaginationContent className="w-full grid grid-cols-2 gap-1">
@@ -947,7 +1212,10 @@ export default function AdditionalQuestions({
       <div className="w-full mb-6">
         <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl p-0.5 shadow-lg">
           <button
-            onClick={() => setShowCompatibilityForm(!showCompatibilityForm)}
+            onClick={(e) => {
+              e.preventDefault()
+              setShowCompatibilityForm(!showCompatibilityForm)
+            }}
             className={`w-full text-left rounded-2xl px-4 py-3 transition-all 
        ${showCompatibilityForm ? "bg-transparent text-white" : "bg-background hover:bg-background/90"}
        flex items-start gap-3 relative overflow-visible group`}
@@ -1273,18 +1541,18 @@ export default function AdditionalQuestions({
   )
 
   // 채팅 페이지로 이동하는 함수
-  const handleChatStart = () => {
+  function handleChatStart() {
     // 현재 URL을 returnPath로 사용
     const currentPath = window.location.pathname + window.location.search
 
-    const chatParams = new URLSearchParams()
-    chatParams.set("saju", JSON.stringify(saju))
-    chatParams.set("name", name)
-    chatParams.set("gender", gender)
-    chatParams.set("interpretation", interpretation)
-    chatParams.set("returnPath", currentPath)
+    const params = new URLSearchParams()
+    params.set("saju", JSON.stringify(saju))
+    params.set("name", name)
+    params.set("gender", gender)
+    params.set("interpretation", interpretation)
+    params.set("returnPath", currentPath)
 
-    router.push(`/chat?${chatParams.toString()}`)
+    router.push(`/chat?${params.toString()}`)
   }
 
   return <>{isMobile ? renderMobilePagination() : renderDesktopView()}</>

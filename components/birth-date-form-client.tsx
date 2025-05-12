@@ -208,8 +208,9 @@ export default function BirthDateFormClient() {
         monthStem: sajuResult.monthStem,
         monthBranch: sajuResult.monthBranch,
         dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.hourBranch,
+        dayBranch: sajuResult.dayBranch,
         hourStem: sajuResult.hourStem,
+        hourBranch: sajuResult.hourBranch,
         elements: sajuResult.elements,
         interpretation: sajuResult.interpretation,
         yearStemSibseong: sajuResult.yearStemSibseong,
@@ -522,19 +523,13 @@ export default function BirthDateFormClient() {
                 </span>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 p-0 ml-1"
-                      type="button"
-                      onClick={(e) => e.preventDefault()}
-                    >
+                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0 ml-1">
                       <InfoIcon className="h-4 w-4" />
                       <span className="sr-only">도시 선택 안내</span>
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-80 p-3 text-sm">
-                    <p>태어난 도시를 바탕으로 시간이 자동 계산됩니다</p>
+                    <p>태어난 도시를 선택하면 해당 지역의 시간대에 맞게 사주가 계산됩니다.</p>
                   </PopoverContent>
                 </Popover>
               </>
