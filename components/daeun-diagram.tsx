@@ -36,7 +36,6 @@ export default function DaeunDiagram({
   const [error, setError] = useState<string | null>(null)
   const [daeunInfo, setDaeunInfo] = useState<any>(null)
   const [currentDaeunIndex, setCurrentDaeunIndex] = useState(0)
-  const [debugInfo, setDebugInfo] = useState<string>("")
 
   useEffect(() => {
     try {
@@ -62,8 +61,8 @@ export default function DaeunDiagram({
       const info = calculateDaeunInfo(saju, birthYear, birthMonth, birthDay, normalizedGender, birthHour, birthMinute)
       setDaeunInfo(info)
 
-      // 현재 나이 계산 (한국식)
-      const currentAge = calculateKoreanAge(birthYear)
+      // 현재 나이 계산 (만 나이)
+      const currentAge = calculateKoreanAge(birthYear, birthMonth, birthDay)
 
       // 현재 대운 인덱스 계산
       const index = getCurrentDaeunIndex(info.pillars, currentAge)
@@ -161,6 +160,7 @@ export default function DaeunDiagram({
         <div className="text-xs text-muted-foreground space-y-1">
           <p>※ 대운은 10년 단위로 변화하는 큰 운의 흐름입니다.</p>
           <p>※ 대운세수는 생일과 절입일의 차이를 기준으로 계산됩니다.</p>
+          <p>※ 모든 나이는 만 나이 기준입니다.</p>
           {timeUnknown && (
             <p className="text-yellow-600 dark:text-yellow-400">
               ※ 출생시간이 불확실하여 대략적인 대운 계산만 가능합니다.

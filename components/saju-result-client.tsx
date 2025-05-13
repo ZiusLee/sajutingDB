@@ -18,6 +18,7 @@ import AdditionalQuestions from "./additional-questions"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import DaeunDiagram from "./daeun-diagram"
+import Link from "next/link"
 
 interface SajuResultClientProps {
   saju: Saju
@@ -35,6 +36,7 @@ interface SajuResultClientProps {
   model?: string
   relationshipStatus?: string
   location?: string
+  uuid?: string
 }
 
 export default function SajuResultClient({
@@ -53,6 +55,7 @@ export default function SajuResultClient({
   model = "",
   relationshipStatus = "",
   location = "서울특별시",
+  uuid = "",
 }: SajuResultClientProps) {
   const [interpretation, setInterpretation] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -306,6 +309,8 @@ ${interpretation}
     }
   }
 
+  const sajuParam = JSON.stringify(saju)
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
@@ -384,6 +389,19 @@ ${interpretation}
                   <Button className="w-full flex items-center justify-center gap-2" onClick={navigateToChatList}>
                     <MessageSquare className="h-4 w-4" />
                     <span>사주 채팅 상담 시작하기</span>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link
+                      href={
+                        uuid
+                          ? `/daeun-analysis?uuid=${uuid}`
+                          : sajuParam
+                            ? `/daeun-analysis?saju=${encodeURIComponent(sajuParam)}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
+                            : `/daeun-analysis?date=${solarYear}${solarMonth}${solarDay}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
+                      }
+                    >
+                      10년 대운 상세분석
+                    </Link>
                   </Button>
                 </div>
               </div>
@@ -598,6 +616,19 @@ ${interpretation}
                   <Button className="w-full flex items-center justify-center gap-2" onClick={navigateToChatList}>
                     <MessageSquare className="h-4 w-4" />
                     <span>사주 채팅 상담 시작하기</span>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link
+                      href={
+                        uuid
+                          ? `/daeun-analysis?uuid=${uuid}`
+                          : sajuParam
+                            ? `/daeun-analysis?saju=${encodeURIComponent(sajuParam)}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
+                            : `/daeun-analysis?date=${solarYear}${solarMonth}${solarDay}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
+                      }
+                    >
+                      10년 대운 상세분석
+                    </Link>
                   </Button>
                 </div>
               </CardContent>

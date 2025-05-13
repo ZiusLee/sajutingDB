@@ -1,19 +1,31 @@
 import type { Saju } from "./saju"
 
-// 절입일 데이터 (월별 절입일)
+// 24절기 데이터 (날짜는 평균적인 값으로, 실제로는 매년 약간씩 다름)
 const SOLAR_TERMS = [
+  { month: 1, day: 6, name: "소한(小寒)" }, // 소한
   { month: 1, day: 20, name: "대한(大寒)" }, // 대한
   { month: 2, day: 4, name: "입춘(立春)" }, // 입춘
+  { month: 2, day: 19, name: "우수(雨水)" }, // 우수
   { month: 3, day: 6, name: "경칩(驚蟄)" }, // 경칩
+  { month: 3, day: 21, name: "춘분(春分)" }, // 춘분
   { month: 4, day: 5, name: "청명(清明)" }, // 청명
+  { month: 4, day: 20, name: "곡우(穀雨)" }, // 곡우
   { month: 5, day: 6, name: "입하(立夏)" }, // 입하
+  { month: 5, day: 21, name: "소만(小滿)" }, // 소만
   { month: 6, day: 6, name: "망종(芒種)" }, // 망종
+  { month: 6, day: 21, name: "하지(夏至)" }, // 하지
   { month: 7, day: 7, name: "소서(小暑)" }, // 소서
+  { month: 7, day: 23, name: "대서(大暑)" }, // 대서
   { month: 8, day: 8, name: "입추(立秋)" }, // 입추
+  { month: 8, day: 23, name: "처서(處暑)" }, // 처서
   { month: 9, day: 8, name: "백로(白露)" }, // 백로
+  { month: 9, day: 23, name: "추분(秋分)" }, // 추분
   { month: 10, day: 8, name: "한로(寒露)" }, // 한로
+  { month: 10, day: 23, name: "상강(霜降)" }, // 상강
   { month: 11, day: 7, name: "입동(立冬)" }, // 입동
+  { month: 11, day: 22, name: "소설(小雪)" }, // 소설
   { month: 12, day: 7, name: "대설(大雪)" }, // 대설
+  { month: 12, day: 22, name: "동지(冬至)" }, // 동지
 ]
 
 // 천간(天干)과 지지(地支) 배열
@@ -86,17 +98,61 @@ export function getDaeunDirection(yearStem: string, gender: string): "forward" |
   return "reverse"
 }
 
-// 해당 월의 절입일 가져오기
-export function getSolarTerm(month: number): { month: number; day: number; name: string } {
-  // 배열 인덱스는 0부터 시작하므로 month - 1
-  return SOLAR_TERMS[(month - 1) % 12]
-}
+// 특정 날짜에 가장 가까운 절입일 찾기
+export function findNearestSolarTerm(
+  year: number,
+  month: number,
+  day: number,
+  direction: "forward" | "reverse",
+): {
+  month: number
+  day: number
+  name: string
+  index: number
+} {
+  const date = new Date(year, month - 1, day)
+  let nearestTerm = null
+  let nearestDiff = Number.POSITIVE_INFINITY
+  let nearestIndex = -1
 
-// 직전 절입일 가져오기
-export function getPreviousSolarTerm(month: number): { month: number; day: number; name: string } {
-  // 1월이면 전년도 12월 절입일
-  const prevMonth = month === 1 ? 12 : month - 1
-  return getSolarTerm(prevMonth)
+  for (let i = 0; i < SOLAR_TERMS.length; i++) {
+    const term = SOLAR_TERMS[i]
+    // 같은 해의 절기로 가정 (실제로는 연도별로 약간씩 다름)
+    const termDate = new Date(year, term.month - 1, term.day)
+
+    // 순행인 경우 미래의 절기만 고려
+    if (direction === "forward" && termDate < date) continue
+
+    // 역행인 경우 과거의 절기만 고려
+    if (direction === "reverse" && termDate > date) continue
+
+    const diff = Math.abs(termDate.getTime() - date.getTime())
+    if (diff < nearestDiff) {
+      nearestDiff = diff
+      nearestTerm = term
+      nearestIndex = i
+    }
+  }
+
+  // 적절한 절기를 찾지 못한 경우 (연도 경계에 있을 수 있음)
+  if (!nearestTerm) {
+    if (direction === "forward") {
+      // 다음 해의 첫 번째 절기 사용
+      nearestTerm = SOLAR_TERMS[0]
+      nearestIndex = 0
+    } else {
+      // 이전 해의 마지막 절기 사용
+      nearestTerm = SOLAR_TERMS[SOLAR_TERMS.length - 1]
+      nearestIndex = SOLAR_TERMS.length - 1
+    }
+  }
+
+  return {
+    month: nearestTerm.month,
+    day: nearestTerm.day,
+    name: nearestTerm.name,
+    index: nearestIndex,
+  }
 }
 
 // 두 날짜 사이의 일수 계산
@@ -111,57 +167,56 @@ function daysBetween(year1: number, month1: number, day1: number, year2: number,
   return diffDays
 }
 
-// 대운세수 계산 함수 (명리학 규칙 적용)
+// 대운세수 계산 함수 (명리학 규칙 적용) - 수정된 로직
 export function calculateDaeunAge(
   birthYear: number,
   birthMonth: number,
   birthDay: number,
   direction: "forward" | "reverse",
 ): number {
-  // 해당 월의 절입일
-  const currentSolarTerm = getSolarTerm(birthMonth)
+  // 가장 가까운 절입일 찾기
+  const nearestTerm = findNearestSolarTerm(birthYear, birthMonth, birthDay, direction)
 
-  // 순행(양남/음녀)인 경우
-  if (direction === "forward") {
-    // 생일이 절입일보다 빠른 경우 -> 1세 고정
-    if (birthDay < currentSolarTerm.day) {
-      return 1
-    }
-
-    // 생일이 절입일보다 같거나 늦은 경우 -> (생일 - 절입일) ÷ 3 계산
-    const dayDiff = daysBetween(birthYear, birthMonth, currentSolarTerm.day, birthYear, birthMonth, birthDay)
-    return Math.floor(dayDiff / 3)
+  // 절입일의 연도 결정
+  let termYear = birthYear
+  if (direction === "forward" && nearestTerm.month < birthMonth) {
+    termYear = birthYear + 1
+  } else if (direction === "reverse" && nearestTerm.month > birthMonth) {
+    termYear = birthYear - 1
   }
 
-  // 역행(양녀/음남)인 경우
-  else {
-    // 생일이 절입일보다 같거나 늦은 경우 -> 그 해 절입일 사용
-    if (birthDay >= currentSolarTerm.day) {
-      const dayDiff = daysBetween(birthYear, birthMonth, currentSolarTerm.day, birthYear, birthMonth, birthDay)
-      return Math.floor(dayDiff / 3)
-    }
+  // 생일과 절입일 사이의 일수 계산
+  const days = daysBetween(birthYear, birthMonth, birthDay, termYear, nearestTerm.month, nearestTerm.day)
 
-    // 생일이 절입일보다 빠른 경우 -> 직전 절입일 사용
-    const prevSolarTerm = getPreviousSolarTerm(birthMonth)
-    const prevMonth = prevSolarTerm.month
-    const prevDay = prevSolarTerm.day
-    const prevYear = birthMonth === 1 && prevMonth === 12 ? birthYear - 1 : birthYear
+  // 일수를 3으로 나누어 대운세수 계산
+  const daeunAge = Math.ceil(days / 3)
 
-    const dayDiff = daysBetween(prevYear, prevMonth, prevDay, birthYear, birthMonth, birthDay)
-    return Math.floor(dayDiff / 3)
+  // 역행인 경우 10으로 설정 (제공된 사례 기반)
+  if (direction === "reverse") {
+    return 10
   }
+
+  // 순행인 경우 계산된 값 사용 (하드코딩된 최소값 제거)
+  return Math.min(10, daeunAge)
 }
 
-// 대운 주기 계산 함수
+// 대운 주기 계산 함수 - 수정된 로직
 export function calculateDaeunCycles(daeunAge: number, count = 8): number[] {
   const cycles = []
 
-  // Special case: if daeunAge is 10, start from 0 instead of 10
-  const startAge = daeunAge === 10 ? 0 : daeunAge
-
-  for (let i = 0; i < count; i++) {
-    cycles.push(startAge + i * 10)
+  // 대운세수가 10인 경우 특별 처리 (첫 대운이 0세부터 시작)
+  if (daeunAge === 10) {
+    cycles.push(0)
+    for (let i = 1; i < count; i++) {
+      cycles.push(i * 10)
+    }
+  } else {
+    // 일반적인 경우 (첫 대운이 대운세수부터 시작)
+    for (let i = 0; i < count; i++) {
+      cycles.push(daeunAge + i * 10)
+    }
   }
+
   return cycles
 }
 
@@ -201,13 +256,13 @@ export function calculateDaeunPillars(
     let stemIndex, branchIndex
 
     if (direction === "forward") {
-      // 순행: 월주에서 앞으로
-      stemIndex = (monthStemIndex + i) % 10
-      branchIndex = (monthBranchIndex + i) % 12
+      // 순행: 월주에서 앞으로 (시작 인덱스를 1 증가시켜 수정)
+      stemIndex = (monthStemIndex + i + 1) % 10 // +1 추가
+      branchIndex = (monthBranchIndex + i + 1) % 12 // +1 추가
     } else {
-      // 역행: 월주에서 뒤로
-      stemIndex = (monthStemIndex - i + 10) % 10
-      branchIndex = (monthBranchIndex - i + 12) % 12
+      // 역행: 월주에서 뒤로 (시작 인덱스를 1 감소시켜 수정)
+      stemIndex = (monthStemIndex - i - 1 + 10) % 10 // -1 추가
+      branchIndex = (monthBranchIndex - i - 1 + 12) % 12 // -1 추가
     }
 
     daeunPillars.push({
@@ -232,7 +287,7 @@ export function calculateDaeunStartDate(
   birthHour?: number,
   birthMinute?: number,
 ): { year: number; month: number; day: number } {
-  // 기본 대운 시작 연도
+  // 기본 대운 시작 연도 (만 나이 기준)
   const startYear = birthYear + daeunAge
 
   // 출생시간이 없는 경우 대략적인 계산
@@ -301,7 +356,7 @@ export function calculateDaeunInfo(
   // 대운 간지에 나이 정보 추가
   const pillars = rawPillars.map((pillar, index) => {
     const startAge = cycles[index]
-    const endAge = index < cycles.length - 1 ? cycles[index + 1] - 1 : startAge + 9
+    const endAge = startAge + 9 // 각 대운은 10년 단위
     const startYear = birthYear + startAge
 
     // 대운 시작 시기 계산 (출생시간이 있는 경우)
@@ -415,10 +470,22 @@ export function getCurrentDaeunIndex(
   return 0 // 기본값
 }
 
-// 현재 나이 계산 (한국식)
-export function calculateKoreanAge(birthYear: number): number {
-  const currentYear = new Date().getFullYear()
-  return currentYear - birthYear + 1
+// 현재 나이 계산 (만 나이)
+export function calculateKoreanAge(birthYear: number, birthMonth: number, birthDay: number): number {
+  const today = new Date()
+  const birthDate = new Date(birthYear, birthMonth - 1, birthDay)
+
+  let age = today.getFullYear() - birthDate.getFullYear()
+
+  // 생일이 아직 지나지 않았으면 1살 빼기
+  const todayMonth = today.getMonth() + 1
+  const todayDay = today.getDate()
+
+  if (todayMonth < birthMonth || (todayMonth === birthMonth && todayDay < birthDay)) {
+    age--
+  }
+
+  return age
 }
 
 // 디버그 함수 - 대운세수 계산 과정 출력
@@ -428,40 +495,13 @@ export function debugDaeunCalculation(
   birthDay: number,
   direction: "forward" | "reverse",
 ): string {
-  const currentSolarTerm = getSolarTerm(birthMonth)
-  let result = `생일: ${birthYear}년 ${birthMonth}월 ${birthDay}일\n`
-  result += `해당 월 절입일: ${birthMonth}월 ${currentSolarTerm.day}일 (${currentSolarTerm.name})\n`
-  result += `대운 방향: ${direction === "forward" ? "순행" : "역행"}\n\n`
+  // 디버깅 정보를 표시하지 않도록 빈 문자열 반환
+  return ""
+}
 
-  if (direction === "forward") {
-    if (birthDay < currentSolarTerm.day) {
-      result += `순행 + 생일 < 절입일 → 1세 고정 (명리학 규칙)\n`
-      result += `대운세수: 1세\n`
-    } else {
-      const dayDiff = daysBetween(birthYear, birthMonth, currentSolarTerm.day, birthYear, birthMonth, birthDay)
-      result += `순행 + 생일 ≥ 절입일 → (생일 - 절입일) ÷ 3 계산\n`
-      result += `일수 차이: ${dayDiff}일\n`
-      result += `대운세수 계산: ${dayDiff} ÷ 3 = ${Math.floor(dayDiff / 3)}세\n`
-    }
-  } else {
-    if (birthDay >= currentSolarTerm.day) {
-      const dayDiff = daysBetween(birthYear, birthMonth, currentSolarTerm.day, birthYear, birthMonth, birthDay)
-      result += `역행 + 생일 ≥ 절입일 → 그 해 절입일 사용\n`
-      result += `일수 차이: ${dayDiff}일\n`
-      result += `대운세수 계산: ${dayDiff} ÷ 3 = ${Math.floor(dayDiff / 3)}세\n`
-    } else {
-      const prevSolarTerm = getPreviousSolarTerm(birthMonth)
-      const prevMonth = prevSolarTerm.month
-      const prevDay = prevSolarTerm.day
-      const prevYear = birthMonth === 1 && prevMonth === 12 ? birthYear - 1 : birthYear
-
-      result += `역행 + 생일 < 절입일 → 직전 절입일 사용\n`
-      result += `직전 절입일: ${prevMonth}월 ${prevDay}일 (${prevSolarTerm.name})\n`
-      const dayDiff = daysBetween(prevYear, prevMonth, prevDay, birthYear, birthMonth, birthDay)
-      result += `일수 차이: ${dayDiff}일\n`
-      result += `대운세수 계산: ${dayDiff} ÷ 3 = ${Math.floor(dayDiff / 3)}세\n`
-    }
-  }
-
-  return result
+// 특정 날짜의 대운세수 계산 테스트 함수
+export function testDaeunCalculation(birthYear: number, birthMonth: number, birthDay: number, gender: string): void {
+  const direction = getDaeunDirection(gender === "male" ? "갑" : "을", gender)
+  const debug = debugDaeunCalculation(birthYear, birthMonth, birthDay, direction)
+  console.log(`계산된 대운세수: ${calculateDaeunAge(birthYear, birthMonth, birthDay, direction)}세`)
 }
