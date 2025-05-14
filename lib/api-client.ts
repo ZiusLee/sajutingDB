@@ -122,6 +122,7 @@ export async function getSajuInterpretation(
     if (!response.ok) {
       console.error("API response error:", response.status, responseText.substring(0, 200) + "...")
 
+      // 서버 오류 처리 개선
       if (response.status === 504 || response.status === 500) {
         console.log("Returning fallback interpretation due to server error")
         return {
@@ -138,11 +139,13 @@ export async function getSajuInterpretation(
 ## 오류 정보:
 - 오류 시간: ${new Date().toISOString()}
 - 오류 내용: 서버 오류 (${response.status})
+- 오류 메시지: ${responseText.substring(0, 100)}...
 
 ## 문제 해결 방법:
 1. 페이지를 새로고침하고 다시 시도해보세요.
 2. 인터넷 연결을 확인해보세요.
 3. 잠시 후 다시 시도해보세요.
+4. 계속 문제가 발생하면 다른 브라우저에서 시도해보세요.
 `,
           error: `서버 오류: ${response.status}`,
         }
@@ -179,6 +182,7 @@ export async function getSajuInterpretation(
       return data
     } catch (parseError) {
       console.error("Error parsing API response:", parseError)
+      console.error("Response text:", responseText.substring(0, 200) + "...")
 
       // 응답이 JSON이 아닌 경우 (HTML 오류 페이지 등)
       return {
@@ -195,10 +199,12 @@ export async function getSajuInterpretation(
 ## 오류 정보:
 - 오류 시간: ${new Date().toISOString()}
 - 오류 내용: 응답 데이터 처리 오류
+- 응답 데이터 일부: ${responseText.substring(0, 100)}...
 
 ## 문제 해결 방법:
 1. 페이지를 새로고침하고 다시 시도해보세요.
 2. 잠시 후 다시 시도해보세요.
+3. 브라우저 캐시를 지우고 다시 시도해보세요.
 `,
         error: "응답 데이터 처리 오류",
       }
@@ -223,6 +229,7 @@ export async function getSajuInterpretation(
 1. 페이지를 새로고침하고 다시 시도해보세요.
 2. 인터넷 연결을 확인해보세요.
 3. 잠시 후 다시 시도해보세요.
+4. 서버 부하가 높을 수 있으니 한 시간 후에 다시 시도해보세요.
 `,
         error: "사주 해석 요청 시간이 초과되었습니다.",
       }
@@ -245,6 +252,7 @@ export async function getSajuInterpretation(
 1. 인터넷 연결을 확인해보세요.
 2. 페이지를 새로고침하고 다시 시도해보세요.
 3. 잠시 후 다시 시도해보세요.
+4. 다른 네트워크에서 접속해보세요.
 `,
         error: "네트워크 오류",
       }
@@ -259,7 +267,7 @@ export async function getSajuInterpretation(
 
 ## 기본적인 해석:
 - 일주(日柱)를 중심으로 성격과 성향을 파악할 수 있습니다.
-- 오행의 균형에 따라 삶의 방향성��� 달라질 수 있습니다.
+- 오행의 균형에 따라 삶의 방향성이 달라질 수 있습니다.
 - 상세한 해석은 전문가와 상담하시는 것이 좋습니다.
 
 ## 오류 정보:
@@ -270,6 +278,7 @@ export async function getSajuInterpretation(
 1. 페이지를 새로고침하고 다시 시도해보세요.
 2. 인터넷 연결을 확인해보세요.
 3. 잠시 후 다시 시도해보세요.
+4. 브라우저를 업데이트하거나 다른 브라우저를 사용해보세요.
 `,
       error: error instanceof Error ? error.message : "알 수 없는 오류",
     }

@@ -421,6 +421,7 @@ export default function SajuChat({
   const [showSajuInfo, setShowSajuInfo] = useState(false)
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
+  const [retryCount, setRetryCount] = useState(0) // 재시도 횟수 추적
 
   // Get saved chat session or create initial messages
   const savedSession = activeChatSession || getChatSession(sessionKey)
@@ -483,6 +484,9 @@ export default function SajuChat({
 
       // 오류 상태 초기화
       setStreamingError(null)
+
+      // 재시도 횟수 초기화
+      setRetryCount(0)
     },
     onError: (error) => {
       console.error("Chat error:", error)
@@ -500,6 +504,8 @@ export default function SajuChat({
           errorMessage = "요청 시간이 초과되었습니다. 다시 시도해주세요."
         } else if (error.message.includes("model")) {
           errorMessage = "AI 모델 로딩 중 오류가 발생했습니다. 다시 시도해주세요."
+        } else if (error.message.includes("parse") || error.message.includes("JSON")) {
+          errorMessage = "응답 처리 중 오류가 발생했습니다. 다시 시도해주세요."
         }
       }
 
@@ -526,8 +532,15 @@ export default function SajuChat({
 
   // 재시도 핸들러
   const handleRetry = useCallback(() => {
+    // 재시도 횟수 제한 (최대 3회)
+    if (retryCount >= 3) {
+      setStreamingError("여러 번 재시도했으나 계속 오류가 발생합니다. 잠시 후 다시 시도해주세요.")
+      return
+    }
+
     setIsRetrying(true)
     setStreamingError(null)
+    setRetryCount((prev) => prev + 1)
 
     try {
       // 마지막 사용자 메시지 찾기
@@ -551,7 +564,7 @@ export default function SajuChat({
     } finally {
       setIsRetrying(false)
     }
-  }, [messages, append, reload])
+  }, [messages, append, reload, retryCount])
 
   // 원래의 handleSubmit 함수 저장
   const originalHandleSubmit = handleSubmit
@@ -589,6 +602,9 @@ export default function SajuChat({
 
     // 오류 상태 초기화
     setStreamingError(null)
+
+    // 재시도 횟수 초기화
+    setRetryCount(0)
 
     // 원래의 handleSubmit 함수 호출
     originalHandleSubmit(e)
@@ -988,15 +1004,27 @@ export default function SajuChat({
                 <div className="flex justify-center my-4">
                   <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-lg p-3 text-sm flex flex-col items-center max-w-[85%]">
                     <p>{streamingError}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRetry}
-                      className="mt-2 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 flex items-center gap-1"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      다시 시도
-                    </Button>
+                    {retryCount < 3 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRetry}
+                        className="mt-2 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 flex items-center gap-1"
+                        disabled={isRetrying}
+                      >
+                        {isRetrying ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            재시도 중...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3 w-3" />
+                            다시 시도 ({retryCount}/3)
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}

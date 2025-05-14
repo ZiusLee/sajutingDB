@@ -301,7 +301,7 @@ ${relationshipGuidance}
 
       try {
         const { text } = await generateText({
-          model: openai("gpt-4.1-mini"), // Changed from gpt-4.1 to gpt-4.1-mini
+          model: openai("gpt-4.1-mini"), // Changed from gpt-4.1-mini to gpt-4o
           prompt: prompt,
           temperature: 0.8,
           maxTokens: 3500,
@@ -322,12 +322,14 @@ ${relationshipGuidance}
         })
       } catch (openaiError) {
         console.error("Error calling OpenAI API:", openaiError)
+        console.error("Error details:", JSON.stringify(openaiError, null, 2))
 
         // OpenAI API 오류 시 폴백 해석 반환
         return NextResponse.json(
           {
             fallbackInterpretation: createFallbackInterpretation(openaiError),
             error: openaiError instanceof Error ? openaiError.message : "Unknown OpenAI API error",
+            errorDetails: JSON.stringify(openaiError, null, 2),
           },
           { status: 500 },
         )
