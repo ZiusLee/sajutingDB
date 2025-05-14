@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { MessageSquare } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -67,13 +66,6 @@ export default function SajuResultClient({
   const [isMobile, setIsMobile] = useState(false)
   // 컴포넌트 내부에서 searchParams 사용
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState(() => {
-    // URL 파라미터에서 탭 정보를 읽어옴
-    const tabParam = searchParams.get("tab")
-    return tabParam === "interpretation" ? "interpretation" : "diagram"
-  })
-  // 탭 참조를 위한 ref 추가
-  const tabsRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const [questionSet, setQuestionSet] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
@@ -293,499 +285,207 @@ ${interpretation}
     setImageError(true)
   }
 
-  // 총운 리포트 탭으로 이동하는 함수
-  const navigateToInterpretationTab = () => {
-    if (isMobile) {
-      setActiveTab("interpretation")
-      // 모바일에서는 페이지 상단으로 스크롤
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    } else {
-      // 데스크톱에서는 상태를 변경하고 탭 컴포넌트의 value를 업데이트
-      setActiveTab("interpretation")
-      // 탭 요소가 있으면 해당 요소로 스크롤
-      if (tabsRef.current) {
-        tabsRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
-      }
-    }
-  }
-
   const sajuParam = JSON.stringify(saju)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
         <h2 className="text-xl font-bold">사주 결과 {name ? `- ${name}님` : ""}</h2>
       </div>
 
-      {isMobile ? (
-        <div className="sm:hidden">
-          <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
-            <div className="flex border-b border-gray-200 dark:border-gray-800">
-              <button
-                onClick={() => setActiveTab("diagram")}
-                className={`flex-1 py-2 px-3 text-center text-sm font-medium ${
-                  activeTab === "diagram"
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-gray-500 dark:text-gray-400"
-                }`}
-              >
-                사주 도표
-              </button>
-              <button
-                onClick={() => setActiveTab("interpretation")}
-                className={`flex-1 py-2 px-3 text-center text-sm font-medium ${
-                  activeTab === "interpretation"
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-gray-500 dark:text-gray-400"
-                }`}
-              >
-                나의 총운 리포트
-              </button>
-            </div>
+      <Card>
+        <CardContent className="p-4">
+          <SajuDiagram
+            saju={saju}
+            timeUnknown={timeUnknown}
+            name={name}
+            gender={normalizedGender}
+            solarYear={solarYear}
+            solarMonth={solarMonth}
+            solarDay={solarDay}
+            hour={hour}
+            minute={minute}
+            lunarYear={lunarYear}
+            lunarMonth={lunarMonth}
+            lunarDay={lunarDay}
+            location={location}
+          />
 
-            {activeTab === "diagram" && (
-              <div className="p-3">
-                <h3 className="text-base font-medium mb-2">사주 도표</h3>
-                <SajuDiagram
-                  saju={saju}
-                  timeUnknown={timeUnknown}
-                  name={name}
-                  gender={normalizedGender}
-                  solarYear={solarYear}
-                  solarMonth={solarMonth}
-                  solarDay={solarDay}
-                  hour={hour}
-                  minute={minute}
-                  lunarYear={lunarYear}
-                  lunarMonth={lunarMonth}
-                  lunarDay={lunarDay}
-                  location={location}
-                />
+          {/* 총운 리포트 섹션 */}
+          <div className="mt-8">
+            <h3 className="text-xl font-bold mb-4">나의 총운 리포트</h3>
 
-                {/* 대운 다이어그램 추가 */}
-                <DaeunDiagram
-                  saju={saju}
-                  gender={normalizedGender}
-                  solarYear={solarYear}
-                  solarMonth={solarMonth}
-                  solarDay={solarDay}
-                  hour={hour}
-                  minute={minute}
-                  timeUnknown={timeUnknown}
-                />
+            {!interpretation && !isLoading && !error && (
+              <div className="flex flex-col items-center justify-center py-6 space-y-3">
+                <p className="text-center text-muted-foreground">AI를 통한 나의 총운 리포트를 받아보세요.</p>
+                <Button onClick={fetchInterpretation}>총운 리포트 받기</Button>
+              </div>
+            )}
 
-                <div className="mt-4 mb-2">
-                  <Button
-                    variant="outline"
-                    className="w-full flex items-center justify-center gap-2"
-                    onClick={navigateToInterpretationTab}
-                  >
-                    <span>나의 총운 리포트 보기</span>
-                  </Button>
+            {isLoading && (
+              <div className="flex flex-col items-center justify-center py-6 space-y-3">
+                <div className="animate-float">
+                  {imageError ? (
+                    <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
+                      <span className="text-primary text-xl">🔮</span>
+                    </div>
+                  ) : (
+                    <Image
+                      src="/images/sajuping_character.png"
+                      alt="사주핑 캐릭터"
+                      width={80}
+                      height={80}
+                      className="opacity-90"
+                      onError={handleImageError}
+                    />
+                  )}
                 </div>
-
-                {/* Add chat button to diagram tab - Mobile */}
-                <div className="mt-6">
-                  <Button className="w-full flex items-center justify-center gap-2" onClick={navigateToChatList}>
-                    <MessageSquare className="h-4 w-4" />
-                    <span>사주 채팅 상담 시작하기</span>
-                  </Button>
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link
-                      href={
-                        uuid
-                          ? `/daeun-analysis?uuid=${uuid}`
-                          : sajuParam
-                            ? `/daeun-analysis?saju=${encodeURIComponent(sajuParam)}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                            : `/daeun-analysis?date=${solarYear}${solarMonth}${solarDay}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                      }
-                    >
-                      10년 대운 상세분석
-                    </Link>
-                  </Button>
+                <div className="text-center space-y-1">
+                  <p className="font-medium text-primary">{loadingStage}</p>
+                  <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
+                </div>
+                <div className="w-full max-w-xs mt-1">
+                  <Progress value={loadingProgress} className="h-1.5" />
+                  <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgress.toFixed(0)}% 완료</p>
+                </div>
+                <div className="w-full max-w-xs mt-2 bg-muted/30 rounded-md p-2 h-24 overflow-y-auto">
+                  <div className="space-y-1 text-xs">
+                    {loadingMessages.map((message, index) => (
+                      <p key={index} className="text-muted-foreground">
+                        {message}
+                      </p>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            {activeTab === "interpretation" && (
-              <div className="p-3">
-                <h3 className="text-base font-medium mb-2">나의 총운 리포트</h3>
+            {error && (
+              <div className="text-red-500 text-center py-4">
+                <p>오류가 발생했습니다: {error}</p>
+                <Button onClick={fetchInterpretation} className="mt-3" variant="outline" size="sm">
+                  다시 시도
+                </Button>
+              </div>
+            )}
 
-                {!interpretation && !isLoading && !error && (
-                  <div className="flex flex-col items-center justify-center py-6 space-y-3">
-                    <p className="text-center text-muted-foreground">AI를 통한 나의 총운 리포트를 받아보세요.</p>
-                    <Button onClick={fetchInterpretation}>총운 리포트 받기</Button>
-                  </div>
-                )}
+            {interpretation && !isLoading && (
+              <div className="space-y-4">
+                <div className="markdown-content prose dark:prose-invert max-w-none">
+                  <ReactMarkdown>{interpretation}</ReactMarkdown>
+                </div>
+                <Separator className="my-4" />
+                <FeedbackButtons contentType="saju-interpretation" contentId={saju.dayStem + saju.dayBranch} />
 
-                {isLoading && (
-                  <div className="flex flex-col items-center justify-center py-6 space-y-3">
-                    <div className="animate-float">
-                      {imageError ? (
-                        <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
-                          <span className="text-primary text-xl">🔮</span>
-                        </div>
-                      ) : (
-                        <Image
-                          src="/images/sajuping_character.png"
-                          alt="사주핑 캐릭터"
-                          width={80}
-                          height={80}
-                          className="opacity-90"
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="text-center space-y-1">
-                      <p className="font-medium text-primary">{loadingStage}</p>
-                      <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
-                    </div>
-                    <div className="w-full max-w-xs mt-1">
-                      <Progress value={loadingProgress} className="h-1.5" />
-                      <p className="text-xs text-center mt-1 text-muted-foreground">
-                        {loadingProgress.toFixed(0)}% 완료
-                      </p>
-                    </div>
-                    <div className="w-full max-w-xs mt-2 bg-muted/30 rounded-md p-2 h-24 overflow-y-auto">
-                      <div className="space-y-1 text-xs">
-                        {loadingMessages.map((message, index) => (
-                          <p key={index} className="text-muted-foreground">
-                            {message}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="text-red-500 text-center py-4">
-                    <p>오류가 발생했습니다: {error}</p>
-                    <Button onClick={fetchInterpretation} className="mt-3" variant="outline" size="sm">
-                      다시 시도
-                    </Button>
-                  </div>
-                )}
-
-                {interpretation && !isLoading && (
-                  <div className="space-y-3">
-                    <div className="markdown-content text-sm prose dark:prose-invert max-w-none">
-                      <ReactMarkdown>{interpretation}</ReactMarkdown>
-                    </div>
-                    <Separator className="my-3" />
-                    <FeedbackButtons contentType="saju-interpretation" contentId={saju.dayStem + saju.dayBranch} />
-
-                    {/* Donation Section - Mobile */}
-                    <div className="mt-6 p-3 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
-                      <div className="flex flex-col items-center">
-                        <h3 className="text-lg font-bold mb-3">복채 주면 운이 더 좋아진다냥!</h3>
-                        <img
-                          src="/images/donation-cat.png"
-                          alt="복채 고양이"
-                          className="w-32 h-32 object-contain mb-3"
-                        />
-                        <div className="text-center space-y-1 text-xs dark:text-gray-200">
-                          <p>사주 다 보고 나면,오늘 운이 조금 더 잘 풀렸으면 좋겠다냥~ 🐾</p>
-                          <p>복채를 살짝 내면, 진짜 조~용히 복 하나가 따라붙는다냥. 🎁</p>
-                          <p>아무도 모르게, 딱! 오늘 하루, 좋은 기운이 너랑 함께할 거다냥! 🍀😽</p>
-                          <div className="mt-3 font-medium text-sm">
-                            <p className="text-base">토스뱅크</p>
-                            <div className="flex items-center justify-center gap-1 mt-1">
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText("1001-8576-5363")
-                                  const copyBtn = document.getElementById("copy-account-btn-mobile")
-                                  if (copyBtn) {
-                                    copyBtn.classList.add("text-green-600")
-                                    copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-check"><polyline points="20 6 9 17 4 12"/></svg>`
-                                    setTimeout(() => {
-                                      copyBtn.classList.remove("text-green-600")
-                                      copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`
-                                    }, 2000)
-                                  }
-                                  toast({
-                                    title: "계좌번호 복사 완료",
-                                    description: "계좌번호가 클립보드에 복사되었습니다.",
-                                  })
-                                }}
-                                className="text-base font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center"
-                                aria-label="계좌번호 복사"
+                {/* Donation Section */}
+                <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
+                  <div className="flex flex-col items-center">
+                    <h3 className="text-xl font-bold mb-3">복채 주면 운이 더 좋아진다냥!</h3>
+                    <img src="/images/donation-cat.png" alt="복채 고양이" className="w-32 h-32 object-contain mb-3" />
+                    <div className="text-center space-y-1 text-xs dark:text-gray-200">
+                      <p>사주 다 보고 나면,오늘 운이 조금 더 잘 풀렸으면 좋겠다냥~ 🐾</p>
+                      <p>복채를 살짝 내면, 진짜 조~용히 복 하나가 따라붙는다냥. 🎁</p>
+                      <p>아무도 모르게, 딱! 오늘 하루, 좋은 기운이 너랑 함께할 거다냥! 🍀😽</p>
+                      <div className="mt-3 font-medium text-sm">
+                        <p className="text-base">토스뱅크</p>
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText("1001-8576-5363")
+                              const copyBtn = document.getElementById("copy-account-btn-mobile")
+                              if (copyBtn) {
+                                copyBtn.classList.add("text-green-600")
+                                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-check"><polyline points="20 6 9 17 4 12"/></svg>`
+                                setTimeout(() => {
+                                  copyBtn.classList.remove("text-green-600")
+                                  copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`
+                                }, 2000)
+                              }
+                              toast({
+                                title: "계좌번호 복사 완료",
+                                description: "계좌번호가 클립보드에 복사되었습니다.",
+                              })
+                            }}
+                            className="text-base font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+                            aria-label="계좌번호 복사"
+                          >
+                            1001-8576-5363
+                            <span id="copy-account-btn-mobile" className="ml-1 inline-flex items-center">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="lucide lucide-copy"
                               >
-                                1001-8576-5363
-                                <span id="copy-account-btn-mobile" className="ml-1 inline-flex items-center">
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="lucide lucide-copy"
-                                  >
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                  </svg>
-                                </span>
-                              </button>
-                            </div>
-                            <p className="text-base mt-1">사주핑 (선현국)</p>
-                          </div>
+                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                              </svg>
+                            </span>
+                          </button>
                         </div>
+                        <p className="text-base mt-1">사주핑 (선현국)</p>
                       </div>
                     </div>
-
-                    {/* Add chat button to interpretation tab - Mobile */}
-                    <Button className="w-full flex items-center justify-center gap-2 mt-4" onClick={navigateToChatList}>
-                      <MessageSquare className="h-4 w-4" />
-                      <span>사주 채팅 상담 시작하기</span>
-                    </Button>
-
-                    {/* 추가 질문 섹션 - 모바일 */}
-                    <div id="additional-questions-mobile" className="mt-6">
-                      <AdditionalQuestions
-                        saju={saju}
-                        name={name}
-                        gender={normalizedGender}
-                        model={model}
-                        relationshipStatus={relationshipStatus}
-                        interpretation={interpretation}
-                      />
-                    </div>
                   </div>
-                )}
+                </div>
+
+                {/* 추가 질문 섹션 */}
+                <div id="additional-questions" className="mt-6">
+                  <AdditionalQuestions
+                    saju={saju}
+                    name={name}
+                    gender={normalizedGender}
+                    model={model}
+                    relationshipStatus={relationshipStatus}
+                    interpretation={interpretation}
+                  />
+                </div>
               </div>
             )}
           </div>
-        </div>
-      ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" ref={tabsRef}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="diagram" data-value="diagram">
-              사주 도표
-            </TabsTrigger>
-            <TabsTrigger value="interpretation" data-value="interpretation">
-              나의 총운 리포트
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="diagram" className="mt-4">
-            <Card>
-              <CardContent className="p-4">
-                <SajuDiagram
-                  saju={saju}
-                  timeUnknown={timeUnknown}
-                  name={name}
-                  gender={normalizedGender}
-                  solarYear={solarYear}
-                  solarMonth={solarMonth}
-                  solarDay={solarDay}
-                  hour={hour}
-                  minute={minute}
-                  lunarYear={lunarYear}
-                  lunarMonth={lunarMonth}
-                  lunarDay={lunarDay}
-                  location={location}
-                />
 
-                {/* 대운 다이어그램 추가 */}
-                <DaeunDiagram
-                  saju={saju}
-                  gender={normalizedGender}
-                  solarYear={solarYear}
-                  solarMonth={solarMonth}
-                  solarDay={solarDay}
-                  hour={hour}
-                  minute={minute}
-                  timeUnknown={timeUnknown}
-                />
+          {/* 대운 다이어그램 */}
+          <div className="mt-8">
+            <DaeunDiagram
+              saju={saju}
+              gender={normalizedGender}
+              solarYear={solarYear}
+              solarMonth={solarMonth}
+              solarDay={solarDay}
+              hour={hour}
+              minute={minute}
+              timeUnknown={timeUnknown}
+            />
+          </div>
 
-                <div className="mt-4 mb-2">
-                  <Button
-                    variant="outline"
-                    className="w-full flex items-center justify-center gap-2"
-                    onClick={navigateToInterpretationTab}
-                  >
-                    <span>나의 총운 리포트 보기</span>
-                  </Button>
-                </div>
-
-                {/* Add chat button to diagram tab - Desktop */}
-                <div className="mt-6">
-                  <Button className="w-full flex items-center justify-center gap-2" onClick={navigateToChatList}>
-                    <MessageSquare className="h-4 w-4" />
-                    <span>사주 채팅 상담 시작하기</span>
-                  </Button>
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link
-                      href={
-                        uuid
-                          ? `/daeun-analysis?uuid=${uuid}`
-                          : sajuParam
-                            ? `/daeun-analysis?saju=${encodeURIComponent(sajuParam)}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                            : `/daeun-analysis?date=${solarYear}${solarMonth}${solarDay}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                      }
-                    >
-                      10년 대운 상세분석
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="interpretation" className="mt-4">
-            <Card>
-              <CardContent className="p-4">
-                {!interpretation && !isLoading && !error && (
-                  <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                    <p className="text-center text-muted-foreground">AI를 통한 나의 총운 리포트를 받아보세요.</p>
-                    <Button onClick={fetchInterpretation}>총운 리포트 받기</Button>
-                  </div>
-                )}
-
-                {isLoading && (
-                  <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                    <div className="animate-float">
-                      {imageError ? (
-                        <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center">
-                          <span className="text-primary text-2xl">🔮</span>
-                        </div>
-                      ) : (
-                        <Image
-                          src="/images/sajuping_character.png"
-                          alt="사주핑 캐릭터"
-                          width={100}
-                          height={100}
-                          className="opacity-90"
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="text-center space-y-2">
-                      <p className="font-medium text-primary">{loadingStage}</p>
-                      <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
-                    </div>
-                    <div className="w-full max-w-md mt-2">
-                      <Progress value={loadingProgress} className="h-2" />
-                      <p className="text-xs text-center mt-1 text-muted-foreground">
-                        {loadingProgress.toFixed(0)}% 완료
-                      </p>
-                    </div>
-                    <div className="w-full max-w-md mt-2 bg-muted/30 rounded-md p-3 h-32 overflow-y-auto">
-                      <div className="space-y-1.5 text-sm">
-                        {loadingMessages.map((message, index) => (
-                          <p key={index} className="text-muted-foreground">
-                            {message}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="text-red-500 text-center py-4">
-                    <p>오류가 발생했습니다: {error}</p>
-                    <Button onClick={fetchInterpretation} className="mt-4" variant="outline">
-                      다시 시도
-                    </Button>
-                  </div>
-                )}
-
-                {interpretation && !isLoading && (
-                  <div className="space-y-4">
-                    <div className="markdown-content prose dark:prose-invert max-w-none">
-                      <ReactMarkdown>{interpretation}</ReactMarkdown>
-                    </div>
-                    <Separator className="my-4" />
-                    <FeedbackButtons contentType="saju-interpretation" contentId={saju.dayStem + saju.dayBranch} />
-
-                    {/* Donation Section */}
-                    <div className="mt-8 p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
-                      <div className="flex flex-col items-center">
-                        <h3 className="text-xl font-bold mb-4">복채 주면 운이 더 좋아진다냥!</h3>
-                        <img
-                          src="/images/donation-cat.png"
-                          alt="복채 고양이"
-                          className="w-48 h-48 object-contain mb-4"
-                        />
-                        <div className="text-center space-y-2 text-xs dark:text-gray-200">
-                          <p>사주 보고 나서, 오늘 운이 더 잘 풀렸으면 좋겠다냥~ 🐾</p>
-                          <p>복채를 살짝~ 내면 복 하나가 따라붙는다냥 🎁😽</p>
-                          <p>오늘 하루 좋은 기운이 너랑 함께할 거다냥!🍀</p>
-                          <div className="mt-4 font-medium text-base">
-                            <p className="text-lg">토스뱅크</p>
-                            <div className="flex items-center justify-center gap-1 mt-1">
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText("1001-8576-5363")
-                                  const copyBtn = document.getElementById("copy-account-btn")
-                                  if (copyBtn) {
-                                    copyBtn.classList.add("text-green-600")
-                                    copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-check"><polyline points="20 6 9 17 4 12"/></svg>`
-                                    setTimeout(() => {
-                                      copyBtn.classList.remove("text-green-600")
-                                      copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`
-                                    }, 2000)
-                                  }
-                                  toast({
-                                    title: "계좌번호 복사 완료",
-                                    description: "계좌번호가 클립보드에 복사되었습니다.",
-                                  })
-                                }}
-                                className="text-lg font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center"
-                                aria-label="계좌번호 복사"
-                              >
-                                1001-8576-5363
-                                <span id="copy-account-btn" className="ml-1 inline-flex items-center">
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="lucide lucide-copy"
-                                  >
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                  </svg>
-                                </span>
-                              </button>
-                            </div>
-                            <p className="text-lg mt-1">사주핑 (선현국)</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Add chat button to interpretation tab - Desktop */}
-                    <Button className="w-full flex items-center justify-center gap-2 mt-4" onClick={navigateToChatList}>
-                      <MessageSquare className="h-4 w-4" />
-                      <span>사주 채팅 상담 시작하기</span>
-                    </Button>
-
-                    <div id="additional-questions">
-                      <AdditionalQuestions
-                        saju={saju}
-                        name={name}
-                        gender={normalizedGender}
-                        model={model}
-                        relationshipStatus={relationshipStatus}
-                        interpretation={interpretation} // 기존 해석 전달
-                      />
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
+          {/* 채팅 버튼 및 대운 분석 버튼 */}
+          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <Button className="flex-1 flex items-center justify-center gap-2" onClick={navigateToChatList}>
+              <MessageSquare className="h-4 w-4" />
+              <span>사주 채팅 상담 시작하기</span>
+            </Button>
+            <Button variant="outline" className="flex-1" asChild>
+              <Link
+                href={
+                  uuid
+                    ? `/daeun-analysis?uuid=${uuid}`
+                    : sajuParam
+                      ? `/daeun-analysis?saju=${encodeURIComponent(sajuParam)}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
+                      : `/daeun-analysis?date=${solarYear}${solarMonth}${solarDay}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
+                }
+              >
+                10년 대운 상세분석
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

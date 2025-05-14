@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
 - 띠: ${yearAnimal}
 - 오행 분포: 목(${elements?.wood || 0}), 화(${elements?.fire || 0}), 토(${elements?.earth || 0}), 금(${elements?.metal || 0}), 수(${elements?.water || 0})
 
-🌟 나의 총운을 통해 인생의 테마를 들여다보기 아래 모든 운의 설명은 일간 일주 십성 기반으로 설명해주세요
+🌟 나의 총운을 통해 인생의 테마를 들여다보기 아래 모든 운의 설명은 일간 일주 십성 기반으로 (십성을 쓸때는 십성의 설명을 간단하게는 해줘, 십성의 이게 무슨의미인데 너가 그게 몇개 있다. 이런식으로 설명해주세요
 
 1. 인생의 큰 흐름과 중심 에너지 💫
 나의 사주에서 핵심 에너지(일간과 일지)를 바탕으로, 삶에서 반복적으로 드러나는 주제나 운명의 중심 흐름을 이야기해 주세요.
@@ -300,8 +300,9 @@ ${relationshipGuidance}
       }
 
       try {
+        // 모델을 gpt-4o로 변경 (gpt-4.1-mini 대신)
         const { text } = await generateText({
-          model: openai("gpt-4.1-mini"), // Changed from gpt-4.1-mini to gpt-4o
+          model: openai("gpt-4o"),
           prompt: prompt,
           temperature: 0.8,
           maxTokens: 3500,

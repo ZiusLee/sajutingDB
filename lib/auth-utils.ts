@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 import { verify } from "jsonwebtoken"
 
-// JWT 시크릿 키 (실제 프로덕션에서는 환경 변수로 관리)
+// JWT 시크릿 키 (실제 프로덕션에서는 환경 변��로 관리)
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 // 요청에서 사용자 ID 추출

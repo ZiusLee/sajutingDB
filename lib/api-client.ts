@@ -74,8 +74,6 @@ export async function fetchLunarDate(year: string, month: string, day: string) {
   }
 }
 
-// getSajuInterpretation 함수를 수정하여 오류 처리를 개선합니다.
-
 export async function getSajuInterpretation(
   saju: any,
   name?: string,
