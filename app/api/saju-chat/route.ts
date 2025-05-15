@@ -4,12 +4,12 @@ import { solarToLunar } from "@/lib/lunar-calendar"
 
 export const runtime = "edge"
 
-// 원래 모델 선택 로직으로 복원
+// getModelForRoomType 함수에서 career 케이스를 수정합니다.
 function getModelForRoomType(roomType: string): string {
   try {
     switch (roomType) {
       case "career":
-        return "ft:gpt-4o:towinai::8Lw0rYK6"
+        return "gpt-4o" // 파인튜닝 모델에서 일반 gpt-4o 모델로 변경
       case "marriage":
         // gpt-4.1 모델로 변경
         return "gpt-4.1"
