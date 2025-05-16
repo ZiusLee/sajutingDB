@@ -4,6 +4,8 @@ import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useToast } from "@/components/ui/use-toast"
+import { Home, Search, PlusSquare, Heart, User } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 export function BottomNavBar() {
   const router = useRouter()
@@ -54,64 +56,64 @@ export function BottomNavBar() {
     !isAuthenticated ||
     pathname?.includes("/login") ||
     pathname?.includes("/register") ||
-    pathname?.includes("/reset-password") ||
-    pathname?.includes("/saju-chat") || // 채팅 페이지에서는 표시하지 않음
-    pathname?.includes("/chat") // 채팅 페이지에서는 표시하지 않음
+    pathname?.includes("/reset-password")
   ) {
     return null
   }
 
-  // 임시 조치: 모든 페이지에서 bottom nav bar를 표시하지 않음
-  // 나중에 채팅 UI가 수정되면 이 부분을 제거하고 원래대로 복원
-  return null
-
-  /* 원래 코드 (나중에 복원할 수 있도록 주석 처리)
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-      <div className="container flex justify-around items-center h-16">
+    <div className="fixed bottom-0 left-0 right-0 border-t bg-background z-50">
+      <div className="flex justify-around items-center h-16">
         <Button
           variant="ghost"
-          className="flex flex-col items-center justify-center h-full w-full"
-          onClick={() => router.push("/chatlist")}
-          data-active={pathname?.includes("/chat") || pathname?.includes("/chatlist")}
-        >
-          <MessageSquare
-            className={`h-6 w-6 ${
-              pathname?.includes("/chat") || pathname?.includes("/chatlist") ? "text-primary" : ""
-            }`}
-          />
-          <span
-            className={`text-xs mt-1 ${
-              pathname?.includes("/chat") || pathname?.includes("/chatlist") ? "text-primary font-medium" : ""
-            }`}
-          >
-            채팅
-          </span>
-        </Button>
-
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center justify-center h-full w-full"
+          size="icon"
+          className="h-12 w-12 rounded-full"
           onClick={() => router.push("/")}
-          data-active={pathname === "/"}
+          aria-label="홈"
         >
-          <Calendar className={`h-6 w-6 ${pathname === "/" ? "text-primary" : ""}`} />
-          <span className={`text-xs mt-1 ${pathname === "/" ? "text-primary font-medium" : ""}`}>사주</span>
+          <Home className={`h-6 w-6 ${pathname === "/" ? "text-primary" : "text-muted-foreground"}`} />
         </Button>
 
         <Button
           variant="ghost"
-          className="flex flex-col items-center justify-center h-full w-full"
-          onClick={() => router.push("/mypage")}
-          data-active={pathname?.includes("/mypage")}
+          size="icon"
+          className="h-12 w-12 rounded-full"
+          onClick={() => router.push("/search")}
+          aria-label="검색"
         >
-          <User className={`h-6 w-6 ${pathname?.includes("/mypage") ? "text-primary" : ""}`} />
-          <span className={`text-xs mt-1 ${pathname?.includes("/mypage") ? "text-primary font-medium" : ""}`}>
-            마이페이지
-          </span>
+          <Search className={`h-6 w-6 ${pathname === "/search" ? "text-primary" : "text-muted-foreground"}`} />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-12 w-12 rounded-full"
+          onClick={() => router.push("/")}
+          aria-label="새 사주 입력"
+        >
+          <PlusSquare className="h-6 w-6 text-muted-foreground" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-12 w-12 rounded-full"
+          onClick={() => router.push("/saju-chat/general")}
+          aria-label="AI 상담"
+        >
+          <Heart className={`h-6 w-6 ${pathname.includes("/saju-chat") ? "text-primary" : "text-muted-foreground"}`} />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-12 w-12 rounded-full"
+          onClick={() => router.push("/mypage")}
+          aria-label="마이페이지"
+        >
+          <User className={`h-6 w-6 ${pathname === "/mypage" ? "text-primary" : "text-muted-foreground"}`} />
         </Button>
       </div>
     </div>
   )
-  */
 }

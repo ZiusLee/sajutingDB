@@ -2,22 +2,17 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Calendar, Clock, LogOut, Eye, LinkIcon, RefreshCw, Bug } from "lucide-react"
-import { getSupabase } from "@/lib/supabase-client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
-import { Input } from "@/components/ui/input"
-import ManualDataLink from "@/components/manual-data-link"
-import {
-  getUserSajuProfiles,
-  findAndLinkSessions,
-  linkSessionToUser,
-  debugCheckSessions,
-} from "@/lib/saju-session-service"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Grid3X3, MessageCircle, Calendar, BookmarkIcon, UserIcon } from "lucide-react"
+import { getUserSajuProfiles } from "@/lib/saju-session-service"
+import { BottomNavBar } from "@/components/bottom-nav-bar"
+import { ElementDisplay } from "@/components/element-display"
+import { calculateElementsFromSaju } from "@/lib/element-utils"
+import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -79,11 +74,16 @@ export default function MyPage() {
   const [userEmail, setUserEmail] = useState("")
   const [authUserId, setAuthUserId] = useState<string | null>(null)
   const [sajuProfiles, setSajuProfiles] = useState<SajuProfile[]>([])
-  const [showDataLink, setShowDataLink] = useState(false)
-  const [isLinking, setIsLinking] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
-  const [directLinkId, setDirectLinkId] = useState("")
-  const supabase = getSupabase()
+  const [activeTab, setActiveTab] = useState("posts")
+  const supabase = createClientComponentClient()
+  const [defaultProfile, setDefaultProfile] = useState<SajuProfile | null>(null)
+  const [elements, setElements] = useState<Record<string, number>>({
+    wood: 0,
+    fire: 0,
+    earth: 0,
+    metal: 0,
+    water: 0,
+  })
 
   // Load user data function
   const loadUserData = async () => {
@@ -104,14 +104,41 @@ export default function MyPage() {
         setAuthUserId(userId)
         setUserName(userData.user.user_metadata?.name || userData.user.email?.split("@")[0] || "사용자")
         setUserEmail(userData.user.email || "")
-
-        // Debug check sessions directly
-        await debugCheckSessions(userId)
       }
 
       // Get all saju profiles
       const { profiles } = await getUserSajuProfiles()
       setSajuProfiles(profiles)
+
+      // 메인 사주 프로필 가져오기
+      if (userData.user) {
+        const userId = userData.user.id
+        try {
+          const defaultSession = await getDefaultSajuSession(userId)
+          if (defaultSession) {
+            const profile = await getSajuProfileBySessionId(defaultSession.id)
+            if (profile) {
+              setDefaultProfile(profile)
+
+              // 오행 계산
+              const calculatedElements = calculateElementsFromSaju(
+                profile.saju.yearStem,
+                profile.saju.yearBranch,
+                profile.saju.monthStem,
+                profile.saju.monthBranch,
+                profile.saju.dayStem,
+                profile.saju.dayBranch,
+                profile.saju.hourStem,
+                profile.saju.hourBranch,
+              )
+
+              setElements(calculatedElements)
+            }
+          }
+        } catch (error) {
+          console.error("Error loading default profile:", error)
+        }
+      }
     } catch (error) {
       console.error("Error loading user data:", error)
       toast({
@@ -129,38 +156,9 @@ export default function MyPage() {
     loadUserData()
   }, [router, supabase])
 
-  // 로그아웃 처리
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut()
-
-      // Clear localStorage
-      localStorage.removeItem("user_token")
-      localStorage.removeItem("user_authenticated")
-      localStorage.removeItem("user_id")
-      localStorage.removeItem("user_name")
-      localStorage.removeItem("user_email")
-
-      router.push("/")
-    } catch (error) {
-      console.error("로그아웃 오류:", error)
-    }
-  }
-
-  // Force refresh profiles
-  const handleForceRefresh = async () => {
-    toast({
-      title: "새로고침 중...",
-      description: "프로필 데이터를 다시 불러오고 있습니다.",
-    })
-    await loadUserData()
-  }
-
-  // View profile details - 이미 로드된 데이터를 사용하여 상세 페이지로 이동
+  // View profile details
   const handleViewDetails = (profile: SajuProfile) => {
-    // 이미 로드된 데이터를 URL 파라미터로 인코딩하여 전달
     const sajuData = {
-      // 사주 정보
       yearStem: profile.saju.yearStem,
       yearBranch: profile.saju.yearBranch,
       monthStem: profile.saju.monthStem,
@@ -169,8 +167,6 @@ export default function MyPage() {
       dayBranch: profile.saju.dayBranch,
       hourStem: profile.saju.hourStem,
       hourBranch: profile.saju.hourBranch,
-
-      // 십성 정보
       yearStemSibseong: profile.saju.yearStemSibseong || "",
       monthStemSibseong: profile.saju.monthStemSibseong || "",
       dayStemSibseong: profile.saju.dayStemSibseong || "",
@@ -179,8 +175,6 @@ export default function MyPage() {
       monthBranchSibseong: profile.saju.monthBranchSibseong || "",
       dayBranchSibseong: profile.saju.dayBranchSibseong || "",
       hourBranchSibseong: profile.saju.hourBranchSibseong || "",
-
-      // 한자 정보
       yearStemHanja: profile.saju.yearStemHanja || "",
       yearBranchHanja: profile.saju.yearBranchHanja || "",
       monthStemHanja: profile.saju.monthStemHanja || "",
@@ -189,451 +183,240 @@ export default function MyPage() {
       dayBranchHanja: profile.saju.dayBranchHanja || "",
       hourStemHanja: profile.saju.hourStemHanja || "",
       hourBranchHanja: profile.saju.hourBranchHanja || "",
-
-      // 오행 정보
       elements: profile.saju.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
-
-      // 일주 정보
       dayMaster: profile.saju.dayMaster || profile.saju.dayStem,
       dayMasterHanja: profile.saju.dayMasterHanja || "",
-
-      // 양력 정보
       year: profile.birthYear,
       month: profile.birthMonth,
       day: profile.birthDay,
       hour: profile.birthHour,
       minute: profile.birthMinute,
-
-      // 음력 정보 (있을 경우에만)
-      lunarYear: profile.lunarYear || profile.birthYear, // 음력 정보가 없으면 양력 정보로 대체
+      lunarYear: profile.lunarYear || profile.birthYear,
       lunarMonth: profile.lunarMonth || profile.birthMonth,
       lunarDay: profile.lunarDay || profile.birthDay,
-
-      // 시간 미상 여부
       timeUnknown: profile.timeUnknown,
     }
 
-    // URL 파라미터로 데이터 전달
     const encodedSaju = encodeURIComponent(JSON.stringify(sajuData))
     router.push(`/result?saju=${encodedSaju}&name=${encodeURIComponent(profile.name)}&gender=${profile.gender}`)
   }
 
-  // Navigate to result page when clicking on a profile card
-  const handleProfileClick = (profile: SajuProfile) => {
-    handleViewDetails(profile)
-  }
+  // Navigate to chat with AI
+  const handleChatWithAI = () => {
+    // 메인 사주가 있으면 메인 사주 사용, 없으면 첫 번째 사주 사용
+    const profileToUse = defaultProfile || (sajuProfiles.length > 0 ? sajuProfiles[0] : null)
 
-  // Find and link all sessions
-  const handleFindAndLinkSessions = async () => {
-    try {
-      setIsLinking(true)
-      toast({
-        title: "세션 연결 중...",
-        description: "모든 관련 세션을 찾아 연결하고 있습니다.",
-      })
-
-      const { success, linkedCount } = await findAndLinkSessions()
-
-      if (success) {
-        toast({
-          title: "세션 연결 완료",
-          description: `${linkedCount}개의 세션이 성공적으로 연결되었습니다.`,
-        })
-
-        // Always reload data after linking attempt
-        await loadUserData()
-      } else {
-        throw new Error("세션 연결에 실패했습니다.")
+    if (profileToUse) {
+      // 사주 데이터 준비
+      const sajuData = {
+        yearStem: profileToUse.saju.yearStem,
+        yearBranch: profileToUse.saju.yearBranch,
+        monthStem: profileToUse.saju.monthStem,
+        monthBranch: profileToUse.saju.monthBranch,
+        dayStem: profileToUse.saju.dayStem,
+        dayBranch: profileToUse.saju.dayBranch,
+        hourStem: profileToUse.saju.hourStem,
+        hourBranch: profileToUse.saju.hourBranch,
+        elements: profileToUse.saju.elements || elements,
+        year: profileToUse.birthYear,
+        month: profileToUse.birthMonth,
+        day: profileToUse.birthDay,
+        hour: profileToUse.birthHour,
+        minute: profileToUse.birthMinute,
+        timeUnknown: profileToUse.timeUnknown,
       }
-    } catch (error) {
-      console.error("Error finding and linking sessions:", error)
+
+      // 사주 데이터를 URL 파라미터로 인코딩
+      const encodedSaju = encodeURIComponent(JSON.stringify(sajuData))
+
+      // 채팅 리스트 페이지로 이동
+      router.push(
+        `/chat-list?saju=${encodedSaju}&name=${encodeURIComponent(profileToUse.name)}&gender=${
+          profileToUse.gender
+        }&returnPath=/mypage`,
+      )
+    } else {
       toast({
-        title: "세션 연결 오류",
-        description: "세션을 연결하는 중 오류가 발생했습니다.",
+        title: "사주 정보 필요",
+        description: "AI와 상담하기 위해서는 먼저 사주 정보가 필요합니다.",
         variant: "destructive",
       })
-    } finally {
-      setIsLinking(false)
+      router.push("/")
     }
   }
 
-  // Debug function to check database directly
-  const handleDebug = async () => {
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-
-      if (!userData.user) {
-        toast({
-          title: "인증 오류",
-          description: "로그인된 사용자를 찾을 수 없습니다.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const authUserId = userData.user.id
-
-      // Direct query to check all saju_sessions
-      const { data: allSessions, error: allSessionsError } = await supabase.from("saju_sessions").select("*").limit(50)
-
-      // Query to check sessions with this auth_user_id
-      const { data: userSessions, error: userSessionsError } = await supabase
-        .from("saju_sessions")
-        .select("*")
-        .eq("auth_user_id", authUserId)
-
-      // Get the most recent session
-      const { data: recentSession, error: recentSessionError } = await supabase
-        .from("saju_sessions")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
-
-      // Check if the user's own ID exists as a session
-      const { data: selfSession, error: selfSessionError } = await supabase
-        .from("saju_sessions")
-        .select("*")
-        .eq("id", authUserId)
-        .single()
-
-      // Compile debug info
-      const debugData = {
-        authUserId,
-        allSessionsCount: allSessions?.length || 0,
-        userSessionsCount: userSessions?.length || 0,
-        allSessionsError: allSessionsError?.message,
-        userSessionsError: userSessionsError?.message,
-        recentSession,
-        recentSessionError: recentSessionError?.message,
-        selfSession: selfSession || "Not found",
-        selfSessionError: selfSessionError?.message,
-        localStorage: {
-          user_id: localStorage.getItem("user_id"),
-          user_authenticated: localStorage.getItem("user_authenticated"),
-          user_name: localStorage.getItem("user_name"),
-          user_email: localStorage.getItem("user_email"),
-        },
-      }
-
-      setDebugInfo(debugData)
-      console.log("Debug info:", debugData)
-
-      toast({
-        title: "디버그 정보 수집 완료",
-        description: "콘솔에서 디버그 정보를 확인하세요.",
-      })
-    } catch (error) {
-      console.error("Debug error:", error)
-      toast({
-        title: "디버그 오류",
-        description: "디버그 정보를 수집하는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Handle direct session linking
-  const handleDirectLink = async () => {
-    if (!directLinkId || directLinkId.trim() === "") {
-      toast({
-        title: "세션 ID 필요",
-        description: "연결할 세션 ID를 입력해주세요.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      toast({
-        title: "세션 연결 중...",
-        description: `세션 ID ${directLinkId}를 연결하고 있습니다.`,
-      })
-
-      const success = await linkSessionToUser(directLinkId)
-
-      if (success) {
-        toast({
-          title: "세션 연결 완료",
-          description: `세션 ID ${directLinkId}가 성공적으로 연결되었습니다.`,
-        })
-        setDirectLinkId("")
-        await loadUserData()
-      } else {
-        throw new Error("세션 연결에 실패했습니다.")
-      }
-    } catch (error) {
-      console.error("Error linking session:", error)
-      toast({
-        title: "세션 연결 오류",
-        description: "세션을 연결하는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Fix specific session
-  const handleFixSession = async () => {
-    try {
-      // Get the most recent session ID from localStorage or debug info
-      const sessionId =
-        localStorage.getItem("user_id") || debugInfo?.recentSession?.id || "91c5a3de-3665-411b-852e-9a82204b0341" // Fallback to the ID from logs
-
-      if (!sessionId) {
-        toast({
-          title: "세션 ID 없음",
-          description: "수정할 세션 ID를 찾을 수 없습니다.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      toast({
-        title: "세션 수정 중...",
-        description: `세션 ID ${sessionId}를 수정하고 있습니다.`,
-      })
-
-      const success = await linkSessionToUser(sessionId)
-
-      if (success) {
-        toast({
-          title: "세션 수정 완료",
-          description: `세션 ID ${sessionId}가 성공적으로 수정되었습니다.`,
-        })
-        await loadUserData()
-      } else {
-        throw new Error("세션 수정에 실패했습니다.")
-      }
-    } catch (error) {
-      console.error("Error fixing session:", error)
-      toast({
-        title: "세션 수정 오류",
-        description: "세션을 수정하는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    }
+  // Navigate to edit saju page
+  const handleEditSaju = () => {
+    router.push("/edit-saju")
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 pb-20">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="mr-2">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-bold">마이페이지</h1>
-        <div className="ml-auto flex gap-2">
-          <Button variant="ghost" size="icon" onClick={handleDebug} title="디버그">
-            <Bug className="h-5 w-5" />
+    <div className="container mx-auto pb-20">
+      {/* 프로필 헤더 섹션 */}
+      <div className="px-4 pt-6 pb-4 border-b">
+        <div className="flex items-start">
+          {/* 프로필 이미지 */}
+          <Avatar className="h-20 w-20 mr-5">
+            <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
+              {userName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+
+          {/* 프로필 정보 */}
+          <div className="flex-1">
+            <h1 className="text-xl font-bold">{userName}</h1>
+            <p className="text-sm text-muted-foreground">{userEmail}</p>
+
+            {/* 오행 표시 */}
+            <div className="mt-3 mb-2">
+              {defaultProfile ? (
+                <>
+                  <div className="flex items-center mb-1">
+                    <span className="text-xs font-medium mr-2">메인 사주 오행</span>
+                    <span className="text-xs text-muted-foreground">({defaultProfile.name})</span>
+                  </div>
+                  <ElementDisplay elements={elements} maxSlots={12} />
+                </>
+              ) : (
+                <div className="text-xs text-muted-foreground">메인 사주를 설정하면 오행 정보가 표시됩니다.</div>
+              )}
+            </div>
+
+            {/* 통계 정보 */}
+            <div className="flex mt-3 space-x-4">
+              <div className="text-center">
+                <div className="font-bold">{sajuProfiles.length}</div>
+                <div className="text-xs text-muted-foreground">사주</div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold">0</div>
+                <div className="text-xs text-muted-foreground">상담</div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold">0</div>
+                <div className="text-xs text-muted-foreground">저장</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 액션 버튼 */}
+        <div className="flex mt-4 gap-2">
+          <Button variant="outline" className="flex-1" onClick={handleEditSaju}>
+            프로필 편집
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleForceRefresh} title="새로고침">
-            <RefreshCw className="h-5 w-5" />
+          <Button variant="default" className="flex-1" onClick={handleChatWithAI}>
+            <MessageCircle className="h-4 w-4 mr-2" />
+            AI 상담하기
           </Button>
         </div>
       </div>
 
-      {/* 사용자 프로필 카드 */}
-      <Card className="mb-8">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <Avatar className="h-20 w-20">
-              <AvatarFallback className="text-2xl">{userName.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-xl font-bold">{userName}</h2>
-              <p className="text-gray-500 dark:text-gray-400">{userEmail}</p>
-              {authUserId && <p className="text-xs text-gray-400 mt-1">ID: {authUserId}</p>}
+      {/* 하이라이트 섹션 */}
+      <div className="py-4 px-2 overflow-x-auto whitespace-nowrap border-b">
+        <div className="inline-flex space-x-4 px-2">
+          {[...Array(Math.min(3, sajuProfiles.length))].map((_, index) => (
+            <div key={index} className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full border-2 border-primary flex items-center justify-center mb-1 bg-primary/10">
+                <Calendar className="h-8 w-8 text-primary" />
+              </div>
+              <span className="text-xs">{sajuProfiles[index]?.name || "사주"}</span>
             </div>
-            <Button variant="outline" onClick={handleLogout} className="gap-2">
-              <LogOut className="h-4 w-4" />
-              로그아웃
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Debug Info */}
-      {debugInfo && (
-        <Card className="mb-8 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-          <CardHeader>
-            <CardTitle className="text-sm">디버그 정보</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs">
-            <div className="space-y-2">
-              <div>
-                <strong>Auth User ID:</strong> {debugInfo.authUserId}
+          ))}
+          {sajuProfiles.length === 0 && (
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full border-2 border-gray-300 flex items-center justify-center mb-1">
+                <Calendar className="h-8 w-8 text-gray-400" />
               </div>
-              <div>
-                <strong>Total Sessions:</strong> {debugInfo.allSessionsCount}
-              </div>
-              <div>
-                <strong>User Sessions:</strong> {debugInfo.userSessionsCount}
-              </div>
-              <div>
-                <strong>LocalStorage User ID:</strong> {debugInfo.localStorage.user_id || "없음"}
-              </div>
-              {debugInfo.recentSession && (
-                <div>
-                  <strong>최근 세션:</strong> ID: {debugInfo.recentSession.id}, Auth User ID:{" "}
-                  {debugInfo.recentSession.auth_user_id || "없음"}
-                </div>
-              )}
-              <Button size="sm" onClick={handleFixSession} className="mt-2">
-                최근 세션 연결 수정
-              </Button>
+              <span className="text-xs text-gray-400">사주 없음</span>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 데이터 연결 버튼 */}
-      <div className="mb-8">
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Button variant="outline" onClick={() => setShowDataLink(!showDataLink)} className="gap-2">
-            <LinkIcon className="h-4 w-4" />
-            {showDataLink ? "데이터 연결 숨기기" : "데이터 수동 연결"}
-          </Button>
-
-          <Button variant="outline" onClick={handleFindAndLinkSessions} disabled={isLinking} className="gap-2">
-            {isLinking ? (
-              <>
-                <div className="animate-spin h-4 w-4 border-b-2 border-current rounded-full"></div>
-                연결 중...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                모든 세션 자동 연결
-              </>
-            )}
-          </Button>
+          )}
         </div>
-
-        {showDataLink && (
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle className="text-lg">세션 ID로 직접 연결</CardTitle>
-              <CardDescription>특정 세션 ID를 알고 있다면 직접 입력하여 연결할 수 있습니다.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="세션 ID 입력"
-                  value={directLinkId}
-                  onChange={(e) => setDirectLinkId(e.target.value)}
-                />
-                <Button onClick={handleDirectLink}>연결</Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {showDataLink && (
-          <ManualDataLink
-            onSuccess={() => {
-              setShowDataLink(false)
-              loadUserData()
-            }}
-          />
-        )}
       </div>
 
       {/* 탭 네비게이션 */}
-      <Tabs defaultValue="profiles" className="mb-8">
-        <TabsList className="grid w-full grid-cols-1">
-          <TabsTrigger value="profiles">내 사주 프로필</TabsTrigger>
+      <Tabs defaultValue="posts" className="w-full" onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3 bg-transparent h-12 border-b rounded-none">
+          <TabsTrigger
+            value="posts"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-black data-[state=active]:rounded-none data-[state=active]:shadow-none"
+          >
+            <Grid3X3 className="h-5 w-5" />
+          </TabsTrigger>
+          <TabsTrigger
+            value="saved"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-black data-[state=active]:rounded-none data-[state=active]:shadow-none"
+          >
+            <BookmarkIcon className="h-5 w-5" />
+          </TabsTrigger>
+          <TabsTrigger
+            value="tagged"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-black data-[state=active]:rounded-none data-[state=active]:shadow-none"
+          >
+            <UserIcon className="h-5 w-5" />
+          </TabsTrigger>
         </TabsList>
 
-        {/* 내 사주 프로필 탭 */}
-        <TabsContent value="profiles">
+        {/* 사주 그리드 */}
+        <TabsContent value="posts" className="mt-0">
           {isLoading ? (
             <div className="flex items-center justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : sajuProfiles.length > 0 ? (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">내 사주 프로필</h2>
-                <p className="text-sm text-gray-500">{sajuProfiles.length}개의 프로필</p>
-              </div>
-              <div className="grid gap-4">
-                {sajuProfiles.map((profile) => (
-                  <Card
-                    key={profile.id}
-                    className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleProfileClick(profile)}
-                  >
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <div>
-                        <CardTitle className="text-sm font-medium leading-none flex items-center gap-2">
-                          {profile.name}
-                        </CardTitle>
-                        <CardDescription className="text-xs mt-1">
-                          {profile.saju.yearStem}
-                          {profile.saju.yearBranch} {profile.saju.monthStem}
-                          {profile.saju.monthBranch} {profile.saju.dayStem}
-                          {profile.saju.dayBranch} {profile.saju.hourStem}
-                          {profile.saju.hourBranch}
-                        </CardDescription>
+            <div className="grid grid-cols-3 gap-1">
+              {sajuProfiles.map((profile) => (
+                <div
+                  key={profile.id}
+                  className="aspect-square relative cursor-pointer"
+                  onClick={() => handleViewDetails(profile)}
+                >
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-800 hover:opacity-90">
+                    <div className="text-center px-1">
+                      <div className="text-xs font-semibold mb-1 truncate w-full">{profile.name}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {profile.saju.yearStem}
+                        {profile.saju.yearBranch} {profile.saju.monthStem}
+                        {profile.saju.monthBranch}
                       </div>
-                      <Badge variant="outline" className="font-normal">
-                        {profile.gender === "male" ? "남성" : "여성"}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-col space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4" />
-                          <span>
-                            {profile.birthYear}년 {profile.birthMonth}월 {profile.birthDay}일
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            {profile.timeUnknown ? "시간 미상" : `${profile.birthHour}:${profile.birthMinute}`}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-2">
-                          생성일: {new Date(profile.createdAt).toLocaleDateString("ko-KR")}
-                        </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {profile.saju.dayStem}
+                        {profile.saju.dayBranch} {profile.saju.hourStem}
+                        {profile.saju.hourBranch}
                       </div>
-                    </CardContent>
-                    <CardContent>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleViewDetails(profile)
-                          }}
-                          className="gap-1"
-                        >
-                          <Eye className="h-4 w-4" />
-                          상세 보기
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-gray-500 dark:text-gray-400 mb-4">이 계정에 연결된 사주 프로필이 없습니다.</p>
-                <div className="flex flex-col gap-4">
-                  <Button onClick={() => router.push("/")}>새 사주 프로필 생성하기</Button>
-                  <Button variant="outline" onClick={handleFindAndLinkSessions} className="gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    기존 데이터 자동으로 찾기
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <Calendar className="h-12 w-12 text-gray-400 mb-2" />
+              <p className="text-muted-foreground mb-4">아직 등록된 사주가 없습니다.</p>
+              <Button onClick={() => router.push("/")}>사주 입력하기</Button>
+            </div>
           )}
         </TabsContent>
+
+        {/* 저장된 항목 */}
+        <TabsContent value="saved" className="mt-0">
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <BookmarkIcon className="h-12 w-12 text-gray-400 mb-2" />
+            <p className="text-muted-foreground">저장된 항목이 없습니다.</p>
+          </div>
+        </TabsContent>
+
+        {/* 태그된 항목 */}
+        <TabsContent value="tagged" className="mt-0">
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <UserIcon className="h-12 w-12 text-gray-400 mb-2" />
+            <p className="text-muted-foreground">태그된 항목이 없습니다.</p>
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {/* 하단 네비게이션 바 */}
+      <BottomNavBar />
     </div>
   )
 }

@@ -46,7 +46,7 @@ function getPersonalizedRoomTitle(saju: any, gender: string): string {
       { element: "", count: 0 },
     ).element
 
-    switch (maxElement.element) {
+    switch (maxElement) {
       case "wood":
         return "자기 계발 맞춤 상담"
       case "fire":
@@ -252,7 +252,7 @@ export default function ChatListClient() {
       } else {
         // URL 파라미터에서 가져온 정보 사용
         try {
-          saju = JSON.parse(sajuParam)
+          saju = JSON.parse(decodeURIComponent(sajuParam))
           userName = name
           userGender = gender
           userInterpretation = interpretation
@@ -274,6 +274,18 @@ export default function ChatListClient() {
         returnPath,
       }
       setChatData(data)
+
+      // 현재 사주 데이터를 localStorage에 저장 (다른 페이지에서 사용할 수 있도록)
+      localStorage.setItem(
+        "last_chat_saju_data",
+        JSON.stringify({
+          saju,
+          name: userName,
+          gender: userGender,
+          interpretation: userInterpretation,
+          timestamp: Date.now(),
+        }),
+      )
 
       // 채팅방 데이터 생성
       const displayName = userName || "사용자"
@@ -558,7 +570,10 @@ export default function ChatListClient() {
   // 뒤로가기 핸들러
   const handleBack = () => {
     // 사주 데이터가 있으면 결과 페이지로 이동
-    if (chatData?.saju) {
+    if (chatData?.returnPath) {
+      // returnPath가 있으면 그 경로로 이동
+      router.push(chatData.returnPath)
+    } else if (chatData?.saju) {
       // 결과 페이지에 필요한 데이터를 쿼리 파라미터로 전달
       const sajuParam = encodeURIComponent(JSON.stringify(chatData.saju))
       const nameParam = chatData.name ? encodeURIComponent(chatData.name) : ""
@@ -566,9 +581,6 @@ export default function ChatListClient() {
 
       // 총운 리포트 탭이 선택된 상태로 결과 페이지로 이동
       router.push(`/result?saju=${sajuParam}&name=${nameParam}&gender=${genderParam}&tab=interpretation`)
-    } else if (chatData?.returnPath) {
-      // 기존 returnPath가 있으면 그 경로로 이동 (fallback)
-      router.push(chatData.returnPath)
     } else {
       // 모든 데이터가 없는 경우 홈페이지로 이동 (최후의 fallback)
       router.push("/")

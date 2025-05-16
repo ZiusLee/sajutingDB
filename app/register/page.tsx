@@ -79,7 +79,7 @@ export default function RegisterPage() {
 
       // Redirect to login page after a delay
       setTimeout(() => {
-        router.push("/login")
+        router.push("/mypage")
       }, 3000)
     } catch (err) {
       console.error("회원가입 오류:", err)
