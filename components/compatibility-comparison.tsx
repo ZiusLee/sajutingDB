@@ -63,6 +63,49 @@ export default function CompatibilityComparison({
     return elementColors[branchElements[branch as keyof typeof branchElements]]
   }
 
+  // 오행 정보 계산 또는 기본값 사용
+  const calculateElements = (saju: Saju) => {
+    // 이미 elements가 있으면 그대로 사용
+    if (saju.elements && typeof saju.elements.wood === "number") {
+      return saju.elements
+    }
+
+    // 오행 카운트 초기화
+    const elements = {
+      wood: 0,
+      fire: 0,
+      earth: 0,
+      metal: 0,
+      water: 0,
+    }
+
+    // 천간의 오행 계산
+    if (saju.yearStem && stemElements[saju.yearStem as keyof typeof stemElements])
+      elements[stemElements[saju.yearStem as keyof typeof stemElements] as keyof typeof elements]++
+    if (saju.monthStem && stemElements[saju.monthStem as keyof typeof stemElements])
+      elements[stemElements[saju.monthStem as keyof typeof stemElements] as keyof typeof elements]++
+    if (saju.dayStem && stemElements[saju.dayStem as keyof typeof stemElements])
+      elements[stemElements[saju.dayStem as keyof typeof stemElements] as keyof typeof elements]++
+    if (saju.hourStem && stemElements[saju.hourStem as keyof typeof stemElements])
+      elements[stemElements[saju.hourStem as keyof typeof stemElements] as keyof typeof elements]++
+
+    // 지지의 오행 계산
+    if (saju.yearBranch && branchElements[saju.yearBranch as keyof typeof branchElements])
+      elements[branchElements[saju.yearBranch as keyof typeof branchElements] as keyof typeof elements]++
+    if (saju.monthBranch && branchElements[saju.monthBranch as keyof typeof branchElements])
+      elements[branchElements[saju.monthBranch as keyof typeof branchElements] as keyof typeof elements]++
+    if (saju.dayBranch && branchElements[saju.dayBranch as keyof typeof branchElements])
+      elements[branchElements[saju.dayBranch as keyof typeof branchElements] as keyof typeof elements]++
+    if (saju.hourBranch && branchElements[saju.hourBranch as keyof typeof branchElements])
+      elements[branchElements[saju.hourBranch as keyof typeof branchElements] as keyof typeof elements]++
+
+    return elements
+  }
+
+  // 사용자와 파트너의 오행 정보 계산
+  const userElements = calculateElements(userSaju)
+  const partnerElements = calculateElements(partnerSaju)
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6">
@@ -117,31 +160,31 @@ export default function CompatibilityComparison({
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">목(木)</div>
-                  <div className="text-lg font-bold">{userSaju.elements.wood}</div>
+                  <div className="text-lg font-bold">{userElements.wood}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">화(火)</div>
-                  <div className="text-lg font-bold">{userSaju.elements.fire}</div>
+                  <div className="text-lg font-bold">{userElements.fire}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">토(土)</div>
-                  <div className="text-lg font-bold">{userSaju.elements.earth}</div>
+                  <div className="text-lg font-bold">{userElements.earth}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">금(金)</div>
-                  <div className="text-lg font-bold">{userSaju.elements.metal}</div>
+                  <div className="text-lg font-bold">{userElements.metal}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">수(水)</div>
-                  <div className="text-lg font-bold">{userSaju.elements.water}</div>
+                  <div className="text-lg font-bold">{userElements.water}</div>
                 </CardContent>
               </Card>
             </div>
@@ -156,13 +199,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(userSaju.yearStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.yearStem}</div>
-                    <div className="text-xs">{userSaju.yearStemHanja}</div>
+                    <div className="text-xs">{userSaju.yearStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(userSaju.yearBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.yearBranch}</div>
-                    <div className="text-xs">{userSaju.yearBranchHanja}</div>
+                    <div className="text-xs">{userSaju.yearBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -172,13 +215,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(userSaju.monthStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.monthStem}</div>
-                    <div className="text-xs">{userSaju.monthStemHanja}</div>
+                    <div className="text-xs">{userSaju.monthStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(userSaju.monthBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.monthBranch}</div>
-                    <div className="text-xs">{userSaju.monthBranchHanja}</div>
+                    <div className="text-xs">{userSaju.monthBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -188,13 +231,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(userSaju.dayStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.dayStem}</div>
-                    <div className="text-xs">{userSaju.dayStemHanja}</div>
+                    <div className="text-xs">{userSaju.dayStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(userSaju.dayBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.dayBranch}</div>
-                    <div className="text-xs">{userSaju.dayBranchHanja}</div>
+                    <div className="text-xs">{userSaju.dayBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -204,13 +247,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(userSaju.hourStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.hourStem}</div>
-                    <div className="text-xs">{userSaju.hourStemHanja}</div>
+                    <div className="text-xs">{userSaju.hourStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(userSaju.hourBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{userSaju.hourBranch}</div>
-                    <div className="text-xs">{userSaju.hourBranchHanja}</div>
+                    <div className="text-xs">{userSaju.hourBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -269,31 +312,31 @@ export default function CompatibilityComparison({
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">목(木)</div>
-                  <div className="text-lg font-bold">{partnerSaju.elements.wood}</div>
+                  <div className="text-lg font-bold">{partnerElements.wood}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">화(火)</div>
-                  <div className="text-lg font-bold">{partnerSaju.elements.fire}</div>
+                  <div className="text-lg font-bold">{partnerElements.fire}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">토(土)</div>
-                  <div className="text-lg font-bold">{partnerSaju.elements.earth}</div>
+                  <div className="text-lg font-bold">{partnerElements.earth}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">금(金)</div>
-                  <div className="text-lg font-bold">{partnerSaju.elements.metal}</div>
+                  <div className="text-lg font-bold">{partnerElements.metal}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-2 text-center">
                   <div className="text-sm text-muted-foreground">수(水)</div>
-                  <div className="text-lg font-bold">{partnerSaju.elements.water}</div>
+                  <div className="text-lg font-bold">{partnerElements.water}</div>
                 </CardContent>
               </Card>
             </div>
@@ -308,13 +351,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(partnerSaju.yearStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.yearStem}</div>
-                    <div className="text-xs">{partnerSaju.yearStemHanja}</div>
+                    <div className="text-xs">{partnerSaju.yearStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(partnerSaju.yearBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.yearBranch}</div>
-                    <div className="text-xs">{partnerSaju.yearBranchHanja}</div>
+                    <div className="text-xs">{partnerSaju.yearBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -324,13 +367,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(partnerSaju.monthStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.monthStem}</div>
-                    <div className="text-xs">{partnerSaju.monthStemHanja}</div>
+                    <div className="text-xs">{partnerSaju.monthStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(partnerSaju.monthBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.monthBranch}</div>
-                    <div className="text-xs">{partnerSaju.monthBranchHanja}</div>
+                    <div className="text-xs">{partnerSaju.monthBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -340,13 +383,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(partnerSaju.dayStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.dayStem}</div>
-                    <div className="text-xs">{partnerSaju.dayStemHanja}</div>
+                    <div className="text-xs">{partnerSaju.dayStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(partnerSaju.dayBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.dayBranch}</div>
-                    <div className="text-xs">{partnerSaju.dayBranchHanja}</div>
+                    <div className="text-xs">{partnerSaju.dayBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -356,13 +399,13 @@ export default function CompatibilityComparison({
                 <Card className={`border-2 ${getStemColor(partnerSaju.hourStem)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.hourStem}</div>
-                    <div className="text-xs">{partnerSaju.hourStemHanja}</div>
+                    <div className="text-xs">{partnerSaju.hourStemHanja || ""}</div>
                   </CardContent>
                 </Card>
                 <Card className={`border-2 ${getBranchColor(partnerSaju.hourBranch)}`}>
                   <CardContent className="p-1 sm:p-2 text-center">
                     <div className="text-base sm:text-lg font-bold">{partnerSaju.hourBranch}</div>
-                    <div className="text-xs">{partnerSaju.hourBranchHanja}</div>
+                    <div className="text-xs">{partnerSaju.hourBranchHanja || ""}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -380,11 +423,11 @@ export default function CompatibilityComparison({
               <div className="text-sm font-medium text-green-800 dark:text-green-300">목(木)</div>
               <div className="flex justify-center items-center gap-2 mt-1">
                 <div className="text-base font-bold">
-                  {userName}: {userSaju.elements.wood}
+                  {userName}: {userElements.wood}
                 </div>
                 <div className="text-gray-400">vs</div>
                 <div className="text-base font-bold">
-                  {partnerName}: {partnerSaju.elements.wood}
+                  {partnerName}: {partnerElements.wood}
                 </div>
               </div>
             </CardContent>
@@ -395,11 +438,11 @@ export default function CompatibilityComparison({
               <div className="text-sm font-medium text-red-800 dark:text-red-300">화(火)</div>
               <div className="flex justify-center items-center gap-2 mt-1">
                 <div className="text-base font-bold">
-                  {userName}: {userSaju.elements.fire}
+                  {userName}: {userElements.fire}
                 </div>
                 <div className="text-gray-400">vs</div>
                 <div className="text-base font-bold">
-                  {partnerName}: {partnerSaju.elements.fire}
+                  {partnerName}: {partnerElements.fire}
                 </div>
               </div>
             </CardContent>
@@ -410,11 +453,11 @@ export default function CompatibilityComparison({
               <div className="text-sm font-medium text-yellow-800 dark:text-yellow-300">토(土)</div>
               <div className="flex justify-center items-center gap-2 mt-1">
                 <div className="text-base font-bold">
-                  {userName}: {userSaju.elements.earth}
+                  {userName}: {userElements.earth}
                 </div>
                 <div className="text-gray-400">vs</div>
                 <div className="text-base font-bold">
-                  {partnerName}: {partnerSaju.elements.earth}
+                  {partnerName}: {partnerElements.earth}
                 </div>
               </div>
             </CardContent>
@@ -425,11 +468,11 @@ export default function CompatibilityComparison({
               <div className="text-sm font-medium text-gray-800 dark:text-gray-300">금(金)</div>
               <div className="flex justify-center items-center gap-2 mt-1">
                 <div className="text-base font-bold">
-                  {userName}: {userSaju.elements.metal}
+                  {userName}: {userElements.metal}
                 </div>
                 <div className="text-gray-400">vs</div>
                 <div className="text-base font-bold">
-                  {partnerName}: {partnerSaju.elements.metal}
+                  {partnerName}: {partnerElements.metal}
                 </div>
               </div>
             </CardContent>
@@ -440,11 +483,11 @@ export default function CompatibilityComparison({
               <div className="text-sm font-medium text-blue-800 dark:text-blue-300">수(水)</div>
               <div className="flex justify-center items-center gap-2 mt-1">
                 <div className="text-base font-bold">
-                  {userName}: {userSaju.elements.water}
+                  {userName}: {userElements.water}
                 </div>
                 <div className="text-gray-400">vs</div>
                 <div className="text-base font-bold">
-                  {partnerName}: {partnerSaju.elements.water}
+                  {partnerName}: {partnerElements.water}
                 </div>
               </div>
             </CardContent>

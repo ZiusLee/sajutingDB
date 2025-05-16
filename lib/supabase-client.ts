@@ -6,7 +6,21 @@ let supabaseInstance: SupabaseClient | null = null
 
 export function getSupabase() {
   if (!supabaseInstance) {
-    supabaseInstance = createClientComponentClient()
+    // 세션 지속성을 'local'로 설정하여 브라우저를 닫아도 세션이 유지되도록 함
+    supabaseInstance = createClientComponentClient({
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://tqrwktpmyylxyhgsrwlo.supabase.co",
+      supabaseKey:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxcndrdHBteXlseHloZ3Nyd2xvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTEzNzA1NzYsImV4cCI6MjAyNjk0NjU3Nn0.Yd_6UO8X_XCZGjopPWbNxIEaW_yXONTkGPJlG_LBHV0",
+      options: {
+        auth: {
+          persistSession: true,
+          storageKey: "sajuping-auth",
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      },
+    })
   }
   return supabaseInstance
 }

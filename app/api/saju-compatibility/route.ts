@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
     // 사용자 사주 정보 추출
     const userSaju = userInfo.saju
 
+    // 사용자 사주에 elements가 없는 경우 계산
+    if (!userSaju.elements) {
+      console.log("User saju elements not provided, calculating...")
+      userSaju.elements = calculateElements(userSaju)
+    }
+
     // 파트너 사주 계산
     let partnerSaju
     try {
@@ -56,6 +62,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to calculate partner's saju" }, { status: 500 })
     }
 
+    // 파트너 사주에 elements가 없는 경우 계산
+    if (!partnerSaju.elements) {
+      console.log("Partner saju elements not provided, calculating...")
+      partnerSaju.elements = calculateElements(partnerSaju)
+    }
+
     // 사용자와 파트너의 정보 추출
     const userName = userInfo.name || "사용자"
     const userGender = userInfo.gender || "male"
@@ -70,6 +82,10 @@ export async function POST(request: NextRequest) {
     console.log(
       `Processing compatibility request for ${userName} and ${partnerName}, model: ${model}, relationship status: ${relationshipStatus}`,
     )
+
+    // 오행 정보 안전하게 접근
+    const userElements = userSaju.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }
+    const partnerElements = partnerSaju.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }
 
     // 관계 상태에 따른 추가 분석 지침
     let relationshipGuidance = ""
@@ -123,7 +139,7 @@ export async function POST(request: NextRequest) {
 8. 일반적인 관계에서의 궁합 분석
    - 두 사람이 어떤 관계에서든 가장 잘 맞는 측면을 분석해주세요.
    - 친구, 연인, 동료, 가족 등 다양한 관계에서의 궁합을 설명해주세요.
-   - 서로에게 가장 도움이 는 방식과 ���할을 제안해주세요.
+   - 서로에게 가장 도움이 되는 방식과 역할을 제안해주세요.
    - 관계의 발전 가능성과 방향성에 대한 조언을 제공해주세요.
 `
         break
@@ -143,7 +159,7 @@ export async function POST(request: NextRequest) {
 - 일주: ${userSaju.dayStem}${userSaju.dayBranch} (일간: ${userSaju.dayMaster})
 - 시주: ${userSaju.hourStem}${userSaju.hourBranch}
 - 띠: ${userSaju.yearAnimal}
-- 오행 분포: 목(${userSaju.elements.wood}), 화(${userSaju.elements.fire}), 토(${userSaju.elements.earth}), 금(${userSaju.elements.metal}), 수(${userSaju.elements.water})
+- 오행 분포: 목(${userElements.wood}), 화(${userElements.fire}), 토(${userElements.earth}), 금(${userElements.metal}), 수(${userElements.water})
 
 ## 두 번째 사람 (${partnerName})
 - 이름: ${partnerName}
@@ -153,7 +169,7 @@ export async function POST(request: NextRequest) {
 - 일주: ${partnerSaju.dayStem}${partnerSaju.dayBranch} (일간: ${partnerSaju.dayMaster})
 - 시주: ${partnerSaju.hourStem}${partnerSaju.hourBranch}
 - 띠: ${partnerSaju.yearAnimal}
-- 오행 분포: 목(${partnerSaju.elements.wood}), 화(${partnerSaju.elements.fire}), 토(${partnerSaju.elements.earth}), 금(${partnerSaju.elements.metal}), 수(${partnerSaju.elements.water})
+- 오행 분포: 목(${partnerElements.wood}), 화(${partnerElements.fire}), 토(${partnerElements.earth}), 금(${partnerElements.metal}), 수(${partnerElements.water})
 ${timeInfoText}
 
 다음 내용을 포함하여 두 사람의 궁합을 분석해주세요:
@@ -239,6 +255,7 @@ ${relationshipGuidance}
           responseTime: `${responseTime}ms`,
           compatibilityScore,
           relationshipStatus,
+          partnerSaju,
         })
       } catch (openaiError) {
         console.error("OpenAI API error:", openaiError)
@@ -321,6 +338,7 @@ ${relationshipGuidance}
           fallbackFromOpenAI: fallbackFromOpenAI,
           compatibilityScore,
           relationshipStatus,
+          partnerSaju,
         })
       } catch (deepseekError) {
         console.error("DeepSeek API error:", deepseekError)
@@ -362,4 +380,59 @@ ${relationshipGuidance}
       { status: 500 },
     )
   }
+}
+
+// 천간과 지지에서 오행을 계산하는 함수
+function calculateElements(saju) {
+  // 천간과 지지의 오행 매핑
+  const stemElements = {
+    갑: "wood",
+    을: "wood",
+    병: "fire",
+    정: "fire",
+    무: "earth",
+    기: "earth",
+    경: "metal",
+    신: "metal",
+    임: "water",
+    계: "water",
+  }
+
+  const branchElements = {
+    자: "water",
+    축: "earth",
+    인: "wood",
+    묘: "wood",
+    진: "earth",
+    사: "fire",
+    오: "fire",
+    미: "earth",
+    신: "metal",
+    유: "metal",
+    술: "earth",
+    해: "water",
+  }
+
+  // 오행 카운트 초기화
+  const elements = {
+    wood: 0,
+    fire: 0,
+    earth: 0,
+    metal: 0,
+    water: 0,
+  }
+
+  // 천간의 오행 계산
+  if (saju.yearStem && stemElements[saju.yearStem]) elements[stemElements[saju.yearStem]]++
+  if (saju.monthStem && stemElements[saju.monthStem]) elements[stemElements[saju.monthStem]]++
+  if (saju.dayStem && stemElements[saju.dayStem]) elements[stemElements[saju.dayStem]]++
+  if (saju.hourStem && stemElements[saju.hourStem]) elements[stemElements[saju.hourStem]]++
+
+  // 지지의 오행 계산
+  if (saju.yearBranch && branchElements[saju.yearBranch]) elements[branchElements[saju.yearBranch]]++
+  if (saju.monthBranch && branchElements[saju.monthBranch]) elements[branchElements[saju.monthBranch]]++
+  if (saju.dayBranch && branchElements[saju.dayBranch]) elements[branchElements[saju.dayBranch]]++
+  if (saju.hourBranch && branchElements[saju.hourBranch]) elements[branchElements[saju.hourBranch]]++
+
+  return elements
 }

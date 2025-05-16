@@ -18,23 +18,36 @@ export async function GET(request: NextRequest) {
     const email = searchParams.get("email")
     const id = searchParams.get("id")
 
-    let query = adminSupabase.from("users").select("*")
-
-    if (email) {
-      query = query.eq("email", email)
-    }
-
-    if (id) {
-      query = query.eq("id", id)
-    }
-
-    const { data, error } = await query
+    // auth.users 테이블에서 사용자 정보 가져오기
+    const { data: users, error } = await adminSupabase.auth.admin.listUsers()
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ users: data })
+    let filteredUsers = users.users
+
+    // 이메일로 필터링
+    if (email) {
+      filteredUsers = filteredUsers.filter(
+        (user) => user.email && user.email.toLowerCase().includes(email.toLowerCase()),
+      )
+    }
+
+    // ID로 필터링
+    if (id) {
+      filteredUsers = filteredUsers.filter((user) => user.id === id)
+    }
+
+    // 필요한 정보만 추출
+    const simplifiedUsers = filteredUsers.map((user) => ({
+      id: user.id,
+      email: user.email,
+      created_at: user.created_at,
+      user_metadata: user.user_metadata,
+    }))
+
+    return NextResponse.json({ users: simplifiedUsers })
   } catch (error) {
     console.error("Error fetching users:", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
@@ -49,21 +62,27 @@ export async function POST(request: NextRequest) {
 
     // ID가 있으면 업데이트, 없으면 생성
     if (id) {
-      const { data, error } = await adminSupabase.from("users").update(userInfo).eq("id", id).select().single()
+      const { data, error } = await adminSupabase.auth.admin.updateUserById(id, userInfo)
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
-      return NextResponse.json({ user: data, action: "updated" })
+      return NextResponse.json({ user: data.user, action: "updated" })
     } else {
-      const { data, error } = await adminSupabase.from("users").insert(userInfo).select().single()
+      // 새 사용자 생성 로직
+      const { data, error } = await adminSupabase.auth.admin.createUser({
+        email: userInfo.email,
+        password: userInfo.password,
+        email_confirm: true,
+        user_metadata: userInfo.user_metadata,
+      })
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
-      return NextResponse.json({ user: data, action: "created" })
+      return NextResponse.json({ user: data.user, action: "created" })
     }
   } catch (error) {
     console.error("Error creating/updating user:", error)
@@ -81,7 +100,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 })
     }
 
-    const { error } = await adminSupabase.from("users").delete().eq("id", id)
+    const { error } = await adminSupabase.auth.admin.deleteUser(id)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

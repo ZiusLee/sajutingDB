@@ -48,6 +48,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (userData?.user) {
           console.log("User authenticated:", userData.user.id)
           setUser(userData.user)
+
+          // 로그인 상태를 localStorage에 저장
+          localStorage.setItem("user_authenticated", "true")
+          localStorage.setItem("user_id", userData.user.id)
+          if (userData.user.user_metadata?.name) {
+            localStorage.setItem("user_name", userData.user.user_metadata.name)
+          }
+          if (userData.user.email) {
+            localStorage.setItem("user_email", userData.user.email)
+          }
+
           return userData.user
         } else {
           console.log("No user found in session")
@@ -82,6 +93,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Auth state changed:", event, session?.user?.id)
       if (session?.user) {
         setUser(session.user)
+
+        // 로그인 상태를 localStorage에 저장
+        localStorage.setItem("user_authenticated", "true")
+        localStorage.setItem("user_id", session.user.id)
+        if (session.user.user_metadata?.name) {
+          localStorage.setItem("user_name", session.user.user_metadata.name)
+        }
+        if (session.user.email) {
+          localStorage.setItem("user_email", session.user.email)
+        }
+
         // 로그인 상태가 변경되었고 사용자가 있는 경우 마이페이지로 리다이렉션
         // 단, 이미 /mypage 경로에 있는 경우는 제외
         if (window.location.pathname !== "/mypage") {
@@ -89,6 +111,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setUser(null)
+
+        // 로그아웃 시 localStorage에서 사용자 정보 제거
+        localStorage.removeItem("user_authenticated")
+        localStorage.removeItem("user_id")
+        localStorage.removeItem("user_name")
+        localStorage.removeItem("user_email")
       }
       setIsLoading(false)
     })

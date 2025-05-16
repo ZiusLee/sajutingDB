@@ -5,6 +5,8 @@ import { useRouter, useParams } from "next/navigation"
 import SajuChat from "@/components/saju-chat"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
+// 파일 상단에 URL 유틸리티 함수 import 추가
+import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -37,6 +39,12 @@ export default function SajuChatPage() {
       const generatedKey = `chat_${parsedSaju.name || "user"}_${params.roomType}`
       setSessionKey(generatedKey)
 
+      // 원래 경로 저장 (있는 경우)
+      const lastChatData = loadSajuFromLocalStorage("last_chat_saju_data")
+      if (lastChatData && lastChatData.returnPath) {
+        localStorage.setItem("chat_return_path", lastChatData.returnPath)
+      }
+
       setLoading(false)
 
       // 로그인 상태 확인
@@ -55,7 +63,34 @@ export default function SajuChatPage() {
   }, [router, toast, params.roomType])
 
   const handleBack = () => {
-    router.push("/chatlist")
+    try {
+      // 저장된 원래 경로가 있으면 그 경로로 이동
+      const savedReturnPath = localStorage.getItem("chat_return_path")
+
+      if (savedReturnPath) {
+        // 사주 데이터가 있는지 확인
+        if (saju) {
+          // URL 유틸리티 함수를 사용하여 사주 데이터를 URL에 추가
+          const urlWithSaju = addSajuToUrl(savedReturnPath, saju.saju, saju.name, saju.gender)
+
+          router.push(urlWithSaju)
+        } else {
+          router.push(savedReturnPath)
+        }
+      } else if (saju) {
+        // 사주 데이터가 있으면 결과 페이지로 이동
+        const sajuParam = encodeURIComponent(JSON.stringify(saju.saju))
+        const nameParam = saju.name ? `&name=${encodeURIComponent(saju.name)}` : ""
+        const genderParam = saju.gender ? `&gender=${encodeURIComponent(saju.gender)}` : ""
+
+        router.push(`/result?saju=${sajuParam}${nameParam}${genderParam}`)
+      } else {
+        router.push("/chat-list")
+      }
+    } catch (error) {
+      console.error("Error in handleBack:", error)
+      router.push("/chat-list")
+    }
   }
 
   if (loading) {

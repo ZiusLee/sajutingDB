@@ -34,6 +34,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 
+// URL 유틸리티 함수 import 추가
+import { addSajuToUrl, saveSajuToLocalStorage, loadSajuFromLocalStorage } from "@/lib/url-utils"
+
 // 사용자의 사주에 맞는 맞춤 채팅방 제목 생성
 function getPersonalizedRoomTitle(saju: any, gender: string): string {
   // 사주 데이터를 분석하여 맞춤 제목 생성
@@ -205,7 +208,7 @@ export default function ChatListClient() {
       const name = searchParams.get("name") || ""
       const gender = searchParams.get("gender") || ""
       const interpretation = searchParams.get("interpretation") || ""
-      const returnPath = searchParams.get("returnPath") || "/"
+      let returnPath = searchParams.get("returnPath") || "/"
 
       // URL 파라미터가 없으면 localStorage에서 가져오기 시도
       let saju, userName, userGender, userInterpretation
@@ -214,30 +217,18 @@ export default function ChatListClient() {
         console.log("No saju parameter found, trying localStorage")
 
         try {
-          const lastChatData = localStorage.getItem("last_chat_saju_data")
+          // 유틸리티 함수를 사용하여 localStorage에서 데이터 로드
+          const lastChatData = loadSajuFromLocalStorage("last_chat_saju_data", 3600000) // 1시간 유효
+
           if (lastChatData) {
-            const parsedData = JSON.parse(lastChatData)
-
-            // 데이터가 1시간 이내인지 확인 (오래된 데이터는 사용하지 않음)
-            const dataAge = Date.now() - parsedData.timestamp
-            const isRecent = dataAge < 3600000 // 1시간 = 3600000ms
-
-            if (isRecent) {
-              console.log("Using recent saju data from localStorage")
-              saju = parsedData.saju
-              userName = parsedData.name || ""
-              userGender = parsedData.gender || ""
-              userInterpretation = parsedData.interpretation || ""
-            } else {
-              console.log("Stored saju data is too old, not using it")
-              setError("사주 정보가 없습니다. 메인 페이지로 이동합니다.")
-              setTimeout(() => {
-                window.location.href = "/"
-              }, 2000)
-              return
-            }
+            console.log("Using recent saju data from localStorage")
+            saju = lastChatData.saju
+            userName = lastChatData.name || ""
+            userGender = lastChatData.gender || ""
+            userInterpretation = lastChatData.interpretation || ""
+            returnPath = lastChatData.returnPath || "/"
           } else {
-            console.log("No stored saju data found")
+            console.log("No valid saju data found in localStorage")
             setError("사주 정보가 없습니다. 메인 페이지로 이동합니다.")
             setTimeout(() => {
               window.location.href = "/"
@@ -276,16 +267,7 @@ export default function ChatListClient() {
       setChatData(data)
 
       // 현재 사주 데이터를 localStorage에 저장 (다른 페이지에서 사용할 수 있도록)
-      localStorage.setItem(
-        "last_chat_saju_data",
-        JSON.stringify({
-          saju,
-          name: userName,
-          gender: userGender,
-          interpretation: userInterpretation,
-          timestamp: Date.now(),
-        }),
-      )
+      saveSajuToLocalStorage("last_chat_saju_data", saju, userName, userGender, userInterpretation, returnPath)
 
       // 채팅방 데이터 생성
       const displayName = userName || "사용자"
@@ -569,20 +551,34 @@ export default function ChatListClient() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
-    // 사주 데이터가 있으면 결과 페이지로 이동
-    if (chatData?.returnPath) {
+    try {
       // returnPath가 있으면 그 경로로 이동
-      router.push(chatData.returnPath)
-    } else if (chatData?.saju) {
-      // 결과 페이지에 필요한 데이터를 쿼리 파라미터로 전달
-      const sajuParam = encodeURIComponent(JSON.stringify(chatData.saju))
-      const nameParam = chatData.name ? encodeURIComponent(chatData.name) : ""
-      const genderParam = chatData.gender ? encodeURIComponent(chatData.gender) : ""
+      if (chatData?.returnPath) {
+        console.log("Navigating to return path:", chatData.returnPath)
 
-      // 총운 리포트 탭이 선택된 상태로 결과 페이지로 이동
-      router.push(`/result?saju=${sajuParam}&name=${nameParam}&gender=${genderParam}&tab=interpretation`)
-    } else {
-      // 모든 데이터가 없는 경우 홈페이지로 이동 (최후의 fallback)
+        // URL 유틸리티 함수를 사용하여 사주 데이터를 URL에 추가
+        const urlWithSaju = addSajuToUrl(chatData.returnPath, chatData.saju, chatData.name, chatData.gender)
+
+        router.push(urlWithSaju)
+        return
+      }
+
+      // 사주 데이터가 있으면 결과 페이지로 이동
+      if (chatData?.saju) {
+        // 결과 페이지에 필요한 데이터를 쿼리 파라미터로 전달
+        const sajuParam = encodeURIComponent(JSON.stringify(chatData.saju))
+        const nameParam = chatData.name ? `&name=${encodeURIComponent(chatData.name)}` : ""
+        const genderParam = chatData.gender ? `&gender=${encodeURIComponent(chatData.gender)}` : ""
+
+        // 결과 페이지로 이동
+        router.push(`/result?saju=${sajuParam}${nameParam}${genderParam}`)
+      } else {
+        // 모든 데이터가 없는 경우 홈페이지로 이동 (최후의 fallback)
+        router.push("/")
+      }
+    } catch (error) {
+      console.error("Error in handleBack:", error)
+      // 오류 발생 시 홈으로 이동
       router.push("/")
     }
   }

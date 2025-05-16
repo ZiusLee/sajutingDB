@@ -98,6 +98,23 @@ export default async function ResultPage({
                 <div className="py-2">
                   <SocialShareButtons />
                 </div>
+
+                {/* 채팅 상담 버튼 추가 */}
+                <div className="py-2">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link
+                      href={`/chat-list?saju=${
+                        sajuParam || encodeURIComponent(JSON.stringify(formattedSaju))
+                      }&name=${encodeURIComponent(userData.name || "")}&gender=${encodeURIComponent(userData.gender || "")}&returnPath=/result?${
+                        uuid
+                          ? `uuid=${uuid}`
+                          : `saju=${sajuParam || encodeURIComponent(JSON.stringify(formattedSaju))}&name=${encodeURIComponent(userData.name || "")}&gender=${encodeURIComponent(userData.gender || "")}`
+                      }`}
+                    >
+                      AI 상담 시작하기
+                    </Link>
+                  </Button>
+                </div>
               </div>
 
               {/* 베타서비스 신청 폼 */}
@@ -204,6 +221,103 @@ export default async function ResultPage({
                 {/* 소셜미디어 공유 버튼 추가 */}
                 <div className="py-2">
                   <SocialShareButtons />
+                </div>
+
+                {/* 채팅 상담 버튼 추가 */}
+                <div className="py-2">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link
+                      href={`/chat-list?saju=${
+                        sajuParam ||
+                        encodeURIComponent(
+                          JSON.stringify({
+                            yearStem: sajuData.yearStem,
+                            yearBranch: sajuData.yearBranch,
+                            monthStem: sajuData.monthStem,
+                            monthBranch: sajuData.monthBranch,
+                            dayStem: sajuData.dayStem,
+                            dayBranch: sajuData.dayBranch,
+                            hourStem: sajuData.hourStem,
+                            hourBranch: sajuData.hourBranch,
+                            yearStemSibseong: sajuData.yearStemSibseong,
+                            monthStemSibseong: sajuData.monthStemSibseong,
+                            dayStemSibseong: sajuData.dayStemSibseong,
+                            hourStemSibseong: sajuData.hourStemSibseong,
+                            yearBranchSibseong: sajuData.yearBranchSibseong,
+                            monthBranchSibseong: sajuData.monthBranchSibseong,
+                            dayBranchSibseong: sajuData.dayBranchSibseong,
+                            hourBranchSibseong: sajuData.hourBranchSibseong,
+                            yearStemHanja: sajuData.yearStemHanja,
+                            yearBranchHanja: sajuData.yearBranchHanja,
+                            monthStemHanja: sajuData.monthStemHanja,
+                            monthBranchHanja: sajuData.monthBranchHanja,
+                            dayStemHanja: sajuData.dayStemHanja,
+                            dayBranchHanja: sajuData.dayBranchHanja,
+                            hourStemHanja: sajuData.hourStemHanja,
+                            hourBranchHanja: sajuData.hourBranchHanja,
+                            elements: sajuData.elements,
+                            dayMaster: sajuData.dayMaster,
+                            dayMasterHanja: sajuData.dayMasterHanja,
+                            year: sajuData.year,
+                            month: sajuData.month,
+                            day: sajuData.day,
+                            hour: sajuData.hour,
+                            minute: sajuData.minute,
+                            lunarYear: sajuData.lunarYear,
+                            lunarMonth: sajuData.lunarMonth,
+                            lunarDay: sajuData.lunarDay,
+                          }),
+                        )
+                      }&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}&returnPath=/result?${
+                        uuid
+                          ? `uuid=${uuid}`
+                          : `saju=${
+                              sajuParam ||
+                              encodeURIComponent(
+                                JSON.stringify({
+                                  yearStem: sajuData.yearStem,
+                                  yearBranch: sajuData.yearBranch,
+                                  monthStem: sajuData.monthStem,
+                                  monthBranch: sajuData.monthBranch,
+                                  dayStem: sajuData.dayStem,
+                                  dayBranch: sajuData.dayBranch,
+                                  hourStem: sajuData.hourStem,
+                                  hourBranch: sajuData.hourBranch,
+                                  yearStemSibseong: sajuData.yearStemSibseong,
+                                  monthStemSibseong: sajuData.monthStemSibseong,
+                                  dayStemSibseong: sajuData.dayStemSibseong,
+                                  hourStemSibseong: sajuData.hourStemSibseong,
+                                  yearBranchSibseong: sajuData.yearBranchSibseong,
+                                  monthBranchSibseong: sajuData.monthBranchSibseong,
+                                  dayBranchSibseong: sajuData.dayBranchSibseong,
+                                  hourBranchSibseong: sajuData.hourBranchSibseong,
+                                  yearStemHanja: sajuData.yearStemHanja,
+                                  yearBranchHanja: sajuData.yearBranchHanja,
+                                  monthStemHanja: sajuData.monthStemHanja,
+                                  monthBranchHanja: sajuData.monthBranchHanja,
+                                  dayStemHanja: sajuData.dayStemHanja,
+                                  dayBranchHanja: sajuData.dayBranchHanja,
+                                  hourStemHanja: sajuData.hourStemHanja,
+                                  hourBranchHanja: sajuData.hourBranchHanja,
+                                  elements: sajuData.elements,
+                                  dayMaster: sajuData.dayMaster,
+                                  dayMasterHanja: sajuData.dayMasterHanja,
+                                  year: sajuData.year,
+                                  month: sajuData.month,
+                                  day: sajuData.day,
+                                  hour: sajuData.hour,
+                                  minute: sajuData.minute,
+                                  lunarYear: sajuData.lunarYear,
+                                  lunarMonth: sajuData.lunarMonth,
+                                  lunarDay: sajuData.lunarDay,
+                                }),
+                              )
+                            }&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}`
+                      }`}
+                    >
+                      AI 상담 시작하기
+                    </Link>
+                  </Button>
                 </div>
               </div>
 
@@ -329,6 +443,23 @@ export default async function ResultPage({
               {/* 소셜미디어 공유 버튼 추가 */}
               <div className="py-2">
                 <SocialShareButtons />
+              </div>
+
+              {/* 채팅 상담 버튼 추가 */}
+              <div className="py-2">
+                <Button variant="outline" className="w-full" asChild>
+                  <Link
+                    href={`/chat-list?saju=${
+                      sajuParam || encodeURIComponent(JSON.stringify(saju))
+                    }&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}&returnPath=/result?${
+                      uuid
+                        ? `uuid=${uuid}`
+                        : `saju=${sajuParam || encodeURIComponent(JSON.stringify(saju))}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}`
+                    }`}
+                  >
+                    AI 상담 시작하기
+                  </Link>
+                </Button>
               </div>
             </div>
 
