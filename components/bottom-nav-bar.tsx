@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useToast } from "@/components/ui/use-toast"
-import { Home, Search, PlusSquare, Heart, User } from "lucide-react"
+import { Home, Search, PlusSquare, Coins, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function BottomNavBar() {
@@ -98,10 +98,10 @@ export function BottomNavBar() {
           variant="ghost"
           size="icon"
           className="h-12 w-12 rounded-full"
-          onClick={() => router.push("/saju-chat/general")}
-          aria-label="AI 상담"
+          onClick={() => router.push("/daily-fortune")}
+          aria-label="오늘의 운세"
         >
-          <Heart className={`h-6 w-6 ${pathname.includes("/saju-chat") ? "text-primary" : "text-muted-foreground"}`} />
+          <Coins className={`h-6 w-6 ${pathname === "/daily-fortune" ? "text-primary" : "text-muted-foreground"}`} />
         </Button>
 
         <Button
