@@ -3,16 +3,21 @@
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useToast } from "@/components/ui/use-toast"
-import { FortuneSlotMachine } from "./fortune-slot-machine"
-import { CoinManager } from "./coin-manager"
-import { TalismanCollection } from "./talisman-collection"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Separator } from "@/components/ui/separator"
+import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
+import { FortuneSlotMachine } from "./fortune-slot-machine-gpt"
+import { TalismanCollection } from "./talisman-collection"
 
 export default function DailyFortuneClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [defaultSession, setDefaultSession] = useState<any>(null)
+  const [sajuProfile, setSajuProfile] = useState<any>(null)
   const [coins, setCoins] = useState(0)
   const [lastCheckIn, setLastCheckIn] = useState<string | null>(null)
   const [talismans, setTalismans] = useState<string[]>([])
@@ -49,6 +54,39 @@ export default function DailyFortuneClient() {
 
   const loadUserData = async (userId: string) => {
     try {
+      // 사용자의 대표 사주 세션 가져오기 (lib/saju-session-service.ts 활용)
+      const defaultSession = await getDefaultSajuSession(userId)
+
+      if (!defaultSession) {
+        // 대표 사주가 없으면 사주 세션 목록 가져오기
+        const { data: sessions, error: sessionsError } = await supabase
+          .from("saju_sessions")
+          .select("*")
+          .eq("auth_user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+
+        if (sessionsError || !sessions || sessions.length === 0) {
+          toast({
+            title: "사주 정보 없음",
+            description: "사주 정보를 먼저 등록해주세요.",
+          })
+          return
+        }
+
+        setDefaultSession(sessions[0])
+
+        // 사주 프로필 정보 가져오기
+        const profile = await getSajuProfileBySessionId(sessions[0].id)
+        setSajuProfile(profile)
+      } else {
+        setDefaultSession(defaultSession)
+
+        // 사주 프로필 정보 가져오기
+        const profile = await getSajuProfileBySessionId(defaultSession.id)
+        setSajuProfile(profile)
+      }
+
       // 코인 정보 로드
       const { data: coinData, error: coinError } = await supabase
         .from("user_coins")
@@ -222,6 +260,22 @@ export default function DailyFortuneClient() {
     )
   }
 
+  if (!sajuProfile) {
+    return (
+      <div className="container max-w-md mx-auto p-4 pb-20">
+        <Alert className="mb-4">
+          <AlertTitle>사주 정보가 필요합니다</AlertTitle>
+          <AlertDescription>
+            오늘의 운세를 보려면 먼저 사주 정보를 등록해주세요.
+            <div className="mt-4">
+              <Button onClick={() => (window.location.href = "/")}>사주 등록하러 가기</Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   return (
     <div className="container max-w-md mx-auto p-4 pb-20 bg-gray-950">
       <Card className="mb-4 bg-gray-900 border-amber-800">
@@ -232,7 +286,21 @@ export default function DailyFortuneClient() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CoinManager coins={coins} lastCheckIn={lastCheckIn} onCheckIn={checkInForCoins} />
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center">
+              <span className="text-amber-400 text-lg font-bold mr-2">🪙 {coins}</span>
+              <span className="text-sm text-gray-400">코인</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={checkInForCoins}
+              disabled={lastCheckIn === new Date().toISOString().split("T")[0]}
+              className="border-amber-500 text-amber-400 hover:bg-amber-500/20"
+            >
+              {lastCheckIn === new Date().toISOString().split("T")[0] ? "출석 완료" : "출석 체크"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -248,7 +316,13 @@ export default function DailyFortuneClient() {
         <TabsContent value="fortune">
           <Card className="bg-gray-900 border-amber-800">
             <CardContent className="pt-6">
-              <FortuneSlotMachine coins={coins} useCoins={useCoins} addTalisman={addTalisman} />
+              <FortuneSlotMachine
+                coins={coins}
+                useCoins={useCoins}
+                addTalisman={addTalisman}
+                sajuProfile={sajuProfile}
+                userId={user?.id}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -260,6 +334,58 @@ export default function DailyFortuneClient() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <div className="mt-6">
+        <Card className="bg-gray-900 border-amber-800">
+          <CardHeader>
+            <CardTitle className="text-lg text-amber-400">사주 정보</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-amber-300">기본 정보</h3>
+                <Separator className="my-2 bg-amber-800/50" />
+                <p className="text-gray-300">이름: {sajuProfile.name || "이름 없음"}</p>
+                <p className="text-gray-300">성별: {sajuProfile.gender === "male" ? "남성" : "여성"}</p>
+              </div>
+              <div>
+                <h3 className="font-medium text-amber-300">사주 정보</h3>
+                <Separator className="my-2 bg-amber-800/50" />
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="bg-gray-800 p-2 rounded-md">
+                    <p className="text-xs text-amber-300">년주</p>
+                    <p className="text-gray-300">
+                      {sajuProfile.saju.yearStem}
+                      {sajuProfile.saju.yearBranch}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800 p-2 rounded-md">
+                    <p className="text-xs text-amber-300">월주</p>
+                    <p className="text-gray-300">
+                      {sajuProfile.saju.monthStem}
+                      {sajuProfile.saju.monthBranch}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800 p-2 rounded-md">
+                    <p className="text-xs text-amber-300">일주</p>
+                    <p className="text-gray-300">
+                      {sajuProfile.saju.dayStem}
+                      {sajuProfile.saju.dayBranch}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800 p-2 rounded-md">
+                    <p className="text-xs text-amber-300">시주</p>
+                    <p className="text-gray-300">
+                      {sajuProfile.saju.hourStem}
+                      {sajuProfile.saju.hourBranch}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

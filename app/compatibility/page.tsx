@@ -90,10 +90,8 @@ export default function CompatibilityPage() {
             name: userSaju.name,
             gender: userSaju.gender,
             saju: userSaju.saju,
-            relationshipStatus: "unknown",
           },
           partnerData,
-          "gpt-4",
           "unknown",
         )
 
@@ -104,12 +102,31 @@ export default function CompatibilityPage() {
           if (result.partnerSaju) {
             setPartnerSaju(result.partnerSaju)
           }
+        } else if (result && result.fallbackInterpretation) {
+          // 오류 발생 시 폴백 해석 사용
+          setCompatibilityResult(result.fallbackInterpretation)
+          setError(result.error || "궁합 분석 중 오류가 발생했습니다.")
         } else {
           throw new Error("궁합 분석 결과를 받지 못했습니다.")
         }
       } catch (error) {
         console.error("Error analyzing compatibility:", error)
         setError(error instanceof Error ? error.message : "궁합 분석 중 오류가 발생했습니다.")
+        // 오류 발생 시 기본 메시지 설정
+        setCompatibilityResult(`
+# 궁합 분석 오류
+
+궁합 분석을 가져오는 중 오류가 발생했습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: ${error instanceof Error ? error.message : "알 수 없는 오류"}
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 인터넷 연결을 확인해보세요.
+3. 잠시 후 다시 시도해보세요.
+        `)
       } finally {
         setIsLoading(false)
       }
@@ -134,18 +151,6 @@ export default function CompatibilityPage() {
             {userSaju?.name}님과 {partnerData?.name}님의 궁합을 분석 중입니다...
           </p>
         </div>
-      ) : error ? (
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="text-center text-red-500">
-              <p className="mb-2 font-medium">오류가 발생했습니다</p>
-              <p className="text-sm">{error}</p>
-              <Button variant="outline" className="mt-4" onClick={() => router.back()}>
-                돌아가기
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       ) : (
         <div className="space-y-6">
           {userSaju && partnerSaju && (
@@ -157,7 +162,13 @@ export default function CompatibilityPage() {
             />
           )}
 
-          <Card className="bg-gradient-to-r from-pink-50 to-purple-50 border-pink-100 dark:from-pink-950 dark:to-purple-950 dark:border-pink-800 dark:text-gray-100">
+          <Card
+            className={
+              error
+                ? "bg-red-50 border-red-100 dark:bg-red-950 dark:border-red-800"
+                : "bg-gradient-to-r from-pink-50 to-purple-50 border-pink-100 dark:from-pink-950 dark:to-purple-950 dark:border-pink-800 dark:text-gray-100"
+            }
+          >
             <CardContent className="p-4 sm:p-6">
               <h2 className="text-xl font-semibold mb-4 text-center">
                 {userSaju?.name}님과 {partnerData?.name}님의 궁합

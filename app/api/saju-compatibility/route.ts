@@ -223,17 +223,32 @@ ${relationshipGuidance}
     if (currentModel === "openai") {
       try {
         console.log("Attempting to generate compatibility analysis with OpenAI model")
-        const { text } = await generateText({
-          model: openai("gpt-4.1"),
-          prompt: prompt,
-          temperature: 0.7,
-          maxTokens: 2500,
-          apiKey: OPENAI_API_KEY,
-        })
 
-        interpretation = text
-        responseTime = Date.now() - startTime
-        console.log(`OpenAI compatibility analysis received in ${responseTime}ms`)
+        // 타임아웃 설정 추가
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 50000) // 50초 타임아웃
+
+        try {
+          const { text } = await generateText({
+            model: openai("gpt-4o"),
+            prompt: prompt,
+            temperature: 0.7,
+            maxTokens: 2500,
+            apiKey: OPENAI_API_KEY,
+          })
+
+          clearTimeout(timeoutId) // 타임아웃 취소
+
+          interpretation = text
+          responseTime = Date.now() - startTime
+          console.log(`OpenAI compatibility analysis received in ${responseTime}ms`)
+        } catch (abortError) {
+          if (abortError.name === "AbortError") {
+            console.error("OpenAI request timed out after 50 seconds")
+            throw new Error("OpenAI request timed out")
+          }
+          throw abortError
+        }
 
         // 궁합 점수 추출 시도
         try {
@@ -262,6 +277,8 @@ ${relationshipGuidance}
 
         // Check if the error is related to quota or billing
         const errorMessage = openaiError instanceof Error ? openaiError.message : "Unknown error"
+        console.error("OpenAI error details:", errorMessage)
+
         const isQuotaError =
           errorMessage.includes("quota") ||
           errorMessage.includes("billing") ||
@@ -273,7 +290,27 @@ ${relationshipGuidance}
           currentModel = "deepseek"
           fallbackFromOpenAI = true
         } else {
-          throw new Error(`OpenAI API error: ${errorMessage}`)
+          // 오류 응답 반환
+          return NextResponse.json(
+            {
+              error: `OpenAI API error: ${errorMessage}`,
+              fallbackInterpretation: `
+# 궁합 분석 오류
+
+궁합 분석을 가져오는 중 OpenAI API 오류가 발생했습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: ${errorMessage}
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 잠시 후 다시 시도해보세요.
+3. 계속 문제가 발생하면 다른 브라우저에서 시도해보세요.
+            `,
+            },
+            { status: 500 },
+          )
         }
       }
     }
@@ -284,38 +321,54 @@ ${relationshipGuidance}
         console.log(
           `Attempting to generate compatibility analysis with DeepSeek model${fallbackFromOpenAI ? " (fallback from OpenAI)" : ""}`,
         )
-        const response = await fetch("https://api.deepseek.com/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer sk-3b3cde78c0224436bc60d3a293129f47",
-          },
-          body: JSON.stringify({
-            model: "deepseek-chat",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "당신은 사주팔자 전문가입니다. 두 사람의 사주 궁합을 분석하고 상세한 해석을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요.",
-              },
-              { role: "user", content: prompt },
-            ],
-            stream: false,
-            max_tokens: 2500,
-            temperature: 0.7,
-          }),
-        })
 
-        if (!response.ok) {
-          const errorData = await response.text()
-          console.error(`DeepSeek API error (${response.status}):`, errorData)
-          throw new Error(`DeepSeek API error: ${response.status}`)
+        // 타임아웃 설정 추가
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 50000) // 50초 타임아웃
+
+        try {
+          const response = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer sk-3b3cde78c0224436bc60d3a293129f47",
+            },
+            body: JSON.stringify({
+              model: "deepseek-chat",
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "당신은 사주팔자 전문가입니다. 두 사람의 사주 궁합을 분석하고 상세한 해석을 제공해주세요. 마크다운 형식으로 응답해주세요. 제목과 소제목을 사용하고, 내용은 구체적으로 작성해주세요.",
+                },
+                { role: "user", content: prompt },
+              ],
+              stream: false,
+              max_tokens: 2500,
+              temperature: 0.7,
+            }),
+            signal: controller.signal,
+          })
+
+          clearTimeout(timeoutId) // 타임아웃 취소
+
+          if (!response.ok) {
+            const errorData = await response.text()
+            console.error(`DeepSeek API error (${response.status}):`, errorData)
+            throw new Error(`DeepSeek API error: ${response.status}`)
+          }
+
+          const data = await response.json()
+          interpretation = data.choices[0].message.content
+          responseTime = Date.now() - startTime
+          console.log(`DeepSeek compatibility analysis received in ${responseTime}ms`)
+        } catch (abortError) {
+          if (abortError.name === "AbortError") {
+            console.error("DeepSeek request timed out after 50 seconds")
+            throw new Error("DeepSeek request timed out")
+          }
+          throw abortError
         }
-
-        const data = await response.json()
-        interpretation = data.choices[0].message.content
-        responseTime = Date.now() - startTime
-        console.log(`DeepSeek compatibility analysis received in ${responseTime}ms`)
 
         // 궁합 점수 추출 시도
         try {
@@ -342,15 +395,57 @@ ${relationshipGuidance}
         })
       } catch (deepseekError) {
         console.error("DeepSeek API error:", deepseekError)
-        throw new Error(
-          `DeepSeek API error: ${deepseekError instanceof Error ? deepseekError.message : "Unknown error"}`,
+
+        const errorMessage = deepseekError instanceof Error ? deepseekError.message : "Unknown error"
+        console.error("DeepSeek error details:", errorMessage)
+
+        // 오류 응답 반환
+        return NextResponse.json(
+          {
+            error: `DeepSeek API error: ${errorMessage}`,
+            fallbackInterpretation: `
+# 궁합 분석 오류
+
+궁합 분석을 가져오는 중 DeepSeek API 오류가 발생했습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: ${errorMessage}
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 잠시 후 다시 시도해보세요.
+3. 계속 문제가 발생하면 다른 브라우저에서 시도해보세요.
+          `,
+          },
+          { status: 500 },
         )
       }
     }
 
     // 여기까지 왔다면 어떤 모델도 성공하지 못한 것이므로 오류 반환
     console.error("Failed to generate compatibility analysis with any model")
-    throw new Error("Failed to generate compatibility analysis with any model")
+    return NextResponse.json(
+      {
+        error: "Failed to generate compatibility analysis with any model",
+        fallbackInterpretation: `
+# 궁합 분석 오류
+
+궁합 분석을 가져오는 중 오류가 발생했습니다.
+
+## 오류 정보:
+- 오류 시간: ${new Date().toISOString()}
+- 오류 내용: 모든 AI 모델에서 응답을 받지 못했습니다.
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 다른 AI 모델을 선택해보세요 (DeepSeek 또는 OpenAI).
+3. 인터넷 연결을 확인해보세요.
+4. 잠시 후 다시 시도해보세요.
+      `,
+      },
+      { status: 500 },
+    )
   } catch (error) {
     console.error("Error generating compatibility analysis:", error)
 

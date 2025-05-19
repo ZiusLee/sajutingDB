@@ -35,20 +35,59 @@ export async function getCompatibilityAnalysis(userInfo: any, partnerInfo: any, 
   try {
     console.log("Requesting compatibility analysis")
 
-    const response = await fetch("/api/saju-compatibility", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userInfo, partnerInfo, relationshipStatus }),
-    })
+    // 타임아웃 설정 추가
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60초 타임아웃
 
-    if (!response.ok) {
-      throw new Error("Failed to get compatibility analysis")
+    try {
+      const response = await fetch("/api/saju-compatibility", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userInfo, partnerInfo, relationshipStatus }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId) // 타임아웃 취소
+
+      // 응답 상태 코드 로깅 추가
+      console.log("API response status:", response.status)
+
+      // 응답이 JSON이 아닐 경우를 대비한 처리
+      const responseText = await response.text()
+      console.log("API response length:", responseText.length)
+
+      let data
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("Error parsing API response:", parseError)
+        console.error("Response text:", responseText.substring(0, 200) + "...")
+        throw new Error("Invalid JSON response")
+      }
+
+      return data
+    } catch (abortError) {
+      if (abortError.name === "AbortError") {
+        console.error("Compatibility analysis request timed out after 60 seconds")
+        return {
+          fallbackInterpretation: `
+# 궁합 분석 시간 초과
+
+궁합 분석 요청 시간이 초과되었습니다.
+
+## 문제 해결 방법:
+1. 페이지를 새로고침하고 다시 시도해보세요.
+2. 인터넷 연결을 확인해보세요.
+3. 잠시 후 다시 시도해보세요.
+4. 서버 부하가 높을 수 있으니 한 시간 후에 다시 시도해보세요.
+`,
+          error: "궁합 분석 요청 시간이 초과되었습니다.",
+        }
+      }
+      throw abortError
     }
-
-    const data = await response.json()
-    return data
   } catch (error) {
     console.error("Error fetching compatibility analysis:", error)
     throw error

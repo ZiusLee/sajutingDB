@@ -7,11 +7,16 @@ import { Loader2, Star } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
+import ReactMarkdown from "react-markdown"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Progress } from "@/components/ui/progress"
 
 interface FortuneSlotMachineProps {
   coins: number
   useCoins: (amount: number) => Promise<boolean>
   addTalisman: (talismanId: string) => Promise<void>
+  sajuProfile: any
+  userId: string
 }
 
 // 운세 카테고리
@@ -23,73 +28,34 @@ const FORTUNE_CATEGORIES = [
   { id: "health", name: "건강운", color: "bg-purple-500", textColor: "text-purple-500", icon: "💪" },
 ]
 
-// 운세 결과 레벨
-const FORTUNE_LEVELS = [
-  { id: "very_bad", name: "매우 나쁨", color: "text-red-600", emoji: "😱" },
-  { id: "bad", name: "나쁨", color: "text-orange-500", emoji: "😟" },
-  { id: "neutral", name: "보통", color: "text-yellow-500", emoji: "😐" },
-  { id: "good", name: "좋음", color: "text-green-500", emoji: "😊" },
-  { id: "very_good", name: "매우 좋음", color: "text-blue-500", emoji: "🤩" },
-]
+// 예상 로딩 시간 (밀리초)
+const ESTIMATED_LOADING_TIME = 15000
 
-// 운세 메시지
-const FORTUNE_MESSAGES = {
-  love: {
-    very_bad: "오늘은 연애 운이 매우 좋지 않습니다. 감정적인 대화는 피하는 것이 좋겠습니다.",
-    bad: "오늘은 연애 운이 다소 좋지 않습니다. 상대방의 말에 귀 기울이는 것이 중요합니다.",
-    neutral: "오늘의 연애 운은 평범합니다. 평소와 같이 행동하세요.",
-    good: "오늘은 연애 운이 좋습니다. 마음에 드는 사람에게 다가가보세요.",
-    very_good: "오늘은 연애 운이 매우 좋습니다! 고백이나 데이트 신청에 좋은 날입니다.",
-  },
-  money: {
-    very_bad: "오늘은 금전 운이 매우 좋지 않습니다. 불필요한 지출은 피하세요.",
-    bad: "오늘은 금전 운이 다소 좋지 않습니다. 충동구매를 자제하세요.",
-    neutral: "오늘의 금전 운은 평범합니다. 계획적인 소비를 하세요.",
-    good: "오늘은 금전 운이 좋습니다. 투자나 재테크에 좋은 날입니다.",
-    very_good: "오늘은 금전 운이 매우 좋습니다! 예상치 못한 수입이 있을 수 있습니다.",
-  },
-  career: {
-    very_bad: "오늘은 직업 운이 매우 좋지 않습니다. 중요한 결정은 미루는 것이 좋겠습니다.",
-    bad: "오늘은 직업 운이 다소 좋지 않습니다. 실수하지 않도록 주의하세요.",
-    neutral: "오늘의 직업 운은 평범합니다. 맡은 일에 충실하세요.",
-    good: "오늘은 직업 운이 좋습니다. 업무에서 좋은 성과를 낼 수 있습니다.",
-    very_good: "오늘은 직업 운이 매우 좋습니다! 승진이나 좋은 기회가 올 수 있습니다.",
-  },
-  business: {
-    very_bad: "오늘은 사업 운이 매우 좋지 않습니다. 중요한 계약이나 미팅은 연기하세요.",
-    bad: "오늘은 사업 운이 다소 좋지 않습니다. 신중하게 결정하세요.",
-    neutral: "오늘의 사업 운은 평범합니다. 기본에 충실하세요.",
-    good: "오늘은 사업 운이 좋습니다. 새로운 아이디어를 실행에 옮겨보세요.",
-    very_good: "오늘은 사업 운이 매우 좋습니다! 새로운 거래나 파트너십에 좋은 날입니다.",
-  },
-  health: {
-    very_bad: "오늘은 건강 운이 매우 좋지 않습니다. 무리한 활동은 피하고 충분한 휴식을 취하세요.",
-    bad: "오늘은 건강 운이 다소 좋지 않습니다. 건강에 신경 쓰세요.",
-    neutral: "오늘의 건강 운은 평범합니다. 규칙적인 생활을 유지하세요.",
-    good: "오늘은 건강 운이 좋습니다. 가벼운 운동을 해보세요.",
-    very_good: "오늘은 건강 운이 매우 좋습니다! 활력이 넘치는 하루가 될 것입니다.",
-  },
-}
-
-export function FortuneSlotMachine({ coins, useCoins, addTalisman }: FortuneSlotMachineProps) {
+export function FortuneSlotMachine({ coins, useCoins, addTalisman, sajuProfile, userId }: FortuneSlotMachineProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>(FORTUNE_CATEGORIES[0].id)
   const [isSpinning, setIsSpinning] = useState(false)
   const [showResult, setShowResult] = useState(false)
-  const [fortuneResult, setFortuneResult] = useState<string | null>(null)
   const [leverPulled, setLeverPulled] = useState(false)
   const [capsuleVisible, setCapsuleVisible] = useState(false)
   const [capsulePosition, setCapsulePosition] = useState(0)
   const [capsuleRotation, setCapsuleRotation] = useState(0)
   const [result, setResult] = useState<{
     category: string
-    level: string
-    message: string
+    fortune: string
     talisman: string | null
   } | null>(null)
+  const [fortuneCache, setFortuneCache] = useState<Record<string, { fortune: string; date: string }>>({})
+
+  // 로딩 애니메이션을 위한 상태
+  const [showBigCapsule, setShowBigCapsule] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [remainingTime, setRemainingTime] = useState(0)
+  const [loadingStartTime, setLoadingStartTime] = useState(0)
 
   const machineRef = useRef<HTMLDivElement>(null)
   const leverRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+  const supabase = createClientComponentClient()
 
   // 별 애니메이션을 위한 상태
   const [stars, setStars] = useState<{ id: number; x: number; y: number; size: number; delay: number }[]>([])
@@ -104,10 +70,131 @@ export function FortuneSlotMachine({ coins, useCoins, addTalisman }: FortuneSlot
       delay: Math.random() * 3,
     }))
     setStars(newStars)
+
+    // 캐시된 운세 로드
+    loadCachedFortunes()
   }, [])
+
+  // 로딩 진행 상태 업데이트
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null
+
+    if (showBigCapsule && loadingStartTime > 0) {
+      intervalId = setInterval(() => {
+        const elapsed = Date.now() - loadingStartTime
+        const progress = Math.min(Math.floor((elapsed / ESTIMATED_LOADING_TIME) * 100), 99)
+        const remaining = Math.max(Math.ceil((ESTIMATED_LOADING_TIME - elapsed) / 1000), 1)
+
+        setLoadingProgress(progress)
+        setRemainingTime(remaining)
+
+        // 99%에서 멈추고 실제 완료는 API 응답에서 처리
+        if (progress >= 99) {
+          clearInterval(intervalId as NodeJS.Timeout)
+        }
+      }, 100)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [showBigCapsule, loadingStartTime])
+
+  const loadCachedFortunes = async () => {
+    try {
+      // 오늘 날짜
+      const today = new Date().toISOString().split("T")[0]
+
+      // 오늘 생성된 운세 가져오기
+      const { data: fortuneData, error } = await supabase
+        .from("daily_fortunes")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("fortune_date", today)
+
+      if (!error && fortuneData && fortuneData.length > 0) {
+        const cache: Record<string, { fortune: string; date: string }> = {}
+
+        fortuneData.forEach((item) => {
+          if (item.category) {
+            cache[item.category] = {
+              fortune: item.fortune,
+              date: today,
+            }
+          }
+        })
+
+        setFortuneCache(cache)
+      }
+    } catch (error) {
+      console.error("캐시된 운세 로드 오류:", error)
+    }
+  }
+
+  const generateFortune = async () => {
+    try {
+      const response = await fetch("/api/daily-fortune", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          saju: sajuProfile.saju,
+          name: sajuProfile.name || "사용자",
+          gender: sajuProfile.gender || "male",
+          category: selectedCategory,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("운세 생성에 실패했습니다")
+      }
+
+      const data = await response.json()
+      return data.interpretation
+    } catch (error) {
+      console.error("운세 생성 오류:", error)
+      throw error
+    }
+  }
+
+  const saveFortune = async (fortuneText: string) => {
+    try {
+      // 오늘 날짜
+      const today = new Date().toISOString()
+      const todayDate = today.split("T")[0]
+
+      // 데이터베이스에 저장
+      await supabase.from("daily_fortunes").insert({
+        user_id: userId,
+        session_id: sajuProfile.sessionId,
+        fortune: fortuneText,
+        created_at: today,
+        fortune_date: todayDate,
+        category: selectedCategory,
+      })
+    } catch (error) {
+      console.error("운세 저장 오류:", error)
+    }
+  }
 
   const pullLever = async () => {
     if (isSpinning || coins < 1) return
+
+    // 오늘 날짜
+    const today = new Date().toISOString().split("T")[0]
+
+    // 이미 오늘 해당 카테고리의 운세를 뽑았는지 확인
+    if (fortuneCache[selectedCategory] && fortuneCache[selectedCategory].date === today) {
+      // 이미 뽑은 운세가 있으면 그것을 보여줌
+      setResult({
+        category: selectedCategory,
+        fortune: fortuneCache[selectedCategory].fortune,
+        talisman: null, // 이미 뽑은 경우 부적은 없음
+      })
+      setShowResult(true)
+      return
+    }
 
     const success = await useCoins(1)
     if (!success) {
@@ -136,48 +223,79 @@ export function FortuneSlotMachine({ coins, useCoins, addTalisman }: FortuneSlot
         setCapsulePosition(100)
         setCapsuleRotation(720)
 
-        // 결과 생성 및 표시
+        // 캡슐이 떨어진 후 큰 캡슐 애니메이션 시작
         setTimeout(() => {
-          // 캡슐 숨기기
           setCapsuleVisible(false)
+          setShowBigCapsule(true)
+          setLoadingStartTime(Date.now())
+          setLoadingProgress(0)
+          setRemainingTime(Math.ceil(ESTIMATED_LOADING_TIME / 1000))
 
-          const levelIndex = Math.floor(Math.random() * FORTUNE_LEVELS.length)
-          const level = FORTUNE_LEVELS[levelIndex].id
-          const message =
-            FORTUNE_MESSAGES[selectedCategory as keyof typeof FORTUNE_MESSAGES][
-              level as keyof typeof FORTUNE_MESSAGES.love
-            ]
+          // GPT API 호출하여 운세 생성
+          generateFortune()
+            .then((fortuneText) => {
+              // 로딩 완료 표시
+              setLoadingProgress(100)
+              setRemainingTime(0)
 
-          // 부적 획득 확률 (20%)
-          const getTalisman = Math.random() < 0.2
-          let talismanId = null
+              // 잠시 후 큰 캡슐 숨기기
+              setTimeout(() => {
+                setShowBigCapsule(false)
 
-          if (getTalisman) {
-            // 해당 카테고리의 부적
-            talismanId = `${selectedCategory}_talisman`
-            addTalisman(talismanId)
-          }
+                // 부적 획득 확률 (20%)
+                const getTalisman = Math.random() < 0.2
+                let talismanId = null
 
-          setResult({
-            category: selectedCategory,
-            level,
-            message,
-            talisman: talismanId,
-          })
+                if (getTalisman) {
+                  // 해당 카테고리의 부적
+                  talismanId = `${selectedCategory}_talisman`
+                  addTalisman(talismanId)
+                }
 
-          // 결과 팝업 표시
-          setShowResult(true)
-          setIsSpinning(false)
+                // 결과 설정
+                const newResult = {
+                  category: selectedCategory,
+                  fortune: fortuneText,
+                  talisman: talismanId,
+                }
 
-          // 좋은 결과일 경우 축하 효과
-          if (level === "good" || level === "very_good") {
-            confetti({
-              particleCount: 100,
-              spread: 70,
-              origin: { y: 0.6 },
+                setResult(newResult)
+
+                // 캐시에 저장
+                setFortuneCache((prev) => ({
+                  ...prev,
+                  [selectedCategory]: {
+                    fortune: fortuneText,
+                    date: today,
+                  },
+                }))
+
+                // 결과 팝업 표시
+                setShowResult(true)
+                setIsSpinning(false)
+
+                // 데이터베이스에 저장
+                saveFortune(fortuneText)
+
+                // 축하 효과
+                confetti({
+                  particleCount: 100,
+                  spread: 70,
+                  origin: { y: 0.6 },
+                })
+              }, 1000)
             })
-          }
-        }, 2000) // 2초 후 결과 표시
+            .catch((error) => {
+              console.error("운세 생성 오류:", error)
+              setIsSpinning(false)
+              setShowBigCapsule(false)
+              toast({
+                title: "운세 생성 오류",
+                description: "운세를 생성하는 중 오류가 발생했습니다.",
+                variant: "destructive",
+              })
+            })
+        }, 1000) // 캡슐이 떨어진 후 1초 후에 큰 캡슐 애니메이션 시작
       }, 300)
     }, 1000)
   }
@@ -342,12 +460,95 @@ export function FortuneSlotMachine({ coins, useCoins, addTalisman }: FortuneSlot
         <div className="absolute top-32 right-6 w-8 h-8 rounded-full bg-red-400 border-2 border-red-600"></div>
 
         {/* 로딩 오버레이 */}
-        {isSpinning && (
+        {isSpinning && !showBigCapsule && (
           <div className="absolute inset-0 bg-black bg-opacity-30 flex justify-center items-center z-10">
             <Loader2 className="h-12 w-12 animate-spin text-white" />
           </div>
         )}
       </div>
+
+      {/* 큰 캡슐 로딩 애니메이션 */}
+      <AnimatePresence>
+        {showBigCapsule && (
+          <motion.div
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black bg-opacity-80"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* 큰 캡슐 */}
+            <motion.div
+              className="relative"
+              initial={{ y: -200, scale: 0.5 }}
+              animate={{
+                y: 0,
+                scale: 1,
+                rotate: 360 * 5,
+              }}
+              transition={{
+                y: { duration: 1, ease: "easeOut" },
+                scale: { duration: 1, ease: "easeOut" },
+                rotate: { duration: 20, ease: "linear", repeat: Number.POSITIVE_INFINITY },
+              }}
+            >
+              <div
+                className={`w-40 h-40 rounded-full ${categoryInfo.color} flex items-center justify-center shadow-lg border-4 border-white border-opacity-50`}
+              >
+                <span className="text-6xl">{categoryInfo.icon}</span>
+              </div>
+
+              {/* 빛나는 효과 */}
+              <motion.div
+                className="absolute inset-0 rounded-full bg-white"
+                animate={{
+                  opacity: [0.1, 0.3, 0.1],
+                  scale: [1, 1.2, 1],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Number.POSITIVE_INFINITY,
+                }}
+              />
+            </motion.div>
+
+            {/* 로딩 메시지 */}
+            <div className="mt-8 text-center">
+              <h3 className="text-xl font-bold text-white mb-2">오늘의 운세가 모이고 있습니다</h3>
+              <p className="text-gray-300 mb-4">잠시만 기다려주세요... (약 {remainingTime}초 남음)</p>
+
+              {/* 프로그레스 바 */}
+              <div className="w-64 mx-auto">
+                <Progress value={loadingProgress} className="h-2" />
+              </div>
+
+              {/* 별 효과 */}
+              <div className="relative h-20 w-full mt-4">
+                {[...Array(8)].map((_, i) => (
+                  <motion.div
+                    key={`loading-star-${i}`}
+                    className="absolute text-yellow-300 text-xl"
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      top: `${Math.random() * 100}%`,
+                    }}
+                    animate={{
+                      opacity: [0, 1, 0],
+                      scale: [0.5, 1.5, 0.5],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Number.POSITIVE_INFINITY,
+                      delay: Math.random() * 2,
+                    }}
+                  >
+                    ✨
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 버튼 */}
       <Button
@@ -361,7 +562,7 @@ export function FortuneSlotMachine({ coins, useCoins, addTalisman }: FortuneSlot
 
       {/* 결과 팝업 */}
       <Dialog open={showResult} onOpenChange={setShowResult}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-center text-xl flex items-center justify-center">
               <Star className="h-5 w-5 text-yellow-500 mr-2" />
@@ -371,14 +572,10 @@ export function FortuneSlotMachine({ coins, useCoins, addTalisman }: FortuneSlot
           </DialogHeader>
 
           {result && (
-            <div className="mt-4 text-center space-y-4">
-              <div className="text-4xl mb-2">{FORTUNE_LEVELS.find((l) => l.id === result.level)?.emoji}</div>
-
-              <p className={`text-lg font-semibold ${FORTUNE_LEVELS.find((l) => l.id === result.level)?.color}`}>
-                {FORTUNE_LEVELS.find((l) => l.id === result.level)?.name}
-              </p>
-
-              <p className="text-gray-700 dark:text-gray-300">{result.message}</p>
+            <div className="mt-4 space-y-4">
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown>{result.fortune}</ReactMarkdown>
+              </div>
 
               {result.talisman && (
                 <motion.div
