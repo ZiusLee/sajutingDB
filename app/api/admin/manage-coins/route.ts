@@ -1,27 +1,13 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { isAdmin, getUserIdByEmail } from "@/lib/admin-utils"
+import { getUserIdByEmail } from "@/lib/admin-utils"
 
 export async function POST(request: Request) {
   const supabase = createRouteHandlerClient({ cookies })
 
   try {
-    // 현재 로그인한 사용자 확인
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "인증되지 않은 사용자입니다." }, { status: 401 })
-    }
-
-    // 관리자 권한 확인
-    const adminCheck = await isAdmin(user.id)
-    if (!adminCheck) {
-      return NextResponse.json({ error: "관리자 권한이 없습니다." }, { status: 403 })
-    }
+    // 로그인 확인 로직 제거됨
 
     // 요청 데이터 파싱
     const { email, amount } = await request.json()
@@ -89,7 +75,7 @@ export async function POST(request: Request) {
       data,
     })
   } catch (error) {
-    console.error("관리자 코인 관리 오류:", error)
+    console.error("코인 관리 오류:", error)
     return NextResponse.json({ error: "코인을 업데이트하는 중 오류가 발생했습니다." }, { status: 500 })
   }
 }
