@@ -1,12 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
+import { createClient } from "@/lib/supabase-server"
+import { checkRateLimit, logApiUsage } from "@/lib/api-rate-limiter"
 
 // API 라우트의 타임아웃 설정을 90초로 변경
 export const maxDuration = 90
 
 // API 라우트의 오류 처리 및 로깅을 개선합니다
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
   try {
     // Add a fallback interpretation generator
     const createFallbackInterpretation = (error: any) => {
@@ -52,7 +55,51 @@ export async function POST(request: NextRequest) {
       gender: requestGender,
       questionSet = "basic",
       relationshipStatus = "solo",
+      model = "gpt-4o",
     } = requestData
+
+    // 필수 파라미터 확인
+    if (!saju) {
+      return NextResponse.json({ error: "사주 정보가 필요합니다." }, { status: 400 })
+    }
+
+    // 사용자 정보 가져오기
+    const supabase = createClient()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const userId = session?.user?.id || null
+
+    // IP 주소 및 사용자 에이전트 가져오기
+    const ipAddress = request.headers.get("x-forwarded-for") || "unknown"
+    const userAgent = request.headers.get("user-agent") || "unknown"
+
+    // API 호출 제한 확인
+    const rateLimitResult = await checkRateLimit(userId, "/api/saju-interpretation", ipAddress, userAgent)
+
+    if (!rateLimitResult.allowed) {
+      // API 사용 기록
+      await logApiUsage(
+        userId,
+        "/api/saju-interpretation",
+        ipAddress,
+        userAgent,
+        { saju, name: requestName, gender: requestGender, model, relationshipStatus, questionSet },
+        429,
+        Date.now() - startTime,
+        0,
+      )
+
+      return NextResponse.json(
+        {
+          error: "API 호출 제한 초과",
+          reason: rateLimitResult.reason,
+          resetAt: rateLimitResult.resetAt,
+          limit: rateLimitResult.limit,
+        },
+        { status: 429 },
+      )
+    }
 
     if (!saju) {
       console.error("Missing saju data in request")
@@ -280,7 +327,6 @@ ${relationshipGuidance}
     }
 
     // 비스트리밍 요청 처리
-    const startTime = Date.now()
     let interpretation = ""
     let responseTime = 0
 
@@ -302,7 +348,7 @@ ${relationshipGuidance}
       try {
         // 모델을 gpt-4o로 변경 (gpt-4.1-mini 대신)
         const { text } = await generateText({
-          model: openai("gpt-4o"),
+          model: openai(model),
           prompt: prompt,
           temperature: 0.8,
           maxTokens: 3500,
@@ -314,6 +360,18 @@ ${relationshipGuidance}
         interpretation = text
         responseTime = Date.now() - startTime
         console.log(`OpenAI response generated in ${responseTime}ms`)
+
+        // API 사용 기록
+        await logApiUsage(
+          userId,
+          "/api/saju-interpretation",
+          ipAddress,
+          userAgent,
+          { saju, name: requestName, gender: requestGender, model, relationshipStatus, questionSet },
+          200,
+          Date.now() - startTime,
+          model.includes("gpt-4") ? 10 : 1, // GPT-4 모델은 비용이 더 높음
+        )
 
         // 응답 반환
         return NextResponse.json({
