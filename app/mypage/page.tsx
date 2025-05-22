@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Grid3X3, MessageCircle, Calendar, BookmarkIcon, UserIcon } from "lucide-react"
+import { Grid3X3, MessageCircle, Calendar, BookmarkIcon, UserIcon, LogOut, Settings } from "lucide-react"
 import { getUserSajuProfiles } from "@/lib/saju-session-service"
 import { BottomNavBar } from "@/components/bottom-nav-bar"
 import { ElementDisplay } from "@/components/element-display"
@@ -250,10 +250,37 @@ export default function MyPage() {
     router.push("/edit-saju")
   }
 
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      toast({
+        title: "로그아웃 성공",
+        description: "성공적으로 로그아웃되었습니다.",
+      })
+      router.push("/")
+    } catch (error) {
+      console.error("로그아웃 오류:", error)
+      toast({
+        title: "로그아웃 오류",
+        description: "로그아웃 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="container mx-auto pb-20">
+      {/* 상단 로그아웃 버튼 */}
+      <div className="flex justify-end pt-4 px-4">
+        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500">
+          <LogOut className="h-4 w-4 mr-2" />
+          로그아웃
+        </Button>
+      </div>
+
       {/* 프로필 헤더 섹션 */}
-      <div className="px-4 pt-6 pb-4 border-b">
+      <div className="px-4 pt-2 pb-4 border-b">
         <div className="flex items-start">
           {/* 프로필 이미지 */}
           <Avatar className="h-20 w-20 mr-5">
@@ -303,6 +330,7 @@ export default function MyPage() {
         {/* 액션 버튼 */}
         <div className="flex mt-4 gap-2">
           <Button variant="outline" className="flex-1" onClick={handleEditSaju}>
+            <Settings className="h-4 w-4 mr-2" />
             프로필 편집
           </Button>
           <Button variant="default" className="flex-1" onClick={handleChatWithAI}>
