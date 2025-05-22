@@ -1,6 +1,5 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
 
 // Create a singleton instance of the Supabase client
 let supabaseInstance: SupabaseClient | null = null
@@ -25,9 +24,6 @@ export function getSupabase() {
   }
   return supabaseInstance
 }
-
-// 내보내기 추가: createClient 함수
-export const createClient = supabaseCreateClient
 
 // Initialize the Supabase client with environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://tqrwktpmyylxyhgsrwlo.supabase.co"

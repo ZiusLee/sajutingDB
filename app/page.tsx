@@ -1,14 +1,10 @@
 "use client"
-import { useRouter } from "next/navigation"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import BirthDateFormClient from "@/components/birth-date-form-client"
-import { getSupabase } from "@/lib/supabase-client"
 
 export default function Home() {
-  const router = useRouter()
-  const supabase = getSupabase()
-
-  // 인증된 사용자를 마이페이지로 리다이렉션하는 코드 제거
+  // 리다이렉션 코드 제거
 
   // 메인 페이지에 패딩 추가
   return (

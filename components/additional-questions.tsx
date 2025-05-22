@@ -3,12 +3,12 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { getAdditionalInterpretation } from "@/lib/api-client"
 // 필요한 import 추가 (파일 상단)
 import { getLoveDetailedAnalysis } from "@/lib/api-client"
 import ReactMarkdown from "react-markdown"
-import { Loader2, MessageCircle, Users, Trash2, UserPlus, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, MessageCircle, Users, Trash2, UserPlus, ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -26,17 +26,14 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useToast } from "@/components/ui/use-toast"
-import FeedbackButtons from "./feedback-buttons"
 
 interface AdditionalQuestionsProps {
   saju: any
-  name?: string
-  gender?: string
-  model?: string
+  name: string
+  gender: string
+  model: string
   relationshipStatus?: string
-  interpretation?: string | null
+  interpretation?: string
 }
 
 interface CompatibilityResultCardProps {
@@ -67,11 +64,11 @@ const CompatibilityResultCardComponent: React.FC<CompatibilityResultCardProps> =
 
 export default function AdditionalQuestions({
   saju,
-  name = "",
-  gender = "",
-  model = "openai",
+  name,
+  gender,
+  model,
   relationshipStatus = "solo",
-  interpretation = null,
+  interpretation = "",
 }: AdditionalQuestionsProps) {
   const router = useRouter()
   const [activeCategories, setActiveCategories] = useState<string[]>([])
@@ -106,9 +103,9 @@ export default function AdditionalQuestions({
   const [showSavedPartners, setShowSavedPartners] = useState(false)
 
   // 로딩 상태 및 시간 관리
-  const [loadingStageTimer, setLoadingStageTimer] = useState("사주 분석 준비")
+  const [loadingStage, setLoadingStage] = useState("사주 분석 준비")
   const [loadingTimeLeft, setLoadingTimeLeft] = useState<number>(60) // 초기 예상 시간 (초)
-  const [loadingProgressTimer, setLoadingProgressTimer] = useState(0) // 로딩 진행률 (0-100%)
+  const [loadingProgress, setLoadingProgress] = useState(0) // 로딩 진행률 (0-100%)
 
   // 사주 정보 추출
   const { dayStem, dayBranch } = saju || { dayStem: "", dayBranch: "" }
@@ -148,8 +145,8 @@ export default function AdditionalQuestions({
 
     if (loadingCategory) {
       setLoadingTimeLeft(60) // 초기화
-      setLoadingProgressTimer(0) // 진행률 초기화
-      setLoadingStageTimer("사주 분석 준비")
+      setLoadingProgress(0) // 진행률 초기화
+      setLoadingStage("사주 분석 준비")
 
       intervalId = setInterval(() => {
         setLoadingTimeLeft((prevTime) => {
@@ -160,16 +157,16 @@ export default function AdditionalQuestions({
 
           // 로딩 단계 업데이트
           if (prevTime <= 45) {
-            setLoadingStageTimer("운세 분석 마무리")
+            setLoadingStage("운세 분석 마무리")
           } else if (prevTime <= 50) {
-            setLoadingStageTimer("운세 분석 중")
+            setLoadingStage("운세 분석 중")
           } else if (prevTime <= 55) {
-            setLoadingStageTimer("사주 정보 확인 중")
+            setLoadingStage("사주 정보 확인 중")
           }
 
           // 진행률 업데이트 (60초에서 0초까지 감소하면서 0%에서 100%로 증가)
           const newProgress = Math.min(100, Math.max(0, Math.round(((60 - prevTime) / 60) * 100)))
-          setLoadingProgressTimer(newProgress)
+          setLoadingProgress(newProgress)
 
           return prevTime - 1
         })
@@ -823,13 +820,13 @@ export default function AdditionalQuestions({
                     <div className="flex flex-col items-center justify-center py-5 sm:py-8 space-y-3 sm:space-y-4">
                       <Loader2 className="h-12 w-12 animate-spin text-primary" />
                       <div className="text-center space-y-2">
-                        <p className="font-medium text-primary">{loadingStageTimer}</p>
+                        <p className="font-medium text-primary">{loadingStage}</p>
                         <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
                       </div>
 
                       <div className="w-full max-w-xs mt-2">
-                        <Progress value={loadingProgressTimer} className="h-1.5" />
-                        <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgressTimer}% 완료</p>
+                        <Progress value={loadingProgress} className="h-1.5" />
+                        <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgress}% 완료</p>
                       </div>
                     </div>
                   ) : errors[category.id] ? (
@@ -1514,13 +1511,13 @@ export default function AdditionalQuestions({
                   <div className="flex flex-col items-center justify-center py-5 sm:py-8 space-y-3 sm:space-y-4">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
                     <div className="text-center space-y-2">
-                      <p className="font-medium text-primary">{loadingStageTimer}</p>
+                      <p className="font-medium text-primary">{loadingStage}</p>
                       <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
                     </div>
 
                     <div className="w-full max-w-xs mt-2">
-                      <Progress value={loadingProgressTimer} className="h-1.5" />
-                      <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgressTimer}% 완료</p>
+                      <Progress value={loadingProgress} className="h-1.5" />
+                      <p className="text-xs text-center mt-1 text-muted-foreground">{loadingProgress}% 완료</p>
                     </div>
                   </div>
                 ) : errors[category.id] ? (
@@ -1558,396 +1555,5 @@ export default function AdditionalQuestions({
     router.push(`/chat?${params.toString()}`)
   }
 
-  // State for managing tab selection and loading
-  const [activeTab, setActiveTab] = useState("career")
-  const [isLoading, setIsLoading] = useState(false)
-  const [loadingProgress, setLoadingProgressState] = useState(0)
-  const [loadingStage, setLoadingStageState] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<string | null>(null)
-  const [loveDetailedResult, setLoveDetailedResult] = useState<string | null>(null)
-  const [isLoveDetailedLoading, setIsLoveDetailedLoading] = useState(false)
-  const [loveDetailedError, setLoveDetailedError] = useState<string | null>(null)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const { toast } = useToast()
-
-  // 성별 정보 정규화
-  const normalizedGender =
-    gender === "male" || gender === "남성" || gender === "남자"
-      ? "male"
-      : gender === "female" || gender === "여성" || gender === "여자"
-        ? "female"
-        : ""
-
-  // 로컬 스토리지 키 생성
-  const getStorageKey = (category: string) => {
-    const sajuKey = `${saju.yearStem}${saju.yearBranch}${saju.monthStem}${saju.monthBranch}${saju.dayStem}${saju.dayBranch}${saju.hourStem || ""}${saju.hourBranch || ""}`
-    return `saju_additional_${category}_${sajuKey}`
-  }
-
-  // 로컬 스토리지에서 결과 가져오기
-  const getStoredResult = (category: string) => {
-    const key = getStorageKey(category)
-    return localStorage.getItem(key)
-  }
-
-  // 로컬 스토리지에 결과 저장
-  const storeResult = (category: string, content: string) => {
-    const key = getStorageKey(category)
-    localStorage.setItem(key, content)
-  }
-
-  // 탭 변경 시 저장된 결과 확인
-  const handleTabChange = (value: string) => {
-    setActiveTab(value)
-    setResult(null) // 탭 변경 시 결과 초기화
-    setError(null) // 오류 초기화
-
-    // 로컬 스토리지에서 결과 확인
-    const storedResult = getStoredResult(value)
-    if (storedResult) {
-      setResult(storedResult)
-    }
-
-    // 연애 상세 분석 탭인 경우 별도 처리
-    if (value === "love-detailed") {
-      const storedLoveDetailed = getStoredResult("love-detailed")
-      if (storedLoveDetailed) {
-        setLoveDetailedResult(storedLoveDetailed)
-      }
-    }
-  }
-
-  // 추가 해석 요청
-  const fetchAdditionalInterpretation = async () => {
-    if (isLoading) return
-
-    setIsLoading(true)
-    setError(null)
-    setResult(null)
-    setLoadingProgressState(0)
-    setLoadingStageState("분석 준비 중...")
-
-    // 로딩 애니메이션
-    const loadingInterval = setInterval(() => {
-      setLoadingProgressState((prev) => {
-        const newProgress = prev + 1
-        if (newProgress >= 95) {
-          return 95
-        }
-        return newProgress
-      })
-
-      // 로딩 단계 업데이트
-      if (loadingProgress < 30) {
-        setLoadingStageState("사주 정보 분석 중...")
-      } else if (loadingProgress < 60) {
-        setLoadingStageState("해석 생성 중...")
-      } else {
-        setLoadingStageState("결과 정리 중...")
-      }
-    }, 500)
-
-    try {
-      const response = await getAdditionalInterpretation(
-        saju,
-        name,
-        normalizedGender,
-        model,
-        activeTab,
-        relationshipStatus,
-      )
-
-      if (response.interpretation) {
-        setResult(response.interpretation)
-        storeResult(activeTab, response.interpretation) // 결과 저장
-      } else if (response.fallbackInterpretation) {
-        setResult(response.fallbackInterpretation)
-        storeResult(activeTab, response.fallbackInterpretation) // 폴백 결과 저장
-        toast({
-          title: "제한 시간 초과",
-          description: "기본 해석으로 대체되었습니다. 잠시 후 다시 시도해주세요.",
-          variant: "destructive",
-        })
-      } else {
-        throw new Error("해석 결과를 받지 못했습니다.")
-      }
-    } catch (err) {
-      console.error("Error fetching additional interpretation:", err)
-      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
-      toast({
-        title: "오류 발생",
-        description: "해석을 가져오는 중 오류가 발생했습니다. 다시 시도해주세요.",
-        variant: "destructive",
-      })
-    } finally {
-      clearInterval(loadingInterval)
-      setLoadingProgressState(100)
-      setIsLoading(false)
-    }
-  }
-
-  // 연애 상세 분석 요청
-  const fetchLoveDetailedAnalysis = async () => {
-    if (isLoveDetailedLoading) return
-
-    setIsLoveDetailedLoading(true)
-    setLoveDetailedError(null)
-    setLoveDetailedResult(null)
-
-    try {
-      const response = await getLoveDetailedAnalysis(saju, name, normalizedGender, relationshipStatus)
-
-      if (response.interpretation) {
-        setLoveDetailedResult(response.interpretation)
-        storeResult("love-detailed", response.interpretation) // 결과 저장
-      } else if (response.fallbackInterpretation) {
-        setLoveDetailedResult(response.fallbackInterpretation)
-        storeResult("love-detailed", response.fallbackInterpretation) // 폴백 결과 저장
-        toast({
-          title: "제한 시간 초과",
-          description: "기본 해석으로 대체되었습니다. 잠시 후 다시 시도해주세요.",
-          variant: "destructive",
-        })
-      } else {
-        throw new Error("해석 결과를 받지 못했습니다.")
-      }
-    } catch (err) {
-      console.error("Error fetching love detailed analysis:", err)
-      setLoveDetailedError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
-      toast({
-        title: "오류 발생",
-        description: "연애 상세 분석을 가져오는 중 오류가 발생했습니다. 다시 시도해주세요.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoveDetailedLoading(false)
-    }
-  }
-
-  // 각 탭에 대한 저장된 결과 확인
-  const careerResult = getStoredResult("career")
-  const loveResult = getStoredResult("love")
-  const healthResult = getStoredResult("health")
-  const wealthResult = getStoredResult("wealth")
-  const loveDetailedStoredResult = getStoredResult("love-detailed")
-
-  return (
-    <Card className="border-t-4 border-t-primary">
-      <CardHeader className="cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle className="text-lg">추가 질문하기</CardTitle>
-            <CardDescription>사주에 대해 더 자세히 알아보세요</CardDescription>
-          </div>
-          {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-        </div>
-      </CardHeader>
-
-      {isExpanded && (
-        <CardContent>
-          <Tabs defaultValue="career" value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid grid-cols-4 mb-4">
-              <TabsTrigger value="career" className="text-xs sm:text-sm">
-                직업/적성
-                {careerResult && <span className="ml-1 text-green-500">✓</span>}
-              </TabsTrigger>
-              <TabsTrigger value="love" className="text-xs sm:text-sm">
-                연애/결혼
-                {loveResult && <span className="ml-1 text-green-500">✓</span>}
-              </TabsTrigger>
-              <TabsTrigger value="health" className="text-xs sm:text-sm">
-                건강
-                {healthResult && <span className="ml-1 text-green-500">✓</span>}
-              </TabsTrigger>
-              <TabsTrigger value="wealth" className="text-xs sm:text-sm">
-                재물/투자
-                {wealthResult && <span className="ml-1 text-green-500">✓</span>}
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="career" className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  사주를 바탕으로 당신에게 맞는 직업과 적성에 대해 알아보세요. 어떤 분야에서 능력을 발휘할 수 있는지,
-                  어떤 직업이 당신의 기질과 맞는지 분석해드립니다.
-                </p>
-              </div>
-
-              {!result && !isLoading && (
-                <Button onClick={fetchAdditionalInterpretation} className="w-full">
-                  직업/적성 분석 받기
-                </Button>
-              )}
-
-              {isLoading && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm font-medium">{loadingStage}</span>
-                  </div>
-                  <Progress value={loadingProgress} className="h-1.5" />
-                </div>
-              )}
-
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-
-              {result && (
-                <div className="space-y-4">
-                  <div className="prose dark:prose-invert max-w-none">
-                    <ReactMarkdown>{result}</ReactMarkdown>
-                  </div>
-                  <FeedbackButtons contentType="career-interpretation" contentId={saju.dayStem + saju.dayBranch} />
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="love" className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  사주를 통해 당신의 연애 성향과 결혼 운을 분석합니다. 어떤 유형의 사람과 잘 맞는지, 현재 관계에서
-                  주의해야 할 점은 무엇인지 알아보세요.
-                </p>
-              </div>
-
-              {!result && !isLoading && (
-                <Button onClick={fetchAdditionalInterpretation} className="w-full">
-                  연애/결혼 분석 받기
-                </Button>
-              )}
-
-              {isLoading && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm font-medium">{loadingStage}</span>
-                  </div>
-                  <Progress value={loadingProgress} className="h-1.5" />
-                </div>
-              )}
-
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-
-              {result && (
-                <div className="space-y-4">
-                  <div className="prose dark:prose-invert max-w-none">
-                    <ReactMarkdown>{result}</ReactMarkdown>
-                  </div>
-                  <FeedbackButtons contentType="love-interpretation" contentId={saju.dayStem + saju.dayBranch} />
-
-                  {/* 연애 상세 분석 버튼 */}
-                  <div className="mt-4 pt-4 border-t">
-                    <h4 className="text-base font-medium mb-2">연애 상세 분석</h4>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      더 자세한 연애 분석이 필요하신가요? 연애 성향, 궁합이 좋은 사람, 연애운 흐름 등을 상세하게
-                      분석해드립니다.
-                    </p>
-
-                    {!loveDetailedResult && !isLoveDetailedLoading && (
-                      <Button onClick={fetchLoveDetailedAnalysis} variant="outline" className="w-full">
-                        연애 상세 분석 받기
-                      </Button>
-                    )}
-
-                    {isLoveDetailedLoading && (
-                      <div className="flex items-center justify-center gap-2 py-4">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">연애 상세 분석 중...</span>
-                      </div>
-                    )}
-
-                    {loveDetailedError && <div className="text-red-500 text-sm">{loveDetailedError}</div>}
-
-                    {loveDetailedResult && (
-                      <div className="space-y-4 mt-4">
-                        <div className="prose dark:prose-invert max-w-none">
-                          <ReactMarkdown>{loveDetailedResult}</ReactMarkdown>
-                        </div>
-                        <FeedbackButtons
-                          contentType="love-detailed-interpretation"
-                          contentId={saju.dayStem + saju.dayBranch}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="health" className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  사주에 나타난 건강 정보를 분석합니다. 취약할 수 있는 신체 부위, 건강 관리 방법, 스트레스 해소법 등을
-                  알아보세요.
-                </p>
-              </div>
-
-              {!result && !isLoading && (
-                <Button onClick={fetchAdditionalInterpretation} className="w-full">
-                  건강 분석 받기
-                </Button>
-              )}
-
-              {isLoading && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm font-medium">{loadingStage}</span>
-                  </div>
-                  <Progress value={loadingProgress} className="h-1.5" />
-                </div>
-              )}
-
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-
-              {result && (
-                <div className="space-y-4">
-                  <div className="prose dark:prose-invert max-w-none">
-                    <ReactMarkdown>{result}</ReactMarkdown>
-                  </div>
-                  <FeedbackButtons contentType="health-interpretation" contentId={saju.dayStem + saju.dayBranch} />
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="wealth" className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  사주를 통해 재물운과 투자 성향을 분석합니다. 돈을 모으는 방식, 투자에 적합한 분야, 재물운이 좋은 시기
-                  등을 알아보세요.
-                </p>
-              </div>
-
-              {!result && !isLoading && (
-                <Button onClick={fetchAdditionalInterpretation} className="w-full">
-                  재물/투자 분석 받기
-                </Button>
-              )}
-
-              {isLoading && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm font-medium">{loadingStage}</span>
-                  </div>
-                  <Progress value={loadingProgress} className="h-1.5" />
-                </div>
-              )}
-
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-
-              {result && (
-                <div className="space-y-4">
-                  <div className="prose dark:prose-invert max-w-none">
-                    <ReactMarkdown>{result}</ReactMarkdown>
-                  </div>
-                  <FeedbackButtons contentType="wealth-interpretation" contentId={saju.dayStem + saju.dayBranch} />
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      )}
-    </Card>
-  )
+  return <>{isMobile ? renderMobilePagination() : renderDesktopView()}</>
 }

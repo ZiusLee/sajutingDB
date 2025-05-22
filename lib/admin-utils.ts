@@ -74,8 +74,3 @@ export async function getUserIdByEmail(email: string): Promise<string | null> {
     return null
   }
 }
-
-// checkAdminStatus 함수 추가 - 이 함수가 누락되어 배포 오류가 발생했습니다
-export async function checkAdminStatus(userId: string): Promise<boolean> {
-  return await isAdmin(userId)
-}
