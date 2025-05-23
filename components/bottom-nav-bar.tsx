@@ -49,14 +49,16 @@ export function BottomNavBar() {
     checkAuth()
   }, [supabase, toast])
 
-  // Don't show on login or register pages or when not authenticated
-  // 또한 채팅 관련 페이지에서도 표시하지 않음 (임시 조치)
+  // Don't show on login, register, reset-password, or chat pages
   if (
     isLoading ||
     !isAuthenticated ||
     pathname?.includes("/login") ||
     pathname?.includes("/register") ||
-    pathname?.includes("/reset-password")
+    pathname?.includes("/reset-password") ||
+    pathname?.includes("/saju-chat") ||
+    pathname?.includes("/chat/") ||
+    pathname === "/chat"
   ) {
     return null
   }
