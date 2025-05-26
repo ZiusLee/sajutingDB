@@ -17,7 +17,6 @@ import AdditionalQuestions from "./additional-questions"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import DaeunDiagram from "./daeun-diagram"
-import Link from "next/link"
 
 interface SajuResultClientProps {
   saju: Saju
@@ -470,7 +469,8 @@ ${interpretation}
               <MessageSquare className="h-4 w-4" />
               <span>사주 채팅 상담 시작하기</span>
             </Button>
-            <Button variant="outline" className="flex-1" asChild>
+            {/* 대운 상세분석 버튼 임시 숨김 - 아직 완성되지 않은 기능 */}
+            {/* <Button variant="outline" className="flex-1" asChild>
               <Link
                 href={
                   uuid
@@ -482,7 +482,7 @@ ${interpretation}
               >
                 10년 대운 상세분석
               </Link>
-            </Button>
+            </Button> */}
           </div>
         </CardContent>
       </Card>
