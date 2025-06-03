@@ -9,12 +9,12 @@ function getModelForRoomType(roomType: string): string {
   try {
     switch (roomType) {
       case "career":
-        return "gpt-4o" // 파인튜닝 모델에서 일반 gpt-4o 모델로 변경
+        return "gpt-4.1" // 파인튜닝 모델에서 일반 gpt-4o 모델로 변경
       case "marriage":
         // gpt-4.1 모델로 변경
         return "gpt-4.1"
       case "health":
-        return "gpt-4o"
+        return "gpt-4.1"
       case "business":
         // gpt-4.1 모델로 변경
         return "gpt-4.1"

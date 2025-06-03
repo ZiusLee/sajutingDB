@@ -1,120 +1,55 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, Suspense } from "react"
 import { useRouter } from "next/navigation"
-import { getSupabase } from "@/lib/supabase-client"
+import { useSearchParams } from "next/navigation"
 
-export default function AuthCallbackPage() {
+function CallbackContent() {
   const router = useRouter()
-  // Use our singleton Supabase instance
-  const supabase = getSupabase()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      const { searchParams } = new URL(window.location.href)
-      const code = searchParams.get("code")
+    const code = searchParams.get("code")
 
-      if (code) {
-        try {
-          console.log("Exchanging code for session...")
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    if (code) {
+      // Here you would typically exchange the code for a token
+      // and store it securely (e.g., in an HTTP-only cookie).
+      // For this example, we'll just redirect to the landing page.
 
-          if (error) {
-            console.error("Error exchanging code for session:", error)
-            router.push("/login?error=callback_error")
-            return
-          }
-
-          console.log("Session exchange successful, getting user data...")
-          // Get user data after successful login
-          const {
-            data: { user },
-          } = await supabase.auth.getUser()
-
-          if (user) {
-            console.log("User authenticated:", user.id)
-            // Store user info in localStorage if needed
-            localStorage.setItem("user_authenticated", "true")
-            localStorage.setItem("user_id", user.id)
-
-            // If user has user_metadata with name, store it
-            if (user.user_metadata?.name) {
-              localStorage.setItem("user_name", user.user_metadata.name)
-            } else if (user.email) {
-              localStorage.setItem("user_name", user.email.split("@")[0])
-            }
-
-            // Link user data if needed
-            await linkUserDataIfNeeded(user.id)
-
-            // Redirect to home page or dashboard
-            router.push("/")
-          } else {
-            console.error("No user found after authentication")
-            router.push("/login?error=no_user")
-          }
-        } catch (error) {
-          console.error("Error exchanging code for session:", error)
-          router.push("/login?error=callback_error")
-        }
-      } else {
-        console.error("No code found in URL")
-        router.push("/login?error=no_code")
-      }
+      // 기존의 router.push("/mypage") 또는 router.replace("/mypage") 부분을 다음으로 변경:
+      router.push("/landing")
+    } else {
+      // Handle the case where the code is missing.
+      console.error("Authorization code is missing.")
+      router.push("/") // Redirect to the home page or an error page.
     }
-
-    // Helper function to link user data if needed
-    const linkUserDataIfNeeded = async (authUserId: string) => {
-      try {
-        // Check if the user already has linked data
-        const { data: existingUser, error: userError } = await supabase
-          .from("saju_sessions")
-          .select("id")
-          .eq("auth_user_id", authUserId)
-          .single()
-
-        if (userError && userError.code !== "PGRST116") {
-          console.error("Error checking for existing user:", userError)
-          return
-        }
-
-        // If user already has linked data, no need to proceed
-        if (existingUser) {
-          console.log("User already has linked data:", existingUser.id)
-          return
-        }
-
-        // Check if there's a user ID in localStorage that needs to be linked
-        const localUserId = localStorage.getItem("user_id")
-        if (localUserId && localUserId !== authUserId) {
-          console.log(`Linking local user ID ${localUserId} to auth user ID ${authUserId}`)
-
-          // Update the auth_user_id for the session
-          const { error } = await supabase
-            .from("saju_sessions")
-            .update({ auth_user_id: authUserId })
-            .eq("id", localUserId)
-
-          if (error) {
-            console.error("Error linking user data:", error)
-          } else {
-            console.log("Successfully linked user data")
-          }
-        }
-      } catch (error) {
-        console.error("Error in linkUserDataIfNeeded:", error)
-      }
-    }
-
-    handleAuthCallback()
-  }, [router, supabase.auth])
+  }, [searchParams, router])
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600">
       <div className="text-center">
-        <h2 className="text-2xl font-bold mb-4">로그인 처리 중...</h2>
-        <p>잠시만 기다려주세요.</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+        <h1 className="text-2xl font-bold text-white mb-2">인증 처리 중...</h1>
+        <p className="text-white/80">잠시만 기다려주세요</p>
       </div>
     </div>
+  )
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <h1 className="text-2xl font-bold text-white mb-2">로딩 중...</h1>
+            <p className="text-white/80">잠시만 기다려주세요</p>
+          </div>
+        </div>
+      }
+    >
+      <CallbackContent />
+    </Suspense>
   )
 }
