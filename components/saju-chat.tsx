@@ -8,7 +8,7 @@ import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Loader2, Send, ChevronDown, RefreshCw, Menu, User, Plus, Mic, ChevronUp } from "lucide-react"
+import { Loader2, Send, ChevronDown, RefreshCw, Menu, Edit3, Plus, Mic } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
@@ -527,8 +527,8 @@ export default function SajuChat({
   const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
   const [lastMessageId, setLastMessageId] = useState<string>("")
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-  // showSajuInfo 초기값을 항상 false로 설정 (접힌 상태로 시작)
-  const [showSajuInfo, setShowSajuInfo] = useState(false)
+  // showSajuInfo 초기값을 사주핑인 경우 true로 설정
+  const [showSajuInfo, setShowSajuInfo] = useState(roomType === "sajuping")
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [retryCount, setRetryCount] = useState(0) // 재시도 횟수 추적
@@ -1013,38 +1013,17 @@ export default function SajuChat({
             size="sm"
             onClick={() => setShowSajuInfo(!showSajuInfo)}
             className="p-1 text-gray-300 hover:text-white"
-            title={showSajuInfo ? "사주 정보 숨기기" : "사주 정보 보기"}
           >
-            <User className="h-5 w-5" />
+            <Edit3 className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
       {/* 사주 정보 카드 (접을 수 있음) */}
       {showSajuInfo && (
-        <div className="flex-shrink-0 bg-gradient-to-b from-gray-800 to-gray-900 border-b border-gray-700 shadow-sm">
-          {/* 사주 정보 헤더 */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-            <div className="flex items-center space-x-2">
-              <User className="h-5 w-5 text-purple-400" />
-              <h3 className="text-lg font-medium text-white">{name || "사용자"}님의 사주 정보</h3>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSajuInfo(false)}
-              className="p-1 text-gray-400 hover:text-white"
-              title="사주 정보 접기"
-            >
-              <ChevronUp className="h-5 w-5" />
-            </Button>
-          </div>
-
-          {/* 사주 다이어그램 */}
-          <div className="p-4">
-            <div className="max-w-3xl mx-auto">
-              <SajuDiagram saju={saju} name={name} />
-            </div>
+        <div className="flex-shrink-0 bg-gradient-to-b from-gray-800 to-gray-900 border-b border-gray-700 p-4 shadow-sm">
+          <div className="max-w-3xl mx-auto">
+            <SajuDiagram saju={saju} name={name} />
           </div>
         </div>
       )}
@@ -1065,29 +1044,6 @@ export default function SajuChat({
             <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
               {messages.map((message, index) => (
                 <div key={message.id || index} className="space-y-4">
-                  {/* 첫 번째 AI 메시지 앞에 사주 다이어그램 표시 (showSajuInfo가 false일 때만) */}
-                  {index === 0 && message.role === "assistant" && !showSajuInfo && (
-                    <div className="mb-6 p-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg border border-gray-700">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-2">
-                          <User className="h-5 w-5 text-purple-400" />
-                          <h3 className="text-lg font-medium text-white">{name || "사용자"}님의 사주</h3>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowSajuInfo(true)}
-                          className="p-1 text-gray-400 hover:text-white"
-                          title="사주 정보 상단에 고정"
-                        >
-                          <ChevronUp className="h-5 w-5" />
-                        </Button>
-                      </div>
-                      <SajuDiagram saju={saju} name={name} />
-                    </div>
-                  )}
-
-                  {/* 기존 메시지 렌더링 코드는 그대로 유지 */}
                   {message.role === "user" ? (
                     // 사용자 메시지
                     <div className="flex justify-end">
