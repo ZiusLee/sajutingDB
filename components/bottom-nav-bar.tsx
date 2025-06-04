@@ -3,9 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Search, MessageCircle, User, Sparkles } from "lucide-react"
+import { shouldHideBottomNav } from "@/lib/memory-bank"
 
 export function BottomNavBar() {
   const pathname = usePathname()
+
+  // 🚨 MEMORY BANK RULE: 채팅 페이지에서는 하단 네비게이션 바 숨김
+  if (shouldHideBottomNav(pathname)) {
+    return null
+  }
 
   const navItems = [
     {

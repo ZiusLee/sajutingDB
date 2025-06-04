@@ -8,16 +8,16 @@ export const runtime = "edge"
 function getModelForRoomType(roomType: string): string {
   try {
     switch (roomType) {
+      case "sajuping":
+        return "gpt-4.1" // 사주핑 전용 모델
       case "career":
-        return "gpt-4.1" // 파인튜닝 모델에서 일반 gpt-4o 모델로 변경
+        return "gpt-4o" // 파인튜닝 모델에서 일반 gpt-4o 모델로 변경
       case "marriage":
-        // gpt-4.1 모델로 변경
-        return "gpt-4.1"
+        return "gpt-4o" // gpt-4.1에서 gpt-4o로 변경
       case "health":
-        return "gpt-4.1"
+        return "gpt-4o" // gpt-4.1에서 gpt-4o로 변경
       case "business":
-        // gpt-4.1 모델로 변경
-        return "gpt-4.1"
+        return "gpt-4o" // gpt-4.1에서 gpt-4o로 변경
       case "fitness":
         return "ft:gpt-4.1-mini-2025-04-14:towinai::BUpEktsZ"
       case "diet":
@@ -36,7 +36,39 @@ function getModelForRoomType(roomType: string): string {
 
 export async function POST(req: Request) {
   try {
-    const { messages, saju, name, gender, initialInterpretation, roomType, userId } = await req.json()
+    const body = await req.json()
+    const { messages, saju, name, gender, initialInterpretation, roomType, userId } = body
+
+    // 필수 데이터 검증
+    if (!messages || !Array.isArray(messages)) {
+      console.error("Invalid messages data:", messages)
+      return new Response(
+        JSON.stringify({
+          id: "error-message",
+          role: "assistant",
+          content: "메시지 데이터가 올바르지 않습니다.",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      )
+    }
+
+    if (!saju) {
+      console.error("Missing saju data")
+      return new Response(
+        JSON.stringify({
+          id: "error-message",
+          role: "assistant",
+          content: "사주 데이터가 없습니다. 다시 시도해주세요.",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      )
+    }
 
     // 사용자 질문 저장 - 오류가 발생해도 채팅 응답에 영향을 주지 않도록 수정
     if (userId && messages.length > 0 && messages[messages.length - 1].role === "user") {
@@ -62,8 +94,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // 사주 정보를 문자열로 변환
-    const sajuInfo = JSON.stringify(saju, null, 2)
+    // 사주 정보를 안전하게 문자열로 변환
+    let sajuInfo = ""
+    try {
+      sajuInfo = JSON.stringify(saju, null, 2)
+    } catch (stringifyError) {
+      console.error("Error stringifying saju data:", stringifyError)
+      sajuInfo = "사주 데이터 처리 중 오류가 발생했습니다."
+    }
 
     // 모델 선택 및 시스템 메시지 설정
     const modelName = getModelForRoomType(roomType)
@@ -71,8 +109,70 @@ export async function POST(req: Request) {
     let systemMessage = ""
     let apiMessages = []
 
-    // 룸 타입에 따른 모델 및 시스템 메시지 설정
+    // 룸 타입에 따른 시스템 메시지 설정 (사주핑 부분만 수정)
     switch (roomType) {
+      case "sajuping":
+        // 사주핑 전용 상담 - 직접적인 답변 제공하도록 수정
+        systemMessage = `당신은 '사주핑'이라는 친근하고 전문적인 사주 상담사입니다. 사용자의 사주를 바탕으로 인생의 모든 영역에 대해 깊이 있고 따뜻한 상담을 제공합니다.
+
+사용자 정보:
+- 이름: ${name || "사용자"}
+- 성별: ${gender || "미상"}
+- 사주 데이터: ${sajuInfo}
+
+**중요한 대화 규칙**:
+1. **첫 번째와 두 번째 메시지는 반드시 짧게**:
+   - 첫 번째: 간단한 인사만
+   - 두 번째: "오늘은 뭐가 고민이야?" 또는 "뭐가 궁금해?" 같은 한 줄 질문만
+   - 절대 긴 설명이나 여러 개의 질문을 하지 마세요
+
+2. **사용자가 구체적인 질문을 하면 바로 답변**:
+   - "직업운 알려줘", "연애운 알려줘" 등의 질문에는 추가 질문 없이 바로 사주 분석 제공
+   - 충분히 상세하고 구체적인 답변을 제공
+   - 질문하지 말고 직접적으로 답변
+
+**특정 질문에 대한 응답 구조**:
+사용자가 "직업운 알려줘", "연애운 알려줘", "건강운 알려줘", "재물운 알려줘" 등의 질문을 하면 다음 구조로 답변하세요:
+
+1. 적성/직업운 (직업운 질문 시):
+   - 사용자의 에너지가 어떤 문제를 해결할 때 활성화되는지
+   - 몰입감과 성취감을 느끼는 일의 특성
+   - 사주에 드러난 식상(표현력), 재성, 관성(책임감), 인성(학습) 흐름 분석
+   - 어울리는 직무 성격/기질과 피해야 할 업무 유형
+
+2. 연애운/결혼운 (연애운 질문 시):
+   - 애착 스타일, 사랑을 표현하고 받는 방식
+   - 연애/결혼에서 중요하게 여기는 가치
+   - 연애에서 반복적으로 나타나는 문제 패턴
+   - 이상적인 관계의 형태, 궁합이 잘 맞는 사람의 성향
+   - 올해(2025년 을사년) 연애운 전망
+
+3. 건강운 (건강운 질문 시):
+   - 사주의 오행 불균형에 따른 취약 부위나 기능
+   - 반복적으로 나타날 수 있는 생활 패턴 문제
+   - 스트레스가 신체에 미치는 영향
+   - 회복을 위한 생활 루틴, 환경, 운동 또는 감정 정화법
+
+4. 재물/투자운 (재물운 질문 시):
+   - 사주의 재성(편재/정재)의 강약과 흐름 분석
+   - 돈을 다루는 성향
+   - 수익을 만드는 방식
+   - 재물운이 활성화되는 시기와 흐름
+   - 올해(2025년 을사년) 재물운 전망
+
+5. 삶에 대한 조언:
+   - 모든 답변의 마지막에는 사용자에게 필요한 한마디 조언
+   - 현실적인 인사이트와 따뜻한 위로가 담긴 문장
+   - 사용자의 성향상 반복되는 고민, 약점, 삶의 방향성에 대한 조언
+
+답변 스타일:
+- 친근하고 따뜻한 어조 (반말/존댓말 적절히)
+- 구체적이고 실용적인 조언 제공
+- 사주의 기운과 현실적 상황을 연결하여 설명
+- 답변은 충분히 상세하게 작성하되, 읽기 쉽도록 구조화
+- 질문하지 말고 바로 답변 제공`
+        break
+
       case "personalized":
         // 개인화된 상담은 파인튜닝 모델 사용
         model = openai("ft:gpt-4.1-2025-04-14:towinai::BP66DQ1v")
@@ -282,22 +382,28 @@ ${sajuInfo}
         break
     }
 
+    // 모든 룸 타입에 대해 상세한 답변 지시 추가
+    if (roomType !== "personalized" && roomType !== "love") {
+      systemMessage +=
+        " 답변은 자세하고 풍부하게 작성해주세요. 사용자의 사주 정보를 바탕으로 구체적인 분석을 제공해주세요. 답변 길이에 제한을 두지 말고 충분히 상세하게 설명해주세요."
+    }
+
     // 사용자 메시지 배열에 시스템 메시지 추가
     apiMessages = [{ role: "system", content: systemMessage }, ...messages]
 
     try {
-      // 오류 처리 개선: 스트리밍 응답 생성
+      // 스트리밍 응답 생성
       const result = streamText({
         model: model,
-        messages: apiMessages,
+        messages: [{ role: "system", content: systemMessage }, ...messages],
+        temperature: 0.7,
+        max_tokens: 2000,
       })
 
-      // 스트리밍 응답 생성
       return result.toDataStreamResponse()
     } catch (streamError) {
       console.error("Error in streamText:", streamError)
 
-      // 오류 발생 시 간단한 텍스트 응답 반환
       return new Response(
         JSON.stringify({
           id: "error-message",
@@ -305,7 +411,7 @@ ${sajuInfo}
           content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
         }),
         {
-          status: 200, // 클라이언트에 200 상태 코드 반환
+          status: 200,
           headers: { "Content-Type": "application/json" },
         },
       )
@@ -313,7 +419,6 @@ ${sajuInfo}
   } catch (error) {
     console.error("Error in saju-chat API:", error)
 
-    // 오류 발생 시 간단한 텍스트 응답 반환
     return new Response(
       JSON.stringify({
         id: "error-message",
@@ -321,7 +426,7 @@ ${sajuInfo}
         content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
       }),
       {
-        status: 200, // 클라이언트에 200 상태 코드 반환
+        status: 200,
         headers: { "Content-Type": "application/json" },
       },
     )

@@ -252,37 +252,29 @@ export default function BirthDateFormClient() {
         // 실패해도 계속 진행 (나중에 다시 시도)
       }
 
-      // Construct the URL with the required parameters
-      const url = `/result?date=${birthdate}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}&birthCityId=${encodeURIComponent(birthCityId)}`
+      // Store the current saju data in localStorage for chat
+      localStorage.setItem(
+        "current_saju",
+        JSON.stringify({
+          saju: sajuResult,
+          name: name,
+          gender: gender,
+          interpretation: sajuResult.interpretation || "",
+          timeStandard: getTimeStandardFromCity(),
+          birthCityId,
+        }),
+      )
 
-      // Navigate to the result page
-      router.push(url)
+      // 바로 사주 채팅 페이지로 이동 (sajuping 상담사와 채팅)
+      router.push("/saju-chat/sajuping")
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
       console.error("Error:", err)
     } finally {
       setIsSubmitting(false)
-      // Store the current saju data in localStorage for later use
-      try {
-        localStorage.setItem(
-          "current_saju",
-          JSON.stringify({
-            saju: sajuResult,
-            name: name,
-            gender: gender,
-            interpretation: detailedInterpretation || "",
-            returnPath: router.asPath,
-            timeStandard: getTimeStandardFromCity(),
-            birthCityId,
-          }),
-        )
-
-        // After successfully retrieving all results, update the auth_user_id if we have a userId
-        if (userId && authUser) {
-          updateUserAuthId(userId)
-        }
-      } catch (e) {
-        console.error("Error storing saju data:", e)
+      // After successfully retrieving all results, update the auth_user_id if we have a userId
+      if (userId && authUser) {
+        updateUserAuthId(userId)
       }
     }
   }

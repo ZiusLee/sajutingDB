@@ -8,8 +8,7 @@ import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Send, ArrowLeft, ChevronDown, ChevronUp, RefreshCw } from "lucide-react"
+import { Loader2, Send, ChevronDown, RefreshCw, Menu, Edit3, Plus, Mic } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
@@ -74,6 +73,14 @@ interface SajuChatProps {
 
 // 초기 예상 질문 목록 (채팅방 유형별)
 const initialSuggestedQuestionsByType: Record<string, string[]> = {
+  sajuping: [
+    "직업운 알려줘",
+    "연애운 알려줘",
+    "건강운 알려줘",
+    "재물운 알려줘",
+    "올해 운세는 어떤가요?",
+    "제 성격과 기질은 어떤가요?",
+  ],
   general: ["2025년 운세는 어떤가요?", "제 사주의 장단점은?", "가장 강한 기운은 무엇인가요?"],
   career: ["저에게 맞는 직업은 무엇인가요?", "이직하기 좋은 시기는 언제인가요?", "승진 가능성이 높은 때는 언제인가요?"],
   career_fortune: ["제 적성에 맞는 직업 분야는?", "올해 커리어 전환에 좋은 시기는?", "직장 내 인간관계 개선 방법은?"],
@@ -105,6 +112,23 @@ const getInitialMessageByRoomType = (name: string, roomType: string): string => 
   const userName = name || "사용자"
 
   switch (roomType) {
+    case "sajuping":
+      return `안녕하세요, ${userName}님! 저는 사주핑이에요! 🔮✨
+
+${userName}님의 사주를 바탕으로 인생의 모든 영역에 대해 상담해드릴게요. 
+
+💫 **상담 가능한 영역:**
+• 직업운 & 적성 분석
+• 연애운 & 결혼운 
+• 건강운 & 체질 분석
+• 재물운 & 투자 운세
+• 성격 & 기질 분석
+• 인생의 큰 흐름과 조언
+
+${currentYear}년 을사년(乙巳年), 푸른 뱀의 해에 ${userName}님이 궁금한 모든 것을 물어보세요! 
+
+아래 추천 질문을 눌러보시거나, 직접 궁금한 점을 말씀해주세요 😊`
+
     case "career":
       return `안녕하세요, ${userName}님! 직업 상담사 커리어쌤입니다. 💼
 
@@ -183,9 +207,207 @@ ${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 음(陰)�
   }
 }
 
+// 사주핑 초기 메시지 생성 함수 추가
+const generateSajupingInitialMessages = (name: string, saju: any): any[] => {
+  const userName = name || "사용자"
+
+  // 사주 기본 정보 추출 (안전하게)
+  const yearStem = saju?.yearStem || "?"
+  const yearBranch = saju?.yearBranch || "?"
+  const monthStem = saju?.monthStem || "?"
+  const monthBranch = saju?.monthBranch || "?"
+  const dayStem = saju?.dayStem || "?"
+  const dayBranch = saju?.dayBranch || "?"
+  const hourStem = saju?.hourStem || ""
+  const hourBranch = saju?.hourBranch || ""
+  const dayMaster = saju?.dayMaster || "?"
+
+  // 십성 정보 (안전하게)
+  const yearStemSibseong = saju?.yearStemSibseong || "?"
+  const yearBranchSibseong = saju?.yearBranchSibseong || "?"
+  const monthStemSibseong = saju?.monthStemSibseong || "?"
+  const monthBranchSibseong = saju?.monthBranchSibseong || "?"
+  const dayStemSibseong = saju?.dayStemSibseong || "?"
+  const dayBranchSibseong = saju?.dayBranchSibseong || "?"
+  const hourStemSibseong = saju?.hourStemSibseong || "?"
+  const hourBranchSibseong = saju?.hourBranchSibseong || "?"
+
+  const yearAnimal = saju?.yearAnimal || "?"
+  const elements = saju?.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }
+
+  // 일간의 오행 확인 (안전하게)
+  const stemElements: Record<string, string> = {
+    갑: "목",
+    을: "목",
+    병: "화",
+    정: "화",
+    무: "토",
+    기: "토",
+    경: "금",
+    신: "금",
+    임: "수",
+    계: "수",
+  }
+
+  const dayElement = saju?.dayStem ? stemElements[saju.dayStem] || "?" : "?"
+  const dayPillar = dayStem && dayBranch ? `${dayStem}${dayBranch}` : "?"
+
+  // 첫 번째 메시지: 사주 분석
+  const firstMessage = {
+    id: "saju-analysis",
+    role: "assistant" as const,
+    content: `안녕하세요, ${userName}님! 저는 사주핑이에요! 🔮✨
+
+${userName}님의 사주를 분석해보니 정말 흥미로운 특징들이 보이네요!
+
+🌟 **${userName}님의 사주 정보:**
+- 년주: ${yearStem}${yearBranch} (십성: ${yearStemSibseong}, ${yearBranchSibseong})
+- 월주: ${monthStem}${monthBranch} (십성: ${monthStemSibseong}, ${monthBranchSibseong})
+- 일주: ${dayStem}${dayBranch} (일간: ${dayMaster}) (십성: ${dayStemSibseong}, ${dayBranchSibseong})
+- 시주: ${hourStem || ""}${hourBranch || ""} ${hourStem ? `(십성: ${hourStemSibseong}, ${hourBranchSibseong})` : "(시간 미상)"}
+- 띠: ${yearAnimal}
+- 오행 분포: 목(${elements?.wood || 0}), 화(${elements?.fire || 0}), 토(${elements?.earth || 0}), 금(${elements?.metal || 0}), 수(${elements?.water || 0})
+
+🌟 **${userName}님의 사주 해석:**
+
+1. **인생의 큰 흐름과 중심 에너지** 💫
+${userName}님은 ${dayElement}의 기운을 가진 ${dayPillar}일주로, ${getLifeThemeDescription(dayStem, dayBranch, dayElement)}
+
+2. **성격과 기질** 🌱
+${getPersonalityDescription(dayStem, dayBranch, elements)}
+
+${userName}님만의 독특한 에너지와 잠재력이 느껴져요! 더 자세한 사항이 궁금하시면 편하게 물어보세요! ✨`,
+  }
+
+  // 두 번째 메시지: 간단한 질문
+  const secondMessage = {
+    id: "consultation-start",
+    role: "assistant" as const,
+    content: `오늘은 어떤 것이 궁금하세요? 😊`,
+  }
+
+  return [firstMessage, secondMessage]
+}
+
+// 일간 오행별 설명 함수
+const getDayElementDescription = (element: string): string => {
+  switch (element) {
+    case "목":
+      return "성장과 발전을 추구하며, 창의적이고 유연한 사고를 가지고 계세요"
+    case "화":
+      return "열정적이고 활동적이며, 사람들과의 소통을 즐기는 성향이에요"
+    case "토":
+      return "안정적이고 신뢰할 수 있으며, 포용력이 뛰어난 분이에요"
+    case "금":
+      return "결단력이 있고 정확하며, 원칙을 중시하는 성향을 가지고 계세요"
+    case "수":
+      return "지혜롭고 적응력이 뛰어나며, 깊이 있는 사고를 하는 분이에요"
+    default:
+      return "독특하고 특별한 기운을 가지고 계세요"
+  }
+}
+
+// 인생의 큰 흐름과 중심 에너지 설명 함수
+const getLifeThemeDescription = (dayStem: string, dayBranch: string, dayElement: string): string => {
+  // 일간과 일지의 조합에 따른 인생 테마 설명
+  const stemBranchCombo = `${dayStem}${dayBranch}`
+
+  switch (dayElement) {
+    case "목":
+      return "어린 시절부터 성장과 발전을 추구하는 성향이 강했을 것입니다. 청년기에는 새로운 아이디어와 도전을 통해 자신의 길을 개척하고, 중년기에는 자신만의 영역에서 안정적인 성장을 이루게 됩니다. 장년기와 노년기에는 자신의 경험과 지혜를 다른 사람들과 나누며 더 큰 성취감을 느끼게 될 것입니다. 삶의 중심에는 항상 '성장'과 '발전'이라는 키워드가 자리 잡고 있으며, 이를 통해 자신과 주변 사람들에게 긍정적인 영향을 미치게 됩니다."
+    case "화":
+      return "타고난 열정과 에너지로 어린 시절부터 주변 사람들의 관심을 받았을 것입니다. 청년기에는 자신의 열정을 표현하고 다양한 경험을 통해 자신을 발견하는 시간을 가지게 됩니다. 중년기에는 자신의 열정을 특정 분야에 집중하여 빛나는 성과를 이루며, 장년기와 노년기에는 자신의 경험을 바탕으로 다른 사람들에게 영감을 주는 역할을 하게 됩니다. 삶의 중심에는 '열정'과 '표현'이라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 활력과 기쁨을 전달하게 됩니다."
+    case "토":
+      return "어린 시절부터 안정과 조화를 중요시하는 성향이 강했을 것입니다. 청년기에는 기초를 탄탄히 다지는 데 집중하고, 중년기에는 자신의 영역에서 안정적인 위치를 확보하게 됩니다. 장년기와 노년기에는 자신이 쌓아온 기반을 바탕으로 다른 사람들을 지원하고 보살피는 역할을 하게 될 것입니다. 삶의 중심에는 '안정'과 '조화'라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 신뢰와 안정감을 제공하게 됩니다."
+    case "금":
+      return "어린 시절부터 정확하고 원칙적인 성향이 강했을 것입니다. 청년기에는 자신의 가치관과 원칙을 확립하고, 중년기에는 이를 바탕으로 자신만의 영역에서 권위와 존경을 얻게 됩니다. 장년기와 노년기에는 자신의 경험과 지혜를 바탕으로 다른 사람들에게 조언과 지도를 제공하는 역할을 하게 될 것입니다. 삶의 중심에는 '정확성'과 '원칙'이라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 명확한 방향성을 제시하게 됩니다."
+    case "수":
+      return "어린 시절부터 깊은 사고와 통찰력을 가진 성향이 강했을 것입니다. 청년기에는 다양한 지식과 경험을 통해 자신만의 지혜를 쌓고, 중년기에는 이를 바탕으로 깊이 있는 통찰력을 발휘하게 됩니다. 장년기와 노년기에는 자신의 지혜와 경험을 바탕으로 다른 사람들에게 영감과 통찰력을 제공하는 역할을 하게 될 것입니다. 삶의 중심에는 '지혜'와 '적응력'이라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 깊이 있는 이해와 통찰력을 제공하게 됩니다."
+    default:
+      return "독특한 에너지와 잠재력을 가지고 있으며, 삶의 여정에서 자신만의 특별한 길을 걷게 될 것입니다. 어린 시절부터 노년기까지 자신만의 방식으로 성장하고 발전하며, 주변 사람들에게 긍정적인 영향을 미치게 될 것입니다."
+  }
+}
+
+// 성격과 기질 설명 함수
+const getPersonalityDescription = (dayStem: string, dayBranch: string, elements: any): string => {
+  // 일간과 오행 분포에 따른 성격 설명
+  const dominantElement = getDominantElement(elements)
+
+  switch (dayStem) {
+    case "갑":
+    case "을":
+      return (
+        "목(木)의 기운이 강한 당신은 성장과 발전을 추구하는 성향이 있습니다. 새로운 아이디어와 가능성을 발견하는 데 탁월하며, 창의적인 사고방식으로 문제를 해결합니다. 스트레스를 받으면 더 많은 정보와 지식을 찾아 해결책을 모색하는 경향이 있으며, 대인관계에서는 유연하고 적응력이 뛰어납니다. " +
+        getDominantElementInfluence(dominantElement)
+      )
+    case "병":
+    case "정":
+      return (
+        "화(火)의 기운이 강한 당신은 열정적이고 활동적인 성향이 있습니다. 자신의 생각과 감정을 표현하는 데 능숙하며, 다른 사람들에게 영감을 주는 능력이 있습니다. 스트레스를 받으면 감정을 표출하고 활동적으로 해소하려는 경향이 있으며, 대인관계에서는 따뜻하고 친근한 모습을 보입니다. " +
+        getDominantElementInfluence(dominantElement)
+      )
+    case "무":
+    case "기":
+      return (
+        "토(土)의 기운이 강한 당신은 안정적이고 신뢰할 수 있는 성향이 있습니다. 실용적이고 현실적인 접근 방식으로 문제를 해결하며, 다른 사람들을 돌보고 지원하는 데 능숙합니다. 스트레스를 받으면 안정감을 찾기 위해 익숙한 환경과 루틴을 찾는 경향이 있으며, 대인관계에서는 신뢰와 안정감을 중요시합니다. " +
+        getDominantElementInfluence(dominantElement)
+      )
+    case "경":
+    case "신":
+      return (
+        "금(金)의 기운이 강한 당신은 정확하고 원칙적인 성향이 있습니다. 분석적이고 논리적인 사고방식으로 문제를 해결하며, 효율성과 정확성을 중요시합니다. 스트레스를 받으면 더 많은 구조와 질서를 찾으려는 경향이 있으며, 대인관계에서는 명확한 경계와 원칙을 중요시합니다. " +
+        getDominantElementInfluence(dominantElement)
+      )
+    case "임":
+    case "계":
+      return (
+        "수(水)의 기운이 강한 당신은 지혜롭고 적응력이 뛰어난 성향이 있습니다. 깊이 있는 사고와 통찰력으로 문제를 해결하며, 변화하는 상황에 유연하게 대응합니다. 스트레스를 받으면 내면의 지혜와 직관을 통해 해결책을 찾으려는 경향이 있으며, 대인관계에서는 깊이 있는 이해와 공감을 중요시합니다. " +
+        getDominantElementInfluence(dominantElement)
+      )
+    default:
+      return "독특한 성향과 기질을 가지고 있으며, 자신만의 방식으로 세상을 바라보고 해석합니다. 스트레스 상황에서는 자신만의 독특한 방식으로 대처하며, 대인관계에서도 자신만의 특별한 매력으로 사람들과 소통합니다."
+  }
+}
+
+// 가장 강한 오행 요소 찾기
+const getDominantElement = (elements: any): string => {
+  if (!elements) return "none"
+
+  const elementCounts = [
+    { type: "wood", count: elements.wood || 0 },
+    { type: "fire", count: elements.fire || 0 },
+    { type: "earth", count: elements.earth || 0 },
+    { type: "metal", count: elements.metal || 0 },
+    { type: "water", count: elements.water || 0 },
+  ]
+
+  elementCounts.sort((a, b) => b.count - a.count)
+  return elementCounts[0].type
+}
+
+// 가장 강한 오행의 영향 설명
+const getDominantElementInfluence = (element: string): string => {
+  switch (element) {
+    case "wood":
+      return "특히 목(木)의 기운이 강하게 나타나, 창의성과 성장 지향적인 성향이 더욱 두드러집니다."
+    case "fire":
+      return "특히 화(火)의 기운이 강하게 나타나, 열정적이고 표현력이 풍부한 성향이 더욱 두드러집니다."
+    case "earth":
+      return "특히 토(土)의 기운이 강하게 나타나, 안정적이고 신뢰할 수 있는 성향이 더욱 두드러집니다."
+    case "metal":
+      return "특히 금(金)의 기운이 강하게 나타나, 정확하고 원칙적인 성향이 더욱 두드러집니다."
+    case "water":
+      return "특히 수(水)의 기운이 강하게 나타나, 지혜롭고 적응력이 뛰어난 성향이 더욱 두드러집니다."
+    default:
+      return "오행의 균형이 잘 잡혀 있어, 다양한 상황에 유연하게 대응할 수 있는 능력이 있습니다."
+  }
+}
+
 // 채팅방 유형별 제목
 function getRoomTitle(roomType: string): string {
   switch (roomType) {
+    case "sajuping":
+      return "사주핑"
     case "general":
       return "종합 운세 상담"
     case "career":
@@ -224,6 +446,8 @@ function getRoomTitle(roomType: string): string {
 // 채팅방 유형별 상담사 이름
 const getConsultantName = (roomType: string): string => {
   switch (roomType) {
+    case "sajuping":
+      return "사주핑"
     case "career":
       return "커리어쌤"
     case "career_fortune":
@@ -274,6 +498,8 @@ const generateChatSessionKey = (name: string, saju: any, roomType: string) => {
 // Add a function to get model badge text based on room type
 const getModelBadgeText = (roomType: string): string | null => {
   switch (roomType) {
+    case "sajuping":
+      return "사주핑 AI"
     case "career":
       return "전문 직업 상담 모델"
     case "marriage":
@@ -288,6 +514,8 @@ const getModelBadgeText = (roomType: string): string | null => {
 // Update the getInitialMessage function to include initial messages for the new room types
 function getInitialMessage(roomType: string): string {
   switch (roomType) {
+    case "sajuping":
+      return "안녕하세요! 저는 사주핑이에요! 사주와 관련된 모든 질문을 해주세요!"
     case "general":
       return "안녕하세요! 사주와 관련된 질문이 있으신가요?"
     case "career":
@@ -303,55 +531,10 @@ function getInitialMessage(roomType: string): string {
     case "diet":
       return "안녕하세요! 식단코치 단식쌤입니다. 건강한 식단과 영양에 관한 상담을 도와드릴게요. 어떤 식단 목표가 있으신가요?"
     case "cheerup":
-      return "안녕하냥! 응원냥이 치즈예요! 오늘 힘든 일이 있었나요? 무슨 일이든 털어놓으세요, 제가 응원해드릴게요!"
+      return "안냥하세요! 응원냥이 치즈예요! 오늘 힘든 일이 있었나요? 무슨 일이든 털어놓으세요, 제가 응원해드릴게요!"
     default:
       return "안녕하세요! 무엇을 도와드릴까요?"
   }
-}
-
-// Update the getSpecializedModelBadge function to include badges for the new room types
-function getSpecializedModelBadge(roomType: string): React.ReactNode {
-  const specializedRoomTypes = ["career", "marriage", "health", "business", "fitness", "diet", "cheerup"]
-
-  if (!specializedRoomTypes.includes(roomType)) {
-    return null
-  }
-
-  let badgeText = ""
-  let badgeColor = ""
-
-  switch (roomType) {
-    case "career":
-      badgeText = "직업 특화 모델"
-      badgeColor = "bg-blue-500"
-      break
-    case "marriage":
-      badgeText = "연애 특화 모델"
-      badgeColor = "bg-pink-500"
-      break
-    case "health":
-      badgeText = "건강 특화 모델"
-      badgeColor = "bg-green-500"
-      break
-    case "business":
-      badgeText = "사업 특화 모델"
-      badgeColor = "bg-amber-500"
-      break
-    case "fitness":
-      badgeText = "운동 특화 모델"
-      badgeColor = "bg-purple-500"
-      break
-    case "diet":
-      badgeText = "식단 특화 모델"
-      badgeColor = "bg-emerald-500"
-      break
-    case "cheerup":
-      badgeText = "응원 특화 모델"
-      badgeColor = "bg-rose-500"
-      break
-  }
-
-  return <span className={`${badgeColor} text-white text-xs px-2 py-1 rounded-full ml-2`}>{badgeText}</span>
 }
 
 export default function SajuChat({
@@ -417,21 +600,71 @@ export default function SajuChat({
   const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
   const [lastMessageId, setLastMessageId] = useState<string>("")
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
+  // showSajuInfo 초기값을 사주핑인 경우 true로 설정
+  const [showSajuInfo, setShowSajuInfo] = useState(roomType === "sajuping")
   const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true)
-  const [showSajuInfo, setShowSajuInfo] = useState(false)
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [retryCount, setRetryCount] = useState(0) // 재시도 횟수 추적
 
+  // 응답 품질 확인 함수 - 컴포넌트 내부로 이동
+  const checkResponseQuality = useCallback((content: string) => {
+    // 응답이 너무 짧은 경우 (100자 미만)
+    if (content.length < 100) {
+      return {
+        isGoodQuality: false,
+        reason: "응답이 너무 짧습니다.",
+      }
+    }
+
+    // 응답이 중간에 끊긴 것 같은 경우
+    if (
+      content.endsWith("...") ||
+      content.endsWith("…") ||
+      content.endsWith(",") ||
+      content.endsWith("하지만") ||
+      content.endsWith("그러나") ||
+      content.endsWith("따라서")
+    ) {
+      return {
+        isGoodQuality: false,
+        reason: "응답이 완전하지 않습니다.",
+      }
+    }
+
+    return { isGoodQuality: true }
+  }, [])
+
   // Get saved chat session or create initial messages
   const savedSession = activeChatSession || getChatSession(sessionKey)
-  const initialMessages = savedSession?.messages || [
-    {
-      id: "welcome",
-      role: "assistant",
-      content: getInitialMessageByRoomType(name, roomType),
-    },
-  ]
+
+  // 초기 메시지 생성 로직 수정
+  let initialMessages: any[] = []
+  if (savedSession?.messages) {
+    initialMessages = savedSession.messages
+  } else if (roomType === "sajuping") {
+    try {
+      initialMessages = generateSajupingInitialMessages(name, saju)
+    } catch (error) {
+      console.error("Error generating sajuping initial messages:", error)
+      // 폴백으로 기본 메시지 사용
+      initialMessages = [
+        {
+          id: "welcome",
+          role: "assistant" as const,
+          content: getInitialMessageByRoomType(name, roomType),
+        },
+      ]
+    }
+  } else {
+    initialMessages = [
+      {
+        id: "welcome",
+        role: "assistant" as const,
+        content: getInitialMessageByRoomType(name, roomType),
+      },
+    ]
+  }
 
   // AI SDK의 useChat 훅 사용
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, error, reload, append } = useAIChat({
@@ -448,11 +681,24 @@ export default function SajuChat({
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
     },
     onFinish: (message) => {
-      // 마지막 메시지 시간 업데이트
+      // 응답 품질 확인
+      const qualityCheck = checkResponseQuality(message.content)
+
+      if (!qualityCheck.isGoodQuality && retryCount < 2) {
+        console.log(`응답 품질 문제 감지: ${qualityCheck.reason}. 자동 재시도 중...`)
+        setRetryCount((prev) => prev + 1)
+
+        // 짧은 지연 후 재시도
+        setTimeout(() => {
+          reload()
+        }, 1000)
+
+        return
+      }
+
+      // 기존 코드 유지...
       const newTime = new Date()
       setLastMessageTime(newTime)
-
-      // 마지막 메시지 ID 업데이트 (무한 루프 방지)
       setLastMessageId(message.id)
 
       // 채팅 데이터 저장 - 완료된 메시지를 포함하여 저장
@@ -527,6 +773,9 @@ export default function SajuChat({
 
       // 오류 상태 초기화
       setStreamingError(null)
+    },
+    options: {
+      timeout: 60000, // 타임아웃을 60초로 설정 (기본값보다 길게)
     },
   })
 
@@ -610,7 +859,7 @@ export default function SajuChat({
     originalHandleSubmit(e)
   }
 
-  // 뒤로가기 핸들러 - 채팅 데이터 저장 후 뒤로가기
+  // 뒤로가기 핸들러 - 채팅 데이터 저장 후 /result 페이지로 이동
   const handleBackWithSave = () => {
     try {
       // 채팅 데이터 저장 (오류가 발생해도 계속 진행)
@@ -638,466 +887,366 @@ export default function SajuChat({
             name,
             gender,
             interpretation: initialInterpretation,
-            timestamp: new Date().getTime(),
           }),
         )
       } catch (storageError) {
         console.error("사주 데이터 저장 중 오류:", storageError)
       }
 
-      // 채팅 리스트 페이지로 이동
-      window.location.href = "/chat-list"
+      // 뒤로가기 실행
+      onBack()
     } catch (error) {
       console.error("뒤로가기 처리 중 오류:", error)
-      // 오류가 발생해도 기본 경로로 이동
-      window.location.href = "/"
+      // 오류가 발생해도 뒤로가기는 실행
+      onBack()
     }
   }
 
-  // 예상 질문 클릭 핸들러
-  const handleQuestionClick = useCallback(
-    (question: string) => {
-      setInput(question)
-      if (inputRef.current) {
-        inputRef.current.focus()
+  // 추천 질문 클릭 핸들러
+  const handleSuggestedQuestionClick = (question: string) => {
+    // 이미 로딩 중이면 중복 제출 방지
+    if (isLoading) return
+
+    setInput(question)
+    // 자동으로 전송
+    setTimeout(() => {
+      const form = document.querySelector("form")
+      if (form) {
+        form.requestSubmit()
       }
-    },
-    [setInput],
-  )
+    }, 100)
+  }
 
-  // 새로운 예상 질문 생성 함수
-  const generateNewSuggestedQuestions = useCallback(async () => {
-    // 메시지가 최소 2개 이상일 때만 API 호출 (초기 메시지 + 최소 1개의 대화)
-    if (messages.length < 2 || !shouldGenerateQuestions) return
+  // 추천 질문 생성 함수
+  const generateSuggestedQuestions = useCallback(async () => {
+    // 이미 생성 중이거나 조건이 맞지 않으면 중단
+    if (!shouldGenerateQuestions || isGeneratingQuestions || messages.length < 2) {
+      return
+    }
 
+    // 마지막 메시지가 AI 응답이 아니면 생성하지 않음
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage.role !== "assistant") {
+      return
+    }
+
+    // 중복 호출 방지를 위해 플래그 설정
     setIsGeneratingQuestions(true)
+    setShouldGenerateQuestions(false)
 
     try {
-      // 최근 메시지 3개만 사용 (텍스트 유지)
-      const recentMessages = messages.slice(-3)
+      // 기본 추천 질문 (API 호출 실패 시 폴백용)
+      const defaultQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
 
       const response = await fetch("/api/suggested-questions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Cookie: document.cookie,
         },
         body: JSON.stringify({
-          messages: recentMessages,
-          saju,
+          messages: messages.slice(-4), // 최근 4개 메시지만 전송
           roomType,
-          currentYear: 2025,
-          yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-          // 창의적인 질문 생성을 위한 플래그 추가
-          creative: true,
+          saju,
+          name,
         }),
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to generate suggested questions: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.suggestedQuestions && Array.isArray(data.suggestedQuestions) && data.suggestedQuestions.length > 0) {
-        // 새로운 질문으로 상태 업데이트
-        setSuggestedQuestions(data.suggestedQuestions.slice(0, 2))
+      if (response.ok) {
+        const data = await response.json()
+        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+          setSuggestedQuestions(data.questions)
+        } else {
+          // API가 빈 배열을 반환하면 기본 질문 사용
+          setSuggestedQuestions(defaultQuestions)
+        }
       } else {
-        console.warn("No suggested questions received, using default questions")
-        // 기본 질문으로 폴백
-        setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
+        // API 호출 실패 시 기본 질문 사용
+        setSuggestedQuestions(defaultQuestions)
       }
     } catch (error) {
-      console.error("Error generating suggested questions:", error)
-      // 오류 발생 시 채팅방 유형에 맞는 기본 질문 세트 사용
+      console.error("추천 질문 생성 오류:", error)
+      // 오류 발생 시 기본 질문 사용
       setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
     } finally {
       setIsGeneratingQuestions(false)
-      // 질문 생성 후 플래그를 false로 설정하여 중복 생성 방지
-      setShouldGenerateQuestions(false)
     }
-  }, [messages, saju, roomType, shouldGenerateQuestions])
+  }, [messages, roomType, saju, name, initialSuggestedQuestionsByType])
 
-  // 메시지가 변경될 때마다 스크롤을 아래로 이동
+  // 메시지가 변경될 때마다 추천 질문 생성
   useEffect(() => {
-    if (messagesEndRef.current && chatContainerRef.current) {
-      // 약간의 지연을 두고 스크롤 실행 (모바일에서 더 안정적)
+    // 메시지가 변경되고 마지막 메시지가 AI의 응답일 때만 새 질문 생성
+    if (messages.length > 0 && messages[messages.length - 1].role === "assistant" && !isGeneratingQuestions) {
+      // 이전 타이머 취소를 위한 변수
       const timer = setTimeout(() => {
-        const chatContainer = chatContainerRef.current
-        if (chatContainer) {
-          chatContainer.scrollTop = chatContainer.scrollHeight
-        }
-      }, 100)
+        setShouldGenerateQuestions(true)
+        generateSuggestedQuestions()
+      }, 2000) // 2초 후에 생성
 
       return () => clearTimeout(timer)
     }
-  }, [messages, isLoading])
+  }, [messages, isGeneratingQuestions, generateSuggestedQuestions])
 
-  // 컴포넌트가 마운트되면 입력 필드에 포커스
+  // 스크롤을 맨 아래로 이동하는 함수
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }
+
+  // 메시지가 변경될 때마다 스크롤을 아래로 이동
   useEffect(() => {
-    if (inputRef.current && !isInitialized) {
-      inputRef.current.focus()
-      setIsInitialized(true)
+    scrollToBottom()
+  }, [messages])
+
+  // 컴포넌트 마운트 시 스크롤을 아래로 이동
+  useEffect(() => {
+    if (!isInitialized) {
+      setTimeout(() => {
+        scrollToBottom()
+        setIsInitialized(true)
+      }, 100)
     }
   }, [isInitialized])
 
-  // 메시지가 변경될 때마다 새로운 추천 질문 생성
+  // 네트워크 상태 변경 시 알림
   useEffect(() => {
-    if (messages.length > 0 && !isGeneratingQuestions && shouldGenerateQuestions) {
-      const lastMessage = messages[messages.length - 1]
-
-      // assistant 메시지이고 welcome 메시지가 아닌 경우에만 새 질문 생성
-      if (lastMessage.role === "assistant" && lastMessage.id !== "welcome") {
-        // 디바운스 처리로 연속 호출 방지
-        const timer = setTimeout(() => {
-          generateNewSuggestedQuestions()
-        }, 500)
-
-        return () => clearTimeout(timer)
-      }
+    if (!isOnline) {
+      setStreamingError("인터넷 연결이 끊어졌습니다. 연결 상태를 확인해주세요.")
+    } else if (streamingError?.includes("인터넷 연결")) {
+      setStreamingError(null)
     }
-  }, [messages, isGeneratingQuestions, generateNewSuggestedQuestions, shouldGenerateQuestions])
-
-  // Extract 오행 (five elements) data from saju
-  const extractFiveElements = () => {
-    if (!saju) return []
-
-    // Helper function to count element occurrences in saju
-    const countElementOccurrences = (elementType: string) => {
-      let count = 0
-
-      // 사주 객체에 elements 속성이 있으면 직접 사용
-      if (saju.elements && saju.elements[elementType] !== undefined) {
-        return saju.elements[elementType]
-      }
-
-      // 천간(Stems)의 오행 확인
-      const stemElements: Record<string, string> = {
-        갑: "wood",
-        을: "wood",
-        병: "fire",
-        정: "fire",
-        무: "earth",
-        기: "earth",
-        경: "metal",
-        신: "metal",
-        임: "water",
-        계: "water",
-      }
-
-      // 지지(Branches)의 오행 확인
-      const branchElements: Record<string, string> = {
-        자: "water",
-        축: "earth",
-        인: "wood",
-        묘: "wood",
-        진: "earth",
-        사: "fire",
-        오: "fire",
-        미: "earth",
-        신: "metal",
-        유: "metal",
-        술: "earth",
-        해: "water",
-      }
-
-      // 천간 오행 계산
-      if (saju.yearStem && stemElements[saju.yearStem] === elementType) count++
-      if (saju.monthStem && stemElements[saju.monthStem] === elementType) count++
-      if (saju.dayStem && stemElements[saju.dayStem] === elementType) count++
-      if (saju.hourStem && stemElements[saju.hourStem] === elementType) count++
-
-      // 지지 오행 계산
-      if (saju.yearBranch && branchElements[saju.yearBranch] === elementType) count++
-      if (saju.monthBranch && branchElements[saju.monthBranch] === elementType) count++
-      if (saju.dayBranch && branchElements[saju.dayBranch] === elementType) count++
-      if (saju.hourBranch && branchElements[saju.hourBranch] === elementType) count++
-
-      return count
-    }
-
-    return [
-      { type: "wood", count: countElementOccurrences("wood") },
-      { type: "fire", count: countElementOccurrences("fire") },
-      { type: "earth", count: countElementOccurrences("earth") },
-      { type: "metal", count: countElementOccurrences("metal") },
-      { type: "water", count: countElementOccurrences("water") },
-    ]
-  }
-
-  // Get Korean names for elements
-  const getElementKoreanName = (type: string) => {
-    switch (type) {
-      case "wood":
-        return "목(木)"
-      case "fire":
-        return "화(火)"
-      case "earth":
-        return "토(土)"
-      case "metal":
-        return "금(金)"
-      case "water":
-        return "수(水)"
-      default:
-        return type
-    }
-  }
-
-  // Get color for elements
-  const getElementColor = (type: string) => {
-    switch (type) {
-      case "wood":
-        return "bg-green-500"
-      case "fire":
-        return "bg-red-500"
-      case "earth":
-        return "bg-yellow-500"
-      case "metal":
-        return "bg-gray-400"
-      case "water":
-        return "bg-blue-500"
-      default:
-        return "bg-gray-300"
-    }
-  }
-
-  // Extract day pillar
-  const getDayPillar = () => {
-    if (!saju) return { dayPillar: "", dayPillarHanja: "" }
-
-    const dayPillar = saju.dayStem && saju.dayBranch ? `${saju.dayStem}${saju.dayBranch}` : ""
-    const dayPillarHanja = saju.dayStemHanja && saju.dayBranchHanja ? `${saju.dayStemHanja}${saju.dayBranchHanja}` : ""
-
-    return { dayPillar, dayPillarHanja }
-  }
-
-  const fiveElements = extractFiveElements()
-  const { dayPillar, dayPillarHanja } = getDayPillar()
-
-  const loginPromptDialog = (
-    <LoginPromptDialog isOpen={showLoginPrompt} onClose={handleCloseLoginPrompt} message={loginPromptMessage} />
-  )
+  }, [isOnline, streamingError])
 
   return (
-    <Card className="w-full border-0 sm:border relative z-10 hide-parent-header">
-      <CardHeader className="px-2 py-2 sm:px-4 sm:py-3 border-b flex flex-row items-center justify-between sticky top-0 bg-white dark:bg-gray-950 z-10">
-        <Button variant="ghost" size="icon" onClick={handleBackWithSave} className="mr-2">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-lg">{getRoomTitle(roomType)}</CardTitle>
-          {getModelBadgeText(roomType) && (
-            <span className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs px-2 py-0.5 rounded-full">
-              {getModelBadgeText(roomType)}
-            </span>
-          )}
+    <div className="flex flex-col h-screen bg-white">
+      {/* ChatGPT 스타일 헤더 */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center space-x-3">
+          <Button variant="ghost" size="sm" onClick={handleBackWithSave} className="p-1">
+            <Menu className="h-5 w-5 text-gray-600" />
+          </Button>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setShowSajuInfo(!showSajuInfo)}>
-          사주도표
-          {showSajuInfo ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
-      </CardHeader>
 
-      <CardContent className="p-0">
-        <div className="flex flex-col h-[calc(100vh-56px)]">
-          {/* 네트워크 상태 알림 */}
-          {!isOnline && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-2 text-sm text-center">
-              인터넷 연결이 끊겼습니다. 연결 상태를 확인해주세요.
-            </div>
-          )}
+        <div className="flex items-center space-x-2">
+          <h1 className="text-lg font-medium text-gray-900">{getRoomTitle(roomType)}</h1>
+          {roomType === "sajuping" && <span className="text-sm text-gray-500">AI</span>}
+          <ChevronDown className="h-4 w-4 text-gray-400" />
+        </div>
 
-          {/* Collapsible Saju Info */}
-          {showSajuInfo && (
-            <div className="p-3 border-b animate-in fade-in slide-in-from-top duration-300">
-              <div className="flex flex-col sm:flex-row gap-4 items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                {/* Saju Diagram */}
-                <div className="w-full sm:w-1/2 flex justify-center">
-                  <SajuDiagram saju={saju} size="sm" />
-                </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowSajuInfo(!showSajuInfo)} className="p-1">
+            <Edit3 className="h-5 w-5 text-gray-600" />
+          </Button>
+        </div>
+      </div>
 
-                {/* Five Elements and Day Pillar */}
-                <div className="w-full sm:w-1/2 space-y-3">
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">일주 (Day Pillar)</h3>
-                    <div className="text-xl font-bold text-center p-2 bg-gray-100 dark:bg-gray-700 rounded-md">
-                      {dayPillar ? (
-                        <>
-                          {dayPillar} <span className="text-sm font-normal">({dayPillarHanja})</span>
-                        </>
-                      ) : (
-                        "정보 없음"
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">오행 분포 (Five Elements)</h3>
-                    <div className="space-y-2">
-                      {fiveElements.map((element) => (
-                        <div key={element.type} className="flex items-center gap-2">
-                          <div className="w-20 text-sm">{getElementKoreanName(element.type)}</div>
-                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
-                            <div
-                              className={`h-full ${getElementColor(element.type)}`}
-                              style={{ width: `${Math.min(100, element.count * 12.5)}%` }}
-                            ></div>
-                          </div>
-                          <div className="w-6 text-sm text-right">{element.count}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Messages Area */}
-          <div
-            ref={chatContainerRef}
-            className="flex-1 overflow-y-auto pb-[140px] sm:pb-[160px]"
-            style={{ scrollBehavior: "smooth" }}
-          >
-            <div className="p-3 sm:p-4 space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={message.id || index}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[85%] sm:max-w-[75%] rounded-lg p-3 ${
-                      message.role === "user"
-                        ? "bg-blue-500 text-white rounded-br-none"
-                        : "bg-gray-100 dark:bg-gray-800 rounded-bl-none"
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] sm:max-w-[75%] rounded-lg p-3 bg-gray-100 dark:bg-gray-800 rounded-bl-none">
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 오류 메시지 및 재시도 버튼 */}
-              {streamingError && (
-                <div className="flex justify-center my-4">
-                  <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-lg p-3 text-sm flex flex-col items-center max-w-[85%]">
-                    <p>{streamingError}</p>
-                    {retryCount < 3 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRetry}
-                        className="mt-2 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 flex items-center gap-1"
-                        disabled={isRetrying}
-                      >
-                        {isRetrying ? (
-                          <>
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            재시도 중...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-3 w-3" />
-                            다시 시도 ({retryCount}/3)
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
+      {/* 사주 정보 카드 (접을 수 있음) */}
+      {showSajuInfo && (
+        <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+          <div className="max-w-3xl mx-auto">
+            <SajuDiagram saju={saju} name={name} />
           </div>
+        </div>
+      )}
 
-          {/* Input Area - Fixed at bottom */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 z-10">
-            {/* Suggested Questions */}
-            <div className="px-3 sm:px-4 pt-2">
-              <div className="flex justify-between items-center">
-                <p className="text-xs text-gray-500">추천 질문:</p>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowSuggestedQuestions(!showSuggestedQuestions)}
-                  className="h-6 w-6"
-                >
-                  {showSuggestedQuestions ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-                </Button>
-              </div>
-
-              {showSuggestedQuestions && (
-                <div className="flex flex-wrap gap-2 mt-1 mb-2">
-                  {suggestedQuestions.map((question, index) => (
-                    <button
-                      key={`suggested-${index}`}
-                      onClick={() => handleQuestionClick(question)}
-                      className="text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-full px-3 py-1.5 text-left"
-                      disabled={isLoading}
-                    >
-                      {question}
-                    </button>
-                  ))}
-                  {isGeneratingQuestions && (
-                    <div className="text-sm bg-gray-100 dark:bg-gray-800 rounded-full px-3 py-1.5 flex items-center">
-                      <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                      생성 중...
+      {/* 채팅 영역 */}
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {messages.map((message, index) => (
+            <div key={message.id || index} className="space-y-4">
+              {message.role === "user" ? (
+                // 사용자 메시지
+                <div className="flex justify-end">
+                  <div className="bg-gray-100 rounded-2xl px-4 py-2 max-w-[80%]">
+                    <p className="text-gray-900 text-sm leading-relaxed">{message.content}</p>
+                  </div>
+                </div>
+              ) : (
+                // AI 메시지
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">🤖</span>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="prose prose-sm max-w-none">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => (
+                            <p className="text-gray-900 leading-relaxed mb-3 last:mb-0">{children}</p>
+                          ),
+                          strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                          em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
+                          ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-3">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-3">{children}</ol>,
+                          li: ({ children }) => <li className="text-gray-900">{children}</li>,
+                          h1: ({ children }) => <h1 className="text-xl font-bold mb-3 text-gray-900">{children}</h1>,
+                          h2: ({ children }) => (
+                            <h2 className="text-lg font-semibold mb-2 text-gray-900">{children}</h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-base font-semibold mb-2 text-gray-900">{children}</h3>
+                          ),
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-3">
+                              {children}
+                            </blockquote>
+                          ),
+                          code: ({ children }) => (
+                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono text-gray-800">
+                              {children}
+                            </code>
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
+          ))}
 
-            {/* Input Form */}
-            <div className="px-3 py-2 pb-safe">
-              <form onSubmit={customHandleSubmit} className="flex space-x-2">
-                <div className="flex items-center bg-white dark:bg-gray-800 rounded-full px-4 py-2 flex-1 border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <input
-                    ref={inputRef}
-                    value={input}
-                    onChange={handleInputChange}
-                    placeholder="사주에 대해 질문하세요..."
-                    className="flex-1 bg-transparent border-none focus:outline-none text-base"
-                    disabled={isLoading}
-                  />
+          {/* 로딩 상태 */}
+          {isLoading && (
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">🤖</span>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <div className="flex space-x-1">
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 스트리밍 오류 표시 */}
+          {streamingError && (
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">⚠️</span>
+              </div>
+              <div className="flex-1">
+                <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg">
+                  <p className="text-sm mb-2">{streamingError}</p>
                   <Button
-                    type="submit"
-                    size="icon"
-                    className="rounded-full bg-blue-600 hover:bg-blue-700 text-white ml-2 h-8 w-8 flex items-center justify-center"
-                    disabled={isLoading || !input.trim() || !isOnline}
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    className="text-red-600 border-red-300 hover:bg-red-50"
                   >
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {isRetrying ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        재시도 중...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        다시 시도
+                      </>
+                    )}
                   </Button>
                 </div>
-              </form>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* 추천 질문 영역 */}
+      {showSuggestedQuestions && suggestedQuestions.length > 0 && !isLoading && (
+        <div className="border-t border-gray-200 px-4 py-3">
+          <div className="max-w-3xl mx-auto">
+            <div className="flex flex-wrap gap-2">
+              {suggestedQuestions.slice(0, 3).map((question, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSuggestedQuestionClick(question)}
+                  className="text-sm bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full px-4 py-2"
+                  disabled={isLoading}
+                >
+                  {question}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
-      </CardContent>
-      {loginPromptDialog}
-    </Card>
+      )}
+
+      {/* ChatGPT 스타일 입력 영역 */}
+      <div className="border-t border-gray-200 px-4 py-4">
+        <div className="max-w-3xl mx-auto">
+          <form onSubmit={customHandleSubmit} className="relative">
+            <div className="flex items-center bg-gray-100 rounded-full px-4 py-3">
+              <Button type="button" variant="ghost" size="sm" className="p-1 mr-2" disabled={isLoading}>
+                <Plus className="h-5 w-5 text-gray-500" />
+              </Button>
+
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={handleInputChange}
+                placeholder={
+                  !isOnline ? "인터넷 연결을 확인해주세요" : isLoading ? "답변을 기다리는 중..." : "Ask anything"
+                }
+                className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 placeholder-gray-500"
+                disabled={isLoading || !isOnline}
+              />
+
+              <div className="flex items-center space-x-2 ml-2">
+                <Button type="button" variant="ghost" size="sm" className="p-1" disabled={isLoading}>
+                  <Mic className="h-5 w-5 text-gray-500" />
+                </Button>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !input.trim() || !isOnline}
+                  className="bg-black hover:bg-gray-800 text-white rounded-full p-2"
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </form>
+
+          {/* 질문 카운트 표시 (비로그인 사용자만) */}
+          {!isLoggedIn && (
+            <div className="mt-2 text-center">
+              <span className="text-xs text-gray-500">
+                질문 {questionCount}/5 {questionCount >= 5 && "(로그인하면 무제한 질문 가능)"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 로그인 프롬프트 다이얼로그 */}
+      <LoginPromptDialog
+        isOpen={showLoginPrompt}
+        onClose={handleCloseLoginPrompt}
+        onLogin={handleLogin}
+        message={loginPromptMessage}
+      />
+    </div>
   )
 }

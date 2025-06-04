@@ -121,7 +121,7 @@ export function AboutSajuping() {
                   <Heart className="h-6 w-6 text-red-500 flex-shrink-0 mt-1" />
                   <p className="text-lg">
                     <span className="font-semibold">사주핑의 이름에는 특별한 의미가 있어요.</span>
-                    '사주'와 '핑'의 만남! 핑(Ping)은 메시지를 보내고 응답을 기다린다는 IT 용어인데요, 우주가 당신에게
+                    '사주'와 '핑'의 만남! 핑(Ping)은 메시지를 보내고 응답을 기다린다는 IT 용어인��요, 우주가 당신에게
                     보내는 메시지를 사주핑이 귀엽게 전달해드린다는 의미를 담았답니다. 우주의 메시지, 받아보실래요? 💌
                   </p>
                 </div>

@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
           <Card>
             <CardHeader>
               <CardTitle>새 비밀번호 설정</CardTitle>
-              <CardDescription>새로운 비밀번호를 입력해주세요. 비밀번호는 최소 6자 이상이어야 합니다.</CardDescription>
+              <CardDescription>새로운 비밀번호를 입력해주세요. 비밀번���는 최소 6자 이상이어야 합니다.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handlePasswordUpdate} className="space-y-4">
