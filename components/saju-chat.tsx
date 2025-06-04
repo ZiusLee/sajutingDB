@@ -1071,7 +1071,7 @@ export default function SajuChat({
       {/* 채팅 영역 - 유일한 스크롤 영역 */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto pb-20 md:pb-24"
         style={{
           scrollBehavior: "smooth",
           // 모바일에서 스크롤 성능 최적화
@@ -1240,7 +1240,7 @@ export default function SajuChat({
 
           {/* 추천 질문 영역 */}
           {suggestedQuestions.length > 0 && !isLoading && (
-            <div className="flex-shrink-0 border-t border-gray-700 px-3 md:px-4 py-3 bg-gray-800">
+            <div className="fixed bottom-16 md:bottom-20 left-0 right-0 border-t border-gray-700 px-3 md:px-4 py-3 bg-gray-800 z-40">
               <div className="max-w-3xl mx-auto">
                 <div className="flex flex-wrap gap-2">
                   {suggestedQuestions.slice(0, 3).map((question, index) => (
@@ -1261,7 +1261,7 @@ export default function SajuChat({
           )}
 
           {/* ChatGPT 스타일 입력 영역 - 키보드 위에 고정 */}
-          <div className="flex-shrink-0 border-t border-gray-700 px-3 md:px-4 py-3 md:py-4 bg-gray-800">
+          <div className="fixed bottom-0 left-0 right-0 border-t border-gray-700 px-3 md:px-4 py-3 md:py-4 bg-gray-800 z-50">
             <div className="max-w-3xl mx-auto">
               <form onSubmit={customHandleSubmit} className="relative">
                 <div className="flex items-center bg-gray-700 rounded-full px-3 md:px-4 py-2 md:py-3">
@@ -1310,15 +1310,6 @@ export default function SajuChat({
                   </div>
                 </div>
               </form>
-
-              {/* 질문 카운트 표시 (비로그인 사용자만) */}
-              {!isLoggedIn && (
-                <div className="mt-2 text-center">
-                  <span className="text-xs text-gray-400">
-                    질문 {questionCount}/5 {questionCount >= 5 && "(로그인하면 무제한 질문 가능)"}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
