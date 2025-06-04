@@ -8,7 +8,7 @@ import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Loader2, Send, ChevronDown, RefreshCw, Menu, Edit3, Plus, Mic } from "lucide-react"
+import { Loader2, Send, ChevronDown, RefreshCw, Menu, User, Plus, Mic, ChevronUp } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
@@ -81,6 +81,27 @@ const useNetworkStatus = () => {
   }, [])
 
   return isOnline
+}
+
+// 모바일 키보드 대응 훅
+const useMobileKeyboard = () => {
+  useEffect(() => {
+    // 모바일에서 입력 필드 포커스 시 자동 줌인 방지
+    const viewport = document.querySelector('meta[name="viewport"]')
+    if (viewport) {
+      const originalContent = viewport.getAttribute("content")
+
+      // 입력 필드 포커스 시 줌인 방지를 위한 viewport 설정
+      viewport.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no")
+
+      return () => {
+        // 컴포넌트 언마운트 시 원래 설정으로 복원
+        if (originalContent) {
+          viewport.setAttribute("content", originalContent)
+        }
+      }
+    }
+  }, [])
 }
 
 interface SajuChatProps {
@@ -477,6 +498,9 @@ export default function SajuChat({
   // Dark theme 강제 적용
   useForceDarkTheme()
 
+  // 모바일 키보드 대응
+  useMobileKeyboard()
+
   // 네트워크 상태 모니터링
   const isOnline = useNetworkStatus()
 
@@ -527,8 +551,8 @@ export default function SajuChat({
   const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
   const [lastMessageId, setLastMessageId] = useState<string>("")
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-  // showSajuInfo 초기값을 사주핑인 경우 true로 설정
-  const [showSajuInfo, setShowSajuInfo] = useState(roomType === "sajuping")
+  // showSajuInfo 초기값을 항상 false로 설정 (접힌 상태로 시작)
+  const [showSajuInfo, setShowSajuInfo] = useState(false)
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [retryCount, setRetryCount] = useState(0) // 재시도 횟수 추적
@@ -782,11 +806,6 @@ export default function SajuChat({
     const newQuestionCount = questionCount + 1
     setQuestionCount(newQuestionCount)
 
-    // 모바일에서 키보드 닫기
-    if (inputRef.current) {
-      inputRef.current.blur()
-    }
-
     // Show login prompt after 5 questions if not already shown
     const shouldShowLoginPrompt = newQuestionCount >= 5 && !isLoggedIn && !hasShownLoginPrompt
 
@@ -1013,17 +1032,38 @@ export default function SajuChat({
             size="sm"
             onClick={() => setShowSajuInfo(!showSajuInfo)}
             className="p-1 text-gray-300 hover:text-white"
+            title={showSajuInfo ? "사주 정보 숨기기" : "사주 정보 보기"}
           >
-            <Edit3 className="h-5 w-5" />
+            <User className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
       {/* 사주 정보 카드 (접을 수 있음) */}
       {showSajuInfo && (
-        <div className="flex-shrink-0 bg-gradient-to-b from-gray-800 to-gray-900 border-b border-gray-700 p-4 shadow-sm">
-          <div className="max-w-3xl mx-auto">
-            <SajuDiagram saju={saju} name={name} />
+        <div className="flex-shrink-0 bg-gradient-to-b from-gray-800 to-gray-900 border-b border-gray-700 shadow-sm">
+          {/* 사주 정보 헤더 */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+            <div className="flex items-center space-x-2">
+              <User className="h-5 w-5 text-purple-400" />
+              <h3 className="text-lg font-medium text-white">{name || "사용자"}님의 사주 정보</h3>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSajuInfo(false)}
+              className="p-1 text-gray-400 hover:text-white"
+              title="사주 정보 접기"
+            >
+              <ChevronUp className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* 사주 다이어그램 */}
+          <div className="p-4">
+            <div className="max-w-3xl mx-auto">
+              <SajuDiagram saju={saju} name={name} />
+            </div>
           </div>
         </div>
       )}
@@ -1044,6 +1084,29 @@ export default function SajuChat({
             <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
               {messages.map((message, index) => (
                 <div key={message.id || index} className="space-y-4">
+                  {/* 첫 번째 AI 메시지 앞에 사주 다이어그램 표시 (showSajuInfo가 false일 때만) */}
+                  {index === 0 && message.role === "assistant" && !showSajuInfo && (
+                    <div className="mb-6 p-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg border border-gray-700">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <User className="h-5 w-5 text-purple-400" />
+                          <h3 className="text-lg font-medium text-white">{name || "사용자"}님의 사주</h3>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowSajuInfo(true)}
+                          className="p-1 text-gray-400 hover:text-white"
+                          title="사주 정보 상단에 고정"
+                        >
+                          <ChevronUp className="h-5 w-5" />
+                        </Button>
+                      </div>
+                      <SajuDiagram saju={saju} name={name} />
+                    </div>
+                  )}
+
+                  {/* 기존 메시지 렌더링 코드는 그대로 유지 */}
                   {message.role === "user" ? (
                     // 사용자 메시지
                     <div className="flex justify-end">
@@ -1197,7 +1260,7 @@ export default function SajuChat({
             </div>
           )}
 
-          {/* ChatGPT 스타일 입력 영역 */}
+          {/* ChatGPT 스타일 입력 영역 - 키보드 위에 고정 */}
           <div className="flex-shrink-0 border-t border-gray-700 px-3 md:px-4 py-3 md:py-4 bg-gray-800">
             <div className="max-w-3xl mx-auto">
               <form onSubmit={customHandleSubmit} className="relative">
@@ -1221,6 +1284,9 @@ export default function SajuChat({
                     }
                     className="flex-1 bg-transparent border-none focus:outline-none text-white placeholder-gray-400 text-sm md:text-base"
                     disabled={isLoading || !isOnline}
+                    style={{
+                      fontSize: "16px", // iOS에서 자동 줌인 방지를 위한 최소 폰트 크기
+                    }}
                   />
 
                   <div className="flex items-center space-x-2 ml-2">
