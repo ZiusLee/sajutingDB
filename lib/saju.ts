@@ -220,19 +220,6 @@ const DAY_TO_HOUR_STEM_MAP: Record<string, number> = {
   계: 8, // 계일 자시는 '임자시' (임 = 8)
 }
 
-// 만세력 데이터 - 특정 날짜의 사주 정보
-// 형식: [연도, 월, 일, 연간, 연지, 월간, 월지, 일간, 일지]
-const MANSERYEOK_DATA = [
-  // 1996년 데이터
-  [1996, 1, 6, "을", "해", "무", "자", "임", "인"], // 1996년 1월 6일: 을해년 무자월 임인일
-
-  // 1988년 데이터
-  [1988, 5, 16, "무", "진", "정", "사", "신", "미"], // 1988년 5월 16일: 무진년 정사월 신미일
-
-  // 1999년 데이터 추가
-  [1999, 2, 13, "기", "묘", "병", "인", "병", "신"], // 1999년 2월 13일: 기묘년 병인월 병신일
-]
-
 // Update the Saju interface to ensure all properties are properly typed
 export interface Saju {
   yearStem: string
@@ -286,16 +273,17 @@ function getYearPillar(
   solarMonth: number,
   solarDay: number,
 ): { stem: string; branch: string } {
-  // 양력 연도를 기준으로 계산하도록 변경
   let yearToUse = solarYear
 
-  // 현재 날짜가 입춘 이전인지 확인
-  const isBeforeLichun = solarMonth < LICHUN_MONTH || (solarMonth === LICHUN_MONTH && solarDay <= LICHUN_DAY)
+  // 현재 날짜가 입춘 이전인지 확인 (2월 4일 이전)
+  const isBeforeLichun = solarMonth < 2 || (solarMonth === 2 && solarDay < 4)
 
   // 입춘 이전이면 이전 연도 사용
   if (isBeforeLichun) {
     yearToUse = solarYear - 1
   }
+
+  console.log(`Year calculation: ${solarYear}-${solarMonth}-${solarDay}, using year ${yearToUse}`)
 
   // 갑자년은 서기 4년에 해당 (4 = 갑자, 5 = 을축, ...)
   const stemIndex = (yearToUse + 6) % 10 // 보정: +6
@@ -305,34 +293,6 @@ function getYearPillar(
     stem: HEAVENLY_STEMS[stemIndex],
     branch: EARTHLY_BRANCHES[branchIndex],
   }
-}
-
-// 만세력 데이터에서 특정 날짜의 사주 정보 찾기
-function findSajuInManseryeok(
-  solarYear: number,
-  solarMonth: number,
-  solarDay: number,
-): {
-  yearStem: string
-  yearBranch: string
-  monthStem: string
-  monthBranch: string
-  dayStem: string
-  dayBranch: string
-} | null {
-  for (const [year, month, day, yearStem, yearBranch, monthStem, monthBranch, dayStem, dayBranch] of MANSERYEOK_DATA) {
-    if (solarYear === year && solarMonth === month && solarDay === day) {
-      return {
-        yearStem: yearStem as string,
-        yearBranch: yearBranch as string,
-        monthStem: monthStem as string,
-        monthBranch: monthBranch as string,
-        dayStem: dayStem as string,
-        dayBranch: dayBranch as string,
-      }
-    }
-  }
-  return null
 }
 
 // 시간 기준 타입 정의
@@ -464,7 +424,7 @@ function countElements(
     water: 0,
   }
 
-  // 간의 오행 계��
+  // 간의 오행 계
   elements[STEM_ELEMENTS[yearStem as keyof typeof STEM_ELEMENTS]]++
   elements[STEM_ELEMENTS[monthStem as keyof typeof STEM_ELEMENTS]]++
   elements[STEM_ELEMENTS[dayStem as keyof typeof STEM_ELEMENTS]]++
@@ -603,149 +563,95 @@ function getDayPillar(solarYear: number, solarMonth: number, solarDay: number): 
 // 동추원만세력 기반 절기 데이터
 // 각 절기의 시작일을 기준으로 월지를 결정
 // 형식: [절기명, 월지, 시작 월, 평균 시작일]
-const SOLAR_TERM_DATA = [
-  ["입춘", "인", 2, 4], // 2월 4일경 입춘 - 인월 시작
-  ["경칩", "묘", 3, 6], // 3월 6일경 경칩 - 묘월 시작
-  ["청명", "진", 4, 5], // 4월 5일경 청명 - 진월 시작
-  ["입하", "사", 5, 6], // 5월 6일경 입하 - 사월 시작
-  ["망종", "오", 6, 6], // 6월 6일경 망종 - 오월 시작
-  ["소서", "미", 7, 7], // 7월 7일경 소서 - 미월 시작
-  ["입추", "신", 8, 8], // 8월 8일경 입추 - 신월 시작
-  ["백로", "유", 9, 8], // 9월 8일경 백로 - 유월 시작
-  ["한로", "술", 10, 8], // 10월 8일경 한로 - 술월 시작
-  ["입동", "해", 11, 7], // 11월 7일경 입동 - 해월 시작
-  ["대설", "자", 12, 7], // 12월 7일경 대설 - 자월 시작
-  ["소한", "축", 1, 20], // 1월 20일경 소한 - 축월 시작
-]
 
 // 정확한 절기 시간 정보를 포함한 새 배열 추가
 // [절기명, 월지, 시작 월, 시작일, 시작 시간(24시간제)]
-const SOLAR_TERM_DATA_WITH_TIME = [
-  ["입춘", "인", 2, 4, 11], // 2월 4일 11시경 입춘 - 인월 시작
-  ["경칩", "묘", 3, 6, 9], // 3월 6일 9시경 경칩 - 묘월 시작
-  ["청명", "진", 4, 5, 15], // 4월 5일 15시경 청명 - 진월 시작
-  ["입하", "사", 5, 6, 3], // 5월 6일 3시경 입하 - 사월 시작
-  ["망종", "오", 6, 6, 17], // 6월 6일 17시경 망종 - 오월 시작
-  ["소서", "미", 7, 7, 7], // 7월 7일 7시경 소서 - 미월 시작
-  ["입추", "신", 8, 8, 3], // 8월 8일 3시경 입추 - 신월 시작
-  ["백로", "유", 9, 8, 19], // 9월 8일 19시경 백로 - 유월 시작
-  ["한로", "술", 10, 8, 11], // 10월 8일 11시경 한로 - 술월 시작
-  ["입동", "해", 11, 7, 23], // 11월 7일 23시경 입동 - 해월 시작
-  ["대설", "자", 12, 7, 18], // 12월 7일 18시경 대설 - 자월 시작
-  ["소한", "축", 1, 20, 6], // 1월 20일 6시경 소한 - 축월 시작
-]
 
-// 특정 연도의 정확한 절기 시간 데이터
-// 실제 천문학적 계산에 기반한 정확한 절기 시간 (특정 연도)
-const EXACT_SOLAR_TERM_TIMES: Record<number, Record<string, { month: number; day: number; hour: number }>> = {
-  2003: {
-    대설: { month: 12, day: 7, hour: 18 }, // 2003년 대설: 12월 7일 18시경
-    소한: { month: 1, day: 20, hour: 12 }, // 2003년 소한: 1월 20일 12시경
-    // 다른 절기들도 필요에 따라 추가
-  },
-  // 다른 연도들도 필요에 따라 추가
-}
+import { EXACT_SOLAR_TERMS } from "./solar-terms"
 
-// 정확한 절기 시간을 고려한 월지 계산 함수 추가
-function getMonthBranchWithExactTime(year: number, month: number, day: number, hour = 0): string {
+// Simplify the getMonthBranchFromSolarTerms function to make it more efficient and accurate
+// Replace the current implementation with this improved version:
+
+function getMonthBranchFromSolarTerms(year: number, month: number, day: number, hour = 0): string {
   try {
-    // 1. 특정 연도의 정확한 절기 시간 데이터가 있는지 확인
-    if (EXACT_SOLAR_TERM_TIMES[year]) {
-      // 현재 월의 절기 찾기
-      const currentMonthTerm = SOLAR_TERM_DATA.find((term) => term[2] === month)
-      if (currentMonthTerm) {
-        const termName = currentMonthTerm[0] as string
+    const currentDate = new Date(year, month - 1, day, hour)
+    console.log(`=== Calculating month branch for ${year}-${month}-${day} ${hour}h ===`)
 
-        // 해당 연도의 해당 절기 정확한 시간 데이터가 있는지 확인
-        if (EXACT_SOLAR_TERM_TIMES[year][termName]) {
-          const exactTerm = EXACT_SOLAR_TERM_TIMES[year][termName]
+    // EXACT_SOLAR_TERMS 데이터가 제대로 로드되었는지 확인
+    console.log(`Total solar terms available: ${EXACT_SOLAR_TERMS.length}`)
+    if (EXACT_SOLAR_TERMS.length === 0) {
+      console.error("EXACT_SOLAR_TERMS is empty!")
+      return "자"
+    }
 
-          // 현재 날짜/시간이 절기 시작 시간보다 이전인지 확인
-          if (month === exactTerm.month && (day < exactTerm.day || (day === exactTerm.day && hour < exactTerm.hour))) {
-            // 이전 월의 월지 반환
-            return getPreviousMonthBranch(month)
-          } else if (month === exactTerm.month && day >= exactTerm.day) {
-            // 현재 월의 새 월지 반환
-            return currentMonthTerm[1] as string
-          }
-        }
+    // Define the mapping of solar terms to month branches
+    const solarTermToMonthBranch: Record<string, string> = {
+      대설: "자", // 12월 대설부터 자월 시작
+      소한: "축", // 1월 소한부터 축월 시작
+      입춘: "인", // 2월 입춘부터 인월 시작
+      경칩: "묘", // 3월 경칩부터 묘월 시작
+      청명: "진", // 4월 청명부터 진월 시작
+      입하: "사", // 5월 입하부터 사월 시작
+      망종: "오", // 6월 망종부터 오월 시작
+      소서: "미", // 7월 소서부터 미월 시작
+      입추: "신", // 8월 입추부터 신월 시작
+      백로: "유", // 9월 백로부터 유월 시작
+      한로: "술", // 10월 한로부터 술월 시작
+      입동: "해", // 11월 입동부터 해월 시작
+    }
+
+    // Get all relevant solar terms from current and previous year
+    const currentYearTerms = EXACT_SOLAR_TERMS.filter((term) => term.year === year)
+    const prevYearTerms = EXACT_SOLAR_TERMS.filter((term) => term.year === year - 1)
+
+    console.log(`Current year (${year}) terms found: ${currentYearTerms.length}`)
+    console.log(`Previous year (${year - 1}) terms found: ${prevYearTerms.length}`)
+
+    // 1993년 청명 절기 확인
+    const qingming1993 = currentYearTerms.find((term) => term.solarTerm === "청명")
+    if (qingming1993) {
+      console.log(`Found 청명 for ${year}: ${qingming1993.timestamp}`)
+    } else {
+      console.log(`청명 not found for ${year}`)
+    }
+
+    // Combine and sort all terms by timestamp in descending order
+    const allRelevantTerms = [...currentYearTerms, ...prevYearTerms]
+      .filter((term) => solarTermToMonthBranch[term.solarTerm]) // Only include terms that affect month branch
+      .map((term) => ({
+        ...term,
+        date: new Date(term.timestamp),
+        monthBranch: solarTermToMonthBranch[term.solarTerm],
+      }))
+      .sort((a, b) => b.date.getTime() - a.date.getTime()) // Sort in descending order
+
+    console.log(`Total relevant terms: ${allRelevantTerms.length}`)
+    console.log(`Current date: ${currentDate.toISOString()}`)
+
+    // Find the most recent solar term that has passed
+    for (const term of allRelevantTerms) {
+      console.log(`Checking term: ${term.solarTerm} (${term.timestamp}) -> ${term.monthBranch}`)
+      console.log(`Term date: ${term.date.toISOString()}`)
+      console.log(`Current >= Term: ${currentDate >= term.date}`)
+
+      if (currentDate >= term.date) {
+        console.log(
+          `✓ ${year}-${month}-${day} ${hour}h falls after ${term.solarTerm} (${term.timestamp}), so month branch is ${term.monthBranch}`,
+        )
+        return term.monthBranch
       }
     }
 
-    // 2. 일반적인 절기 시간 데이터 사용
-    const currentMonthTerm = SOLAR_TERM_DATA_WITH_TIME.find((term) => term[2] === month)
-    if (currentMonthTerm) {
-      const [_, newBranch, termMonth, termDay, termHour] = currentMonthTerm
-
-      // 현재 날짜/시간이 절기 시작 시간보다 이전인지 확인
-      if (((day < termDay) as number) || (day === termDay && ((hour < termHour) as number))) {
-        // 이전 월의 월지 반환
-        return getPreviousMonthBranch(month)
-      }
-
-      return newBranch as string
-    }
-
-    // 3. 기본 로직으로 폴백 (기존 로직)
-    return getMonthBranchFromManseryeokOriginal(year, month, day)
+    // If no matching term is found (unlikely but possible for very old dates)
+    console.warn(`Could not determine month branch for ${year}-${month}-${day}, using default 자`)
+    return "자"
   } catch (error) {
-    console.error(`Error in getMonthBranchWithExactTime for ${year}-${month}-${day} ${hour}h:`, error)
-    // 오류 발생 시 기존 로직으로 폴백
-    return getMonthBranchFromManseryeokOriginal(year, month, day)
+    console.error(`Error in getMonthBranchFromSolarTerms for ${year}-${month}-${day}:`, error)
+    return "자" // Safe default
   }
 }
 
-// 이전 월의 월지 반환 함수
-function getPreviousMonthBranch(month: number): string {
-  // 이전 월 계산 (1월이면 12월로)
-  const prevMonth = month === 1 ? 12 : month - 1
-
-  // 이전 월의 절기 찾기
-  const prevMonthTerm = SOLAR_TERM_DATA.find((term) => term[2] === prevMonth)
-
-  return prevMonthTerm ? (prevMonthTerm[1] as string) : "자" // 기본값
-}
-
-// 기존 함수 보존 (원래 로직을 유지)
-function getMonthBranchFromManseryeokOriginal(year: number, month: number, day: number): string {
-  try {
-    // Special case handling for specific dates
-    if (year === 1998 && month === 7) return "오" // 1998년 7월은 오월
-    if (year === 1996 && month === 1 && day >= 6) return "자" // 1996년 1월 6일 이후는 자월
-    if (year === 1988 && month === 5 && day >= 5) return "사" // 1988년 5월 5일 이후는 사월
-
-    // Safe array access with bounds checking
-    for (const [term, branch, termMonth, termDay] of SOLAR_TERM_DATA) {
-      if (month === termMonth) {
-        if (day >= termDay) {
-          return branch as string
-        } else {
-          // Safely calculate previous index with bounds checking
-          const prevIndex = termMonth === 2 ? 11 : (termMonth - 2 + 12) % 12
-          // Make sure the index is valid before accessing
-          if (prevIndex >= 0 && prevIndex < SOLAR_TERM_DATA.length) {
-            return SOLAR_TERM_DATA[prevIndex][1] as string
-          }
-        }
-      }
-    }
-
-    // Default fallback if no match is found
-    console.warn(`No matching solar term found for ${year}-${month}-${day}, using default`)
-    return "자" // Default
-  } catch (error) {
-    console.error(`Error in getMonthBranchFromManseryeok for ${year}-${month}-${day}:`, error)
-    return "자" // Safe fallback
-  }
-}
-
-// 기존 함수를 새 함수로 대체 (인터페이스 유지)
-function getMonthBranchFromManseryeok(year: number, month: number, day: number, hour = 0): string {
-  // 새로운 로직 사용 (정확한 절기 시간 고려)
-  return getMonthBranchWithExactTime(year, month, day, hour)
-}
-
-// getMonthPillar 함수 수정 - hour 매개변수 추가
+// Simplify the getMonthPillar function to make it clearer
 function getMonthPillar(
   solarYear: number,
   solarMonth: number,
@@ -756,54 +662,23 @@ function getMonthPillar(
   apiMonthStem?: string,
   apiMonthBranch?: string,
 ): { stem: string; branch: string } {
-  // API 제공 값이 있으면 사용
-  if (
-    apiMonthStem &&
-    HEAVENLY_STEMS.includes(apiMonthStem) &&
-    apiMonthBranch &&
-    EARTHLY_BRANCHES.includes(apiMonthBranch)
-  ) {
-    console.log(`Using API-provided month pillar: ${apiMonthStem}${apiMonthBranch}`)
-    return {
-      stem: apiMonthStem,
-      branch: apiMonthBranch,
-    }
-  }
+  console.log(`=== getMonthPillar called with: ${solarYear}-${solarMonth}-${solarDay}, yearStem: ${yearStem} ===`)
 
-  // Special case handling
-  if (solarYear === 1998 && solarMonth === 7 && !isLeapMonth) {
-    // 동추원만세력 기준 1998년 7월은 오월
-    return { stem: "무", branch: "오" }
-  }
-
-  // 만세력 데이터 직접 매핑 (특정 날짜)
-  if (solarYear === 1996 && solarMonth === 1 && solarDay >= 6) {
-    return { stem: "무", branch: "자" }
-  }
-
-  if (solarYear === 1988 && solarMonth === 5 && solarDay >= 5) {
-    return { stem: "정", branch: "사" }
-  }
-
-  // 윤달 처리
-  if (isLeapMonth) {
-    // 윤달은 이전 달의 월주를 그대로 사용
-    // 이전 달의 월지 계산
-    const prevMonth = solarMonth === 1 ? 12 : solarMonth - 1
-    const prevMonthDay = solarDay // 같은 날짜 사용
-    const prevYear = solarMonth === 1 ? solarYear - 1 : solarYear
-
-    // 이전 달의 월지 계산 - 시간 정보 전달
-    const monthBranch = getMonthBranchFromManseryeok(prevYear, prevMonth, prevMonthDay, hour)
-    const monthStem = getMonthStem(yearStem, monthBranch)
-
-    return { stem: monthStem, branch: monthBranch }
-  }
+  // API 제공 값을 무시하고 항상 우리 자체 절기 계산을 사용
+  // API 데이터가 부정확할 수 있으므로 신뢰할 수 있는 절기 계산을 우선 사용
 
   try {
-    // 일반적인 계산 - 시간 정보 전달
-    const monthBranch = getMonthBranchFromManseryeok(solarYear, solarMonth, solarDay, hour)
+    // Get the month branch based on solar terms
+    console.log(`Calling getMonthBranchFromSolarTerms...`)
+    const monthBranch = getMonthBranchFromSolarTerms(solarYear, solarMonth, solarDay, hour)
+    console.log(`Month branch from solar terms: ${monthBranch}`)
+
+    // Calculate the month stem based on year stem and month branch
+    console.log(`Calling getMonthStem with yearStem: ${yearStem}, monthBranch: ${monthBranch}`)
     const monthStem = getMonthStem(yearStem, monthBranch)
+    console.log(`Month stem calculated: ${monthStem}`)
+
+    console.log(`Final month pillar: ${monthStem}${monthBranch}`)
     return { stem: monthStem, branch: monthBranch }
   } catch (error) {
     console.error(`Error calculating month pillar for ${solarYear}-${solarMonth}-${solarDay}:`, error)
@@ -812,19 +687,18 @@ function getMonthPillar(
   }
 }
 
-// 월간 결정 (연간과 월지에 따라)
+// Simplify the getMonthStem function for clarity
 function getMonthStem(yearStem: string, monthBranch: string): string {
-  // 월지 순서 (인월부터 시작)
+  // Month branch order starting from 인월
   const monthBranchOrder = ["인", "묘", "진", "사", "오", "미", "신", "유", "술", "해", "자", "축"]
   const monthBranchIndex = monthBranchOrder.indexOf(monthBranch)
 
   if (monthBranchIndex === -1) {
     console.error(`Invalid month branch: ${monthBranch}`)
-    return "무" // 기본값
+    return "무" // Default value
   }
 
-  // 연간별 월간 시작 인덱스 (동추원만세력 기반)
-  // 각 연간에 따른 인월의 월간 시작 인덱스
+  // Year stem to first month stem mapping (for 인월)
   const yearStemToFirstMonthStem: Record<string, number> = {
     갑: 2, // 갑년 인월은 병(丙)으로 시작
     을: 4, // 을년 인월은 무(戊)로 시작
@@ -842,26 +716,20 @@ function getMonthStem(yearStem: string, monthBranch: string): string {
 
   if (firstMonthStemIndex === undefined) {
     console.error(`Invalid year stem: ${yearStem}`)
-    return "무" // 기본값
+    return "무" // Default value
   }
 
+  // Calculate the stem index and return the corresponding stem
   const stemIndex = (firstMonthStemIndex + monthBranchIndex) % 10
+
+  // 디버깅 로그 추가
+  console.log(
+    `Year stem: ${yearStem}, Month branch: ${monthBranch}, First month stem index: ${firstMonthStemIndex}, Month branch index: ${monthBranchIndex}, Calculated stem index: ${stemIndex}, Result: ${HEAVENLY_STEMS[stemIndex]}`,
+  )
+
   return HEAVENLY_STEMS[stemIndex]
 }
 
-function adjustMonthBranchForSpecificYears(
-  year: number,
-  month: number,
-  day: number,
-  calculatedMonthBranch: string,
-): string {
-  if (year === 1998 && month === 7) {
-    return "오" // 1998년 7월은 항상 오월
-  }
-  return calculatedMonthBranch // 다른 경우는 계산된 월지 그대로 반환
-}
-
-// Update the calculateSaju function to pass API stem/branch values to getMonthPillar
 export function calculateSaju(
   lunarYear: string | number,
   lunarMonth: string | number,
@@ -879,67 +747,55 @@ export function calculateSaju(
   apiMonthBranch?: string,
   timeStandard: TimeStandard = "동경135도",
 ): any {
-  // 문자열을 숫자로 변환
   const numLunarYear = typeof lunarYear === "string" ? Number.parseInt(lunarYear, 10) : lunarYear
 
   console.log(
     `Calculate Saju for Lunar: ${numLunarYear}, Solar: ${solarYear}-${solarMonth}-${solarDay}, Time: ${hour}:${minute}, Gender: ${gender}, Name: ${name}, TimeUnknown: ${timeUnknown}, IsLeapMonth: ${isLeapMonth}, TimeStandard: ${timeStandard}`,
   )
 
-  // 만세력 데이터에서 사주 정보 찾기
-  const manseryeokData = findSajuInManseryeok(solarYear, solarMonth, solarDay)
+  // 연간지 계산 (Year Pillar)
+  const yearPillar = getYearPillar(numLunarYear, solarYear, solarMonth, solarDay)
+  const yearStem = yearPillar.stem
+  const yearBranch = yearPillar.branch
 
-  let yearStem, yearBranch, monthStem, monthBranch, dayStem, dayBranch
+  console.log(`Year Pillar calculated: ${yearStem}${yearBranch}`)
 
-  if (manseryeokData) {
-    // 만세력 데이터가 있는 경우 해당 데이터 사용
-    yearStem = manseryeokData.yearStem
-    yearBranch = manseryeokData.yearBranch
-    monthStem = manseryeokData.monthStem
-    monthBranch = manseryeokData.monthBranch
-    dayStem = manseryeokData.dayStem
-    dayBranch = manseryeokData.dayBranch
-  } else {
-    // 연간지 계산 (Year Pillar) - 음력 기준
-    const yearPillar = getYearPillar(numLunarYear, solarYear, solarMonth, solarDay)
-    yearStem = yearPillar.stem
-    yearBranch = yearPillar.branch
+  // 월간지 계산 (Month Pillar)
+  const monthPillar = getMonthPillar(
+    solarYear,
+    solarMonth,
+    solarDay,
+    yearStem,
+    isLeapMonth,
+    hour,
+    apiMonthStem,
+    apiMonthBranch,
+  )
+  const monthStem = monthPillar.stem
+  const monthBranch = monthPillar.branch
 
-    // 월간지 계산 (Month Pillar) - 윤달 정보와 시간 정보 전달, 그리고 API 정보도 전달
-    const monthPillar = getMonthPillar(
-      solarYear,
-      solarMonth,
-      solarDay,
-      yearStem,
-      isLeapMonth,
-      hour,
-      apiMonthStem,
-      apiMonthBranch,
-    )
-    monthStem = monthPillar.stem
-    monthBranch = monthPillar.branch
+  console.log(`Month Pillar calculated: ${monthStem}${monthBranch}`)
 
-    // 일간지 계산 (Day Pillar)
-    const dayPillar = getDayPillar(solarYear, solarMonth, solarDay)
-    dayStem = dayPillar.stem
-    dayBranch = dayPillar.branch
-  }
+  // 일간지 계산 (Day Pillar)
+  const dayPillar = getDayPillar(solarYear, solarMonth, solarDay)
+  const dayStem = dayPillar.stem
+  const dayBranch = dayPillar.branch
 
-  // Modify the hour pillar calculation to handle unknown time
+  console.log(`Day Pillar calculated: ${dayStem}${dayBranch}`)
+
+  // 시간 간지 계산
   let hourStem, hourBranch
 
   if (timeUnknown) {
-    // Use placeholder values for unknown time
     hourStem = "?"
     hourBranch = "?"
   } else {
-    // Calculate hour pillar as usual with the specified time standard
     hourBranch = getHourBranch(hour, minute, timeStandard)
     hourStem = getHourStem(dayStem, hour, minute, timeStandard)
   }
 
   console.log(
-    `Year Pillar: ${yearStem}${yearBranch}, Month Pillar: ${monthStem}${monthBranch}, Day Pillar: ${dayStem}${dayBranch}, Hour Pillar: ${hourStem}${hourBranch}`,
+    `Final pillars - Year: ${yearStem}${yearBranch}, Month: ${monthStem}${monthBranch}, Day: ${dayStem}${dayBranch}, Hour: ${hourStem}${hourBranch}`,
   )
 
   // 오행 계산
