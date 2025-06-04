@@ -11,6 +11,11 @@ if (!connectionString) {
 // 데이터베이스 연결 풀 생성
 const db = new Pool({
   connectionString,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  // 네이티브 바인딩 비활성화
+  native: false,
 })
 
 // 쿼리 실행 함수
