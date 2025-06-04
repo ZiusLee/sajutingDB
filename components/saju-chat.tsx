@@ -12,6 +12,7 @@ import { Loader2, Send, ChevronDown, RefreshCw, Menu, Edit3, Plus, Mic } from "l
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 // useHideHeader 훅을 확장하여 footer도 함께 숨기도록 수정
 const useHideHeaderAndFooter = () => {
@@ -19,6 +20,7 @@ const useHideHeaderAndFooter = () => {
     // 상위 헤더와 푸터 요소 찾기 및 숨기기
     const header = document.querySelector("header")
     const footer = document.querySelector("footer")
+    const body = document.body
 
     if (header) {
       header.style.display = "none"
@@ -28,6 +30,9 @@ const useHideHeaderAndFooter = () => {
       footer.style.display = "none"
     }
 
+    // body의 스크롤 방지
+    body.style.overflow = "hidden"
+
     // 컴포넌트 언마운트 시 원래대로 복원
     return () => {
       if (header) {
@@ -35,6 +40,24 @@ const useHideHeaderAndFooter = () => {
       }
       if (footer) {
         footer.style.display = ""
+      }
+      body.style.overflow = ""
+    }
+  }, [])
+}
+
+// Dark theme 강제 적용 훅
+const useForceDarkTheme = () => {
+  useEffect(() => {
+    // 채팅방에서는 강제로 dark theme 적용
+    document.documentElement.classList.add("dark")
+
+    // 컴포넌트 언마운트 시 원래 테마로 복원
+    return () => {
+      // 사용자의 원래 테마 설정 확인
+      const savedTheme = localStorage.getItem("theme")
+      if (savedTheme !== "dark") {
+        document.documentElement.classList.remove("dark")
       }
     }
   }, [])
@@ -71,6 +94,58 @@ interface SajuChatProps {
   sessionKey: string
 }
 
+// 핑 캐릭터 정의
+const pingCharacters = [
+  {
+    id: "sajuping",
+    name: "사주핑",
+    emoji: "🔮",
+    description: "사주와 운세 전문",
+    roomType: "sajuping",
+    color: "text-purple-400",
+  },
+  {
+    id: "taroping",
+    name: "타로핑",
+    emoji: "🃏",
+    description: "타로카드 리딩 전문",
+    roomType: "tarot",
+    color: "text-pink-400",
+  },
+  {
+    id: "undongping",
+    name: "운동핑",
+    emoji: "💪",
+    description: "운동과 건강 전문",
+    roomType: "fitness",
+    color: "text-green-400",
+  },
+  {
+    id: "sikdanping",
+    name: "식단핑",
+    emoji: "🥗",
+    description: "식단과 영양 전문",
+    roomType: "diet",
+    color: "text-yellow-400",
+  },
+  {
+    id: "yeonaepping",
+    name: "연애핑",
+    emoji: "💕",
+    description: "연애와 관계 전문",
+    roomType: "love",
+    color: "text-red-400",
+  },
+  {
+    id: "jigeoppping",
+    name: "직업핑",
+    emoji: "💼",
+    description: "직업과 커리어 전문",
+    roomType: "career",
+    color: "text-blue-400",
+  },
+]
+
 // 초기 예상 질문 목록 (채팅방 유형별)
 const initialSuggestedQuestionsByType: Record<string, string[]> = {
   sajuping: [
@@ -80,6 +155,14 @@ const initialSuggestedQuestionsByType: Record<string, string[]> = {
     "재물운 알려줘",
     "올해 운세는 어떤가요?",
     "제 성격과 기질은 어떤가요?",
+  ],
+  tarot: [
+    "오늘의 타로 카드 뽑아줘",
+    "연애운 타로 봐줘",
+    "직업운 타로 리딩해줘",
+    "오늘 주의할 점은?",
+    "이번 주 운세는?",
+    "중요한 결정을 앞두고 있어요",
   ],
   general: ["2025년 운세는 어떤가요?", "제 사주의 장단점은?", "가장 강한 기운은 무엇인가요?"],
   career: ["저에게 맞는 직업은 무엇인가요?", "이직하기 좋은 시기는 언제인가요?", "승진 가능성이 높은 때는 언제인가요?"],
@@ -129,81 +212,59 @@ ${currentYear}년 을사년(乙巳年), 푸른 뱀의 해에 ${userName}님이 �
 
 아래 추천 질문을 눌러보시거나, 직접 궁금한 점을 말씀해주세요 😊`
 
-    case "career":
-      return `안녕하세요, ${userName}님! 직업 상담사 커리어쌤입니다. 💼
+    case "tarot":
+      return `안녕하세요, ${userName}님! 저는 타로핑이에요! 🃏✨
 
-${currentYear}년 을사년(乙巳年)의 직업운에 대해 상담해 드릴게요. 취업, 이직, 승진, 직장 생활 등 직업과 관련된 질문을 해주시면 사주를 바탕으로 답변해드릴게요. 어떤 직업이 잘 맞는지, 언제 이직하면 좋을지 등 구체적인 질문을 해보세요!`
+신비로운 타로카드의 세계로 여러분을 안내해드릴게요!
 
-    case "career_fortune":
-      return `안녕하세요, ${userName}님! 커리어 코치입니다. 🚀
+🔮 **타로 리딩 서비스:**
+• 오늘의 운세 타로
+• 연애운 타로 리딩
+• 직업운 타로 상담
+• 중요한 결정 도움
+• 미래 전망 타로
+• 관계 상담 타로
 
-${userName}님의 사주를 분석해보니 특별한 직업적 재능이 보이네요. ${currentYear}년 을사년(乙巳年)에는 어떤 커리어 목표를 가지고 계신가요? 적성에 맞는 직업 분야, 승진 전략, 이직 시기 등 구체적인 질문을 해주시면 사주를 바탕으로 맞춤형 조언을 드리겠습니다.`
+${currentYear}년 을사년, 푸른 뱀의 해에 타로카드가 ${userName}님에게 전하는 메시지를 들어보세요! 
 
-    case "personalized":
-      return `안녕하세요, ${userName}님! 고민 상담사 마음쌤입니다. 💭
-
-${currentYear}년 을사년(乙巳年), 푸른 뱀의 해입니다. ${userName}님의 고민이 무엇인지 말씀해주시면, 사주를 바탕으로 해결책을 제시해드리겠습니다. 인간관계, 직장, 심리적 고민 등 어떤 것이든 편하게 말씀해주세요. 함께 해결책을 찾아보아요.`
-
-    case "love":
-      return `안녕하세요, ${userName}님! 연애 상담사 러브쌤입니다. 💕
-
-${currentYear}년 을사년(乙巳年), 푸른 뱀의 해인데요. 연애, 만남, 인연 등 애정 관계에 대해 궁금한 점이 있으시면 사주를 바탕으로 답변해드릴게요. 언제 좋은 인연을 만날지, 어떤 유형의 사람과 잘 맞는지 등 구체적인 질문을 해보세요. 당신의 사랑을 응원합니다!`
-
-    case "love_fortune":
-      return `안녕하세요, ${userName}님! 연애 전문 상담사입니다. ❤️
-
-${userName}님의 사주를 보니 특별한 인연의 기운이 느껴지네요. ${currentYear}년 을사년(乙巳年)에는 어떤 사랑의 변화가 있을지 궁금하신가요? 데이트 코스 추천부터 관계 개선 방법까지, 사주를 바탕으로 실질적인 연애 조언을 드리겠습니다. 어떤 부분이 궁금하신가요?`
-
-    case "health":
-      return `안녕하세요, ${userName}님! 건강 상담사 헬스쌤입니다. 🌿
-
-${currentYear}년 을사년(乙巳年), 푸른 뱀의 해입니다. 체질, 건강 관리, 주의해야 할 질병 등 건강과 관련된 질문을 해주면 사주를 바탕으로 답변해드릴게요. 어떤 부분에 주의해야 하는지, 어떤 운동이나 식습관이 좋을지 등 구체적인 질문을 해보세요. 건강한 한 해를 보내시길 바랍니다!`
-
-    case "yearly":
-      return `안녕하세요, ${userName}님! 연간 운세 상담사 이어쌤입니다. 📅
-
-${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해로, 음(陰)의 목(木) 기운과 뱀의 지혜로운 에너지가 함께합니다. 올해의 전반적인 운세, 중요한 시기, 주의해야 할 점 등 올해 운세와 관련된 질문을 해주시면 사주를 바탕으로 답변해드리겠습니다. 어떤 달에 특별히 주의해야 하는지, 언제 중요한 결정을 내리면 좋을지 등 구체적인 질문을 해보세요.`
-
-    case "daily-fortune":
-      return `안녕하세요, ${userName}님! 일일 운세 봇 데일리쌤입니다. 🍀
-
-사주를 기반으로 오늘(${today})의 운세를 알려드립니다. 오늘 하루는 어떤 운이 따를까요? 궁금한 점이 있으시면 편하게 물어보세요! 오늘 하루도 행운이 가득하길 바랍니다.`
-
-    case "business":
-      return `안녕하세요, ${userName}님! 사업 상담사 비즈쌤입니다. 💼
-
-${currentYear}년 을사년(乙巳年)의 사업 운세와 재물운에 대해 상담해 드리겠습니다. 사업 시작 시기, 투자, 재테크 등에 관한 질문이 있으시면 사주를 바탕으로 답변해 드리겠습니다. 어떤 분야에 투자하면 좋을지, 사업 파트너는 어떤 사람이 좋을지 등 구체적인 질문을 해보세요. 성공적인 사업을 응원합니다!`
-
-    case "marriage":
-      return `안녕하세요, ${userName}님! 결혼 상담사 웨딩쌤입니다. 💍
-
-${currentYear}년 을사년(乙巳年)의 결혼운과 가정운에 대해 상담해 드리겠습니다. 결혼 시기, 배우자 선택, 부부 관계 등에 관한 질문이 있으시면 사주를 바탕으로 답변해 드리겠습니다. 언제 결혼하면 좋을지, 어떤 사람과 결혼생활이 행복할지 등 구체적인 질문을 해보세요. 행복한 결혼을 응원합니다!`
-
-    case "marriage_fortune":
-      return `안녕하세요, ${userName}님! 결혼 전문 상담가입니다. 👰🤵
-
-${userName}님의 사주를 보니 인연의 기운이 특별하게 흐르고 있네요. ${currentYear}년 을사년(乙巳年)에 결혼을 계획 중이신가요? 아니면 미래의 결혼에 대해 궁금하신가요? 결혼 적기부터 예비 배우자와의 관계 조화, 결혼 준비 체크리스트까지 실질적인 조언을 드리겠습니다. 무엇이 궁금하신가요?`
+어떤 것이 궁금하신가요? 🌟`
 
     case "fitness":
-      return `안녕하세요, ${userName}님! 운동코치 치코쌤입니다! 💪
+      return `안녕하세요, ${userName}님! 운동핑이에요! 💪✨
 
-${userName}님의 사주와 체질에 맞는 운동 방법과 루틴을 알려드릴게요. 체중 관리, 근력 향상, 유연성 개선 등 어떤 목표가 있으신가요? 사주를 바탕으로 가장 효과적인 운동법을 제안해 드리겠습니다. 오늘부터 함께 건강한 몸을 만들어봐요! 화이팅!`
+${userName}님의 사주와 체질에 맞는 운동 방법과 루틴을 알려드릴게요! 
+
+🏃‍♀️ **운동 상담 서비스:**
+• 체질별 맞춤 운동법
+• 효과적인 운동 루틴
+• 다이어트 운동 계획
+• 근력 향상 프로그램
+• 유연성 개선 스트레칭
+• 부상 예방 가이드
+
+체중 관리, 근력 향상, 유연성 개선 등 어떤 목표가 있으신가요? 사주를 바탕으로 가장 효과적인 운동법을 제안해 드리겠습니다. 
+
+오늘부터 함께 건강한 몸을 만들어봐요! 화이팅! 💪`
 
     case "diet":
-      return `안녕하세요, ${userName}님! 식단코치 단식쌤입니다! 🥗
+      return `안녕하세요, ${userName}님! 식단핑이에요! 🥗✨
 
-${userName}님의 사주와 체질에 맞는 맞춤 식단과 영양 조언을 해드릴게요. 건강한 식습관, 체중 관리, 에너지 증진 등 어떤 목표가 있으신가요? 사주를 바탕으로 가장 효과적인 식단을 제안해 드리겠습니다. 오늘부터 함께 건강한 식습관을 만들어봐요! 맛있게 먹으면서 건강해지는 비결을 알려드릴게요!`
+${userName}님의 사주와 체질에 맞는 맞춤 식단과 영양 조언을 해드릴게요!
 
-    case "cheerup":
-      return `안냥하세요, ${userName}님! 응원냥이 치즈예요! 😺
+🍎 **식단 상담 서비스:**
+• 체질별 맞춤 식단
+• 건강한 다이어트 식단
+• 영양 균형 가이드
+• 식사 타이밍 조언
+• 간식 추천
+• 요리법 팁
 
-힘든 일이 있으신가요? 기운이 없으신가요? 치즈가 ${userName}님의 사주를 보고 딱 맞는 응원과 위로를 해드릴게요! 어떤 고민이 있든 함께 나누면 절반으로 줄어든다냥! 오늘 하루도 파이팅이에요! 무슨 일이 있었는지 치즈에게 털어놓아보세요~ 치즈가 항상 응원할게요옹!`
+건강한 식습관, 체중 관리, 에너지 증진 등 어떤 목표가 있으신가요? 사주를 바탕으로 가장 효과적인 식단을 제안해 드리겠습니다. 
 
-    case "general":
+오늘부터 함께 건강한 식습관을 만들어봐요! 맛있게 먹으면서 건강해지는 비결을 알려드릴게요! 🌟`
+
     default:
-      return `안녕하세요, ${userName}님! 사주 종합 상담사 사주쌤입니다. 🔮
-
-${currentYear}년은 을사년(乙巳年), 푸른 뱀의 해입니다. 음(陰)의 목(木) 기운과 뱀의 지혜로운 에너지가 함께하는 해로, 결혼 시기, 성공 시기, 연애 시기, 일이 풀리는 시기 등 구체적인 질문을 해주시면 사주를 바탕으로 답변해드리겠습니다. ${currentYear}년 을사년의 운세와 앞으로의 인생 흐름에 대해 궁금한 점이 있으시면 무엇이든 물어보세요! 함께 좋은 길을 찾아보아요.`
+      return `안녕하세요, ${userName}님! 무엇을 도와드릴까요?`
   }
 }
 
@@ -289,83 +350,46 @@ ${userName}님만의 독특한 에너지와 잠재력이 느껴져요! 더 자�
   return [firstMessage, secondMessage]
 }
 
-// 일간 오행별 설명 함수
-const getDayElementDescription = (element: string): string => {
-  switch (element) {
-    case "목":
-      return "성장과 발전을 추구하며, 창의적이고 유연한 사고를 가지고 계세요"
-    case "화":
-      return "열정적이고 활동적이며, 사람들과의 소통을 즐기는 성향이에요"
-    case "토":
-      return "안정적이고 신뢰할 수 있으며, 포용력이 뛰어난 분이에요"
-    case "금":
-      return "결단력이 있고 정확하며, 원칙을 중시하는 성향을 가지고 계세요"
-    case "수":
-      return "지혜롭고 적응력이 뛰어나며, 깊이 있는 사고를 하는 분이에요"
-    default:
-      return "독특하고 특별한 기운을 가지고 계세요"
-  }
-}
-
 // 인생의 큰 흐름과 중심 에너지 설명 함수
 const getLifeThemeDescription = (dayStem: string, dayBranch: string, dayElement: string): string => {
-  // 일간과 일지의 조합에 따른 인생 테마 설명
-  const stemBranchCombo = `${dayStem}${dayBranch}`
-
   switch (dayElement) {
     case "목":
-      return "어린 시절부터 성장과 발전을 추구하는 성향이 강했을 것입니다. 청년기에는 새로운 아이디어와 도전을 통해 자신의 길을 개척하고, 중년기에는 자신만의 영역에서 안정적인 성장을 이루게 됩니다. 장년기와 노년기에는 자신의 경험과 지혜를 다른 사람들과 나누며 더 큰 성취감을 느끼게 될 것입니다. 삶의 중심에는 항상 '성장'과 '발전'이라는 키워드가 자리 잡고 있으며, 이를 통해 자신과 주변 사람들에게 긍정적인 영향을 미치게 됩니다."
+      return "어린 시절부터 성장과 발전을 추구하는 성향이 강했을 것입니다. 청년기에는 새로운 아이디어와 도전을 통해 자신의 길을 개척하고, 중년기에는 자신만의 영역에서 안정적인 성장을 이루게 됩니다."
     case "화":
-      return "타고난 열정과 에너지로 어린 시절부터 주변 사람들의 관심을 받았을 것입니다. 청년기에는 자신의 열정을 표현하고 다양한 경험을 통해 자신을 발견하는 시간을 가지게 됩니다. 중년기에는 자신의 열정을 특정 분야에 집중하여 빛나는 성과를 이루며, 장년기와 노년기에는 자신의 경험을 바탕으로 다른 사람들에게 영감을 주는 역할을 하게 됩니다. 삶의 중심에는 '열정'과 '표현'이라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 활력과 기쁨을 전달하게 됩니다."
+      return "타고난 열정과 에너지로 어린 시절부터 주변 사람들의 관심을 받았을 것입니다. 청년기에는 자신의 열정을 표현하고 다양한 경험을 통해 자신을 발견하는 시간을 가지게 됩니다."
     case "토":
-      return "어린 시절부터 안정과 조화를 중요시하는 성향이 강했을 것입니다. 청년기에는 기초를 탄탄히 다지는 데 집중하고, 중년기에는 자신의 영역에서 안정적인 위치를 확보하게 됩니다. 장년기와 노년기에는 자신이 쌓아온 기반을 바탕으로 다른 사람들을 지원하고 보살피는 역할을 하게 될 것입니다. 삶의 중심에는 '안정'과 '조화'라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 신뢰와 안정감을 제공하게 됩니다."
+      return "어린 시절부터 안정과 조화를 중요시하는 성향이 강했을 것입니다. 청년기에는 기초를 탄탄히 다지는 데 집중하고, 중년기에는 자신의 영역에서 안정적인 위치를 확보하게 됩니다."
     case "금":
-      return "어린 시절부터 정확하고 원칙적인 성향이 강했을 것입니다. 청년기에는 자신의 가치관과 원칙을 확립하고, 중년기에는 이를 바탕으로 자신만의 영역에서 권위와 존경을 얻게 됩니다. 장년기와 노년기에는 자신의 경험과 지혜를 바탕으로 다른 사람들에게 조언과 지도를 제공하는 역할을 하게 될 것입니다. 삶의 중심에는 '정확성'과 '원칙'이라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 명확한 방향성을 제시하게 됩니다."
+      return "어린 시절부터 정확하고 원칙적인 성향이 강했을 것입니다. 청년기에는 자신의 가치관과 원칙을 확립하고, 중년기에는 이를 바탕으로 자신만의 영역에서 권위와 존경을 얻게 됩니다."
     case "수":
-      return "어린 시절부터 깊은 사고와 통찰력을 가진 성향이 강했을 것입니다. 청년기에는 다양한 지식과 경험을 통해 자신만의 지혜를 쌓고, 중년기에는 이를 바탕으로 깊이 있는 통찰력을 발휘하게 됩니다. 장년기와 노년기에는 자신의 지혜와 경험을 바탕으로 다른 사람들에게 영감과 통찰력을 제공하는 역할을 하게 될 것입니다. 삶의 중심에는 '지혜'와 '적응력'이라는 키워드가 있으며, 이를 통해 자신과 주변 사람들에게 깊이 있는 이해와 통찰력을 제공하게 됩니다."
+      return "어린 시절부터 깊은 사고와 통찰력을 가진 성향이 강했을 것입니다. 청년기에는 다양한 지식과 경험을 통해 자신만의 지혜를 쌓고, 중년기에는 이를 바탕으로 깊이 있는 통찰력을 발휘하게 됩니다."
     default:
-      return "독특한 에너지와 잠재력을 가지고 있으며, 삶의 여정에서 자신만의 특별한 길을 걷게 될 것입니다. 어린 시절부터 노년기까지 자신만의 방식으로 성장하고 발전하며, 주변 사람들에게 긍정적인 영향을 미치게 될 것입니다."
+      return "독특한 에너지와 잠재력을 가지고 있으며, 삶의 여정에서 자신만의 특별한 길을 걷게 될 것입니다."
   }
 }
 
 // 성격과 기질 설명 함수
 const getPersonalityDescription = (dayStem: string, dayBranch: string, elements: any): string => {
-  // 일간과 오행 분포에 따른 성격 설명
   const dominantElement = getDominantElement(elements)
 
   switch (dayStem) {
     case "갑":
     case "을":
-      return (
-        "목(木)의 기운이 강한 당신은 성장과 발전을 추구하는 성향이 있습니다. 새로운 아이디어와 가능성을 발견하는 데 탁월하며, 창의적인 사고방식으로 문제를 해결합니다. 스트레스를 받으면 더 많은 정보와 지식을 찾아 해결책을 모색하는 경향이 있으며, 대인관계에서는 유연하고 적응력이 뛰어납니다. " +
-        getDominantElementInfluence(dominantElement)
-      )
+      return "목(木)의 기운이 강한 당신은 성장과 발전을 추구하는 성향이 있습니다. 새로운 아이디어와 가능성을 발견하는 데 탁월하며, 창의적인 사고방식으로 문제를 해결합니다."
     case "병":
     case "정":
-      return (
-        "화(火)의 기운이 강한 당신은 열정적이고 활동적인 성향이 있습니다. 자신의 생각과 감정을 표현하는 데 능숙하며, 다른 사람들에게 영감을 주는 능력이 있습니다. 스트레스를 받으면 감정을 표출하고 활동적으로 해소하려는 경향이 있으며, 대인관계에서는 따뜻하고 친근한 모습을 보입니다. " +
-        getDominantElementInfluence(dominantElement)
-      )
+      return "화(火)의 기운이 강한 당신은 열정적이고 활동적인 성향이 있습니다. 자신의 생각과 감정을 표현하는 데 능숙하며, 다른 사람들에게 영감을 주는 능력이 있습니다."
     case "무":
     case "기":
-      return (
-        "토(土)의 기운이 강한 당신은 안정적이고 신뢰할 수 있는 성향이 있습니다. 실용적이고 현실적인 접근 방식으로 문제를 해결하며, 다른 사람들을 돌보고 지원하는 데 능숙합니다. 스트레스를 받으면 안정감을 찾기 위해 익숙한 환경과 루틴을 찾는 경향이 있으며, 대인관계에서는 신뢰와 안정감을 중요시합니다. " +
-        getDominantElementInfluence(dominantElement)
-      )
+      return "토(土)의 기운이 강한 당신은 안정적이고 신뢰할 수 있는 성향이 있습니다. 실용적이고 현실적인 접근 방식으로 문제를 해결하며, 다른 사람들을 돌보고 지원하는 데 능숙합니다."
     case "경":
     case "신":
-      return (
-        "금(金)의 기운이 강한 당신은 정확하고 원칙적인 성향이 있습니다. 분석적이고 논리적인 사고방식으로 문제를 해결하며, 효율성과 정확성을 중요시합니다. 스트레스를 받으면 더 많은 구조와 질서를 찾으려는 경향이 있으며, 대인관계에서는 명확한 경계와 원칙을 중요시합니다. " +
-        getDominantElementInfluence(dominantElement)
-      )
+      return "금(金)의 기운이 강한 당신은 정확하고 원칙적인 성향이 있습니다. 분석적이고 논리적인 사고방식으로 문제를 해결하며, 효율성과 정확성을 중요시합니다."
     case "임":
     case "계":
-      return (
-        "수(水)의 기운이 강한 당신은 지혜롭고 적응력이 뛰어난 성향이 있습니다. 깊이 있는 사고와 통찰력으로 문제를 해결하며, 변화하는 상황에 유연하게 대응합니다. 스트레스를 받으면 내면의 지혜와 직관을 통해 해결책을 찾으려는 경향이 있으며, 대인관계에서는 깊이 있는 이해와 공감을 중요시합니다. " +
-        getDominantElementInfluence(dominantElement)
-      )
+      return "수(水)의 기운이 강한 당신은 지혜롭고 적응력이 뛰어난 성향이 있습니다. 깊이 있는 사고와 통찰력으로 문제를 해결하며, 변화하는 상황에 유연하게 대응합니다."
     default:
-      return "독특한 성향과 기질을 가지고 있으며, 자신만의 방식으로 세상을 바라보고 해석합니다. 스트레스 상황에서는 자신만의 독특한 방식으로 대처하며, 대인관계에서도 자신만의 특별한 매력으로 사람들과 소통합니다."
+      return "독특한 성향과 기질을 가지고 있으며, 자신만의 방식으로 세상을 바라보고 해석합니다."
   }
 }
 
@@ -385,29 +409,14 @@ const getDominantElement = (elements: any): string => {
   return elementCounts[0].type
 }
 
-// 가장 강한 오행의 영향 설명
-const getDominantElementInfluence = (element: string): string => {
-  switch (element) {
-    case "wood":
-      return "특히 목(木)의 기운이 강하게 나타나, 창의성과 성장 지향적인 성향이 더욱 두드러집니다."
-    case "fire":
-      return "특히 화(火)의 기운이 강하게 나타나, 열정적이고 표현력이 풍부한 성향이 더욱 두드러집니다."
-    case "earth":
-      return "특히 토(土)의 기운이 강하게 나타나, 안정적이고 신뢰할 수 있는 성향이 더욱 두드러집니다."
-    case "metal":
-      return "특히 금(金)의 기운이 강하게 나타나, 정확하고 원칙적인 성향이 더욱 두드러집니다."
-    case "water":
-      return "특히 수(水)의 기운이 강하게 나타나, 지혜롭고 적응력이 뛰어난 성향이 더욱 두드러집니다."
-    default:
-      return "오행의 균형이 잘 잡혀 있어, 다양한 상황에 유연하게 대응할 수 있는 능력이 있습니다."
-  }
-}
-
 // 채팅방 유형별 제목
 function getRoomTitle(roomType: string): string {
+  const character = pingCharacters.find((char) => char.roomType === roomType)
+  if (character) {
+    return character.name
+  }
+
   switch (roomType) {
-    case "sajuping":
-      return "사주핑"
     case "general":
       return "종합 운세 상담"
     case "career":
@@ -432,53 +441,10 @@ function getRoomTitle(roomType: string): string {
       return "맞춤 고민 상담"
     case "daily-fortune":
       return "오늘의 운세"
-    case "fitness":
-      return "운동코치 치코쌤"
-    case "diet":
-      return "식단코치 단식쌤"
     case "cheerup":
       return "응원냥이 치즈"
     default:
       return "사주 상담"
-  }
-}
-
-// 채팅방 유형별 상담사 이름
-const getConsultantName = (roomType: string): string => {
-  switch (roomType) {
-    case "sajuping":
-      return "사주핑"
-    case "career":
-      return "커리어쌤"
-    case "career_fortune":
-      return "커리어 코치"
-    case "love":
-      return "러브쌤"
-    case "love_fortune":
-      return "연애 코치"
-    case "health":
-      return "헬스쌤"
-    case "yearly":
-      return "이어쌤"
-    case "business":
-      return "비즈쌤"
-    case "marriage":
-      return "웨딩쌤"
-    case "marriage_fortune":
-      return "결혼 코치"
-    case "personalized":
-      return "마음쌤"
-    case "daily-fortune":
-      return "데일리쌤"
-    case "fitness":
-      return "치코쌤"
-    case "diet":
-      return "단식쌤"
-    case "cheerup":
-      return "치즈"
-    case "general":
-    default:
-      return "사주쌤"
   }
 }
 
@@ -495,48 +461,6 @@ const generateChatSessionKey = (name: string, saju: any, roomType: string) => {
   return `chat_${name}_${birthYear}${birthMonth}${birthDay}${birthHour}_${gender}_${roomType}`
 }
 
-// Add a function to get model badge text based on room type
-const getModelBadgeText = (roomType: string): string | null => {
-  switch (roomType) {
-    case "sajuping":
-      return "사주핑 AI"
-    case "career":
-      return "전문 직업 상담 모델"
-    case "marriage":
-      return "전문 결혼 상담 모델"
-    case "health":
-      return "전문 건강 상담 모델"
-    default:
-      return null
-  }
-}
-
-// Update the getInitialMessage function to include initial messages for the new room types
-function getInitialMessage(roomType: string): string {
-  switch (roomType) {
-    case "sajuping":
-      return "안녕하세요! 저는 사주핑이에요! 사주와 관련된 모든 질문을 해주세요!"
-    case "general":
-      return "안녕하세요! 사주와 관련된 질문이 있으신가요?"
-    case "career":
-      return "안녕하세요! 직업이나 진로에 관한 상담을 도와드릴게요."
-    case "marriage":
-      return "안녕하세요! 결혼이나 연애에 관한 상담을 도와드릴게요."
-    case "health":
-      return "안녕하세요! 건강에 관한 상담을 도와드릴게요."
-    case "business":
-      return "안녕하세요! 사업이나 재테크에 관한 상담을 도와드릴게요."
-    case "fitness":
-      return "안녕하세요! 운동코치 치코쌤입니다. 운동과 피트니스에 관한 상담을 도와드릴게요. 어떤 운동 목표가 있으신가요?"
-    case "diet":
-      return "안녕하세요! 식단코치 단식쌤입니다. 건강한 식단과 영양에 관한 상담을 도와드릴게요. 어떤 식단 목표가 있으신가요?"
-    case "cheerup":
-      return "안냥하세요! 응원냥이 치즈예요! 오늘 힘든 일이 있었나요? 무슨 일이든 털어놓으세요, 제가 응원해드릴게요!"
-    default:
-      return "안녕하세요! 무엇을 도와드릴까요?"
-  }
-}
-
 export default function SajuChat({
   saju,
   name,
@@ -549,6 +473,9 @@ export default function SajuChat({
 }: SajuChatProps) {
   // 상단 헤더 숨기기
   useHideHeaderAndFooter()
+
+  // Dark theme 강제 적용
+  useForceDarkTheme()
 
   // 네트워크 상태 모니터링
   const isOnline = useNetworkStatus()
@@ -602,10 +529,33 @@ export default function SajuChat({
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
   // showSajuInfo 초기값을 사주핑인 경우 true로 설정
   const [showSajuInfo, setShowSajuInfo] = useState(roomType === "sajuping")
-  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true)
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [retryCount, setRetryCount] = useState(0) // 재시도 횟수 추적
+
+  // 현재 캐릭터 정보 가져오기
+  const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
+
+  // 핑 캐릭터 변경 핸들러
+  const handleCharacterChange = (newCharacter: (typeof pingCharacters)[0]) => {
+    if (newCharacter.roomType === roomType) return // 같은 캐릭터면 무시
+
+    try {
+      // 현재 사주 데이터를 localStorage에 저장
+      const currentSajuData = {
+        saju,
+        name,
+        gender,
+        interpretation: initialInterpretation,
+      }
+      localStorage.setItem("current_saju", JSON.stringify(currentSajuData))
+
+      // 새로운 캐릭터의 채팅방으로 이동
+      router.push(`/saju-chat/${newCharacter.roomType}`)
+    } catch (error) {
+      console.error("Error changing character:", error)
+    }
+  }
 
   // 응답 품질 확인 함수 - 컴포넌트 내부로 이동
   const checkResponseQuality = useCallback((content: string) => {
@@ -1018,225 +968,293 @@ export default function SajuChat({
   }, [isOnline, streamingError])
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="fixed inset-0 flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* ChatGPT 스타일 헤더 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+      <div className="flex-shrink-0 flex items-center justify-between px-3 md:px-4 py-3 border-b border-gray-700 bg-gray-800">
         <div className="flex items-center space-x-3">
-          <Button variant="ghost" size="sm" onClick={handleBackWithSave} className="p-1">
-            <Menu className="h-5 w-5 text-gray-600" />
+          <Button variant="ghost" size="sm" onClick={handleBackWithSave} className="p-1 text-gray-300 hover:text-white">
+            <Menu className="h-5 w-5" />
           </Button>
         </div>
 
         <div className="flex items-center space-x-2">
-          <h1 className="text-lg font-medium text-gray-900">{getRoomTitle(roomType)}</h1>
-          {roomType === "sajuping" && <span className="text-sm text-gray-500">AI</span>}
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center space-x-2 text-gray-100 hover:text-white">
+                <span className="text-xl">{currentCharacter.emoji}</span>
+                <h1 className="text-lg font-medium hidden sm:block">{currentCharacter.name}</h1>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-64 bg-gray-800 border-gray-700">
+              {pingCharacters.map((character) => (
+                <DropdownMenuItem
+                  key={character.id}
+                  onClick={() => handleCharacterChange(character)}
+                  className={`flex items-center space-x-3 p-3 cursor-pointer hover:bg-gray-700 ${
+                    character.roomType === roomType ? "bg-gray-700" : ""
+                  }`}
+                >
+                  <span className="text-xl">{character.emoji}</span>
+                  <div className="flex-1">
+                    <div className={`font-medium ${character.color}`}>{character.name}</div>
+                    <div className="text-sm text-gray-400">{character.description}</div>
+                  </div>
+                  {character.roomType === roomType && <div className="w-2 h-2 bg-green-400 rounded-full"></div>}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowSajuInfo(!showSajuInfo)} className="p-1">
-            <Edit3 className="h-5 w-5 text-gray-600" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSajuInfo(!showSajuInfo)}
+            className="p-1 text-gray-300 hover:text-white"
+          >
+            <Edit3 className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
       {/* 사주 정보 카드 (접을 수 있음) */}
       {showSajuInfo && (
-        <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <div className="flex-shrink-0 bg-gradient-to-b from-gray-800 to-gray-900 border-b border-gray-700 p-4 shadow-sm">
           <div className="max-w-3xl mx-auto">
             <SajuDiagram saju={saju} name={name} />
           </div>
         </div>
       )}
 
-      {/* 채팅 영역 */}
-      <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto space-y-6">
-          {messages.map((message, index) => (
-            <div key={message.id || index} className="space-y-4">
-              {message.role === "user" ? (
-                // 사용자 메시지
-                <div className="flex justify-end">
-                  <div className="bg-gray-100 rounded-2xl px-4 py-2 max-w-[80%]">
-                    <p className="text-gray-900 text-sm leading-relaxed">{message.content}</p>
-                  </div>
+      {/* 채팅 영역 - 유일한 스크롤 영역 */}
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto"
+        style={{
+          scrollBehavior: "smooth",
+          // 모바일에서 스크롤 성능 최적화
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <div className="min-h-full flex flex-col">
+          {/* 메시지 영역 */}
+          <div className="flex-1 px-3 md:px-4 py-4 md:py-6">
+            <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
+              {messages.map((message, index) => (
+                <div key={message.id || index} className="space-y-4">
+                  {message.role === "user" ? (
+                    // 사용자 메시지
+                    <div className="flex justify-end">
+                      <div className="bg-blue-600 rounded-2xl px-3 md:px-4 py-2 max-w-[85%] md:max-w-[80%]">
+                        <p className="text-white text-sm leading-relaxed">{message.content}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    // AI 메시지
+                    <div className="flex items-start space-x-2 md:space-x-3">
+                      <div className="flex-shrink-0 w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs md:text-sm font-medium">{currentCharacter.emoji}</span>
+                      </div>
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <div className="prose prose-sm max-w-none prose-invert">
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => (
+                                <p className="text-gray-100 leading-relaxed mb-3 last:mb-0 text-sm md:text-base">
+                                  {children}
+                                </p>
+                              ),
+                              strong: ({ children }) => (
+                                <strong className="font-semibold text-white">{children}</strong>
+                              ),
+                              em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
+                              ul: ({ children }) => (
+                                <ul className="list-disc list-inside space-y-1 mb-3 text-gray-100 text-sm md:text-base">
+                                  {children}
+                                </ul>
+                              ),
+                              ol: ({ children }) => (
+                                <ol className="list-decimal list-inside space-y-1 mb-3 text-gray-100 text-sm md:text-base">
+                                  {children}
+                                </ol>
+                              ),
+                              li: ({ children }) => <li className="text-gray-100">{children}</li>,
+                              h1: ({ children }) => (
+                                <h1 className="text-lg md:text-xl font-bold mb-3 text-white">{children}</h1>
+                              ),
+                              h2: ({ children }) => (
+                                <h2 className="text-base md:text-lg font-semibold mb-2 text-white">{children}</h2>
+                              ),
+                              h3: ({ children }) => (
+                                <h3 className="text-sm md:text-base font-semibold mb-2 text-white">{children}</h3>
+                              ),
+                              blockquote: ({ children }) => (
+                                <blockquote className="border-l-4 border-gray-600 pl-4 italic text-gray-300 mb-3">
+                                  {children}
+                                </blockquote>
+                              ),
+                              code: ({ children }) => (
+                                <code className="bg-gray-800 px-1 py-0.5 rounded text-xs md:text-sm font-mono text-gray-200">
+                                  {children}
+                                </code>
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                // AI 메시지
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">🤖</span>
+              ))}
+
+              {/* 로딩 상태 */}
+              {isLoading && (
+                <div className="flex items-start space-x-2 md:space-x-3">
+                  <div className="flex-shrink-0 w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs md:text-sm font-medium">{currentCharacter.emoji}</span>
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown
-                        components={{
-                          p: ({ children }) => (
-                            <p className="text-gray-900 leading-relaxed mb-3 last:mb-0">{children}</p>
-                          ),
-                          strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                          em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
-                          ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-3">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-3">{children}</ol>,
-                          li: ({ children }) => <li className="text-gray-900">{children}</li>,
-                          h1: ({ children }) => <h1 className="text-xl font-bold mb-3 text-gray-900">{children}</h1>,
-                          h2: ({ children }) => (
-                            <h2 className="text-lg font-semibold mb-2 text-gray-900">{children}</h2>
-                          ),
-                          h3: ({ children }) => (
-                            <h3 className="text-base font-semibold mb-2 text-gray-900">{children}</h3>
-                          ),
-                          blockquote: ({ children }) => (
-                            <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-3">
-                              {children}
-                            </blockquote>
-                          ),
-                          code: ({ children }) => (
-                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono text-gray-800">
-                              {children}
-                            </code>
-                          ),
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        ></div>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
-            </div>
-          ))}
 
-          {/* 로딩 상태 */}
-          {isLoading && (
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">🤖</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  <div className="flex space-x-1">
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    ></div>
+              {/* 스트리밍 오류 표시 */}
+              {streamingError && (
+                <div className="flex items-start space-x-2 md:space-x-3">
+                  <div className="flex-shrink-0 w-7 h-7 md:w-8 md:h-8 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs md:text-sm font-medium">⚠️</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="bg-red-900/50 border border-red-700 text-red-200 p-3 rounded-lg">
+                      <p className="text-sm mb-2">{streamingError}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRetry}
+                        disabled={isRetrying}
+                        className="text-red-300 border-red-600 hover:bg-red-800/50"
+                      >
+                        {isRetrying ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            재시도 중...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            다시 시도
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* 스트리밍 오류 표시 */}
-          {streamingError && (
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">⚠️</span>
-              </div>
-              <div className="flex-1">
-                <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg">
-                  <p className="text-sm mb-2">{streamingError}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRetry}
-                    disabled={isRetrying}
-                    className="text-red-600 border-red-300 hover:bg-red-50"
-                  >
-                    {isRetrying ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                        재시도 중...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        다시 시도
-                      </>
-                    )}
-                  </Button>
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* 추천 질문 영역 */}
+          {suggestedQuestions.length > 0 && !isLoading && (
+            <div className="flex-shrink-0 border-t border-gray-700 px-3 md:px-4 py-3 bg-gray-800">
+              <div className="max-w-3xl mx-auto">
+                <div className="flex flex-wrap gap-2">
+                  {suggestedQuestions.slice(0, 3).map((question, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSuggestedQuestionClick(question)}
+                      className="text-xs md:text-sm bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 rounded-full px-3 md:px-4 py-2"
+                      disabled={isLoading}
+                    >
+                      {question}
+                    </Button>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
+          {/* ChatGPT 스타일 입력 영역 */}
+          <div className="flex-shrink-0 border-t border-gray-700 px-3 md:px-4 py-3 md:py-4 bg-gray-800">
+            <div className="max-w-3xl mx-auto">
+              <form onSubmit={customHandleSubmit} className="relative">
+                <div className="flex items-center bg-gray-700 rounded-full px-3 md:px-4 py-2 md:py-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="p-1 mr-2 text-gray-400 hover:text-gray-200"
+                    disabled={isLoading}
+                  >
+                    <Plus className="h-4 w-4 md:h-5 md:w-5" />
+                  </Button>
 
-      {/* 추천 질문 영역 */}
-      {showSuggestedQuestions && suggestedQuestions.length > 0 && !isLoading && (
-        <div className="border-t border-gray-200 px-4 py-3">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.slice(0, 3).map((question, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSuggestedQuestionClick(question)}
-                  className="text-sm bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full px-4 py-2"
-                  disabled={isLoading}
-                >
-                  {question}
-                </Button>
-              ))}
+                  <input
+                    ref={inputRef}
+                    value={input}
+                    onChange={handleInputChange}
+                    placeholder={
+                      !isOnline ? "인터넷 연결을 확인해주세요" : isLoading ? "답변을 기다리는 중..." : "Ask anything"
+                    }
+                    className="flex-1 bg-transparent border-none focus:outline-none text-white placeholder-gray-400 text-sm md:text-base"
+                    disabled={isLoading || !isOnline}
+                  />
+
+                  <div className="flex items-center space-x-2 ml-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="p-1 text-gray-400 hover:text-gray-200"
+                      disabled={isLoading}
+                    >
+                      <Mic className="h-4 w-4 md:h-5 md:w-5" />
+                    </Button>
+
+                    <Button
+                      type="submit"
+                      disabled={isLoading || !input.trim() || !isOnline}
+                      className="bg-white hover:bg-gray-100 text-black rounded-full p-2"
+                    >
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+
+              {/* 질문 카운트 표시 (비로그인 사용자만) */}
+              {!isLoggedIn && (
+                <div className="mt-2 text-center">
+                  <span className="text-xs text-gray-400">
+                    질문 {questionCount}/5 {questionCount >= 5 && "(로그인하면 무제한 질문 가능)"}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ChatGPT 스타일 입력 영역 */}
-      <div className="border-t border-gray-200 px-4 py-4">
-        <div className="max-w-3xl mx-auto">
-          <form onSubmit={customHandleSubmit} className="relative">
-            <div className="flex items-center bg-gray-100 rounded-full px-4 py-3">
-              <Button type="button" variant="ghost" size="sm" className="p-1 mr-2" disabled={isLoading}>
-                <Plus className="h-5 w-5 text-gray-500" />
-              </Button>
-
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                placeholder={
-                  !isOnline ? "인터넷 연결을 확인해주세요" : isLoading ? "답변을 기다리는 중..." : "Ask anything"
-                }
-                className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 placeholder-gray-500"
-                disabled={isLoading || !isOnline}
-              />
-
-              <div className="flex items-center space-x-2 ml-2">
-                <Button type="button" variant="ghost" size="sm" className="p-1" disabled={isLoading}>
-                  <Mic className="h-5 w-5 text-gray-500" />
-                </Button>
-
-                <Button
-                  type="submit"
-                  disabled={isLoading || !input.trim() || !isOnline}
-                  className="bg-black hover:bg-gray-800 text-white rounded-full p-2"
-                >
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </form>
-
-          {/* 질문 카운트 표시 (비로그인 사용자만) */}
-          {!isLoggedIn && (
-            <div className="mt-2 text-center">
-              <span className="text-xs text-gray-500">
-                질문 {questionCount}/5 {questionCount >= 5 && "(로그인하면 무제한 질문 가능)"}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 

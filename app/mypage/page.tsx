@@ -13,7 +13,6 @@ import { BottomNavBar } from "@/components/bottom-nav-bar"
 import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
 import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
-import { getMainSajuProfile, getAvailableSajuProfile } from "@/lib/saju-storage"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -85,7 +84,6 @@ export default function MyPage() {
     metal: 0,
     water: 0,
   })
-  const [mainSajuProfile, setMainSajuProfile] = useState<SajuProfile | null>(null)
 
   // Load user data function
   const loadUserData = async () => {
@@ -116,16 +114,11 @@ export default function MyPage() {
       if (userData.user) {
         const userId = userData.user.id
         try {
-          // 1. 먼저 로컬 스토리지에서 대표 사주 확인
-          const localMainProfile = getMainSajuProfile()
-
-          // 2. 서버에서 대표 사주 세션 확인
           const defaultSession = await getDefaultSajuSession(userId)
           if (defaultSession) {
             const profile = await getSajuProfileBySessionId(defaultSession.id)
             if (profile) {
               setDefaultProfile(profile)
-              setMainSajuProfile(profile)
 
               // 오행 계산
               const calculatedElements = calculateElementsFromSaju(
@@ -140,14 +133,6 @@ export default function MyPage() {
               )
 
               setElements(calculatedElements)
-            }
-          } else if (localMainProfile) {
-            // 서버에 대표 사주가 없지만 로컬에 있는 경우
-            setMainSajuProfile(localMainProfile)
-            setDefaultProfile(localMainProfile)
-
-            if (localMainProfile.saju.elements) {
-              setElements(localMainProfile.saju.elements)
             }
           }
         } catch (error) {
@@ -218,8 +203,8 @@ export default function MyPage() {
 
   // Navigate to chat with AI
   const handleChatWithAI = () => {
-    // 사용 가능한 사주 프로필 확인 (우선순위: 대표 사주 > 최근 사주)
-    const profileToUse = defaultProfile || mainSajuProfile || getAvailableSajuProfile()
+    // 메인 사주가 있으면 메인 사주 사용, 없으면 첫 번째 사주 사용
+    const profileToUse = defaultProfile || (sajuProfiles.length > 0 ? sajuProfiles[0] : null)
 
     if (profileToUse) {
       // 사주 데이터 준비
@@ -436,12 +421,7 @@ export default function MyPage() {
             <div className="flex flex-col items-center justify-center p-8 text-center">
               <Calendar className="h-12 w-12 text-gray-400 mb-2" />
               <p className="text-muted-foreground mb-4">아직 등록된 사주가 없습니다.</p>
-              <Button onClick={() => router.push("/")} className="mb-2">
-                사주 입력하기
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                사주를 입력하면 AI 상담과 운세 분석을 이용할 수 있습니다.
-              </p>
+              <Button onClick={() => router.push("/")}>사주 입력하기</Button>
             </div>
           )}
         </TabsContent>

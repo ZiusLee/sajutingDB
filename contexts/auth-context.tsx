@@ -4,8 +4,6 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import { getSupabase } from "@/lib/supabase-client"
-import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
-import { saveMainSajuProfile, type SajuProfile } from "@/lib/saju-storage"
 
 interface AuthContextType {
   user: User | null
@@ -13,8 +11,6 @@ interface AuthContextType {
   isLoading: boolean
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
-  mainSajuProfile: SajuProfile | null
-  loadMainSajuProfile: () => Promise<SajuProfile | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -25,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   // Use our singleton Supabase instance
   const supabase = getSupabase()
-  const [mainSajuProfile, setMainSajuProfile] = useState<SajuProfile | null>(null)
 
   // Function to refresh user data
   const refreshUser = async () => {
@@ -64,11 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("user_email", userData.user.email)
           }
 
-          // 사용자 인증 성공 후 대표 사주 프로필 로드 시도
-          if (userData.user) {
-            loadMainSajuProfile().catch((err) => console.error("Failed to load main saju profile:", err))
-          }
-
           return userData.user
         } else {
           console.log("No user found in session")
@@ -85,36 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  // 대표 사주 프로필 로드 함수
-  const loadMainSajuProfile = async (): Promise<SajuProfile | null> => {
-    try {
-      if (!user) return null
-
-      console.log("Loading main saju profile for user:", user.id)
-      const defaultSession = await getDefaultSajuSession(user.id)
-
-      if (defaultSession) {
-        console.log("Default session found:", defaultSession.id)
-        const profile = await getSajuProfileBySessionId(defaultSession.id)
-
-        if (profile) {
-          console.log("Main saju profile loaded:", profile.name)
-          setMainSajuProfile(profile)
-          // 로컬 스토리지에도 저장
-          saveMainSajuProfile(profile)
-          return profile
-        }
-      } else {
-        console.log("No default saju session found for user:", user.id)
-      }
-
-      return null
-    } catch (error) {
-      console.error("Error loading main saju profile:", error)
-      return null
     }
   }
 
@@ -201,8 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         logout,
         refreshUser,
-        mainSajuProfile,
-        loadMainSajuProfile,
       }}
     >
       {children}

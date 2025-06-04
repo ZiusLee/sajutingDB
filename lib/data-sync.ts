@@ -581,7 +581,7 @@ export async function savePartnerToSupabase(partner: PartnerInfo): Promise<boole
     // 상대방 정보를 Supabase에 저장하기 위해 compatibility_analysis 테이블 사용
     // 실제 궁합 분석 없이 상대방 정보만 저장
     try {
-      // 서버 API 라우트를 통해 데��터 저장
+      // 서버 API 라우트를 통해 데이터 저장
       const response = await fetch("/api/save-compatibility", {
         method: "POST",
         headers: {
