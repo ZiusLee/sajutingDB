@@ -492,6 +492,29 @@ export default function SajuChat({
   isLoggedIn = false,
   sessionKey,
 }: SajuChatProps) {
+  // 상태 변수들에 스크롤 관련 상태 추가:
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
+  const [isNewUser, setIsNewUser] = useState(true) // 새로운 사용자인지 확인
+
+  // 스크롤 위치 모니터링
+  const handleScroll = useCallback(() => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      setShowScrollToBottom(!isNearBottom)
+    }
+  }, [])
+
+  // 맨 아래로 스크롤하는 함수
+  const scrollToBottomSmooth = useCallback(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      })
+    }
+  }, [])
+
   // 상단 헤더 숨기기
   useHideHeaderAndFooter()
 
@@ -611,6 +634,12 @@ export default function SajuChat({
 
   // Get saved chat session or create initial messages
   const savedSession = activeChatSession || getChatSession(sessionKey)
+
+  // 새로운 사용자인지 기존 사용자인지 확인
+  useEffect(() => {
+    const hasExistingSession = savedSession?.messages && savedSession.messages.length > 0
+    setIsNewUser(!hasExistingSession)
+  }, [savedSession])
 
   // 초기 메시지 생성 로직 수정
   let initialMessages: any[] = []
@@ -886,7 +915,7 @@ export default function SajuChat({
     }, 100)
   }
 
-  // 추천 질문 생성 함수
+  // 추천 질문 생성 함수를 더 스마트하게 개선
   const generateSuggestedQuestions = useCallback(async () => {
     // 이미 생성 중이거나 조건이 맞지 않으면 중단
     if (!shouldGenerateQuestions || isGeneratingQuestions || messages.length < 2) {
@@ -913,17 +942,22 @@ export default function SajuChat({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: messages.slice(-4), // 최근 4개 메시지만 전송
+          messages: messages.slice(-6), // 최근 6개 메시지로 늘려서 더 많은 컨텍스트 제공
           roomType,
           saju,
           name,
+          currentContext: lastMessage.content.slice(0, 500), // 마지막 AI 응답의 일부를 컨텍스트로 제공
         }),
       })
 
       if (response.ok) {
         const data = await response.json()
         if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
-          setSuggestedQuestions(data.questions)
+          // 기존 질문과 중복되지 않는 새로운 질문만 설정
+          const newQuestions = data.questions.filter(
+            (q) => !suggestedQuestions.includes(q) && q.length > 5 && q.length < 50,
+          )
+          setSuggestedQuestions(newQuestions.length > 0 ? newQuestions : data.questions)
         } else {
           // API가 빈 배열을 반환하면 기본 질문 사용
           setSuggestedQuestions(defaultQuestions)
@@ -939,7 +973,7 @@ export default function SajuChat({
     } finally {
       setIsGeneratingQuestions(false)
     }
-  }, [messages, roomType, saju, name, initialSuggestedQuestionsByType])
+  }, [messages, roomType, saju, name, suggestedQuestions, initialSuggestedQuestionsByType])
 
   // 메시지가 변경될 때마다 추천 질문 생성
   useEffect(() => {
@@ -962,20 +996,42 @@ export default function SajuChat({
     }
   }
 
-  // 메시지가 변경될 때마다 스크롤을 아래로 이동
+  // 메시지가 변경될 때 스크롤 처리 (기존 useEffect 교체)
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    // 새로운 메시지가 추가되었고, 사용자가 맨 아래 근처에 있을 때만 자동 스크롤
+    if (chatContainerRef.current && !isNewUser) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200
 
-  // 컴포넌트 마운트 시 스크롤을 아래로 이동
+      if (isNearBottom) {
+        setTimeout(() => {
+          scrollToBottom()
+        }, 100)
+      }
+    }
+  }, [messages, isNewUser])
+
+  // 스크롤 이벤트 리스너 등록
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current
+    if (chatContainer) {
+      chatContainer.addEventListener("scroll", handleScroll)
+      return () => chatContainer.removeEventListener("scroll", handleScroll)
+    }
+  }, [handleScroll])
+
+  // 컴포넌트 마운트 시 스크롤 위치 설정
   useEffect(() => {
     if (!isInitialized) {
       setTimeout(() => {
-        scrollToBottom()
+        // 기존 사용자만 맨 아래로 스크롤
+        if (!isNewUser) {
+          scrollToBottom()
+        }
         setIsInitialized(true)
       }, 100)
     }
-  }, [isInitialized])
+  }, [isInitialized, isNewUser])
 
   // 네트워크 상태 변경 시 알림
   useEffect(() => {
@@ -1070,7 +1126,7 @@ export default function SajuChat({
 
       {/* 채팅 영역 - 유일한 스크롤 영역 */}
       <div
-        className="flex-1 overflow-y-auto pb-[80px]"
+        className="flex-1 overflow-y-auto pb-[120px]"
         ref={chatContainerRef}
         style={{
           scrollBehavior: "smooth",
@@ -1238,18 +1294,31 @@ export default function SajuChat({
             </div>
           </div>
 
+          {/* 맨 아래로 가기 버튼 */}
+          {showScrollToBottom && (
+            <div className="fixed bottom-32 right-4 z-20">
+              <Button
+                onClick={scrollToBottomSmooth}
+                className="w-12 h-12 rounded-full bg-gray-700/90 hover:bg-gray-600/90 border border-gray-600/50 shadow-lg backdrop-blur-md transition-all duration-200"
+                size="sm"
+              >
+                <ChevronDown className="h-5 w-5 text-white" />
+              </Button>
+            </div>
+          )}
+
           {/* 추천 질문 영역 */}
           {suggestedQuestions.length > 0 && !isLoading && (
-            <div className="flex-shrink-0 border-t border-gray-700 px-3 md:px-4 py-3 bg-gray-800">
+            <div className="flex-shrink-0 px-3 md:px-4 py-3 bg-transparent">
               <div className="max-w-3xl mx-auto">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mb-2">
                   {suggestedQuestions.slice(0, 3).map((question, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       size="sm"
                       onClick={() => handleSuggestedQuestionClick(question)}
-                      className="text-xs md:text-sm bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 rounded-full px-3 md:px-4 py-2"
+                      className="text-xs md:text-sm bg-gray-700/80 border-gray-600 text-gray-200 hover:bg-gray-600 rounded-full px-3 md:px-4 py-2 backdrop-blur-sm"
                       disabled={isLoading}
                     >
                       {question}
@@ -1260,19 +1329,19 @@ export default function SajuChat({
             </div>
           )}
 
-          {/* ChatGPT 스타일 입력 영역 - 항상 화면 하단에 고정 */}
-          <div className="flex-shrink-0 border-t border-gray-700 px-3 md:px-4 py-3 md:py-4 bg-gray-800 fixed bottom-0 left-0 right-0 z-10">
+          {/* ChatGPT 스타일 입력 영역 - 개방적인 디자인 */}
+          <div className="flex-shrink-0 px-3 md:px-4 py-3 md:py-4 bg-transparent fixed bottom-0 left-0 right-0 z-10">
             <div className="max-w-3xl mx-auto">
               <form onSubmit={customHandleSubmit} className="relative">
-                <div className="flex items-center bg-gray-700 rounded-full px-3 md:px-4 py-2 md:py-3">
+                <div className="flex items-center bg-gray-700/90 backdrop-blur-md rounded-3xl px-4 md:px-5 py-3 md:py-4 shadow-lg border border-gray-600/50">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="p-1 mr-2 text-gray-400 hover:text-gray-200"
+                    className="p-1 mr-3 text-gray-400 hover:text-gray-200 rounded-full"
                     disabled={isLoading}
                   >
-                    <Plus className="h-4 w-4 md:h-5 md:w-5" />
+                    <Plus className="h-5 w-5" />
                   </Button>
 
                   <input
@@ -1282,28 +1351,28 @@ export default function SajuChat({
                     placeholder={
                       !isOnline ? "인터넷 연결을 확인해주세요" : isLoading ? "답변을 기다리는 중..." : "Ask anything"
                     }
-                    className="flex-1 bg-transparent border-none focus:outline-none text-white placeholder-gray-400 text-sm md:text-base"
+                    className="flex-1 bg-transparent border-none focus:outline-none text-white placeholder-gray-400 text-base"
                     disabled={isLoading || !isOnline}
                     style={{
                       fontSize: "16px", // iOS에서 자동 줌인 방지를 위한 최소 폰트 크기
                     }}
                   />
 
-                  <div className="flex items-center space-x-2 ml-2">
+                  <div className="flex items-center space-x-3 ml-3">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="p-1 text-gray-400 hover:text-gray-200"
+                      className="p-1 text-gray-400 hover:text-gray-200 rounded-full"
                       disabled={isLoading}
                     >
-                      <Mic className="h-4 w-4 md:h-5 md:w-5" />
+                      <Mic className="h-5 w-5" />
                     </Button>
 
                     <Button
                       type="submit"
                       disabled={isLoading || !input.trim() || !isOnline}
-                      className="bg-white hover:bg-gray-100 text-black rounded-full p-2"
+                      className="bg-white hover:bg-gray-100 text-black rounded-full p-2.5 shadow-md transition-all duration-200"
                     >
                       {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
