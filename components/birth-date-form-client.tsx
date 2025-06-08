@@ -125,22 +125,22 @@ export default function BirthDateFormClient() {
     const timeStandard = getTimeStandardFromCity()
     const cityData = getCityById(birthCityId)
 
+    // Declare variables outside the try block so they're accessible in finally
+    let hour = 0
+    let minute = 0
+    let lunarData: any = null
+
     // Declare sajuResult outside the try block
     let sajuResult: any
     let userId: string | null = null
 
     try {
       // 시간 파싱 - 시간을 모르는 경우 기본값 사용
-      let hour = 0
-      let minute = 0
-
       if (!timeUnknown) {
         const parsedTime = parseTimeInput(time)
         hour = parsedTime.hour
         minute = parsedTime.minute
       }
-
-      let lunarData
 
       try {
         // 음력 날짜 정보 가져오기 (API 호출)
@@ -208,8 +208,7 @@ export default function BirthDateFormClient() {
         monthStem: sajuResult.monthStem,
         monthBranch: sajuResult.monthBranch,
         dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.dayBranch,
-        hourStem: sajuResult.hourStem,
+        dayBranch: sajuResult.hourStem,
         hourBranch: sajuResult.hourBranch,
         elements: sajuResult.elements,
         interpretation: sajuResult.interpretation,
@@ -252,6 +251,15 @@ export default function BirthDateFormClient() {
         // 실패해도 계속 진행 (나중에 다시 시도)
       }
 
+      // After successfully saving saju data to database, ensure session ID is stored
+      if (userId) {
+        // Store the session ID in the saju data for later use
+        const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
+        storedData.sessionId = userId // The userId returned from syncLocalStorageToDatabase is actually the session ID
+        localStorage.setItem("tempSajuData", JSON.stringify(storedData))
+        console.log("Stored session ID for chat:", userId)
+      }
+
       // Construct the URL with the required parameters
       // const url = `/result?date=${birthdate}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}&birthCityId=${encodeURIComponent(birthCityId)}`
 
@@ -274,6 +282,19 @@ export default function BirthDateFormClient() {
             returnPath: router.asPath,
             timeStandard: getTimeStandardFromCity(),
             birthCityId,
+            birthInfo: {
+              solarYear: Number.parseInt(year),
+              solarMonth: Number.parseInt(month),
+              solarDay: Number.parseInt(day),
+              solarHour: timeUnknown ? undefined : hour,
+              solarMinute: timeUnknown ? undefined : minute,
+              lunarYear: Number.parseInt(lunarData.year),
+              lunarMonth: Number.parseInt(lunarData.month),
+              lunarDay: Number.parseInt(lunarData.day),
+              timeUnknown: timeUnknown,
+              birthCityId: birthCityId,
+              timeStandard: timeStandard,
+            },
           }),
         )
 

@@ -1,5 +1,12 @@
-import ChatListClient from "@/components/chat-list-client"
+// This file is no longer needed - removing chat list page
 
-export default function ChatListPage() {
-  return <ChatListClient />
+const ChatListPage = () => {
+  return (
+    <div>
+      <h1>Chat List Page</h1>
+      <p>This page is intentionally left blank.</p>
+    </div>
+  )
 }
+
+export default ChatListPage
