@@ -34,6 +34,16 @@ function getModelForRoomType(roomType: string): string {
   }
 }
 
+function getDominantElement(elements: any): string {
+  if (!elements) return "unknown"
+  const max = Math.max(elements.wood, elements.fire, elements.earth, elements.metal, elements.water)
+  if (elements.wood === max) return "목"
+  if (elements.fire === max) return "화"
+  if (elements.earth === max) return "토"
+  if (elements.metal === max) return "금"
+  return "수"
+}
+
 export async function POST(req: Request) {
   try {
     const { messages, saju, name, gender, initialInterpretation, roomType, userId } = await req.json()
@@ -63,7 +73,15 @@ export async function POST(req: Request) {
     }
 
     // 사주 정보를 문자열로 변환
-    const sajuInfo = JSON.stringify(saju, null, 2)
+    const essentialSaju = {
+      yearPillar: `${saju?.yearStem}${saju?.yearBranch}`,
+      monthPillar: `${saju?.monthStem}${saju?.monthBranch}`,
+      dayPillar: `${saju?.dayStem}${saju?.dayBranch}`,
+      timePillar: `${saju?.hourStem}${saju?.hourBranch}`,
+      sibseong: saju?.sibseong || "정보없음",
+      dominantElement: getDominantElement(saju?.elements),
+    }
+    const sajuInfo = JSON.stringify(essentialSaju)
 
     // 모델 선택 및 시스템 메시지 설정
     const modelName = getModelForRoomType(roomType)
@@ -96,21 +114,11 @@ ${sajuInfo}
         break
 
       case "fitness":
-        systemMessage = `당신은 '운동코치 치코쌤'이라는 캐릭터입니다. 당신은 헬스트레이너이자 요가 강사 같은 말투로 사용자에게 활기차고 친근하게 운동 코칭을 제공하는 AI입니다.
-       사용자의 사주 오행 성향을 바탕으로 오늘의 컨디션을 분석하고,
-       유산소·근력·스트레칭 등 맞춤형 운동 유형을 구체적인 세트 수·횟수·시간으로 제안하며,
-       각 동작의 올바른 자세와 부상 방지 팁을 상세히 설명하세요.
-       주간 또는 단계별 목표 설정 로드맵을 안내해 꾸준히 실천할 수 있도록 돕고,
-       "좋아요! 내일도 파이팅!", "조금만 더 힘내요!" 같은 코치의 응원 멘트로 동기 부여해 주세요.
+        systemMessage = `당신은 운동코치 치코쌤입니다. 사주 기반 맞춤 운동 조언을 제공하세요.
 
-       사용자 사주 정보:
-       ${sajuInfo}
-       사용자 이름: ${name}
-       성별: ${gender}
-
-       사용자의 사주 정보를 바탕으로 체질에 맞는 운동 방법, 루틴, 주의사항 등을 친절하고 전문적으로 조언해주세요.
-       답변은 친근하고 격려하는 톤으로, '치코쌤'이라는 캐릭터에 맞게 작성해주세요.
-`
+사용자 정보: ${name} (${gender})
+일주: ${saju?.dayStem}${saju?.dayBranch}
+주요 오행: ${getDominantElement(saju?.elements)}`
         break
 
       case "diet":
@@ -283,7 +291,9 @@ ${sajuInfo}
     }
 
     // 사용자 메시지 배열에 시스템 메시지 추가
-    apiMessages = [{ role: "system", content: systemMessage }, ...messages]
+    const maxMessages = 3
+    const recentMessages = messages.slice(-maxMessages)
+    apiMessages = [{ role: "system", content: systemMessage }, ...recentMessages]
 
     try {
       // 오류 처리 개선: 스트리밍 응답 생성
