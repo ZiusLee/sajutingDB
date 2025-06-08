@@ -54,7 +54,7 @@ export function MobileNav() {
             )}
             onClick={() => setOpen(false)}
           >
-            로그��/회원가입
+            로그인/회원가입
           </Link>
           <Link
             href="/activate"

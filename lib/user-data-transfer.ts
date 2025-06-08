@@ -241,4 +241,70 @@ export async function setDefaultUserProfile(profileId: string): Promise<boolean>
   }
 }
 
-// Removed getChatHistory function since we're dropping chat_rooms table
+/**
+ * Get chat history for the current user
+ */
+export async function getChatHistory(): Promise<any[]> {
+  try {
+    // Get the current auth user
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session || !session.user) {
+      console.log("No authenticated user found, returning empty chat history")
+      return []
+    }
+
+    const authUserId = session.user.id
+
+    // Get all saju_sessions linked to this auth user
+    const { data: sessions, error: sessionsError } = await supabase
+      .from("saju_sessions")
+      .select("id")
+      .eq("auth_user_id", authUserId)
+
+    if (sessionsError || !sessions || sessions.length === 0) {
+      console.log("No sessions found for auth user:", authUserId)
+      return []
+    }
+
+    // Get all chat rooms for these sessions
+    const sessionIds = sessions.map((s) => s.id)
+    const { data: chatRooms, error: chatError } = await supabase
+      .from("chat_rooms")
+      .select(`
+        id,
+        title,
+        room_type,
+        created_at,
+        updated_at,
+        user_id
+      `)
+      .in("user_id", sessionIds)
+      .order("updated_at", { ascending: false })
+
+    if (chatError) {
+      console.error("Error fetching chat rooms:", chatError)
+      return []
+    }
+
+    if (!chatRooms || chatRooms.length === 0) {
+      console.log("No chat rooms found for user sessions")
+      return []
+    }
+
+    // Format the chat history
+    return chatRooms.map((room) => ({
+      id: room.id,
+      title: room.title || "Untitled Chat",
+      roomType: room.room_type || "general",
+      createdAt: room.created_at,
+      updatedAt: room.updated_at,
+      userId: room.user_id,
+    }))
+  } catch (error) {
+    console.error("Error getting chat history:", error)
+    return []
+  }
+}

@@ -3,7 +3,38 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
-      // Removed saju_profiles, chat_rooms, and user_saju_info tables
+      saju_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          birth_date: string
+          birth_time: string
+          gender: string
+          created_at: string
+          // Add other fields as needed
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          birth_date: string
+          birth_time: string
+          gender: string
+          created_at?: string
+          // Add other fields as needed
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          birth_date?: string
+          birth_time?: string
+          gender?: string
+          created_at?: string
+          // Add other fields as needed
+        }
+      }
       saju_interpretations: {
         Row: {
           id: string
@@ -11,7 +42,7 @@ export interface Database {
           basic_interpretation: string
           model_used: string
           response_time: string
-          user_feedback: string | null
+          user_feedback: string | null // 피드백 필드 추가
           created_at: string
           updated_at: string | null
         }
@@ -21,7 +52,7 @@ export interface Database {
           basic_interpretation: string
           model_used: string
           response_time: string
-          user_feedback?: string | null
+          user_feedback?: string | null // 피드백 필드 추가
           created_at?: string
           updated_at?: string | null
         }
@@ -31,7 +62,7 @@ export interface Database {
           basic_interpretation?: string
           model_used?: string
           response_time?: string
-          user_feedback?: string | null
+          user_feedback?: string | null // 피드백 필드 추가
           created_at?: string
           updated_at?: string | null
         }
@@ -188,6 +219,39 @@ export interface Database {
           updated_at?: string
         }
       }
+      chat_rooms: {
+        Row: {
+          id: string
+          user_id: string
+          profile_id: string
+          room_type: string
+          last_message: string | null
+          last_message_time: string | null
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          profile_id: string
+          room_type: string
+          last_message?: string | null
+          last_message_time?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          profile_id?: string
+          room_type?: string
+          last_message?: string | null
+          last_message_time?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
+      // Add other tables as needed
     }
     Views: {
       [_ in never]: never
