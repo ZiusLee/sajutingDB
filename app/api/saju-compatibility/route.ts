@@ -429,7 +429,7 @@ ${relationshipGuidance}
       {
         error: "Failed to generate compatibility analysis with any model",
         fallbackInterpretation: `
-# 궁합 분석 오류
+# 궁합 ���석 오류
 
 궁합 분석을 가져오는 중 오류가 발생했습니다.
 
