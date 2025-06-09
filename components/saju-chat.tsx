@@ -79,13 +79,25 @@ const useMobileKeyboard = () => {
     const viewport = document.querySelector('meta[name="viewport"]')
     if (viewport) {
       const originalContent = viewport.getAttribute("content")
+      viewport.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
+      )
 
-      viewport.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no")
+      // 모바일에서 키보드가 올라올 때 처리
+      const handleResize = () => {
+        const vh = window.innerHeight * 0.01
+        document.documentElement.style.setProperty("--vh", `${vh}px`)
+      }
+
+      window.addEventListener("resize", handleResize)
+      handleResize()
 
       return () => {
         if (originalContent) {
           viewport.setAttribute("content", originalContent)
         }
+        window.removeEventListener("resize", handleResize)
       }
     }
   }, [])
@@ -1020,9 +1032,12 @@ export default function SajuChat({
   )
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-gray-900 text-white overflow-hidden">
+    <div
+      className="fixed inset-0 flex flex-col bg-gray-900 text-white overflow-hidden"
+      style={{ height: "calc(var(--vh, 1vh) * 100)" }}
+    >
       {/* ChatGPT 스타일 헤더 */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 md:px-4 py-3 border-b border-gray-700 bg-gray-800">
+      <div className="flex-shrink-0 flex items-center justify-between px-2 sm:px-3 md:px-4 py-2.5 sm:py-3 border-b border-gray-700 bg-gray-800">
         <div className="flex items-center space-x-3">
           <Button variant="ghost" size="sm" onClick={handleBackWithSave} className="p-1 text-gray-300 hover:text-white">
             <Menu className="h-5 w-5" />
@@ -1114,7 +1129,7 @@ export default function SajuChat({
 
       {/* 채팅 영역 */}
       <div
-        className="flex-1 overflow-y-auto pb-[120px]"
+        className="flex-1 overflow-y-auto pb-[140px] sm:pb-[120px]"
         ref={chatContainerRef}
         style={{
           scrollBehavior: "smooth",
@@ -1122,7 +1137,7 @@ export default function SajuChat({
         }}
       >
         <div className="min-h-full flex flex-col">
-          <div className="flex-1 px-3 md:px-4 py-4 md:py-6">
+          <div className="flex-1 px-2 sm:px-3 md:px-4 py-3 sm:py-4 md:py-6">
             <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
               {messages.map((message, index) => (
                 <div key={message.id || index} className="space-y-4 group">
@@ -1150,14 +1165,14 @@ export default function SajuChat({
 
                   {message.role === "user" ? (
                     <div className="flex justify-end">
-                      <div className="bg-blue-600 rounded-2xl px-3 md:px-4 py-2 max-w-[85%] md:max-w-[80%]">
-                        <p className="text-white text-sm leading-relaxed">{message.content}</p>
+                      <div className="bg-blue-600 rounded-2xl px-3 py-2.5 max-w-[90%] sm:max-w-[85%] md:max-w-[80%]">
+                        <p className="text-white text-sm sm:text-base leading-relaxed">{message.content}</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-start space-x-2 md:space-x-3">
-                      <div className="flex-shrink-0 w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs md:text-sm font-medium">{currentCharacter.emoji}</span>
+                    <div className="flex items-start space-x-2 sm:space-x-3">
+                      <div className="flex-shrink-0 w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs sm:text-sm font-medium">{currentCharacter.emoji}</span>
                       </div>
                       <div className="flex-1 space-y-2 min-w-0">
                         <div className="prose prose-sm max-w-none prose-invert">
@@ -1318,28 +1333,28 @@ export default function SajuChat({
           </div>
 
           {showScrollToBottom && (
-            <div className="fixed bottom-32 right-4 z-20">
+            <div className="fixed bottom-28 sm:bottom-32 right-3 sm:right-4 z-20">
               <Button
                 onClick={scrollToBottomSmooth}
-                className="w-12 h-12 rounded-full bg-gray-700/90 hover:bg-gray-600/90 border border-gray-600/50 shadow-lg backdrop-blur-md transition-all duration-200"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-700/90 hover:bg-gray-600/90 border border-gray-600/50 shadow-lg backdrop-blur-md transition-all duration-200"
                 size="sm"
               >
-                <ChevronDown className="h-5 w-5 text-white" />
+                <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </Button>
             </div>
           )}
 
           {suggestedQuestions.length > 0 && !isLoading && (
-            <div className="flex-shrink-0 px-3 md:px-4 py-3 bg-transparent">
+            <div className="flex-shrink-0 px-2 sm:px-3 md:px-4 py-2 sm:py-3 bg-transparent">
               <div className="max-w-3xl mx-auto">
-                <div className="flex flex-wrap gap-2 mb-2">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2">
                   {suggestedQuestions.slice(0, 3).map((question, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       size="sm"
                       onClick={() => handleSuggestedQuestionClick(question)}
-                      className="text-xs md:text-sm bg-gray-700/80 border-gray-600 text-gray-200 hover:bg-gray-600 rounded-full px-3 md:px-4 py-2 backdrop-blur-sm"
+                      className="text-xs sm:text-sm bg-gray-700/80 border-gray-600 text-gray-200 hover:bg-gray-600 rounded-full px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 backdrop-blur-sm"
                       disabled={isLoading}
                     >
                       {question}
@@ -1350,11 +1365,11 @@ export default function SajuChat({
             </div>
           )}
 
-          <div className="flex-shrink-0 px-3 md:px-4 py-3 md:py-4 bg-transparent fixed bottom-0 left-0 right-0 z-10">
+          <div className="flex-shrink-0 px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 bg-transparent fixed bottom-0 left-0 right-0 z-10 safe-area-inset-bottom">
             <div className="max-w-3xl mx-auto">
               <form onSubmit={customHandleSubmit} className="relative">
-                <div className="flex items-center bg-gray-700/90 backdrop-blur-md rounded-3xl px-4 md:px-5 py-3 md:py-4 shadow-lg border border-gray-600/50">
-                  <div className="flex items-center mr-3">
+                <div className="flex items-center bg-gray-700/90 backdrop-blur-md rounded-2xl sm:rounded-3xl px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 shadow-lg border border-gray-600/50">
+                  <div className="flex items-center mr-2 sm:mr-3">
                     {pingCharacters.map((character) => (
                       <Button
                         key={character.id}
@@ -1362,7 +1377,7 @@ export default function SajuChat({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleCharacterChange(character)}
-                        className={`p-2 rounded-full transition-all duration-200 ${
+                        className={`p-1.5 sm:p-2 rounded-full transition-all duration-200 ${
                           character.roomType === roomType
                             ? `${character.bgColor} ${character.borderColor} border text-white`
                             : "text-gray-400 hover:text-gray-200 hover:bg-gray-600/50"
@@ -1370,7 +1385,7 @@ export default function SajuChat({
                         disabled={isLoading}
                         title={character.name}
                       >
-                        <span className="text-lg">{character.emoji}</span>
+                        <span className="text-base sm:text-lg">{character.emoji}</span>
                       </Button>
                     ))}
                   </div>
@@ -1382,28 +1397,28 @@ export default function SajuChat({
                     placeholder={
                       !isOnline ? "인터넷 연결을 확인해주세요" : isLoading ? "답변을 기다리는 중..." : "Ask anything"
                     }
-                    className="flex-1 bg-transparent border-none focus:outline-none text-white placeholder-gray-400 text-base"
+                    className="flex-1 bg-transparent border-none focus:outline-none text-white placeholder-gray-400 text-base min-w-0"
                     disabled={isLoading || !isOnline}
                     style={{
                       fontSize: "16px",
                     }}
                   />
 
-                  <div className="flex items-center space-x-3 ml-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-3 flex-shrink-0">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="p-1 text-gray-400 hover:text-gray-200 rounded-full"
+                      className="p-1.5 sm:p-2 text-gray-400 hover:text-gray-200 rounded-full"
                       disabled={isLoading}
                     >
-                      <Mic className="h-5 w-5" />
+                      <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
 
                     <Button
                       type="submit"
                       disabled={isLoading || !input.trim() || !isOnline}
-                      className="bg-white hover:bg-gray-100 text-black rounded-full p-2.5 shadow-md transition-all duration-200"
+                      className="bg-white hover:bg-gray-100 text-black rounded-full p-2 sm:p-2.5 shadow-md transition-all duration-200 flex-shrink-0"
                     >
                       {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
