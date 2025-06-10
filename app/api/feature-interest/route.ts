@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     // 사용자 ID 가져오기 (로그인한 경우)
     const userId = await getUserIdFromRequest(req)
 
-    // IP 주소 가져오기 (익명 사용자 구분용)
+    // IP 주소 가져오기 (익명 사용자 구분��)
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
 
     // 기능 관심도 테이블이 없으면 생성

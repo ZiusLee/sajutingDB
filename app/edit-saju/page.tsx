@@ -427,7 +427,7 @@ export default function EditSajuPage() {
         <Button variant="ghost" size="icon" onClick={() => router.push("/mypage")} className="mr-2">
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">사주 프로필 관리</h1>
+        <h1 className="text-2xl font-bold">사주 ��로필 관리</h1>
         <div className="ml-auto flex gap-2">
           <Button variant="ghost" size="icon" onClick={handleDebug} title="디버그">
             <Bug className="h-5 w-5" />

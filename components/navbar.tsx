@@ -7,7 +7,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useEffect, useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { User, LogOut, Home, SnowflakeIcon as Crystal } from "lucide-react"
+import { User, LogOut, Home } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -62,15 +62,9 @@ export function Navbar() {
     <nav className="border-b">
       <div className="container flex items-center justify-between h-16">
         <Link href="/" className="text-xl font-bold">
-          사주팅
+          사주핑
         </Link>
         <div className="flex items-center gap-4">
-          <Link href="/calculator" passHref>
-            <Button variant={pathname === "/calculator" ? "default" : "ghost"}>
-              <Crystal className="h-4 w-4 mr-2" />
-              사주 계산기
-            </Button>
-          </Link>
           <Link href="/landing" passHref>
             <Button variant={pathname === "/landing" ? "default" : "ghost"}>
               <Home className="h-4 w-4 mr-2" />홈

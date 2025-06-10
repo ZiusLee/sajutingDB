@@ -517,14 +517,14 @@ export default function BirthDateFormClient() {
           <Label>성별</Label>
           <RadioGroup value={gender} onValueChange={setGender} className="flex space-x-4">
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="female" id="female" />
-              <Label htmlFor="female" className="cursor-pointer">
+              <RadioGroupItem value="female" id="female" className="w-4 h-4" />
+              <Label htmlFor="female" className="cursor-pointer text-sm">
                 여성
               </Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="male" id="male" />
-              <Label htmlFor="male" className="cursor-pointer">
+              <RadioGroupItem value="male" id="male" className="w-4 h-4" />
+              <Label htmlFor="male" className="cursor-pointer text-sm">
                 남성
               </Label>
             </div>

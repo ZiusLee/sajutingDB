@@ -29,7 +29,7 @@ const FORTUNE_LEVELS = [
   { id: "bad", name: "나쁨", color: "text-orange-500", emoji: "😟" },
   { id: "neutral", name: "보통", color: "text-yellow-500", emoji: "😐" },
   { id: "good", name: "좋음", color: "text-green-500", emoji: "😊" },
-  { id: "very_good", name: "매우 좋음", color: "text-blue-500", emoji: "🤩" },
+  { id: "very_good", name: "매우 좋���", color: "text-blue-500", emoji: "🤩" },
 ]
 
 // 운세 메시지
