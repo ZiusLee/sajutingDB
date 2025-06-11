@@ -65,6 +65,7 @@ interface SajuProfile {
     }
     dayMaster?: string
     dayMasterHanja?: string
+    yearAnimal?: string
   }
 }
 
@@ -268,7 +269,9 @@ export default function MyPage() {
 
     if (profileToUse) {
       try {
-        // 사주 데이터 준비
+        console.log("Using profile for chat:", profileToUse)
+
+        // 사주 데이터 준비 - 모든 필드 포함
         const sajuData = {
           saju: {
             yearStem: profileToUse.saju.yearStem,
@@ -279,9 +282,26 @@ export default function MyPage() {
             dayBranch: profileToUse.saju.dayBranch,
             hourStem: profileToUse.saju.hourStem,
             hourBranch: profileToUse.saju.hourBranch,
+            yearStemHanja: profileToUse.saju.yearStemHanja || "",
+            yearBranchHanja: profileToUse.saju.yearBranchHanja || "",
+            monthStemHanja: profileToUse.saju.monthStemHanja || "",
+            monthBranchHanja: profileToUse.saju.monthBranchHanja || "",
+            dayStemHanja: profileToUse.saju.dayStemHanja || "",
+            dayBranchHanja: profileToUse.saju.dayBranchHanja || "",
+            hourStemHanja: profileToUse.saju.hourStemHanja || "",
+            hourBranchHanja: profileToUse.saju.hourBranchHanja || "",
             elements: profileToUse.saju.elements || elements,
             dayMaster: profileToUse.saju.dayMaster || profileToUse.saju.dayStem,
             dayMasterHanja: profileToUse.saju.dayMasterHanja || "",
+            yearStemSibseong: profileToUse.saju.yearStemSibseong || "",
+            monthStemSibseong: profileToUse.saju.monthStemSibseong || "",
+            dayStemSibseong: profileToUse.saju.dayStemSibseong || "",
+            hourStemSibseong: profileToUse.saju.hourStemSibseong || "",
+            yearBranchSibseong: profileToUse.saju.yearBranchSibseong || "",
+            monthBranchSibseong: profileToUse.saju.monthBranchSibseong || "",
+            dayBranchSibseong: profileToUse.saju.dayBranchSibseong || "",
+            hourBranchSibseong: profileToUse.saju.hourBranchSibseong || "",
+            yearAnimal: profileToUse.saju.yearAnimal || "",
           },
           name: profileToUse.name,
           gender: profileToUse.gender,
@@ -295,6 +315,7 @@ export default function MyPage() {
           lunarDay: profileToUse.lunarDay || profileToUse.birthDay,
           timeUnknown: profileToUse.timeUnknown,
           interpretation: "", // 기본값
+          sessionId: profileToUse.id, // 세션 ID 추가
           birthInfo: {
             solarYear: Number.parseInt(profileToUse.birthYear),
             solarMonth: Number.parseInt(profileToUse.birthMonth),
@@ -307,6 +328,8 @@ export default function MyPage() {
             timeUnknown: profileToUse.timeUnknown,
           },
         }
+
+        console.log("Prepared saju data for chat:", sajuData)
 
         // 로컬 스토리지에 사주 데이터 저장
         localStorage.setItem("current_saju", JSON.stringify(sajuData))
@@ -497,6 +520,9 @@ export default function MyPage() {
                         {profile.saju.monthBranch} {profile.saju.dayStem}
                         {profile.saju.dayBranch} {profile.saju.hourStem}
                         {profile.saju.hourBranch}
+                        {profile.saju.yearAnimal && (
+                          <span className="ml-2 text-yellow-500 dark:text-yellow-400">{profile.saju.yearAnimal}</span>
+                        )}
                       </div>
 
                       <div className="mb-3">

@@ -340,6 +340,22 @@ export default function SajuChat({
     try {
       setSessionInitialized(true)
 
+      // 먼저 로컬 스토리지에서 current_saju 데이터 확인
+      const currentSajuData = localStorage.getItem("current_saju")
+      if (currentSajuData) {
+        try {
+          const parsedData = JSON.parse(currentSajuData)
+          if (parsedData.sessionId) {
+            console.log("Found session ID in current_saju:", parsedData.sessionId)
+            setDatabaseSessionId(parsedData.sessionId)
+            await loadExistingMessages(parsedData.sessionId)
+            return
+          }
+        } catch (e) {
+          console.error("Error parsing current_saju data:", e)
+        }
+      }
+
       // 로그인된 사용자의 경우 사용자별 세션을 찾음
       if (isLoggedIn && userId) {
         const response = await fetch("/api/saju-sessions", {
@@ -385,131 +401,124 @@ export default function SajuChat({
           return
         }
       }
-    } catch (error) {
-      console.error("Error getting existing session ID:", error)
     }
-  }, [sessionInitialized, databaseSessionId, isLoggedIn, userId, name, gender])
+  } catch (error) {
+    console.error("Error getting existing session ID:", error)
+  }
+}
+, [sessionInitialized, databaseSessionId, isLoggedIn, userId, name, gender])
 
-  const loadExistingMessages = useCallback(
-    async (sessionId: string) => {
-      try {
-        const response = await fetch(`/api/messages?sessionId=${sessionId}`)
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.messages && data.messages.length > 0) {
-            console.log(`Loaded ${data.messages.length} existing messages from database`)
-
-            // 메시지를 올바른 형태로 변환
-            const formattedMessages = data.messages.map((msg: any) => ({
-              id: msg.id,
-              role: msg.role,
-              content: msg.content,
-            }))
-
-            // 기존 메시지 로딩 로직은 useAIChat 초기화 시점에서 처리
-            console.log("Messages loaded from database")
-          }
-        }
-      } catch (error) {
-        console.error("Error loading existing messages:", error)
-      }
-    },
-    [], // messages 의존성 제거
-  )
-
-  useEffect(() => {
-    if (isLoggedIn && !sessionInitialized) {
-      getExistingSessionId()
-    }
-  }, [isLoggedIn, sessionInitialized, getExistingSessionId])
-
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
-  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
-    initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
-  )
-  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
-  const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
-  const [lastMessageId, setLastMessageId] = useState<string>("")
-  const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-  const [showSajuInfo, setShowSajuInfo] = useState(false)
-  const [streamingError, setStreamingError] = useState<string | null>(null)
-  const [isRetrying, setIsRetrying] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
-
-  const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
-
-  const handleCharacterChange = (newCharacter: (typeof pingCharacters)[0]) => {
-    if (newCharacter.roomType === roomType) return
-
+const loadExistingMessages = useCallback(
+  async (sessionId: string) => {
     try {
-      const currentSajuData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        birthInfo,
-      }
-      localStorage.setItem("current_saju", JSON.stringify(currentSajuData))
+      const response = await fetch(`/api/messages?sessionId=${sessionId}`)
 
-      router.push(`/saju-chat/${newCharacter.roomType}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.messages && data.messages.length > 0) {
+          console.log(`Loaded ${data.messages.length} existing messages from database`)
+
+          // 메시지를 올바른 형태로 변환
+          const formattedMessages = data.messages.map((msg: any) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+          }))
+
+          // 기존 메시지 로딩 로직은 useAIChat 초기화 시점에서 처리
+          console.log("Messages loaded from database")
+        }
+      }
     } catch (error) {
-      console.error("Error changing character:", error)
+      console.error("Error loading existing messages:", error)
+    }
+  },
+  [], // messages 의존성 제거
+)
+
+useEffect(() => {
+  if (isLoggedIn && !sessionInitialized) {
+    getExistingSessionId()
+  }
+}, [isLoggedIn, sessionInitialized, getExistingSessionId])
+\
+const messagesEndRef = useRef<HTMLDivElement>(null)
+const inputRef = useRef<HTMLInputElement>(null)
+const chatContainerRef = useRef<HTMLDivElement>(null)
+const [isInitialized, setIsInitialized] = useState(false)
+const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
+  initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
+)
+const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
+const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
+const [lastMessageId, setLastMessageId] = useState<string>("")
+const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
+const [showSajuInfo, setShowSajuInfo] = useState(false)
+const [streamingError, setStreamingError] = useState<string | null>(null)
+const [isRetrying, setIsRetrying] = useState(false)
+const [retryCount, setRetryCount] = useState(0)
+
+const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
+
+const handleCharacterChange = (newCharacter: (typeof pingCharacters)[0]) => {
+  if (newCharacter.roomType === roomType) return
+
+  try {
+    const currentSajuData = {
+      saju,
+      name,
+      gender,
+      interpretation: initialInterpretation,
+      birthInfo,
+    }
+    localStorage.setItem("current_saju", JSON.stringify(currentSajuData))
+
+    router.push(`/saju-chat/${newCharacter.roomType}`)
+  } catch (error) {
+    console.error("Error changing character:", error)
+  }
+}
+
+const checkResponseQuality = useCallback((content: string) => {
+  if (content.length < 100) {
+    return {
+      isGoodQuality: false,
+      reason: "응답이 너무 짧습니다.",
     }
   }
 
-  const checkResponseQuality = useCallback((content: string) => {
-    if (content.length < 100) {
-      return {
-        isGoodQuality: false,
-        reason: "응답이 너무 짧습니다.",
-      }
+  if (
+    content.endsWith("...") ||
+    content.endsWith("…") ||
+    content.endsWith(",") ||
+    content.endsWith("하지만") ||
+    content.endsWith("그러나") ||
+    content.endsWith("따라서")
+  ) {
+    return {
+      isGoodQuality: false,
+      reason: "응답이 완전하지 않습니다.",
     }
+  }
 
-    if (
-      content.endsWith("...") ||
-      content.endsWith("…") ||
-      content.endsWith(",") ||
-      content.endsWith("하지만") ||
-      content.endsWith("그러나") ||
-      content.endsWith("따라서")
-    ) {
-      return {
-        isGoodQuality: false,
-        reason: "응답이 완전하지 않습니다.",
-      }
-    }
+  return { isGoodQuality: true }
+}, [])
 
-    return { isGoodQuality: true }
-  }, [])
+const savedSession = activeChatSession || getChatSession(sessionKey)
 
-  const savedSession = activeChatSession || getChatSession(sessionKey)
+useEffect(() => {
+  const hasExistingSession = savedSession?.messages && savedSession.messages.length > 0
+  setIsNewUser(!hasExistingSession)
+}, [savedSession, setIsNewUser])
 
-  useEffect(() => {
-    const hasExistingSession = savedSession?.messages && savedSession.messages.length > 0
-    setIsNewUser(!hasExistingSession)
-  }, [savedSession])
-
-  let initialMessages: any[] = []
-  if (savedSession?.messages) {
-    initialMessages = savedSession.messages
-  } else if (roomType === "sajuping") {
-    try {
-      initialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
-    } catch (error) {
-      console.error("Error generating sajuping initial messages:", error)
-      initialMessages = [
-        {
-          id: "welcome",
-          role: "assistant" as const,
-          content: getInitialMessageByRoomType(name, roomType, birthInfo),
-        },
-      ]
-    }
-  } else {
+let initialMessages: any[] = []
+if (savedSession?.messages) {
+  initialMessages = savedSession.messages
+} else if (roomType === "sajuping") {
+  try {
+    initialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
+  } catch (error) {
+    console.error("Error generating sajuping initial messages:", error)
     initialMessages = [
       {
         id: "welcome",
@@ -518,385 +527,394 @@ export default function SajuChat({
       },
     ]
   }
+} else {
+  initialMessages = [
+    {
+      id: "welcome",
+      role: "assistant" as const,
+      content: getInitialMessageByRoomType(name, roomType, birthInfo),
+    },
+  ]
+}
 
-  // 메모리 컨텍스트 생성
-  const getMemoryContext = useCallback(() => {
-    if (!userId) return ""
-    return memoryService.generateContextSummary(userId)
-  }, [userId])
+// 메모리 컨텍스트 생성
+const getMemoryContext = useCallback(() => {
+  if (!userId) return ""
+  return memoryService.generateContextSummary(userId)
+}, [userId])
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit: aiHandleSubmit,
-    isLoading,
-    setInput,
-    error,
-    reload,
-    append,
-  } = useAIChat({
-    api: "/api/saju-chat",
-    initialMessages,
-    body: {
-      compressedSaju: compressSaju(
-        saju,
-        birthInfo?.solarYear?.toString(),
-        birthInfo?.solarMonth?.toString(),
-        birthInfo?.solarDay?.toString(),
-        birthInfo?.solarHour?.toString(),
-        birthInfo?.solarMinute?.toString(),
-        birthInfo?.timeUnknown,
-      ),
+const {
+  messages,
+  input,
+  handleInputChange,
+  handleSubmit: aiHandleSubmit,
+  isLoading,
+  setInput,
+  error,
+  reload,
+  append,
+} = useAIChat({
+  api: "/api/saju-chat",
+  initialMessages,
+  body: {
+    compressedSaju: compressSaju(
+      saju,
+      birthInfo?.solarYear?.toString(),
+      birthInfo?.solarMonth?.toString(),
+      birthInfo?.solarDay?.toString(),
+      birthInfo?.solarHour?.toString(),
+      birthInfo?.solarMinute?.toString(),
+      birthInfo?.timeUnknown,
+    ),
+    name,
+    gender,
+    initialInterpretation,
+    roomType,
+    userId,
+    currentYear: 2025,
+    yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+    birthInfo,
+    memoryContext: getMemoryContext(),
+  },
+  onFinish: async (message) => {
+    const qualityCheck = checkResponseQuality(message.content)
+
+    if (!qualityCheck.isGoodQuality && retryCount < 2) {
+      setRetryCount((prev) => prev + 1)
+      setTimeout(() => {
+        reload()
+      }, 1000)
+      return
+    }
+
+    const updatedMessages = [...messages, message]
+
+    // 데이터베이스에 메시지 저장 (로그인된 사용자의 경우)
+    if (databaseSessionId && isLoggedIn) {
+      try {
+        await saveMessagesToDatabase(updatedMessages, databaseSessionId)
+        console.log("Messages saved to database successfully")
+      } catch (error) {
+        console.error("Failed to save messages to database:", error)
+      }
+    }
+
+    // 로컬 세션에도 저장
+    const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
+    const sessionData = {
+      saju,
       name,
       gender,
-      initialInterpretation,
+      interpretation: initialInterpretation,
       roomType,
-      userId,
-      currentYear: 2025,
-      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+      messages: updatedMessages,
+      lastMessageTime: new Date().toISOString(),
       birthInfo,
-      memoryContext: getMemoryContext(),
-    },
-    onFinish: async (message) => {
-      const qualityCheck = checkResponseQuality(message.content)
-
-      if (!qualityCheck.isGoodQuality && retryCount < 2) {
-        setRetryCount((prev) => prev + 1)
-        setTimeout(() => {
-          reload()
-        }, 1000)
-        return
-      }
-
-      const updatedMessages = [...messages, message]
-
-      // 데이터베이스에 메시지 저장 (로그인된 사용자의 경우)
-      if (databaseSessionId && isLoggedIn) {
-        try {
-          await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-          console.log("Messages saved to database successfully")
-        } catch (error) {
-          console.error("Failed to save messages to database:", error)
-        }
-      }
-
-      // 로컬 세션에도 저장
-      const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages: updatedMessages,
-        lastMessageTime: new Date().toISOString(),
-        birthInfo,
-        databaseSessionId, // 데이터베이스 세션 ID도 저장
-      }
-
-      try {
-        saveChatSession(currentSessionKey, sessionData)
-        setActiveChatSession(sessionData)
-      } catch (saveError) {
-        console.error("Error saving chat session to localStorage:", saveError)
-      }
-
-      const newTime = new Date()
-      setLastMessageTime(newTime)
-      setLastMessageId(message.id)
-
-      setShouldGenerateQuestions(true)
-      setStreamingError(null)
-      setRetryCount(0)
-    },
-    onError: (error) => {
-      console.error("Chat error:", error)
-
-      let errorMessage = "응답 생성 중 오류가 발생했습니다."
-
-      if (error.message) {
-        errorMessage = error.message
-
-        if (error.message.includes("network") || error.message.includes("fetch")) {
-          errorMessage = "네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요."
-        } else if (error.message.includes("timeout")) {
-          errorMessage = "요청 시간이 초과되었습니다. 다시 시도해주세요."
-        } else if (error.message.includes("model")) {
-          errorMessage = "AI 모델 로딩 중 오류가 발생했습니다. 다시 시도해주세요."
-        } else if (error.message.includes("parse") || error.message.includes("JSON")) {
-          errorMessage = "응답 처리 중 오류가 발생했습니다. 다시 시도해주세요."
-        }
-      }
-
-      setStreamingError(errorMessage)
-      setShouldGenerateQuestions(true)
-    },
-    onResponse: (response) => {
-      if (chatContainerRef.current) {
-        setTimeout(() => {
-          chatContainerRef.current?.scrollTo({
-            top: chatContainerRef.current.scrollHeight,
-            behavior: "smooth",
-          })
-        }, 100)
-      }
-
-      setStreamingError(null)
-    },
-    options: {
-      timeout: 60000,
-    },
-  })
-
-  const handleRetry = useCallback(() => {
-    if (retryCount >= 3) {
-      setStreamingError("여러 번 재시도했으나 계속 오류가 발생합니다. 잠시 후 다시 시도해주세요.")
-      return
+      databaseSessionId, // 데이터베이스 세션 ID도 저장
     }
-
-    setIsRetrying(true)
-    setStreamingError(null)
-    setRetryCount((prev) => prev + 1)
 
     try {
-      const lastUserMessageIndex = [...messages].reverse().findIndex((msg) => msg.role === "user")
-
-      if (lastUserMessageIndex !== -1) {
-        const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
-
-        append({
-          role: "user",
-          content: lastUserMessage.content,
-        })
-      } else {
-        reload()
-      }
-    } catch (error) {
-      console.error("Error in retry handler:", error)
-      setStreamingError("재시도 중 오류가 발생했습니다. 페이지를 새로고침해주세요.")
-    } finally {
-      setIsRetrying(false)
-    }
-  }, [messages, append, reload, retryCount])
-
-  const originalHandleSubmit = aiHandleSubmit
-
-  const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    if (!input.trim()) {
-      return
+      saveChatSession(currentSessionKey, sessionData)
+      setActiveChatSession(sessionData)
+    } catch (saveError) {
+      console.error("Error saving chat session to localStorage:", saveError)
     }
 
-    const newQuestionCount = questionCount + 1
-    setQuestionCount(newQuestionCount)
+    const newTime = new Date()
+    setLastMessageTime(newTime)
+    setLastMessageId(message.id)
 
-    // 로그인 프롬프트 로직
-    const shouldShowLoginPrompt = newQuestionCount >= 5 && !isLoggedIn && !hasShownLoginPrompt
-    if (shouldShowLoginPrompt) {
-      setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-      setShowLoginPrompt(true)
-      setHasShownLoginPrompt(true)
-    }
-
-    setShouldGenerateQuestions(false)
+    setShouldGenerateQuestions(true)
     setStreamingError(null)
     setRetryCount(0)
+  },
+  onError: (error) => {
+    console.error("Chat error:", error)
 
-    // 메시지 전송만 하고 saveUserMessage는 onFinish에서 처리
-    originalHandleSubmit(e)
+    let errorMessage = "응답 생성 중 오류가 발생했습니다."
+
+    if (error.message) {
+      errorMessage = error.message
+
+      if (error.message.includes("network") || error.message.includes("fetch")) {
+        errorMessage = "네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요."
+      } else if (error.message.includes("timeout")) {
+        errorMessage = "요청 시간이 초과되었습니다. 다시 시도해주세요."
+      } else if (error.message.includes("model")) {
+        errorMessage = "AI 모델 로딩 중 오류가 발생했습니다. 다시 시도해주세요."
+      } else if (error.message.includes("parse") || error.message.includes("JSON")) {
+        errorMessage = "응답 처리 중 오류가 발생했습니다. 다시 시도해주세요."
+      }
+    }
+
+    setStreamingError(errorMessage)
+    setShouldGenerateQuestions(true)
+  },
+  onResponse: (response) => {
+    if (chatContainerRef.current) {
+      setTimeout(() => {
+        chatContainerRef.current?.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: "smooth",
+        })
+      }, 100)
+    }
+
+    setStreamingError(null)
+  },
+  options: {
+    timeout: 60000,
+  },
+})
+
+const handleRetry = useCallback(() => {
+  if (retryCount >= 3) {
+    setStreamingError("여러 번 재시도했으나 계속 오류가 발생합니다. 잠시 후 다시 시도해주세요.")
+    return
   }
 
-  const handleBackWithSave = () => {
-    try {
-      console.log("handleBackWithSave called")
+  setIsRetrying(true)
+  setStreamingError(null)
+  setRetryCount((prev) => prev + 1)
 
-      // 세션 저장
-      const sessionData = {
+  try {
+    const lastUserMessageIndex = [...messages].reverse().findIndex((msg) => msg.role === "user")
+
+    if (lastUserMessageIndex !== -1) {
+      const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
+
+      append({
+        role: "user",
+        content: lastUserMessage.content,
+      })
+    } else {
+      reload()
+    }
+  } catch (error) {
+    console.error("Error in retry handler:", error)
+    setStreamingError("재시도 중 오류가 발생했습니다. 페이지를 새로고침해주세요.")
+  } finally {
+    setIsRetrying(false)
+  }
+}, [messages, append, reload, retryCount])
+
+const originalHandleSubmit = aiHandleSubmit
+
+const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault()
+
+  if (!input.trim()) {
+    return
+  }
+
+  const newQuestionCount = questionCount + 1
+  setQuestionCount(newQuestionCount)
+
+  // 로그인 프롬프트 로직
+  const shouldShowLoginPrompt = newQuestionCount >= 5 && !isLoggedIn && !hasShownLoginPrompt
+  if (shouldShowLoginPrompt) {
+    setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+    setShowLoginPrompt(true)
+    setHasShownLoginPrompt(true)
+  }
+
+  setShouldGenerateQuestions(false)
+  setStreamingError(null)
+  setRetryCount(0)
+
+  // 메시지 전송만 하고 saveUserMessage는 onFinish에서 처리
+  originalHandleSubmit(e)
+}
+
+const handleBackWithSave = () => {
+  try {
+    console.log("handleBackWithSave called")
+
+    // 세션 저장
+    const sessionData = {
+      saju,
+      name,
+      gender,
+      interpretation: initialInterpretation,
+      roomType,
+      messages,
+      lastMessageTime: new Date().toISOString(),
+      birthInfo,
+    }
+    saveChatSession(sessionKey, sessionData)
+
+    // 로컬 스토리지에 마지막 사주 데이터 저장
+    localStorage.setItem(
+      "last_chat_saju_data",
+      JSON.stringify({
         saju,
         name,
         gender,
         interpretation: initialInterpretation,
-        roomType,
-        messages,
-        lastMessageTime: new Date().toISOString(),
         birthInfo,
-      }
-      saveChatSession(sessionKey, sessionData)
+      }),
+    )
 
-      // 로컬 스토리지에 마지막 사주 데이터 저장
-      localStorage.setItem(
-        "last_chat_saju_data",
-        JSON.stringify({
-          saju,
-          name,
-          gender,
-          interpretation: initialInterpretation,
-          birthInfo,
-        }),
-      )
+    // 마이페이지에서 온 경우 체크
+    const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
+    console.log("fromMyPage:", fromMyPage)
 
-      // 마이페이지에서 온 경우 체크
-      const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
-      console.log("fromMyPage:", fromMyPage)
+    // 세션 스토리지 클리어 (먼저 클리어)
+    sessionStorage.removeItem("from_mypage")
 
-      // 세션 스토리지 클리어 (먼저 클리어)
-      sessionStorage.removeItem("from_mypage")
-
-      if (fromMyPage) {
-        console.log("Returning to mypage via window.location")
-        // 즉시 리디렉션하지 말고 약간의 지연을 둠
-        setTimeout(() => {
-          window.location.href = "/mypage"
-        }, 100)
-      } else {
-        console.log("Calling onBack function")
-        // onBack 함수가 있는지 확인
-        if (typeof onBack === "function") {
-          onBack()
-        } else {
-          console.log("onBack is not a function, redirecting to home")
-          setTimeout(() => {
-            window.location.href = "/"
-          }, 100)
-        }
-      }
-    } catch (error) {
-      console.error("뒤로가기 처리 중 오류:", error)
-      // 오류 발생 시 기본 동작
+    if (fromMyPage) {
+      console.log("Returning to mypage via window.location")
+      // 즉시 리디렉션하지 말고 약간의 지연을 둠
       setTimeout(() => {
-        window.location.href = "/"
+        window.location.href = "/mypage"
       }, 100)
-    }
-  }
-
-  const handleSuggestedQuestionClick = (question: string) => {
-    if (isLoading) return
-
-    setInput(question)
-    setTimeout(() => {
-      const form = document.querySelector("form")
-      if (form) {
-        form.requestSubmit()
+    } else {
+      console.log("Calling onBack function")
+      // onBack 함수가 있는지 확인
+      if (typeof onBack === "function") {
+        onBack()
+      } else {
+        console.log("onBack is not a function, redirecting to home")
+        setTimeout(() => {
+          window.location.href = "/"
+        }, 100)
       }
+    }
+  } catch (error) {
+    console.error("뒤로가기 처리 중 오류:", error)
+    // 오류 발생 시 기본 동작
+    setTimeout(() => {
+      window.location.href = "/"
     }, 100)
   }
+}
 
-  const generateSuggestedQuestions = useCallback(async () => {
-    if (!shouldGenerateQuestions || isGeneratingQuestions || messages.length < 2) {
-      return
+const handleSuggestedQuestionClick = (question: string) => {
+  if (isLoading) return
+
+  setInput(question)
+  setTimeout(() => {
+    const form = document.querySelector("form")
+    if (form) {
+      form.requestSubmit()
     }
+  }, 100)
+}
 
-    const lastMessage = messages[messages.length - 1]
-    if (lastMessage.role !== "assistant") {
-      return
-    }
+const generateSuggestedQuestions = useCallback(async () => {
+  if (!shouldGenerateQuestions || isGeneratingQuestions || messages.length < 2) {
+    return
+  }
 
-    setIsGeneratingQuestions(true)
-    setShouldGenerateQuestions(false)
+  const lastMessage = messages[messages.length - 1]
+  if (lastMessage.role !== "assistant") {
+    return
+  }
 
-    try {
-      const defaultQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
+  setIsGeneratingQuestions(true)
+  setShouldGenerateQuestions(false)
 
-      const response = await fetch("/api/suggested-questions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: messages.slice(-6),
-          roomType,
-          saju,
-          name,
-          currentContext: lastMessage.content.slice(0, 500),
-          birthInfo,
-        }),
-      })
+  try {
+    const defaultQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
-          setSuggestedQuestions(data.questions.filter((q) => q.length > 5 && q.length < 50))
-        } else {
-          setSuggestedQuestions(defaultQuestions)
-        }
+    const response = await fetch("/api/suggested-questions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: messages.slice(-6),
+        roomType,
+        saju,
+        name,
+        currentContext: lastMessage.content.slice(0, 500),
+        birthInfo,
+      }),
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+        setSuggestedQuestions(data.questions.filter((q) => q.length > 5 && q.length < 50))
       } else {
         setSuggestedQuestions(defaultQuestions)
       }
-    } catch (error) {
-      console.error("추천 질문 생성 오류:", error)
-      setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
-    } finally {
-      setIsGeneratingQuestions(false)
+    } else {
+      setSuggestedQuestions(defaultQuestions)
     }
-  }, [messages, roomType, shouldGenerateQuestions, isGeneratingQuestions, birthInfo, saju, name])
-
-  // 추천 질문 생성
-  useEffect(() => {
-    if (shouldGenerateQuestions && !isGeneratingQuestions && messages.length > 0) {
-      generateSuggestedQuestions()
-    }
-  }, [shouldGenerateQuestions, isGeneratingQuestions, messages, generateSuggestedQuestions])
-
-  const handleCompatibilityAnalysis = (mainPerson: any, selectedPeople: any[]) => {
-    // 궁합 분석 결과를 채팅에 추가
-    const compatibilityMessage = `궁합 분석을 시작합니다. ${mainPerson.name}님과 ${selectedPeople.map((p) => p.name).join(", ")}님의 궁합을 분석해주세요.`
-
-    append({
-      role: "user",
-      content: compatibilityMessage,
-    })
+  } catch (error) {
+    console.error("추천 질문 생성 오류:", error)
+    setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
+  } finally {
+    setIsGeneratingQuestions(false)
   }
+}, [messages, roomType, shouldGenerateQuestions, isGeneratingQuestions, birthInfo, saju, name])
 
-  const scrollToBottom = () => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-    }
+// 추천 질문 생성
+useEffect(() => {
+  if (shouldGenerateQuestions && !isGeneratingQuestions && messages.length > 0) {
+    generateSuggestedQuestions()
   }
+}, [shouldGenerateQuestions, isGeneratingQuestions, messages, generateSuggestedQuestions])
 
-  useEffect(() => {
-    if (chatContainerRef.current && !isNewUser) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200
+const handleCompatibilityAnalysis = (mainPerson: any, selectedPeople: any[]) => {
+  // 궁합 분석 결과를 채팅에 추가
+  const compatibilityMessage = `궁합 분석을 시작합니다. ${mainPerson.name}님과 ${selectedPeople.map((p) => p.name).join(", ")}님의 궁합을 분석해주세요.`
 
-      if (isNearBottom) {
-        setTimeout(() => {
-          scrollToBottom()
-        }, 100)
-      }
-    }
-  }, [messages, isNewUser])
+  append({
+    role: "user",
+    content: compatibilityMessage,
+  })
+}
 
-  useEffect(() => {
-    if (!isInitialized) {
+const scrollToBottom = () => {
+  if (chatContainerRef.current) {
+    chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+  }
+}
+
+useEffect(() => {
+  if (chatContainerRef.current && !isNewUser) {
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 200
+
+    if (isNearBottom) {
       setTimeout(() => {
-        if (!isNewUser) {
-          scrollToBottom()
-        }
-        setIsInitialized(true)
+        scrollToBottom()
       }, 100)
     }
-  }, [isInitialized, isNewUser])
+  }
+}, [messages, isNewUser])
 
-  const handleScroll = useCallback(() => {
-    if (chatContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-      setShowScrollToBottom(!isNearBottom)
-    }
-  }, [])
+useEffect(() => {
+  if (!isInitialized) {
+    setTimeout(() => {
+      if (!isNewUser) {
+        scrollToBottom()
+      }
+      setIsInitialized(true)
+    }, 100)
+  }
+}, [isInitialized, isNewUser])
 
-  const scrollToBottomSmooth = useCallback(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      })
-    }
-  }, [])
+const handleScroll = useCallback(() => {
+  if (chatContainerRef.current) {
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+    setShowScrollToBottom(!isNearBottom)
+  }
+}, [])
 
-  return (
+const scrollToBottomSmooth = useCallback(() => {
+  if (chatContainerRef.current) {
+    chatContainerRef.current.scrollTo({
+      top: chatContainerRef.current.scrollHeight,
+      behavior: "smooth",
+    })
+  }
+}, [])
+
+return (
     <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
       {/* 개선된 헤더 */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white/10 backdrop-blur-md border-b border-white/20 shadow-lg">
@@ -1010,6 +1028,8 @@ export default function SajuChat({
                   lunarMonth={birthInfo?.lunarMonth?.toString()}
                   lunarDay={birthInfo?.lunarDay?.toString()}
                   location="서울특별시"
+                  showSibseong={true}
+                  showYearAnimal={true}
                 />
               </div>
             </div>
