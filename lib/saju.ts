@@ -925,3 +925,142 @@ export function getTimeRangeInfo(timeStandard: TimeStandard = "동경135도"): {
     }
   }
 }
+
+// 기존 파일에 십성 계산 함수 추가
+
+// 십성 계산 함수
+export function calculateSibseongWithBranches(sajuInfo: any) {
+  // 천간(天干)의 십성 계산
+  const yearStemSibseong = calculateStemSibseong(sajuInfo.yearStem, sajuInfo.dayStem)
+  const monthStemSibseong = calculateStemSibseong(sajuInfo.monthStem, sajuInfo.dayStem)
+  const dayStemSibseong = "일원" // 일간(日干)은 항상 일원(日元)
+  const hourStemSibseong = calculateStemSibseong(sajuInfo.hourStem, sajuInfo.dayStem)
+
+  // 지지(地支)의 십성 계산 (지지에 포함된 천간의 십성)
+  const yearBranchSibseong = calculateBranchSibseong(sajuInfo.yearBranch, sajuInfo.dayStem)
+  const monthBranchSibseong = calculateBranchSibseong(sajuInfo.monthBranch, sajuInfo.dayStem)
+  const dayBranchSibseong = calculateBranchSibseong(sajuInfo.dayBranch, sajuInfo.dayStem)
+  const hourBranchSibseong = calculateBranchSibseong(sajuInfo.hourBranch, sajuInfo.dayStem)
+
+  return {
+    yearStemSibseong: yearStemSibseong,
+    monthStemSibseong: monthStemSibseong,
+    dayStemSibseong: dayStemSibseong,
+    hourStemSibseong: hourStemSibseong,
+    yearBranchSibseong: yearBranchSibseong,
+    monthBranchSibseong: monthBranchSibseong,
+    dayBranchSibseong: dayBranchSibseong,
+    hourBranchSibseong: hourBranchSibseong,
+  }
+}
+
+// 천간(天干)의 십성 계산
+function calculateStemSibseong(stem: string, dayStem: string) {
+  // 일간(日干)의 오행
+  const dayElement = getStemElement(dayStem)
+
+  // 대상 천간의 오행
+  const stemElement = getStemElement(stem)
+
+  // 십성 계산
+  return getSibseong(stemElement, dayElement)
+}
+
+// 지지(地支)의 십성 계산 (지지에 포함된 천간의 십성)
+function calculateBranchSibseong(branch: string, dayStem: string) {
+  // 지지에 포함된 천간들 (예: 자(子)는 계수(癸水))
+  const hiddenStems = getHiddenStems(branch)
+
+  // 각 천간의 십성 계산 후 결합
+  const sibseongs = hiddenStems.map((stem) => calculateStemSibseong(stem, dayStem))
+
+  // 여러 십성이 있을 경우 쉼표로 구분
+  return sibseongs.join(",")
+}
+
+// 천간의 오행 반환
+function getStemElement(stem: string) {
+  const stemElements: Record<string, string> = {
+    갑: "목",
+    을: "목",
+    병: "화",
+    정: "화",
+    무: "토",
+    기: "토",
+    경: "금",
+    신: "금",
+    임: "수",
+    계: "수",
+  }
+
+  return stemElements[stem] || ""
+}
+
+// 지지에 포함된 천간들 반환
+function getHiddenStems(branch: string) {
+  const branchStems: Record<string, string[]> = {
+    자: ["계"],
+    축: ["기", "계", "정"],
+    인: ["갑", "병", "무"],
+    묘: ["을"],
+    진: ["무", "을", "경"],
+    사: ["병", "경", "임"],
+    오: ["정", "무"],
+    미: ["기", "정", "을"],
+    신: ["경", "임", "병"],
+    유: ["신"],
+    술: ["기", "신", "갑"],
+    해: ["임", "갑"],
+  }
+
+  return branchStems[branch] || []
+}
+
+// 십성 계산
+function getSibseong(element: string, dayElement: string) {
+  // 일간과 대상 천간의 관계에 따른 십성
+  if (element === dayElement) {
+    // 같은 오행
+    return element === "목" || element === "화" ? "비견" : "동관"
+  } else if (isGenerating(dayElement, element)) {
+    // 일간이 생(生)하는 오행
+    return element === "목" || element === "화" ? "식신" : "상관"
+  } else if (isGenerating(element, dayElement)) {
+    // 일간을 생(生)하는 오행
+    return element === "목" || element === "화" ? "편인" : "정인"
+  } else if (isControlling(dayElement, element)) {
+    // 일간이 극(剋)하는 오행
+    return element === "목" || element === "화" ? "편재" : "정재"
+  } else if (isControlling(element, dayElement)) {
+    // 일간을 극(剋)하는 오행
+    return element === "목" || element === "화" ? "편관" : "정관"
+  }
+
+  return ""
+}
+
+// 오행 생(生) 관계 확인
+function isGenerating(source: string, target: string) {
+  const generatingPairs = [
+    ["목", "화"], // 목생화
+    ["화", "토"], // 화생토
+    ["토", "금"], // 토생금
+    ["금", "수"], // 금생수
+    ["수", "목"], // 수생목
+  ]
+
+  return generatingPairs.some(([s, t]) => s === source && t === target)
+}
+
+// 오행 극(剋) 관계 확인
+function isControlling(source: string, target: string) {
+  const controllingPairs = [
+    ["목", "토"], // 목극토
+    ["토", "수"], // 토극수
+    ["수", "화"], // 수극화
+    ["화", "금"], // 화극금
+    ["금", "목"], // 금극목
+  ]
+
+  return controllingPairs.some(([s, t]) => s === source && t === target)
+}
