@@ -290,69 +290,91 @@ export default function CompatibilityTool({
 
   // 궁합 분석 실행 - 개선된 버전
   const handleAnalyze = () => {
+    console.log("handleAnalyze called")
+    console.log("mainPerson:", mainPerson)
+    console.log("selectedPeople:", selectedPeople)
+
     if (!mainPerson || selectedPeople.length === 0) {
       alert("대표 사주와 궁합 대상을 선택해주세요.")
       return
     }
 
-    // 사주 데이터 압축 (시간 정보 포함) - 더 정확한 데이터 전달
-    const compressedMainPerson = compressSaju(
-      mainPerson.saju,
-      mainPerson.birthYear,
-      mainPerson.birthMonth,
-      mainPerson.birthDay,
-      mainPerson.birthHour,
-      mainPerson.birthMinute,
-      mainPerson.saju?.timeUnknown || false,
-    )
-
-    // 성별과 이름 정보 정확히 설정
-    compressedMainPerson.gender =
-      mainPerson.gender === "male" || mainPerson.gender === "female" ? mainPerson.gender : "male"
-    compressedMainPerson.name = mainPerson.name
-
-    const compressedSelectedPeople = selectedPeople.map((person) => {
-      const compressed = compressSaju(
-        person.saju,
-        person.birthYear,
-        person.birthMonth,
-        person.birthDay,
-        person.birthHour,
-        person.birthMinute,
-        person.saju?.timeUnknown || false,
+    try {
+      // 사주 데이터 압축 (시간 정보 포함) - 더 정확한 데이터 전달
+      const compressedMainPerson = compressSaju(
+        mainPerson.saju,
+        mainPerson.birthYear,
+        mainPerson.birthMonth,
+        mainPerson.birthDay,
+        mainPerson.birthHour,
+        mainPerson.birthMinute,
+        mainPerson.saju?.timeUnknown || false,
       )
 
       // 성별과 이름 정보 정확히 설정
-      compressed.gender = person.gender === "male" || person.gender === "female" ? person.gender : "male"
-      compressed.name = person.name
+      compressedMainPerson.gender =
+        mainPerson.gender === "male" || mainPerson.gender === "female" ? mainPerson.gender : "male"
+      compressedMainPerson.name = mainPerson.name
 
-      return compressed
-    })
+      const compressedSelectedPeople = selectedPeople.map((person) => {
+        const compressed = compressSaju(
+          person.saju,
+          person.birthYear,
+          person.birthMonth,
+          person.birthDay,
+          person.birthHour,
+          person.birthMinute,
+          person.saju?.timeUnknown || false,
+        )
 
-    console.log("궁합 분석 데이터 (상세):", {
-      mainPerson: compressedMainPerson,
-      selectedPeople: compressedSelectedPeople,
-    })
+        // 성별과 이름 정보 정확히 설정
+        compressed.gender = person.gender === "male" || person.gender === "female" ? person.gender : "male"
+        compressed.name = person.name
 
-    // 로컬 스토리지에 상세 데이터 저장
-    try {
-      const compatibilityData = {
+        return compressed
+      })
+
+      console.log("궁합 분석 데이터 (상세):", {
         mainPerson: compressedMainPerson,
         selectedPeople: compressedSelectedPeople,
-        timestamp: new Date().toISOString(),
-        fullSajuData: {
-          main: mainPerson,
-          selected: selectedPeople,
-        },
-      }
-      localStorage.setItem(`compatibility_latest`, JSON.stringify(compatibilityData))
-      console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
-    } catch (error) {
-      console.error("Error saving compatibility data to localStorage:", error)
-    }
+      })
 
-    onCompatibilityAnalysis(compressedMainPerson, compressedSelectedPeople)
-    onClose()
+      // 로컬 스토리지에 상세 데이터 저장
+      try {
+        const compatibilityData = {
+          mainPerson: compressedMainPerson,
+          selectedPeople: compressedSelectedPeople,
+          timestamp: new Date().toISOString(),
+          fullSajuData: {
+            main: mainPerson,
+            selected: selectedPeople,
+          },
+        }
+        localStorage.setItem(`compatibility_latest`, JSON.stringify(compatibilityData))
+        console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
+      } catch (error) {
+        console.error("Error saving compatibility data to localStorage:", error)
+      }
+
+      // 콜백 함수 호출 전에 로그 추가
+      console.log("Calling onCompatibilityAnalysis callback")
+      console.log("onCompatibilityAnalysis type:", typeof onCompatibilityAnalysis)
+
+      if (typeof onCompatibilityAnalysis === "function") {
+        onCompatibilityAnalysis(compressedMainPerson, compressedSelectedPeople)
+        console.log("onCompatibilityAnalysis callback executed successfully")
+      } else {
+        console.error("onCompatibilityAnalysis is not a function:", onCompatibilityAnalysis)
+        alert("궁합 분석 기능에 오류가 있습니다. 페이지를 새로고침해주세요.")
+        return
+      }
+
+      console.log("Closing compatibility tool")
+      onClose()
+    } catch (error) {
+      console.error("Error in handleAnalyze:", error)
+      alert("궁합 분석 중 오류가 발생했습니다: " + error.message)
+    }
   }
 
   // 대표 사주 변경
@@ -695,10 +717,10 @@ export default function CompatibilityTool({
           {/* 궁합 보기 버튼 */}
           <Button
             onClick={handleAnalyze}
-            disabled={!mainPerson || selectedPeople.length === 0}
+            disabled={!mainPerson || selectedPeople.length === 0 || isLoading}
             className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400"
           >
-            궁합 보기 ({selectedPeople.length}/3)
+            {isLoading ? "분석 중..." : `궁합 보기 (${selectedPeople.length}/3)`}
           </Button>
         </div>
       </DialogContent>

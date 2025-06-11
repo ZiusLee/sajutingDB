@@ -34,63 +34,45 @@ export async function getUserSajuProfiles() {
     const { data: sessions, error: sessionsError } = await supabase
       .from("saju_sessions")
       .select(`
-    id,
-    name,
-    gender,
-    email,
-    created_at,
-    auth_user_id,
-    is_default,
-    birth_info (
-      id,
-      solar_year,
-      solar_month,
-      solar_day,
-      solar_hour,
-      solar_minute,
-      lunar_year,
-      lunar_month,
-      lunar_day,
-      time_unknown
-    ),
-    saju_info (
-      id,
-      year_stem,
-      year_branch,
-      month_stem,
-      month_branch,
-      day_stem,
-      day_branch,
-      hour_stem,
-      hour_branch,
-      year_stem_hanja,
-      year_branch_hanja,
-      month_stem_hanja,
-      month_branch_hanja,
-      day_stem_hanja,
-      day_branch_hanja,
-      hour_stem_hanja,
-      hour_branch_hanja,
-      day_master,
-      day_master_hanja,
-      year_stem_sibseong,
-      month_stem_sibseong,
-      day_stem_sibseong,
-      hour_stem_sibseong,
-      year_branch_sibseong,
-      month_branch_sibseong,
-      day_branch_sibseong,
-      hour_branch_sibseong,
-      year_animal
-    ),
-    elements (
-      wood,
-      fire,
-      earth,
-      metal,
-      water
-    )
-  `)
+        id,
+        name,
+        gender,
+        email,
+        created_at,
+        auth_user_id,
+        is_default,
+        birth_info (
+          id,
+          solar_year,
+          solar_month,
+          solar_day,
+          solar_hour,
+          solar_minute,
+          lunar_year,
+          lunar_month,
+          lunar_day,
+          time_unknown
+        ),
+        saju_info (
+          id,
+          year_stem,
+          year_branch,
+          month_stem,
+          month_branch,
+          day_stem,
+          day_branch,
+          hour_stem,
+          hour_branch,
+          year_stem_sibseong,
+          month_stem_sibseong,
+          day_stem_sibseong,
+          hour_stem_sibseong,
+          year_branch_sibseong,
+          month_branch_sibseong,
+          day_branch_sibseong,
+          hour_branch_sibseong
+        )
+      `)
       .eq("auth_user_id", authUserId)
 
     console.log("Full query result:", sessions)
@@ -138,16 +120,6 @@ export async function getUserSajuProfiles() {
           dayBranch: sajuInfo?.day_branch || "N/A",
           hourStem: sajuInfo?.hour_stem || "N/A",
           hourBranch: sajuInfo?.hour_branch || "N/A",
-          yearStemHanja: sajuInfo?.year_stem_hanja || "",
-          yearBranchHanja: sajuInfo?.year_branch_hanja || "",
-          monthStemHanja: sajuInfo?.month_stem_hanja || "",
-          monthBranchHanja: sajuInfo?.month_branch_hanja || "",
-          dayStemHanja: sajuInfo?.day_stem_hanja || "",
-          dayBranchHanja: sajuInfo?.day_branch_hanja || "",
-          hourStemHanja: sajuInfo?.hour_stem_hanja || "",
-          hourBranchHanja: sajuInfo?.hour_branch_hanja || "",
-          dayMaster: sajuInfo?.day_master || sajuInfo?.day_stem || "",
-          dayMasterHanja: sajuInfo?.day_master_hanja || "",
           yearStemSibseong: sajuInfo?.year_stem_sibseong || "",
           monthStemSibseong: sajuInfo?.month_stem_sibseong || "",
           dayStemSibseong: sajuInfo?.day_stem_sibseong || "",
@@ -156,23 +128,6 @@ export async function getUserSajuProfiles() {
           monthBranchSibseong: sajuInfo?.month_branch_sibseong || "",
           dayBranchSibseong: sajuInfo?.day_branch_sibseong || "",
           hourBranchSibseong: sajuInfo?.hour_branch_sibseong || "",
-          yearAnimal: sajuInfo?.year_animal || "",
-          elements:
-            session.elements && session.elements.length > 0
-              ? {
-                  wood: session.elements[0].wood || 0,
-                  fire: session.elements[0].fire || 0,
-                  earth: session.elements[0].earth || 0,
-                  metal: session.elements[0].metal || 0,
-                  water: session.elements[0].water || 0,
-                }
-              : {
-                  wood: 0,
-                  fire: 0,
-                  earth: 0,
-                  metal: 0,
-                  water: 0,
-                },
         },
       }
     })
