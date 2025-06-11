@@ -38,7 +38,8 @@ interface SajuPerson {
   birthDay: string
   birthHour: string
   birthMinute: string
-  saju: any
+  saju: any // 완전한 사주 정보
+  sajuSummary?: string // 사주 요약 정보
   createdAt: string
 }
 
@@ -88,6 +89,10 @@ export default function CompatibilityTool({
 
   // 현재 사주를 SajuPerson 형태로 변환
   const getCurrentSajuPerson = (): SajuPerson => {
+    const sajuSummary = currentSaju
+      ? `${currentSaju.dayStem}${currentSaju.dayBranch}일주, ${currentSaju.yearAnimal}, 오행: 목${currentSaju.elements.wood} 화${currentSaju.elements.fire} 토${currentSaju.elements.earth} 금${currentSaju.elements.metal} 수${currentSaju.elements.water}`
+      : ""
+
     return {
       id: "current",
       name: currentName || "나",
@@ -98,6 +103,7 @@ export default function CompatibilityTool({
       birthHour: currentBirthInfo?.solarHour?.toString().padStart(2, "0") || "12",
       birthMinute: currentBirthInfo?.solarMinute?.toString().padStart(2, "0") || "0",
       saju: currentSaju,
+      sajuSummary: sajuSummary,
       createdAt: new Date().toISOString(),
     }
   }
@@ -204,7 +210,7 @@ export default function CompatibilityTool({
         }
       }
 
-      // 사주 계산
+      // 완전한 사주 계산
       const saju = calculateSaju(
         lunarData.year,
         lunarData.month,
@@ -225,6 +231,9 @@ export default function CompatibilityTool({
 
       console.log(`${newPersonForm.name} 사주 계산 완료:`, saju)
 
+      // 사주 요약 생성
+      const sajuSummary = `${saju.dayStem}${saju.dayBranch}일주, ${saju.yearAnimal}, 오행: 목${saju.elements.wood} 화${saju.elements.fire} 토${saju.elements.earth} 금${saju.elements.metal} 수${saju.elements.water}`
+
       const newPerson: SajuPerson = {
         id: `person_${Date.now()}`,
         name: newPersonForm.name,
@@ -235,6 +244,7 @@ export default function CompatibilityTool({
         birthHour: newPersonForm.timeUnknown ? "00" : newPersonForm.birthHour.padStart(2, "0"),
         birthMinute: newPersonForm.timeUnknown ? "00" : newPersonForm.birthMinute.padStart(2, "0"),
         saju: saju,
+        sajuSummary: sajuSummary,
         createdAt: new Date().toISOString(),
       }
 
@@ -296,8 +306,12 @@ export default function CompatibilityTool({
       mainPerson.saju.timeUnknown,
     )
 
-    const compressedSelectedPeople = selectedPeople.map((person) =>
-      compressSaju(
+    // 성별 정보 추가
+    compressedMainPerson.gender = mainPerson.gender as "male" | "female"
+    compressedMainPerson.name = mainPerson.name
+
+    const compressedSelectedPeople = selectedPeople.map((person) => {
+      const compressed = compressSaju(
         person.saju,
         person.birthYear,
         person.birthMonth,
@@ -305,8 +319,12 @@ export default function CompatibilityTool({
         person.birthHour,
         person.birthMinute,
         person.saju.timeUnknown,
-      ),
-    )
+      )
+      // 성별 정보 추가
+      compressed.gender = person.gender as "male" | "female"
+      compressed.name = person.name
+      return compressed
+    })
 
     console.log("궁합 분석 데이터:", {
       mainPerson: compressedMainPerson,
@@ -449,14 +467,18 @@ export default function CompatibilityTool({
                     >
                       <CardContent className="p-3">
                         <div className="flex items-center justify-between">
-                          <div>
+                          <div className="flex-1">
                             <div className="font-medium">{person.name}</div>
                             <div className="text-sm text-gray-400">
                               {person.birthYear}년 {person.birthMonth}월 {person.birthDay}일
+                              {!person.saju?.timeUnknown && ` ${person.birthHour}:${person.birthMinute}`}
                             </div>
+                            {person.sajuSummary && (
+                              <div className="text-xs text-gray-500 mt-1">{person.sajuSummary}</div>
+                            )}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {person.gender === "male" ? "남" : person.gender === "female" ? "여" : ""}
+                          <div className="text-xs text-gray-500 ml-2">
+                            {person.gender === "male" ? "남성" : person.gender === "female" ? "여성" : ""}
                           </div>
                         </div>
                       </CardContent>

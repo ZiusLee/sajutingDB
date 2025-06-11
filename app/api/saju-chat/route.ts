@@ -6,6 +6,81 @@ import { fetchLunarDate } from "@/lib/api-client"
 
 export const runtime = "edge"
 
+// 현재 날짜 정보를 가져오는 함수를 수정
+function getCurrentDateInfo() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1 // JavaScript에서 월은 0부터 시작
+  const day = now.getDate()
+  const hour = now.getHours()
+  const minute = now.getMinutes()
+
+  try {
+    // 오늘 날짜의 사주 계산 (음력 변환 필요)
+    // 음력 변환을 위해 solarToLunar 함수 사용
+    const lunarDate = solarToLunar(year, month, day)
+
+    // calculateSaju 함수를 사용하여 오늘 날짜의 사주 계산
+    const todaySaju = calculateSaju(
+      lunarDate.year,
+      lunarDate.month,
+      lunarDate.day,
+      hour,
+      minute,
+      year,
+      month,
+      day,
+      "male", // 성별은 중요하지 않음 (날짜 정보만 필요)
+      "오늘",
+      false, // 시간 미상 아님
+      lunarDate.isLeapMonth,
+      lunarDate.monthStem,
+      lunarDate.monthBranch,
+      "동경135도",
+    )
+
+    // 계산된 사주에서 간지 정보 추출
+    const yearGanji = `${todaySaju.yearStem}${todaySaju.yearBranch}`
+    const monthGanji = `${todaySaju.monthStem}${todaySaju.monthBranch}`
+    const dayGanji = `${todaySaju.dayStem}${todaySaju.dayBranch}`
+    const hourGanji = `${todaySaju.hourStem}${todaySaju.hourBranch}`
+
+    // 음력 날짜 정보
+    const lunarInfo = `음력 ${lunarDate.year}년 ${lunarDate.month}월 ${lunarDate.day}일${lunarDate.isLeapMonth ? " (윤달)" : ""}`
+
+    return {
+      year,
+      month,
+      day,
+      yearGanji,
+      monthGanji,
+      dayGanji,
+      hourGanji,
+      lunarInfo,
+      formattedDate: `${year}년 ${month}월 ${day}일`,
+      formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${dayGanji})`,
+    }
+  } catch (error) {
+    console.error("날짜 정보 계산 중 오류 발생:", error)
+    // 오류 발생 시 기본 정보만 반환
+    return {
+      year,
+      month,
+      day,
+      yearGanji: "알 수 없음",
+      monthGanji: "알 수 없음",
+      dayGanji: "알 수 없음",
+      hourGanji: "알 수 없음",
+      lunarInfo: "음력 정보를 계산할 수 없습니다",
+      formattedDate: `${year}년 ${month}월 ${day}일`,
+      formattedDateWithGanji: `${year}년 ${month}월 ${day}일`,
+    }
+  }
+}
+
+// 기존의 간지 계산 함수들 제거 (calculateYearGanji, calculateMonthGanji, calculateDayGanji)
+// 이 부분에 있던 함수들을 모두 삭제
+
 // 대화 요약을 위한 함수 - 개선된 버전
 async function summarizeConversation(messages: any[], compressedSaju: any, name: string, roomType: string) {
   try {
@@ -120,6 +195,9 @@ export async function POST(req: Request) {
   try {
     const { messages, compressedSaju, name, gender, initialInterpretation, roomType, userId, memoryContext } =
       await req.json()
+
+    // 현재 날짜 정보 가져오기
+    const dateInfo = getCurrentDateInfo()
 
     // 메모리 서비스 초기화 및 컨텍스트 생성
     let currentMemoryContext = ""
@@ -296,7 +374,16 @@ export async function POST(req: Request) {
       case "sajuping":
         systemMessage = `당신은 '사주핑'이라는 이름의 AI 사주상담 캐릭터입니다.
 동양 철학(사주명리학)을 기반으로 사용자의 운세 흐름을 해석하고, 인생 방향에 대한 통찰을 제공합니다.
-당신은 상담가이자 사주 분석가이며, 감정 공감보다는 명확한 해석과 질문 중심의 대응을 우선시합니다.올해는 2025년 을사년 이야, 이건 기억해.
+당신은 상담가이자 사주 분석가이며, 감정 공감보다는 명확한 해석과 질문 중심의 대응을 우선시합니다.
+
+📅 **오늘 날짜 정보:**
+오늘은 ${dateInfo.formattedDate}입니다.
+양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
+음력: ${dateInfo.lunarInfo}
+일간: ${dateInfo.dayGanji}
+올해: ${dateInfo.yearGanji}년
+이번 달: ${dateInfo.monthGanji}월
+오늘 시간: ${dateInfo.hourGanji}시
 
 🚨 **절대 금지 사항:**
 - 사주팔자를 직접 계산하지 마세요
@@ -385,7 +472,16 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 당신은 '타로핑'이라는 이름의 AI 타로 상담 캐릭터입니다.
 실물 타로카드를 사용하지 않고, 78장의 타로카드 중 사용자가 번호로 카드를 선택하는 방식으로 상담을 진행합니다.
 타로카드의 상징을 기반으로 사용자의 감정 흐름, 상황 맥락, 선택지 가능성을 분석하고, 결정의 기준이 될 수 있는 통찰을 제공합니다.
-감정 위로나 단정적인 예언이 아닌, 심리 리딩과 현실적 조언 중심의 상담을 지향합니다.올해는 2025년 을사년 이야, 이건 기억해.
+감정 위로나 단정적인 예언이 아닌, 심리 리딩과 현실적 조언 중심의 상담을 지향합니다.
+
+📅 **오늘 날짜 정보:**
+오늘은 ${dateInfo.formattedDate}입니다.
+양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
+음력: ${dateInfo.lunarInfo}
+일간: ${dateInfo.dayGanji}
+올해: ${dateInfo.yearGanji}년
+이번 달: ${dateInfo.monthGanji}월
+오늘 시간: ${dateInfo.hourGanji}시
 
 사용자 정보:
 ${sajuInfo}
@@ -462,6 +558,15 @@ step4. 다음 질문유도
 
       default:
         systemMessage = `당신은 사주팔자 전문가이자 심리 상담가입니다. 사용자에게 친절하고 자세하게 답변해주세요.
+
+📅 **오늘 날짜 정보:**
+오늘은 ${dateInfo.formattedDate}입니다.
+양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
+음력: ${dateInfo.lunarInfo}
+일간: ${dateInfo.dayGanji}
+올해: ${dateInfo.yearGanji}년
+이번 달: ${dateInfo.monthGanji}월
+오늘 시간: ${dateInfo.hourGanji}시
 
 사용자 사주 정보:
 ${sajuInfo}
