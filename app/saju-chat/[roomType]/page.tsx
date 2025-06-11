@@ -45,6 +45,14 @@ export default function SajuChatPage() {
         localStorage.setItem("chat_return_path", lastChatData.returnPath)
       }
 
+      // 마이페이지에서 왔는지 확인 (더 안전하게)
+      const fromMyPage = sessionStorage.getItem("from_mypage")
+      console.log("from_mypage flag:", fromMyPage)
+      if (fromMyPage === "true") {
+        console.log("Chat opened from mypage - flag confirmed")
+        // 플래그는 saju-chat 컴포넌트에서 처리하므로 여기서는 제거하지 않음
+      }
+
       setLoading(false)
 
       // 로그인 상태 확인
@@ -112,6 +120,7 @@ export default function SajuChatPage() {
         onBack={handleBack}
         isLoggedIn={isLoggedIn}
         sessionKey={sessionKey}
+        birthInfo={saju.birthInfo}
       />
     </div>
   )

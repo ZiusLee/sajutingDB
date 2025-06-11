@@ -962,7 +962,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1959, month: 7, solarTerm: '대서', timestamp: '1959-07-24 00:15' },
   { year: 1959, month: 8, solarTerm: '입추', timestamp: '1959-08-08 16:34' },
   { year: 1959, month: 8, solarTerm: '처서', timestamp: '1959-08-24 07:14' },
-  { year: 1959, month: 9, solarTerm: '백로', timestamp: '1959-09-08 19:18' },
+  { year: 1959, month: 9, solarTerm: '백���', timestamp: '1959-09-08 19:18' },
   { year: 1959, month: 9, solarTerm: '추분', timestamp: '1959-09-24 03:38' },
   { year: 1959, month: 10, solarTerm: '한로', timestamp: '1959-10-09 09:40' },
   { year: 1959, month: 10, solarTerm: '상강', timestamp: '1959-10-24 12:41' },

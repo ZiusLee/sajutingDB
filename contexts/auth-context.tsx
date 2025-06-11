@@ -106,7 +106,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // 로그인 상태가 변경되었고 사용자가 있는 경우 마이페이지로 리다이렉션
         // 단, 이미 /mypage 경로에 있는 경우는 제외
-        if (window.location.pathname !== "/mypage") {
+        const currentPath = window.location.pathname
+        const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list"]
+        const shouldRedirect = !excludedPaths.some((path) => currentPath.startsWith(path))
+
+        // from_mypage 플래그가 있으면 리디렉션하지 않음
+        const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
+
+        if (shouldRedirect && !fromMyPage) {
           router.push("/mypage")
         }
       } else {
