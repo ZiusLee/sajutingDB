@@ -22,24 +22,19 @@ export function SiteHeader() {
     const fetchUser = async () => {
       setIsLoading(true)
       try {
-        // First check if we have a session
         const { data: sessionData } = await supabase.auth.getSession()
 
         if (sessionData?.session) {
-          // If we have a session, get the user
           const { data } = await supabase.auth.getUser()
           if (data?.user) {
             setUser(data.user)
-            // Get user name from localStorage if available
             const storedName = localStorage.getItem("user_name")
             setUserName(storedName || data.user.email?.split("@")[0] || "사용자")
           }
         } else {
-          // No session, user is not logged in (this is normal)
           setUser(null)
         }
       } catch (err) {
-        // Only log actual errors, not "no session" cases
         if (!(err instanceof Error && err.message.includes("Auth session missing"))) {
           console.error("Unexpected error:", err)
         }
@@ -51,7 +46,6 @@ export function SiteHeader() {
 
     fetchUser()
 
-    // Subscribe to auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -69,7 +63,6 @@ export function SiteHeader() {
     }
   }, [supabase])
 
-  // Function to navigate to mypage
   const goToMyPage = () => {
     console.log("Navigating to mypage")
     router.push("/mypage")
@@ -87,11 +80,23 @@ export function SiteHeader() {
         </div>
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
+            {/* 사주핑 캐릭터 링크 */}
+            <Link href="/about" className="hidden sm:block">
+              <Button variant="ghost" size="sm" className="text-sm font-medium">
+                사주핑 캐릭터
+              </Button>
+            </Link>
+
+            {/* 사주핑 스토리 링크 */}
+            <Link href="/landing" className="hidden sm:block">
+              <Button variant="ghost" size="sm" className="text-sm font-medium">
+                사주핑 스토리
+              </Button>
+            </Link>
+
             {isLoading ? (
-              // Show loading state
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
             ) : user ? (
-              // Profile avatar - using Button instead of Link for better click handling
               <Button
                 variant="ghost"
                 className="p-0 h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
