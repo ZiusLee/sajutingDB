@@ -34,7 +34,7 @@ import CompatibilityTool from "@/components/compatibility-tool"
 import UserProfileDropdown from "@/components/user-profile-dropdown"
 import MemoryBank from "@/components/memory-bank"
 import MemoryToast from "@/components/memory-toast"
-import { formatCompressedSajuForGPT, compressSaju, type CompressedSaju } from "@/lib/saju-compression"
+import { compressSaju, type CompressedSaju } from "@/lib/saju-compression"
 import { memoryService } from "@/lib/memory-service"
 
 const useHideHeaderAndFooter = () => {
@@ -422,6 +422,15 @@ export default function SajuChat({
     }>
   >([])
 
+  // 궁합 분석 데이터를 저장할 상태 추가
+  const [compatibilityData, setCompatibilityData] = useState<{
+    mainPerson: CompressedSaju | null
+    selectedPeople: CompressedSaju[]
+  }>({
+    mainPerson: null,
+    selectedPeople: [],
+  })
+
   const getExistingSessionId = useCallback(async () => {
     if (sessionInitialized || databaseSessionId) {
       return
@@ -699,7 +708,17 @@ export default function SajuChat({
     return memoryService.generateContextSummary(userId)
   }, [userId])
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, error, reload, append } = useAIChat({
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit: aiHandleSubmit,
+    isLoading,
+    setInput,
+    error,
+    reload,
+    append,
+  } = useAIChat({
     api: "/api/saju-chat",
     initialMessages,
     body: {
@@ -721,6 +740,8 @@ export default function SajuChat({
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo,
       memoryContext: getMemoryContext(),
+      // 궁합 분석 데이터 추가
+      compatibilityData: compatibilityData,
     },
     onFinish: async (message) => {
       const qualityCheck = checkResponseQuality(message.content)
@@ -898,7 +919,7 @@ export default function SajuChat({
     }
   }, [messages, append, reload, retryCount])
 
-  const originalHandleSubmit = handleSubmit
+  const originalHandleSubmit = aiHandleSubmit
 
   const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -1118,6 +1139,7 @@ export default function SajuChat({
       setActiveChatSession,
       birthInfo,
       messages,
+      messages.length,
     ],
   )
 
@@ -1162,6 +1184,12 @@ export default function SajuChat({
 
   // 궁합 분석 핸들러 수정 - 정확한 사주 정보 전달 강화 및 로컬 스토리지 저장
   const handleCompatibilityAnalysis = (mainPerson: CompressedSaju, selectedPeople: CompressedSaju[]) => {
+    // 궁합 데이터를 상태에 저장
+    setCompatibilityData({
+      mainPerson,
+      selectedPeople,
+    })
+
     // 태그 생성
     const tagId = `compatibility_${Date.now()}`
     const newTag = {
@@ -1193,13 +1221,13 @@ export default function SajuChat({
 
     // 로컬 스토리지에도 저장
     try {
-      const compatibilityData = {
+      const compatibilityDataToStore = {
         mainPerson,
         selectedPeople,
         timestamp: new Date().toISOString(),
       }
-      localStorage.setItem(`compatibility_${tagId}`, JSON.stringify(compatibilityData))
-      console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
+      localStorage.setItem(`compatibility_${tagId}`, JSON.stringify(compatibilityDataToStore))
+      console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityDataToStore)
     } catch (error) {
       console.error("Error saving compatibility data to localStorage:", error)
     }
@@ -1209,85 +1237,16 @@ export default function SajuChat({
     // 사용자에게 보여줄 간단한 메시지 생성
     const userMessage = `🔮 **궁합 분석 요청**
 
-**대표 사주:** ${mainPerson.name} (${mainPerson.birth})
-**궁합 대상:** ${selectedPeople.map((p) => `${p.name} (${p.birth})`).join(", ")}
+**대표 사주:** ${mainPerson.name} (${mainPerson.birth}, ${mainPerson.gender === "male" ? "남성" : "여성"})
+**궁합 대상:** ${selectedPeople.map((p) => `${p.name} (${p.birth}, ${p.gender === "male" ? "남성" : "여성"})`).join(", ")}
 
-${selectedPeople.length}명과의 사주 궁합을 분석해주세요.`
+위 ${selectedPeople.length}명과의 정확한 사주 궁합을 분석해주세요.`
 
-    // GPT에게 보낼 상세한 프롬프트 생성 - 정확한 사주 정보 강조
-    const gptPrompt = `🚨 **중요: 정확한 사주 계산 시스템 결과 사용**
-
-${formatCompressedSajuForGPT(mainPerson, selectedPeople)}
-
-⚠️ **절대 금지:**
-- 위 사주 정보를 수정하거나 재계산하지 마세요
-- 생년월일로부터 새로운 사주를 추론하지 마세요
-- 제공된 정확한 계산 결과만 사용하세요
-
-✅ **분석 지침:**
-- "정확한 사주 계산 결과를 바탕으로 분석하면..." 으로 시작하세요
-- 위에 명시된 정확한 간지와 십성 정보를 그대로 사용하세요
-- 오행 분포도 제공된 수치를 정확히 활용하세요
-
-위 정확히 계산된 사주들의 궁합을 다음 내용을 포함하여 자세히 분석해주세요:
-
-## 🔮 사주 궁합 분석 (정확한 계산 결과 기반)
-
-### 1. 사주팔자 기본 분석
-- 각자의 일간(日干)과 사주 구조 특징
-- 년주, 월주, 일주, 시주의 조화로움
-
-### 2. 일간 궁합 분석 ⭐
-- 일간(日干) 상성 분석 (상생/상극/합/충 관계)
-- 일간합 여부: 갑기합, 을경합, 병신합, 정임합, 무계합
-- 일지(日支) 관계 분석
-
-### 3. 오행 궁합 분석 🌟
-- 오행 분포 비교 및 상호 보완성
-- 부족한 오행을 서로 보완해주는지 분석
-- 오행의 균형과 조화
-
-### 4. 십성 구조 분석 💫
-- 십성 배치의 조화로움
-- 서로의 십성이 미치는 영향
-- 인성, 비겁, 식상, 재성, 관성의 상호작용
-
-### 5. 지지 관계 분석 🏮
-- 지지의 합충형파해 관계
-- 삼합, 육합, 방합 등의 길한 관계
-- 충, 형, 파, 해 등의 흉한 관계
-
-### 6. 궁합 점수 및 등급 📊
-각 대상별로:
-- **종합 궁합 점수**: ⭐⭐⭐⭐⭐ (5점 만점)
-- **궁합 등급**: 최상/상/중상/중/하 등급
-- **점수 산출 근거** 상세 설명
-
-### 7. 관계별 세부 운세 💕
-각 대상별로:
-- **연애운** (70점/100점): 감정적 조화와 로맨스 가능성
-- **결혼운** (80점/100점): 장기적 관계 지속 가능성
-- **사업운** (60점/100점): 협력과 파트너십 가능성
-- **우정운** (90점/100점): 친구로서의 궁합
-
-### 8. 주의사항 및 개선방안 ⚠️
-- 궁합에서 주의해야 할 점들
-- 관계 개선을 위한 구체적 조언
-- 서로 보완할 수 있는 방법
-
-### 9. 시기별 운세 📅
-- 좋은 시기와 주의할 시기
-- 중요한 결정을 내리기 좋은 때
-
-한국어로 친절하고 상세하게 설명해주세요. 각 항목별로 구체적인 근거와 함께 설명해주시고, 실용적인 조언도 포함해주세요.`
-
-    // 사용자 메시지는 간단하게, GPT 프롬프트는 상세하게
+    // 입력창에 메시지 설정하고 전송
     setInput(userMessage)
 
-    // 실제 GPT 호출을 위해 내부적으로 상세한 프롬프트 사용
+    // 실제 전송
     setTimeout(() => {
-      // 입력창의 내용을 GPT 프롬프트로 교체
-      setInput(gptPrompt)
       const form = document.querySelector("form")
       if (form) {
         form.requestSubmit()

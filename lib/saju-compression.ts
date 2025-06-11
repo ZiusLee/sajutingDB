@@ -225,7 +225,7 @@ export function compressSaju(
 
   const sibseongAnalysis = analyzeSibseong(sibseong)
 
-  // 생년월일시 포맷팅 (시간 정보 포함)
+  // 생년월일시 포맷팅 (시간 정보 포함) - 더 정확한 처리
   let birth = ""
   if (birthYear && birthMonth && birthDay) {
     birth = `${birthYear}-${birthMonth.padStart(2, "0")}-${birthDay.padStart(2, "0")}`
@@ -239,22 +239,22 @@ export function compressSaju(
   const summary = `${dayPillar} 일주. ${characteristic}. ${elementAnalysis}. ${sibseongAnalysis}.`
 
   return {
-    name: saju.name,
+    name: saju.name || "이름없음",
     birth,
-    gender: saju.gender as "male" | "female",
+    gender: saju.gender === "male" || saju.gender === "female" ? saju.gender : "male",
     sajuPalja: {
-      year: { stem: saju.yearStem, branch: saju.yearBranch },
-      month: { stem: saju.monthStem, branch: saju.monthBranch },
-      day: { stem: saju.dayStem, branch: saju.dayBranch },
+      year: { stem: saju.yearStem || "", branch: saju.yearBranch || "" },
+      month: { stem: saju.monthStem || "", branch: saju.monthBranch || "" },
+      day: { stem: saju.dayStem || "", branch: saju.dayBranch || "" },
       hour: { stem: saju.hourStem || "", branch: saju.hourBranch || "" },
     },
-    dayMaster: saju.dayMaster,
+    dayMaster: saju.dayMaster || "",
     elements: {
-      목: saju.elements.wood,
-      화: saju.elements.fire,
-      토: saju.elements.earth,
-      금: saju.elements.metal,
-      수: saju.elements.water,
+      목: saju.elements?.wood || 0,
+      화: saju.elements?.fire || 0,
+      토: saju.elements?.earth || 0,
+      금: saju.elements?.metal || 0,
+      수: saju.elements?.water || 0,
     },
     sibseong,
     summary,
@@ -263,19 +263,23 @@ export function compressSaju(
 }
 
 export function formatCompressedSajuForGPT(mainPerson: CompressedSaju, partners: CompressedSaju[]): string {
-  let prompt = `대표 사주: ${mainPerson.name}\n`
+  let prompt = `🔮 **정확한 사주 계산 결과 (시스템 계산 완료)**\n\n`
+
+  prompt += `**대표 사주: ${mainPerson.name}**\n`
   prompt += `- 생년월일시: ${mainPerson.birth}\n`
+  prompt += `- 성별: ${mainPerson.gender === "male" ? "남성" : "여성"}\n`
   prompt += `- 사주팔자: ${mainPerson.sajuPalja.year.stem}${mainPerson.sajuPalja.year.branch}년 ${mainPerson.sajuPalja.month.stem}${mainPerson.sajuPalja.month.branch}월 ${mainPerson.sajuPalja.day.stem}${mainPerson.sajuPalja.day.branch}일 ${mainPerson.sajuPalja.hour.stem}${mainPerson.sajuPalja.hour.branch}시\n`
   prompt += `- 일간: ${mainPerson.dayMaster}\n`
   prompt += `- 십성: 년간(${mainPerson.sibseong.yearStem}) 년지(${mainPerson.sibseong.yearBranch}) 월간(${mainPerson.sibseong.monthStem}) 월지(${mainPerson.sibseong.monthBranch}) 일간(${mainPerson.sibseong.dayStem}) 일지(${mainPerson.sibseong.dayBranch}) 시간(${mainPerson.sibseong.hourStem}) 시지(${mainPerson.sibseong.hourBranch})\n`
   prompt += `- 오행분포: 목${mainPerson.elements.목} 화${mainPerson.elements.화} 토${mainPerson.elements.토} 금${mainPerson.elements.금} 수${mainPerson.elements.수}\n`
   prompt += `- 특징: ${mainPerson.summary}\n\n`
 
-  prompt += `궁합 대상들:\n`
+  prompt += `**궁합 대상들:**\n`
 
   partners.forEach((partner, index) => {
-    prompt += `${index + 1}. ${partner.name}\n`
+    prompt += `${index + 1}. **${partner.name}**\n`
     prompt += `   - 생년월일시: ${partner.birth}\n`
+    prompt += `   - 성별: ${partner.gender === "male" ? "남성" : "여성"}\n`
     prompt += `   - 사주팔자: ${partner.sajuPalja.year.stem}${partner.sajuPalja.year.branch}년 ${partner.sajuPalja.month.stem}${partner.sajuPalja.month.branch}월 ${partner.sajuPalja.day.stem}${partner.sajuPalja.day.branch}일 ${partner.sajuPalja.hour.stem}${partner.sajuPalja.hour.branch}시\n`
     prompt += `   - 일간: ${partner.dayMaster}\n`
     prompt += `   - 십성: 년간(${partner.sibseong.yearStem}) 년지(${partner.sibseong.yearBranch}) 월간(${partner.sibseong.monthStem}) 월지(${partner.sibseong.monthBranch}) 일간(${partner.sibseong.dayStem}) 일지(${partner.sibseong.dayBranch}) 시간(${partner.sibseong.hourStem}) 시지(${partner.sibseong.hourBranch})\n`

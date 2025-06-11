@@ -295,7 +295,7 @@ export default function CompatibilityTool({
       return
     }
 
-    // 사주 데이터 압축 (시간 정보 포함)
+    // 사주 데이터 압축 (시간 정보 포함) - 더 정확한 데이터 전달
     const compressedMainPerson = compressSaju(
       mainPerson.saju,
       mainPerson.birthYear,
@@ -303,11 +303,12 @@ export default function CompatibilityTool({
       mainPerson.birthDay,
       mainPerson.birthHour,
       mainPerson.birthMinute,
-      mainPerson.saju.timeUnknown,
+      mainPerson.saju?.timeUnknown || false,
     )
 
-    // 성별 정보 추가
-    compressedMainPerson.gender = mainPerson.gender as "male" | "female"
+    // 성별과 이름 정보 정확히 설정
+    compressedMainPerson.gender =
+      mainPerson.gender === "male" || mainPerson.gender === "female" ? mainPerson.gender : "male"
     compressedMainPerson.name = mainPerson.name
 
     const compressedSelectedPeople = selectedPeople.map((person) => {
@@ -318,18 +319,37 @@ export default function CompatibilityTool({
         person.birthDay,
         person.birthHour,
         person.birthMinute,
-        person.saju.timeUnknown,
+        person.saju?.timeUnknown || false,
       )
-      // 성별 정보 추가
-      compressed.gender = person.gender as "male" | "female"
+
+      // 성별과 이름 정보 정확히 설정
+      compressed.gender = person.gender === "male" || person.gender === "female" ? person.gender : "male"
       compressed.name = person.name
+
       return compressed
     })
 
-    console.log("궁합 분석 데이터:", {
+    console.log("궁합 분석 데이터 (상세):", {
       mainPerson: compressedMainPerson,
       selectedPeople: compressedSelectedPeople,
     })
+
+    // 로컬 스토리지에 상세 데이터 저장
+    try {
+      const compatibilityData = {
+        mainPerson: compressedMainPerson,
+        selectedPeople: compressedSelectedPeople,
+        timestamp: new Date().toISOString(),
+        fullSajuData: {
+          main: mainPerson,
+          selected: selectedPeople,
+        },
+      }
+      localStorage.setItem(`compatibility_latest`, JSON.stringify(compatibilityData))
+      console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
+    } catch (error) {
+      console.error("Error saving compatibility data to localStorage:", error)
+    }
 
     onCompatibilityAnalysis(compressedMainPerson, compressedSelectedPeople)
     onClose()
