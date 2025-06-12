@@ -63,6 +63,23 @@ class EnhancedMemoryService {
     return EnhancedMemoryService.instance
   }
 
+  // 로그인한 사용자의 모든 세션 ID 가져오기
+  async getUserSessionIds(authUserId: string): Promise<string[]> {
+    try {
+      const { data, error } = await supabase.from("saju_sessions").select("id").eq("auth_user_id", authUserId)
+
+      if (error) {
+        console.error("Error fetching user sessions:", error)
+        return []
+      }
+
+      return data?.map((session) => session.id) || []
+    } catch (error) {
+      console.error("Error in getUserSessionIds:", error)
+      return []
+    }
+  }
+
   // Create memory entry
   async createMemoryEntry(entry: Partial<MemoryEntry>): Promise<MemoryEntry | null> {
     try {
@@ -70,7 +87,7 @@ class EnhancedMemoryService {
         .from("memory_entries")
         .insert({
           user_id: entry.userId, // auth.users.id
-          session_id: entry.sessionId, // saju_sessions.id (선택적)
+          session_id: entry.sessionId, // saju_sessions.id
           title: entry.title,
           content: entry.content,
           entry_date: entry.entryDate || new Date().toISOString().split("T")[0],
@@ -97,9 +114,9 @@ class EnhancedMemoryService {
     }
   }
 
-  // Get memory entries with filters
+  // Get memory entries with filters - 세션 ID 기반으로 수정
   async getMemoryEntries(
-    userId: string,
+    authUserId: string,
     filters: {
       startDate?: string
       endDate?: string
@@ -111,19 +128,27 @@ class EnhancedMemoryService {
     } = {},
   ): Promise<MemoryEntry[]> {
     try {
-      // auth.users.id를 사용 (로그인한 사용자)
+      // 1. 사용자의 모든 세션 ID 가져오기
+      const sessionIds = await this.getUserSessionIds(authUserId)
+
+      if (sessionIds.length === 0) {
+        console.log("No sessions found for user:", authUserId)
+        return []
+      }
+
+      // 2. 세션 ID 또는 user_id로 메모리 엔트리 조회
       let query = supabase
         .from("memory_entries")
         .select(`
-        *,
-        memory_saju_links (
-          saju_session_id,
-          relevance_score,
-          link_type
-        )
-      `)
-        .eq("user_id", userId) // auth.users.id 사용
-        .eq("is_deleted", false) // soft delete 필터 추가
+          *,
+          memory_saju_links (
+            saju_session_id,
+            relevance_score,
+            link_type
+          )
+        `)
+        .eq("is_deleted", false)
+        .or(`session_id.in.(${sessionIds.join(",")}),user_id.eq.${authUserId}`)
         .order("entry_date", { ascending: false })
         .order("entry_time", { ascending: false })
 
@@ -164,16 +189,28 @@ class EnhancedMemoryService {
     }
   }
 
-  // Get relevant memories for AI context
-  async getRelevantMemoriesForContext(userId: string, contextKeywords: string[], limit = 5): Promise<MemoryEntry[]> {
+  // Get relevant memories for AI context - 세션 ID 기반으로 수정
+  async getRelevantMemoriesForContext(
+    authUserId: string,
+    contextKeywords: string[],
+    limit = 5,
+  ): Promise<MemoryEntry[]> {
     try {
+      // 1. 사용자의 모든 세션 ID 가져오기
+      const sessionIds = await this.getUserSessionIds(authUserId)
+
+      if (sessionIds.length === 0) {
+        return []
+      }
+
       // Search by keywords in content and tags
       const searchQuery = contextKeywords.join(" | ")
 
       const { data, error } = await supabase
         .from("memory_entries")
         .select("*")
-        .eq("user_id", userId)
+        .eq("is_deleted", false)
+        .or(`session_id.in.(${sessionIds.join(",")}),user_id.eq.${authUserId}`)
         .or(`tags.cs.{${contextKeywords.join(",")}},search_vector.fts.${searchQuery}`)
         .order("entry_date", { ascending: false })
         .limit(limit)
@@ -192,7 +229,7 @@ class EnhancedMemoryService {
 
   // Extract insights from conversation
   async extractInsightsFromConversation(
-    userId: string,
+    authUserId: string,
     userMessage: string,
     assistantResponse: string,
     sessionId?: string,
@@ -206,7 +243,7 @@ class EnhancedMemoryService {
       }
 
       const memoryEntry = await this.createMemoryEntry({
-        userId,
+        userId: authUserId,
         sessionId,
         title: insights.title,
         content: insights.content,
@@ -228,10 +265,10 @@ class EnhancedMemoryService {
     }
   }
 
-  // Generate insights from memory patterns
-  async generateInsights(userId: string, dateRange?: { start: string; end: string }): Promise<MemoryInsight[]> {
+  // Generate insights from memory patterns - 세션 ID 기반으로 수정
+  async generateInsights(authUserId: string, dateRange?: { start: string; end: string }): Promise<MemoryInsight[]> {
     try {
-      const entries = await this.getMemoryEntries(userId, {
+      const entries = await this.getMemoryEntries(authUserId, {
         startDate: dateRange?.start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         endDate: dateRange?.end || new Date().toISOString().split("T")[0],
         limit: 100,
@@ -248,7 +285,7 @@ class EnhancedMemoryService {
         const { data, error } = await supabase
           .from("memory_insights")
           .insert({
-            user_id: userId,
+            user_id: authUserId,
             insight_type: insight.type,
             title: insight.title,
             description: insight.description,
@@ -297,24 +334,34 @@ class EnhancedMemoryService {
     }
   }
 
-  // Get memory analytics
-  async getMemoryAnalytics(userId: string, days = 30): Promise<any> {
+  // Get memory analytics - 세션 ID 기반으로 수정
+  async getMemoryAnalytics(authUserId: string, days = 30): Promise<any> {
     try {
-      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+      // 1. 사용자의 모든 세션 ID 가져오기
+      const sessionIds = await this.getUserSessionIds(authUserId)
 
-      const { data, error } = await supabase
-        .from("memory_analytics")
-        .select("*")
-        .eq("user_id", userId)
-        .gte("date", startDate)
-        .order("date", { ascending: false })
-
-      if (error) {
-        console.error("Error fetching analytics:", error)
+      if (sessionIds.length === 0) {
         return null
       }
 
-      return this.aggregateAnalytics(data || [])
+      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+
+      // 2. 세션 ID 또는 user_id로 메모리 엔트리 조회
+      const { data: entries, error: entriesError } = await supabase
+        .from("memory_entries")
+        .select("entry_date, emotional_state, tags, category")
+        .eq("is_deleted", false)
+        .or(`session_id.in.(${sessionIds.join(",")}),user_id.eq.${authUserId}`)
+        .gte("entry_date", startDate)
+        .order("entry_date", { ascending: true })
+
+      if (entriesError) {
+        console.error("Error fetching entries for analytics:", entriesError)
+        return null
+      }
+
+      // 3. 분석 데이터 처리
+      return this.processAnalyticsData(entries || [], days)
     } catch (error) {
       console.error("Error in getMemoryAnalytics:", error)
       return null
@@ -508,6 +555,95 @@ class EnhancedMemoryService {
             : "감정 상태가 안정적입니다.",
       data: { trend, emotionalScores, firstAvg, secondAvg },
       confidence: Math.abs(trend) > 0.3 ? 0.8 : 0.5,
+    }
+  }
+
+  private processAnalyticsData(entries: any[], days: number) {
+    // 일별 엔트리 수
+    const dailyCounts: Record<string, number> = {}
+    const emotionalTrends: Record<string, number[]> = {}
+    const tagFrequency: Record<string, number> = {}
+    const categoryDistribution: Record<string, number> = {}
+
+    // 날짜 범위 초기화
+    for (let i = 0; i < days; i++) {
+      const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+      dailyCounts[date] = 0
+    }
+
+    // 엔트리 처리
+    entries.forEach((entry) => {
+      const date = entry.entry_date
+      dailyCounts[date] = (dailyCounts[date] || 0) + 1
+
+      // 감정 상태 처리
+      if (entry.emotional_state && typeof entry.emotional_state === "object") {
+        Object.keys(entry.emotional_state).forEach((emotion) => {
+          if (entry.emotional_state[emotion]) {
+            if (!emotionalTrends[emotion]) {
+              emotionalTrends[emotion] = new Array(days).fill(0)
+            }
+            const dayIndex = Math.floor((Date.now() - new Date(date).getTime()) / (24 * 60 * 60 * 1000))
+            if (dayIndex >= 0 && dayIndex < days) {
+              emotionalTrends[emotion][days - 1 - dayIndex]++
+            }
+          }
+        })
+      }
+
+      // 태그 처리
+      if (entry.tags && Array.isArray(entry.tags)) {
+        entry.tags.forEach((tag: string) => {
+          tagFrequency[tag] = (tagFrequency[tag] || 0) + 1
+        })
+      }
+
+      // 카테고리 처리
+      if (entry.category) {
+        categoryDistribution[entry.category] = (categoryDistribution[entry.category] || 0) + 1
+      }
+    })
+
+    // 통계 계산
+    const totalEntries = Object.values(dailyCounts).reduce((sum, count) => sum + count, 0)
+    const avgEntriesPerDay = totalEntries / days
+
+    const topTags = Object.entries(tagFrequency)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([tag, count]) => ({ tag, count }))
+
+    const topCategories = Object.entries(categoryDistribution)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([category, count]) => ({ category, count }))
+
+    const calculateStreak = (dailyCounts: Record<string, number>): number => {
+      let streak = 0
+      let current = true
+      const dates = Object.keys(dailyCounts).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+
+      for (const date of dates) {
+        if (dailyCounts[date] > 0 && current) {
+          streak++
+        } else {
+          current = false
+        }
+      }
+      return streak
+    }
+
+    return {
+      totalEntries,
+      avgEntriesPerDay: Math.round(avgEntriesPerDay * 100) / 100,
+      dailyCounts: Object.entries(dailyCounts)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({ date, count })),
+      emotionalTrends,
+      topTags,
+      topCategories,
+      activeDays: Object.values(dailyCounts).filter((count) => count > 0).length,
+      streakDays: calculateStreak(dailyCounts),
     }
   }
 
