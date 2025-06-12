@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,15 +10,16 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { BookOpen, Plus, Brain, Clock, Tag, Lightbulb, Heart, Map } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { BookOpen, Plus, Brain, Clock, Tag, Lightbulb, Heart, Map, LogIn, Shield } from "lucide-react"
 import { enhancedMemoryService, type MemoryEntry, type MemoryInsight } from "@/lib/memory-service-enhanced"
 
 export default function PersonalSpacePage() {
   const [user, setUser] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [entries, setEntries] = useState<MemoryEntry[]>([])
   const [insights, setInsights] = useState<MemoryInsight[]>([])
   const [analytics, setAnalytics] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const [showNewEntryForm, setShowNewEntryForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("")
@@ -30,19 +32,53 @@ export default function PersonalSpacePage() {
   })
 
   const supabase = createClientComponentClient()
+  const router = useRouter()
 
-  // 사용자 정보 가져오기
+  // 사용자 인증 확인
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user)
-    }
-    fetchUser()
-  }, [supabase])
+    const checkAuth = async () => {
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser()
 
-  // 데이터 로드
+        if (error || !user) {
+          // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
+          router.push("/login?redirect=/my-questions")
+          return
+        }
+
+        setUser(user)
+      } catch (error) {
+        console.error("인증 확인 중 오류:", error)
+        router.push("/login?redirect=/my-questions")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkAuth()
+
+    // 인증 상태 변화 감지
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.user) {
+        router.push("/login?redirect=/my-questions")
+      } else if (session?.user) {
+        setUser(session.user)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase, router])
+
+  // 데이터 로드 (인증된 사용자만)
   const loadData = async () => {
-    if (!user) return
+    if (!user?.id) return
 
     setIsLoading(true)
     try {
@@ -69,18 +105,18 @@ export default function PersonalSpacePage() {
   }
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       loadData()
     }
-  }, [user, searchQuery, selectedCategory])
+  }, [user?.id, searchQuery, selectedCategory])
 
   // 새 엔트리 생성
   const handleCreateEntry = async () => {
-    if (!user || !newEntry.content.trim()) return
+    if (!user?.id || !newEntry.content.trim()) return
 
     try {
       const entry = await enhancedMemoryService.createMemoryEntry({
-        userId: user.id,
+        userId: user.id, // auth.users.id 사용
         title: newEntry.title || undefined,
         content: newEntry.content,
         emotionalState: newEntry.emotionalState,
@@ -139,12 +175,43 @@ export default function PersonalSpacePage() {
     return colors[emotion] || "bg-gray-500/20 text-gray-300 border-gray-500/30"
   }
 
+  // 로딩 중이거나 인증되지 않은 경우
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="flex space-x-1">
+            <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce"></div>
+            <div
+              className="w-3 h-3 bg-purple-400 rounded-full animate-bounce"
+              style={{ animationDelay: "150ms" }}
+            ></div>
+            <div
+              className="w-3 h-3 bg-purple-400 rounded-full animate-bounce"
+              style={{ animationDelay: "300ms" }}
+            ></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!user) {
     return (
       <div className="container mx-auto py-8">
         <div className="text-center py-12">
-          <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <p className="text-lg text-muted-foreground">로그인이 필요한 페이지입니다.</p>
+          <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">로그인이 필요합니다</h2>
+          <p className="text-muted-foreground mb-6">
+            메모리 다이어리는 개인적인 기록을 안전하게 보관하기 위해 로그인이 필요합니다.
+          </p>
+          <Button
+            onClick={() => router.push("/login?redirect=/my-questions")}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            <LogIn className="h-4 w-4 mr-2" />
+            로그인하기
+          </Button>
         </div>
       </div>
     )
@@ -152,6 +219,15 @@ export default function PersonalSpacePage() {
 
   return (
     <div className="container mx-auto py-8 max-w-6xl">
+      {/* 보안 알림 */}
+      <Alert className="mb-6 border-purple-200/20 bg-purple-50/50">
+        <Shield className="h-4 w-4" />
+        <AlertDescription>
+          <strong>개인 정보 보호:</strong> 모든 메모리 기록은 암호화되어 안전하게 보관되며, 오직 본인만 접근할 수
+          있습니다.
+        </AlertDescription>
+      </Alert>
+
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-8">
         <div>
