@@ -33,23 +33,33 @@ export default function MemoryDiary({ userId, isOpen, onClose }: MemoryDiaryProp
     category: "",
   })
 
+  // 새로운 상태 추가
+  const [analytics, setAnalytics] = useState<any>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string>("")
+  const [selectedVisibility, setSelectedVisibility] = useState<"private" | "shared" | "public">("private")
+
   // Load entries and insights
   const loadData = async () => {
     if (!userId) return
 
     setIsLoading(true)
     try {
-      const [entriesData, insightsData] = await Promise.all([
+      const [entriesData, insightsData, analyticsData] = await Promise.all([
         enhancedMemoryService.getMemoryEntries(userId, {
           search: searchQuery || undefined,
           tags: selectedTags.length > 0 ? selectedTags : undefined,
+          category: selectedCategory || undefined,
           limit: 50,
         }),
         enhancedMemoryService.generateInsights(userId),
+        fetch(`/api/memory/analytics?days=30`)
+          .then((res) => res.json())
+          .catch(() => null),
       ])
 
       setEntries(entriesData)
       setInsights(insightsData)
+      setAnalytics(analyticsData)
     } catch (error) {
       console.error("Error loading memory data:", error)
     } finally {
@@ -61,7 +71,7 @@ export default function MemoryDiary({ userId, isOpen, onClose }: MemoryDiaryProp
     if (isOpen && userId) {
       loadData()
     }
-  }, [isOpen, userId, searchQuery, selectedTags])
+  }, [isOpen, userId, searchQuery, selectedTags, selectedCategory])
 
   // Create new entry
   const handleCreateEntry = async () => {
@@ -76,6 +86,8 @@ export default function MemoryDiary({ userId, isOpen, onClose }: MemoryDiaryProp
         tags: newEntry.tags,
         category: newEntry.category || undefined,
         entryType: "manual",
+        isPrivate: selectedVisibility === "private",
+        visibility: selectedVisibility,
       })
 
       if (entry) {
@@ -88,6 +100,8 @@ export default function MemoryDiary({ userId, isOpen, onClose }: MemoryDiaryProp
           category: "",
         })
         setShowNewEntryForm(false)
+        // Reload analytics
+        loadData()
       }
     } catch (error) {
       console.error("Error creating entry:", error)
@@ -255,6 +269,41 @@ export default function MemoryDiary({ userId, isOpen, onClose }: MemoryDiaryProp
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="category">카테고리</Label>
+                        <select
+                          id="category"
+                          value={newEntry.category}
+                          onChange={(e) => setNewEntry((prev) => ({ ...prev, category: e.target.value }))}
+                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white"
+                        >
+                          <option value="">선택 안함</option>
+                          <option value="relationship">연애/관계</option>
+                          <option value="career">직장/업무</option>
+                          <option value="family">가족</option>
+                          <option value="health">건강</option>
+                          <option value="money">재정</option>
+                          <option value="personal">개인적</option>
+                          <option value="other">기타</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="visibility">공개 설정</Label>
+                        <select
+                          id="visibility"
+                          value={selectedVisibility}
+                          onChange={(e) => setSelectedVisibility(e.target.value as "private" | "shared" | "public")}
+                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white"
+                        >
+                          <option value="private">비공개</option>
+                          <option value="shared">제한 공유</option>
+                          <option value="public">공개</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="flex space-x-2">
                       <Button onClick={handleCreateEntry} className="bg-purple-600 hover:bg-purple-700">
                         저장
@@ -377,11 +426,126 @@ export default function MemoryDiary({ userId, isOpen, onClose }: MemoryDiaryProp
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-4 mt-4">
-              <div className="text-center py-8">
-                <TrendingUp className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">분석 기능을 준비 중입니다.</p>
-                <p className="text-sm text-gray-500 mt-2">감정 변화 그래프와 패턴 분석을 곧 제공할 예정입니다!</p>
-              </div>
+              {analytics ? (
+                <div className="space-y-6">
+                  {/* 기본 통계 */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card className="bg-gray-700/50 border-gray-600">
+                      <CardContent className="p-4 text-center">
+                        <div className="text-2xl font-bold text-purple-400">{analytics.analytics.totalEntries}</div>
+                        <div className="text-sm text-gray-400">총 기록</div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gray-700/50 border-gray-600">
+                      <CardContent className="p-4 text-center">
+                        <div className="text-2xl font-bold text-blue-400">{analytics.analytics.avgEntriesPerDay}</div>
+                        <div className="text-sm text-gray-400">일평균 기록</div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gray-700/50 border-gray-600">
+                      <CardContent className="p-4 text-center">
+                        <div className="text-2xl font-bold text-green-400">{analytics.analytics.activeDays}</div>
+                        <div className="text-sm text-gray-400">활동 일수</div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gray-700/50 border-gray-600">
+                      <CardContent className="p-4 text-center">
+                        <div className="text-2xl font-bold text-yellow-400">{analytics.analytics.streakDays}</div>
+                        <div className="text-sm text-gray-400">연속 기록</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* 주요 태그 */}
+                  {analytics.analytics.topTags.length > 0 && (
+                    <Card className="bg-gray-700/50 border-gray-600">
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center space-x-2">
+                          <Tag className="h-5 w-5 text-purple-400" />
+                          <span>주요 관심사</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-2">
+                          {analytics.analytics.topTags.map(({ tag, count }: { tag: string; count: number }) => (
+                            <Badge key={tag} variant="secondary" className="text-sm">
+                              {tag} ({count})
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* 카테고리 분포 */}
+                  {analytics.analytics.topCategories.length > 0 && (
+                    <Card className="bg-gray-700/50 border-gray-600">
+                      <CardHeader>
+                        <CardTitle className="text-lg">카테고리 분포</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {analytics.analytics.topCategories.map(
+                            ({ category, count }: { category: string; count: number }) => (
+                              <div key={category} className="flex items-center justify-between">
+                                <span className="text-gray-300">{category}</span>
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-20 bg-gray-600 rounded-full h-2">
+                                    <div
+                                      className="bg-purple-400 h-2 rounded-full"
+                                      style={{ width: `${(count / analytics.analytics.totalEntries) * 100}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm text-gray-400">{count}</span>
+                                </div>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* 일별 활동 */}
+                  <Card className="bg-gray-700/50 border-gray-600">
+                    <CardHeader>
+                      <CardTitle className="text-lg">최근 30일 활동</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-7 gap-1">
+                        {analytics.analytics.dailyCounts
+                          .slice(-21)
+                          .map(({ date, count }: { date: string; count: number }) => (
+                            <div
+                              key={date}
+                              className={`w-8 h-8 rounded text-xs flex items-center justify-center ${
+                                count > 0
+                                  ? count === 1
+                                    ? "bg-purple-400/30 text-purple-300"
+                                    : count === 2
+                                      ? "bg-purple-400/60 text-purple-200"
+                                      : "bg-purple-400 text-white"
+                                  : "bg-gray-600 text-gray-400"
+                              }`}
+                              title={`${date}: ${count}개 기록`}
+                            >
+                              {count || ""}
+                            </div>
+                          ))}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-2">색이 진할수록 더 많은 기록을 작성한 날입니다</div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <TrendingUp className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">분석 데이터를 불러오는 중...</p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

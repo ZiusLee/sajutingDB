@@ -388,6 +388,162 @@ export interface Database {
           updated_at?: string
         }
       }
+      memory_entries: {
+        Row: {
+          id: string
+          user_id: string | null
+          session_id: string | null
+          title: string | null
+          content: string
+          entry_date: string
+          entry_time: string
+          emotional_state: Json
+          entry_type: string
+          context_data: Json
+          tags: string[]
+          category: string | null
+          is_private: boolean
+          visibility: string
+          ai_processed: boolean
+          ai_insights: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          session_id?: string | null
+          title?: string | null
+          content: string
+          entry_date?: string
+          entry_time?: string
+          emotional_state?: Json
+          entry_type?: string
+          context_data?: Json
+          tags?: string[]
+          category?: string | null
+          is_private?: boolean
+          visibility?: string
+          ai_processed?: boolean
+          ai_insights?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          session_id?: string | null
+          title?: string | null
+          content?: string
+          entry_date?: string
+          entry_time?: string
+          emotional_state?: Json
+          entry_type?: string
+          context_data?: Json
+          tags?: string[]
+          category?: string | null
+          is_private?: boolean
+          visibility?: string
+          ai_processed?: boolean
+          ai_insights?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      memory_saju_links: {
+        Row: {
+          id: string
+          memory_id: string
+          saju_session_id: string
+          relevance_score: number
+          link_type: string
+          context_notes: string | null
+          ai_confidence: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          memory_id: string
+          saju_session_id: string
+          relevance_score?: number
+          link_type?: string
+          context_notes?: string | null
+          ai_confidence?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          memory_id?: string
+          saju_session_id?: string
+          relevance_score?: number
+          link_type?: string
+          context_notes?: string | null
+          ai_confidence?: number
+          created_at?: string
+        }
+      }
+      memory_insights: {
+        Row: {
+          id: string
+          user_id: string
+          insight_type: string
+          title: string
+          description: string
+          pattern_data: Json
+          source_memory_ids: string[]
+          date_range_start: string | null
+          date_range_end: string | null
+          confidence_score: number
+          model_used: string | null
+          generated_at: string
+          user_acknowledged: boolean
+          user_feedback: Json
+          is_active: boolean
+          expires_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          insight_type: string
+          title: string
+          description: string
+          pattern_data?: Json
+          source_memory_ids?: string[]
+          date_range_start?: string | null
+          date_range_end?: string | null
+          confidence_score?: number
+          model_used?: string | null
+          generated_at?: string
+          user_acknowledged?: boolean
+          user_feedback?: Json
+          is_active?: boolean
+          expires_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          insight_type?: string
+          title?: string
+          description?: string
+          pattern_data?: Json
+          source_memory_ids?: string[]
+          date_range_start?: string | null
+          date_range_end?: string | null
+          confidence_score?: number
+          model_used?: string | null
+          generated_at?: string
+          user_acknowledged?: boolean
+          user_feedback?: Json
+          is_active?: boolean
+          expires_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }

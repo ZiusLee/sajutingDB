@@ -82,10 +82,6 @@ export async function POST(request: NextRequest) {
       data: { user },
     } = await supabaseClient.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
-    }
-
     const body = await request.json()
     const {
       title,
@@ -98,6 +94,8 @@ export async function POST(request: NextRequest) {
       tags = [],
       category,
       sessionId,
+      isPrivate = true,
+      visibility = "private",
     } = body
 
     // Validate required fields
@@ -105,12 +103,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
+    // Validate entry_type
+    const validEntryTypes = ["manual", "ai_generated", "session_summary", "insight_summary"]
+    if (!validEntryTypes.includes(entryType)) {
+      return NextResponse.json({ error: "Invalid entry type" }, { status: 400 })
+    }
+
+    // Validate visibility
+    const validVisibilities = ["private", "shared", "public"]
+    if (!validVisibilities.includes(visibility)) {
+      return NextResponse.json({ error: "Invalid visibility" }, { status: 400 })
+    }
+
     // Create memory entry
     const { data: entry, error: entryError } = await supabaseClient
       .from("memory_entries")
       .insert({
-        user_id: user.id,
-        session_id: sessionId,
+        user_id: user?.id || null,
+        session_id: sessionId || null,
         title,
         content,
         entry_date: entryDate || new Date().toISOString().split("T")[0],
@@ -120,6 +130,10 @@ export async function POST(request: NextRequest) {
         context_data: contextData,
         tags,
         category,
+        is_private: isPrivate,
+        visibility,
+        ai_processed: false,
+        ai_insights: {},
       })
       .select()
       .single()
@@ -129,23 +143,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create entry" }, { status: 500 })
     }
 
-    // Update tag usage counts
-    if (tags.length > 0) {
-      for (const tag of tags) {
-        await supabaseClient.rpc("increment_tag_usage", {
-          p_user_id: user.id,
-          p_tag_name: tag,
-        })
-      }
-    }
-
     // Link to saju session if provided
-    if (sessionId) {
+    if (sessionId && entry) {
       await supabaseClient.from("memory_saju_links").insert({
         memory_id: entry.id,
         saju_session_id: sessionId,
         relevance_score: 0.8, // High relevance for manual links
         link_type: "manual",
+        ai_confidence: 1.0, // Manual links have 100% confidence
       })
     }
 

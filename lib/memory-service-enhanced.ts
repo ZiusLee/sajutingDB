@@ -2,18 +2,19 @@ import { supabase } from "./supabase-client"
 
 export interface MemoryEntry {
   id: string
-  userId: string
-  sessionId?: string
-  title?: string
+  userId: string | null
+  sessionId?: string | null
+  title?: string | null
   content: string
   entryDate: string
   entryTime: string
   emotionalState: Record<string, any>
-  entryType: "manual" | "ai_generated" | "session_summary"
+  entryType: "manual" | "ai_generated" | "session_summary" | "insight_summary"
   contextData: Record<string, any>
   tags: string[]
-  category?: string
+  category?: string | null
   isPrivate: boolean
+  visibility: "private" | "shared" | "public"
   aiProcessed: boolean
   aiInsights: Record<string, any>
   createdAt: string
@@ -23,17 +24,32 @@ export interface MemoryEntry {
 export interface MemoryInsight {
   id: string
   userId: string
-  insightType: string
+  insightType: "pattern" | "trend" | "recommendation" | "warning" | "milestone" | "achievement"
   title: string
   description: string
   patternData: Record<string, any>
   sourceMemoryIds: string[]
-  dateRangeStart?: string
-  dateRangeEnd?: string
+  dateRangeStart?: string | null
+  dateRangeEnd?: string | null
   confidenceScore: number
-  modelUsed: string
+  modelUsed?: string | null
+  generatedAt: string
   userAcknowledged: boolean
+  userFeedback: Record<string, any>
   isActive: boolean
+  expiresAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MemorySajuLink {
+  id: string
+  memoryId: string
+  sajuSessionId: string
+  relevanceScore: number
+  linkType: "related" | "triggered_by" | "resulted_in" | "referenced" | "manual"
+  contextNotes?: string | null
+  aiConfidence: number
   createdAt: string
 }
 
@@ -319,6 +335,7 @@ class EnhancedMemoryService {
       tags: data.tags || [],
       category: data.category,
       isPrivate: data.is_private,
+      visibility: data.visibility,
       aiProcessed: data.ai_processed,
       aiInsights: data.ai_insights || {},
       createdAt: data.created_at,
@@ -339,9 +356,13 @@ class EnhancedMemoryService {
       dateRangeEnd: data.date_range_end,
       confidenceScore: data.confidence_score,
       modelUsed: data.model_used,
+      generatedAt: data.generated_at,
       userAcknowledged: data.user_acknowledged,
+      userFeedback: data.user_feedback || {},
       isActive: data.is_active,
+      expiresAt: data.expires_at,
       createdAt: data.created_at,
+      updatedAt: data.updated_at,
     }
   }
 
