@@ -6,46 +6,33 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Brain,
-  Trash2,
-  Users,
-  Briefcase,
-  MapPin,
-  Heart,
-  User,
-  RefreshCw,
-  MessageSquare,
-  Settings2,
-  Zap,
-  Archive,
-} from "lucide-react"
-import { getMemories, deleteMemory } from "@/lib/memory-api-service"
-import type { MemoryEntry, MemoryType } from "@/lib/memory-types"
+import { Brain, Trash2, Users, Briefcase, MapPin, Heart, User, RefreshCw } from "lucide-react"
+import { memoryService, type MemoryEntry } from "@/lib/memory-service"
 
 interface MemoryBankProps {
   userId: string | null
-  sessionId?: string | null
   isOpen: boolean
   onClose: () => void
 }
 
-export default function MemoryBank({ userId, sessionId, isOpen, onClose }: MemoryBankProps) {
+export default function MemoryBank({ userId, isOpen, onClose }: MemoryBankProps) {
   const [memories, setMemories] = useState<MemoryEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   // 메모리 로드
-  const loadMemories = async () => {
-    if (!userId && !sessionId) {
-      console.log("Memory Bank: User ID and Session ID are missing.")
-      setMemories([])
-      return
-    }
+  const loadMemories = () => {
+    if (!userId) return
+
     setIsLoading(true)
     try {
-      const fetchedMemories = await getMemories(userId, sessionId) // Use new service
-      setMemories(fetchedMemories)
-      console.log(`메모리 뱅크 로드: ${fetchedMemories.length}개 항목`)
+      const userMemory = memoryService.getMemory(userId)
+      if (userMemory) {
+        setMemories(userMemory.entries)
+        console.log(`메모리 뱅크 로드: ${userMemory.entries.length}개 항목`)
+      } else {
+        setMemories([])
+        console.log("메모리 뱅크: 저장된 메모리 없음")
+      }
     } catch (error) {
       console.error("Error loading memories:", error)
       setMemories([])
@@ -56,39 +43,24 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
 
   // 컴포넌트 마운트 시 메모리 로드
   useEffect(() => {
-    if (isOpen && (userId || sessionId)) {
+    if (isOpen && userId) {
       loadMemories()
     }
-  }, [isOpen, userId, sessionId])
+  }, [isOpen, userId])
 
   // 메모리 삭제
-  const handleDeleteMemory = async (memoryId: string) => {
-    if (!userId) {
-      // Deletion currently requires userId
-      console.warn("User ID is required to delete memory.")
-      // Optionally, show a toast or message to the user
-      return
-    }
-    try {
-      await deleteMemory(memoryId, userId) // Use new service
+  const handleDeleteMemory = (memoryId: string) => {
+    if (!userId) return
+
+    const success = memoryService.deleteMemory(userId, memoryId)
+    if (success) {
       setMemories((prev) => prev.filter((memory) => memory.id !== memoryId))
-    } catch (error) {
-      console.error("Error deleting memory:", error)
-      // Optionally, show a toast or message to the user
     }
   }
 
   // 타입별 아이콘
-  const getTypeIcon = (type: MemoryType) => {
+  const getTypeIcon = (type: MemoryEntry["type"]) => {
     switch (type) {
-      case "conversation":
-        return <MessageSquare className="h-4 w-4" /> // Example icon
-      case "preference":
-        return <Settings2 className="h-4 w-4" /> // Example icon
-      case "insight":
-        return <Zap className="h-4 w-4" /> // Example icon
-      case "context":
-        return <Archive className="h-4 w-4" /> // Example icon
       case "compatibility":
         return <Users className="h-4 w-4" />
       case "career":
@@ -105,16 +77,8 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   }
 
   // 타입별 색상
-  const getTypeColor = (type: MemoryType) => {
+  const getTypeColor = (type: MemoryEntry["type"]) => {
     switch (type) {
-      case "conversation":
-        return "bg-sky-500/20 text-sky-300 border-sky-500/30"
-      case "preference":
-        return "bg-amber-500/20 text-amber-300 border-amber-500/30"
-      case "insight":
-        return "bg-teal-500/20 text-teal-300 border-teal-500/30"
-      case "context":
-        return "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
       case "compatibility":
         return "bg-pink-500/20 text-pink-300 border-pink-500/30"
       case "career":
@@ -131,7 +95,7 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   }
 
   // 타입별 메모리 필터링
-  const getMemoriesByType = (type: MemoryType) => {
+  const getMemoriesByType = (type: MemoryEntry["type"]) => {
     return memories.filter((memory) => memory.type === type)
   }
 
@@ -214,21 +178,24 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
             </div>
           ) : (
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 bg-gray-700">
+              <TabsList className="grid w-full grid-cols-6 bg-gray-700">
                 <TabsTrigger value="all" className="text-xs">
                   전체
                 </TabsTrigger>
-                <TabsTrigger value="conversation" className="text-xs">
-                  대화
+                <TabsTrigger value="compatibility" className="text-xs">
+                  궁합
                 </TabsTrigger>
-                <TabsTrigger value="preference" className="text-xs">
-                  선호도
+                <TabsTrigger value="career" className="text-xs">
+                  직업
                 </TabsTrigger>
-                <TabsTrigger value="insight" className="text-xs">
-                  인사이트
+                <TabsTrigger value="location" className="text-xs">
+                  위치
                 </TabsTrigger>
-                <TabsTrigger value="context" className="text-xs">
-                  컨텍스트
+                <TabsTrigger value="emotion" className="text-xs">
+                  감정
+                </TabsTrigger>
+                <TabsTrigger value="personal" className="text-xs">
+                  개인
                 </TabsTrigger>
               </TabsList>
 
@@ -241,15 +208,22 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
                           <div className="flex items-center space-x-2 mb-2">
                             {getTypeIcon(memory.type)}
                             <Badge variant="secondary" className={getTypeColor(memory.type)}>
-                              {memory.type}
+                              {memory.label}
                             </Badge>
                             <span className="text-xs text-gray-500">{formatDate(memory.timestamp)}</span>
                           </div>
-                          <p className="text-white text-sm whitespace-pre-wrap">
-                            {typeof memory.content === "string"
-                              ? memory.content
-                              : JSON.stringify(memory.content, null, 2)}
-                          </p>
+                          <p className="text-white text-sm">{memory.value}</p>
+                          {memory.metadata && Object.keys(memory.metadata).length > 0 && (
+                            <div className="mt-2 text-xs text-gray-400">
+                              {memory.type === "compatibility" && memory.metadata.name && (
+                                <div>
+                                  이름: {memory.metadata.name}, 성별:{" "}
+                                  {memory.metadata.gender === "male" ? "남성" : "여성"}, 관계:{" "}
+                                  {memory.metadata.relationship}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
@@ -265,7 +239,7 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
                 ))}
               </TabsContent>
 
-              {(["conversation", "preference", "insight", "context"] as const).map((type) => (
+              {(["compatibility", "career", "location", "emotion", "personal"] as const).map((type) => (
                 <TabsContent key={type} value={type} className="space-y-3 mt-4">
                   {getMemoriesByType(type).length === 0 ? (
                     <div className="text-center py-8">
@@ -281,15 +255,23 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
                               <div className="flex items-center space-x-2 mb-2">
                                 {getTypeIcon(memory.type)}
                                 <Badge variant="secondary" className={getTypeColor(memory.type)}>
-                                  {memory.type}
+                                  {memory.label}
                                 </Badge>
                                 <span className="text-xs text-gray-500">{formatDate(memory.timestamp)}</span>
                               </div>
-                              <p className="text-white text-sm whitespace-pre-wrap">
-                                {typeof memory.content === "string"
-                                  ? memory.content
-                                  : JSON.stringify(memory.content, null, 2)}
-                              </p>
+                              <p className="text-white text-sm">{memory.value}</p>
+                              {memory.metadata && Object.keys(memory.metadata).length > 0 && (
+                                <div className="mt-2 text-xs text-gray-400">
+                                  {memory.type === "compatibility" && memory.metadata.name && (
+                                    <div>
+                                      이름: {memory.metadata.name}, 성별:{" "}
+                                      {memory.metadata.gender === "male" ? "남성" : "여성"}, 관계:{" "}
+                                      {memory.metadata.relationship}
+                                      {memory.metadata.compressedSaju && <div className="mt-1">사주 정보 저장됨</div>}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <Button
                               variant="ghost"
