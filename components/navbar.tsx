@@ -72,7 +72,10 @@ export function Navbar() {
           </Link>
           {user && (
             <Link href="/my-questions" passHref>
-              <Button variant={pathname === "/my-questions" ? "default" : "ghost"}>내 질문 목록</Button>
+              <Button variant={pathname === "/my-questions" ? "default" : "ghost"}>
+                <User className="h-4 w-4 mr-2" />
+                개인 공간
+              </Button>
             </Link>
           )}
           {user ? (
