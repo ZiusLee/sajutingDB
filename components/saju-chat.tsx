@@ -7,7 +7,7 @@ import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ArrowLeft, Settings, User, Database, LogIn, Mic, Send } from "lucide-react"
+import { ChevronDown, ArrowLeft, Settings, User, Database, Mic, Send } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import { compressSaju } from "@/lib/saju-compression"
 import { memoryService } from "@/lib/memory-service"
@@ -246,12 +246,28 @@ function generateChatSessionKey(name: string, saju: any, roomType: string) {
 // 마크다운 렌더링 함수 추가 (handleCompatibilityAnalysis 함수 위에)
 const renderMarkdown = (content: string) => {
   return content
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/### (.*?)(\n|$)/g, '<h3 class="text-lg font-semibold text-white mb-2 mt-4">$1</h3>')
-    .replace(/## (.*?)(\n|$)/g, '<h2 class="text-xl font-bold text-white mb-3 mt-4">$1</h2>')
-    .replace(/# (.*?)(\n|$)/g, '<h1 class="text-2xl font-bold text-white mb-4 mt-4">$1</h1>')
-    .replace(/• (.*?)(\n|$)/g, '<li class="ml-4 text-white/90">• $1</li>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="italic text-white/90">$1</em>')
+    .replace(
+      /### (.*?)(\n|$)/g,
+      '<h3 class="text-lg font-bold text-white mb-2 mt-4 border-b border-white/20 pb-1">$1</h3>',
+    )
+    .replace(
+      /## (.*?)(\n|$)/g,
+      '<h2 class="text-xl font-bold text-white mb-3 mt-4 border-b border-white/30 pb-2">$1</h2>',
+    )
+    .replace(
+      /# (.*?)(\n|$)/g,
+      '<h1 class="text-2xl font-bold text-white mb-4 mt-4 border-b border-white/40 pb-2">$1</h1>',
+    )
+    .replace(
+      /• (.*?)(\n|$)/g,
+      '<div class="flex items-start ml-4 mb-1"><span class="text-purple-400 mr-2 mt-1">•</span><span class="text-white/90 flex-1">$1</span></div>',
+    )
+    .replace(
+      /(\d+)\. (.*?)(\n|$)/g,
+      '<div class="flex items-start ml-4 mb-1"><span class="text-purple-400 mr-2 mt-1 font-semibold">$1.</span><span class="text-white/90 flex-1">$2</span></div>',
+    )
 }
 
 export default function SajuChat({
@@ -1092,13 +1108,12 @@ ${selectedPeopleInfo}
             </>
           ) : (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => router.push("/login")}
-              className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
-              title="로그인"
+              className="text-white border-white/30 hover:bg-white/20 hover:text-white hover:border-white/50 px-3 py-1 rounded-lg transition-all duration-200 text-sm"
             >
-              <LogIn className="h-5 w-5" />
+              로그인
             </Button>
           )}
         </div>
@@ -1146,13 +1161,16 @@ ${selectedPeopleInfo}
                   )}
                 </div>
                 <div className="flex-1 prose prose-invert max-w-none">
-                  {message.content.split("\n").map((line, i) => (
-                    <p
-                      key={i}
-                      className={`${i === 0 ? "mt-0" : ""} text-white/90 leading-relaxed`}
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(line || "\u00A0") }}
-                    />
-                  ))}
+                  {message.content.split("\n").map((line, i) => {
+                    const renderedLine = renderMarkdown(line || "\u00A0")
+                    return (
+                      <div
+                        key={i}
+                        className={`${i === 0 ? "mt-0" : "mt-2"} text-white/90 leading-relaxed`}
+                        dangerouslySetInnerHTML={{ __html: renderedLine }}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -1234,11 +1252,6 @@ ${selectedPeopleInfo}
           <div className="max-w-3xl mx-auto">
             <form onSubmit={customHandleSubmit} className="relative">
               <div className="flex items-center bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 focus-within:border-white/40 shadow-2xl transition-all duration-300 ease-in-out">
-                {/* + 버튼 주석 처리 */}
-                {/* <Button type="button" variant="ghost" size="sm" className="ml-3 text-white/60 hover:text-white p-2">
-                  <Plus className="h-5 w-5" />
-                </Button> */}
-
                 <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
                   <SheetTrigger asChild>
                     <Button
@@ -1304,14 +1317,14 @@ ${selectedPeopleInfo}
                   disabled={isLoading}
                 />
 
-                <Button type="button" variant="ghost" size="sm" className="mr-1 text-white/60 hover:text-white p-2">
+                <Button type="button" variant="ghost" size="sm" className="text-white/60 hover:text-white p-2">
                   <Mic className="h-5 w-5" />
                 </Button>
 
                 <Button
                   type="submit"
                   disabled={isLoading || !input.trim()}
-                  className="mr-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:bg-gray-600 disabled:text-gray-400 rounded-full p-2 shadow-lg transition-all duration-300 ease-in-out"
+                  className="mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:bg-gray-600 disabled:text-gray-400 rounded-full p-2 shadow-lg transition-all duration-300 ease-in-out"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
