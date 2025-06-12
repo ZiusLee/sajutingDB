@@ -61,7 +61,7 @@ export default function LoginPage() {
 
         if (data.session) {
           console.log("User already logged in, redirecting...")
-          router.push("/landing")
+          router.push("/mypage")
         } else {
           console.log("No active session found")
         }
@@ -84,7 +84,7 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
         },
       })
 
@@ -143,7 +143,7 @@ export default function LoginPage() {
         localStorage.setItem("user_name", userName)
       }
 
-      router.push("/landing")
+      router.push("/mypage")
     } catch (err) {
       console.error("이메일 로그인 오류:", err)
       setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다. 이메일과 비밀번호를 확인해주세요.")

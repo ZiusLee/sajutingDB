@@ -5,7 +5,6 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -22,7 +21,12 @@ import { CitySearch } from "@/components/city-search"
 import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-export default function BirthDateFormClient() {
+interface BirthDateFormClientProps {
+  onSuccess?: (sessionId: string) => void
+  redirectAfterSave?: boolean
+}
+
+export default function BirthDateFormClient({ onSuccess, redirectAfterSave = true }: BirthDateFormClientProps) {
   const [birthdate, setBirthdate] = useState("")
   const [time, setTime] = useState<string>("")
   const [timeUnknown, setTimeUnknown] = useState(false)
@@ -33,27 +37,6 @@ export default function BirthDateFormClient() {
   const [error, setError] = useState<string | null>(null)
   const [saju, setSaju] = useState<any>(null)
   const [lunarDate, setLunarDate] = useState<any>(null)
-  const [detailedInterpretation, setDetailedInterpretation] = useState<string | null>(null)
-  const [isLoadingInterpretation, setIsLoadingInterpretation] = useState(false)
-  const [loadingStage, setLoadingStage] = useState("준비 중")
-  const [loadingProgress, setLoadingProgress] = useState(0)
-  const [selectedModel, setSelectedModel] = useState<string>("openai")
-  const [interpretationResults, setInterpretationResults] = useState<{
-    interpretation: string | null
-    model: string
-    responseTime: string
-    fallbackFromOpenAI?: boolean
-  } | null>(null)
-  const [loadingTimeLeft, setLoadingTimeLeft] = useState<number>(60)
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [hasError, setHasError] = useState<boolean>(false)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [authUser, setAuthUser] = useState<any>(null) // Add authUser state
-  const [privacyConsent, setPrivacyConsent] = useState<boolean>(false)
-  const [isBetaSubmitting, setIsBetaSubmitting] = useState<boolean>(false)
-  const [betaEmail, setBetaEmail] = useState<string>("")
-  const [betaPhone, setBetaPhone] = useState<string>("")
-  const [showSuccessDialog, setShowSuccessDialog] = useState<boolean>(false)
   const [birthCityId, setBirthCityId] = useState<string>(DEFAULT_CITY_ID) // 기본값: 서울
 
   const { toast } = useToast()
@@ -64,9 +47,6 @@ export default function BirthDateFormClient() {
     const cityData = getCityById(birthCityId)
     return cityData?.timeStandard || "동경135도" // 기본값: 동경135도
   }
-
-  // Find the useEffect hook that checks authentication or add it if it doesn't exist
-  // Add this useEffect after the state declarations and before the handleSubmit function
 
   useEffect(() => {
     // Check if user is authenticated with Supabase
@@ -80,7 +60,6 @@ export default function BirthDateFormClient() {
 
         if (session && session.user) {
           console.log("User is authenticated with Supabase:", session.user.id)
-          setAuthUser(session.user)
         } else {
           console.log("User is not authenticated with Supabase")
         }
@@ -92,7 +71,6 @@ export default function BirthDateFormClient() {
     checkAuthAndLinkData()
   }, [])
 
-  // This part is different.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -108,6 +86,11 @@ export default function BirthDateFormClient() {
       return
     }
 
+    if (!name.trim()) {
+      setError("이름을 입력해주세요.")
+      return
+    }
+
     const year = birthdate.substring(0, 4)
     const month = birthdate.substring(4, 6)
     const day = birthdate.substring(6, 8)
@@ -118,8 +101,6 @@ export default function BirthDateFormClient() {
     setError(null)
     setSaju(null)
     setLunarDate(null)
-    setDetailedInterpretation(null)
-    setIsLoadingInterpretation(false)
 
     // 선택된 도시에 따른 시간 기준 가져오기
     const timeStandard = getTimeStandardFromCity()
@@ -182,9 +163,6 @@ export default function BirthDateFormClient() {
         timeStandard,
       )
 
-      // handleSubmit 함수 내에서 사주 계산 후 데이터베이스에 저장하는 코드 추가
-      // setSaju(sajuResult) 바로 다음에 추가:
-
       setSaju(sajuResult)
 
       // Store calculation data in localStorage for later use
@@ -221,9 +199,6 @@ export default function BirthDateFormClient() {
       console.log("Storing saju data to localStorage:", sajuDataToStore)
       localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
 
-      // Add a flag to indicate we should auto-fetch the interpretation
-      localStorage.setItem("autoFetchInterpretation", "true")
-
       // 전역 변수에도 저장
       window.sajuInfo = sajuResult
       window.sajuFullData = sajuDataToStore
@@ -232,8 +207,13 @@ export default function BirthDateFormClient() {
       try {
         console.log("Attempting to save saju data to database...")
 
-        // Pass authUserId to syncLocalStorageToDatabase
-        const authUserId = authUser?.id || null
+        // Get authenticated user ID
+        const supabaseClient = getSupabase()
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        const authUserId = session?.user?.id || null
+
         userId = await syncLocalStorageToDatabase(authUserId)
 
         if (userId) {
@@ -243,33 +223,30 @@ export default function BirthDateFormClient() {
           storedData.userId = userId
           localStorage.setItem("tempSajuData", JSON.stringify(storedData))
           localStorage.setItem("user_id", userId) // Store user ID in standard location
+
+          // After successfully saving saju data to database, ensure session ID is stored
+          storedData.sessionId = userId // The userId returned from syncLocalStorageToDatabase is actually the session ID
+          localStorage.setItem("tempSajuData", JSON.stringify(storedData))
+          console.log("Stored session ID for chat:", userId)
+
+          // Refresh the mypage to show the new saju
+          toast({
+            title: "사주 정보 저장 완료",
+            description: `${name}님의 사주 정보가 저장되었습니다.`,
+          })
+
+          // Reload the page to show the new saju
+          // window.location.reload()
+          // 사주 계산 완료 후 채팅으로 리디렉션
+          // router.push("/saju-chat/sajuping")
         } else {
           console.warn("Failed to get user ID when saving saju data")
         }
       } catch (dbError) {
-        console.error("Failed tosave saju data to database:", dbError)
+        console.error("Failed to save saju data to database:", dbError)
         // 실패해도 계속 진행 (나중에 다시 시도)
       }
 
-      // After successfully saving saju data to database, ensure session ID is stored
-      if (userId) {
-        // Store the session ID in the saju data for later use
-        const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-        storedData.sessionId = userId // The userId returned from syncLocalStorageToDatabase is actually the session ID
-        localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-        console.log("Stored session ID for chat:", userId)
-      }
-
-      // Construct the URL with the required parameters
-      // const url = `/result?date=${birthdate}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}&birthCityId=${encodeURIComponent(birthCityId)}`
-
-      // Navigate directly to saju chat
-      router.push("/saju-chat/sajuping")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
-      console.error("Error:", err)
-    } finally {
-      setIsSubmitting(false)
       // Store the current saju data in localStorage for later use
       try {
         localStorage.setItem(
@@ -278,7 +255,7 @@ export default function BirthDateFormClient() {
             saju: sajuResult,
             name: name,
             gender: gender,
-            interpretation: detailedInterpretation || "",
+            interpretation: "",
             returnPath: router.asPath,
             timeStandard: getTimeStandardFromCity(),
             birthCityId,
@@ -299,106 +276,60 @@ export default function BirthDateFormClient() {
         )
 
         // After successfully retrieving all results, update the auth_user_id if we have a userId
-        if (userId && authUser) {
+        if (userId) {
           updateUserAuthId(userId)
+        }
+
+        // 사주 계산 성공 후 바로 채팅으로 이동 부분을 조건부로 변경
+        if (sajuResult) {
+          // 사주 데이터를 localStorage에 저장한 후
+          localStorage.setItem(
+            "current_saju",
+            JSON.stringify({
+              saju: sajuResult,
+              name: name,
+              gender: gender,
+              interpretation: "",
+              returnPath: "/",
+              timeStandard: getTimeStandardFromCity(),
+              birthCityId,
+              birthInfo: {
+                solarYear: Number.parseInt(year),
+                solarMonth: Number.parseInt(month),
+                solarDay: Number.parseInt(day),
+                solarHour: timeUnknown ? undefined : hour,
+                solarMinute: timeUnknown ? undefined : minute,
+                lunarYear: Number.parseInt(lunarData.year),
+                lunarMonth: Number.parseInt(lunarData.month),
+                lunarDay: Number.parseInt(lunarData.day),
+                timeUnknown: timeUnknown,
+                birthCityId: birthCityId,
+                timeStandard: timeStandard,
+              },
+            }),
+          )
+
+          // 성공 콜백 호출
+          if (onSuccess && userId) {
+            onSuccess(userId)
+          }
+
+          // 리디렉션 여부에 따라 처리
+          if (redirectAfterSave) {
+            // 채팅으로 리디렉션
+            router.push("/saju-chat/sajuping")
+          }
         }
       } catch (e) {
         console.error("Error storing saju data:", e)
       }
-    }
-  }
-
-  const handleBetaSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!privacyConsent) {
-      toast({
-        title: "개인정보 동의 필요",
-        description: "개인정보 수집 및 이용에 동의해주세요.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsBetaSubmitting(true)
-
-    try {
-      // Get the current saju data from localStorage or create a new object
-      const tempSajuData = localStorage.getItem("tempSajuData")
-      const sajuData = tempSajuData ? JSON.parse(tempSajuData) : {}
-
-      // Update with email and phone
-      sajuData.email = betaEmail
-      sajuData.phone = betaPhone
-
-      // Save back to localStorage
-      localStorage.setItem("tempSajuData", JSON.stringify(sajuData))
-
-      // Prepare user data for API
-      const userData = {
-        name: name || "Anonymous User",
-        email: betaEmail,
-        phone: betaPhone,
-        gender: gender || "unknown",
-        relationshipStatus: relationshipStatus || "unknown",
-        privacyConsent: privacyConsent,
-        selectedServices: ["사주 분석"],
-      }
-
-      // Call the beta signup API
-      const response = await fetch("/api/beta-signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userData }),
-      })
-
-      const betaResult = await response.json()
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "베타 신청 중 오류가 발생했습니다.")
-      }
-
-      // Show success dialog
-      setShowSuccessDialog(true)
-
-      // Update user ID in localStorage if available
-      if (betaResult.userId) {
-        const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-        storedData.userId = betaResult.userId
-        localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-
-        // Also update auth_user_id if the user is authenticated
-        updateUserAuthId(betaResult.userId)
-      }
-
-      // Reset form
-      setBetaEmail("")
-      setBetaPhone("")
-      setPrivacyConsent(false)
-    } catch (error: any) {
-      console.error("Error submitting beta signup:", error)
-      toast({
-        title: "오류 발생",
-        description: error.message,
-        variant: "destructive",
-      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.")
+      console.error("Error:", err)
     } finally {
-      setIsBetaSubmitting(false)
+      setIsSubmitting(false)
     }
   }
-
-  // 현재 연도부터 1900년까지의 연도 배열 생성
-  const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: currentYear - 1899 }, (_, i) => (currentYear - i).toString())
-
-  // 월 배열 생성 (01-12)
-  const months = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"))
-
-  // 일 배열 생성 (01-31)
-  const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"))
 
   // 시간 입력값 파싱 함수
   const parseTimeInput = (input: string): { hour: number; minute: number } => {
@@ -509,6 +440,7 @@ export default function BirthDateFormClient() {
             onChange={(e) => setName(e.target.value)}
             placeholder="이름을 입력하세요"
             className="w-full"
+            required
           />
         </div>
 
@@ -607,8 +539,10 @@ export default function BirthDateFormClient() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               계산 중...
             </>
+          ) : redirectAfterSave ? (
+            "사주 정보 저장하기"
           ) : (
-            "사주팔자 보기"
+            "사주 계산하기"
           )}
         </Button>
       </form>
@@ -619,21 +553,6 @@ export default function BirthDateFormClient() {
           <AlertTitle>오류</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-      )}
-
-      {saju && lunarDate && (
-        <Card>
-          <CardContent className="pt-6 space-y-6">
-            <div className="mb-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                양력: {birthdate.substring(0, 4)}년 {birthdate.substring(4, 6)}월 {birthdate.substring(6, 8)}일{" "}
-                {timeUnknown ? "(시간 미상)" : ""}
-                <br />
-                {/* 음력: {lunarDate.year}년 {lunarDate.month}월 {lunarDate.day}일 */}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       )}
     </div>
   )

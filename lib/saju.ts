@@ -475,7 +475,7 @@ function generateInterpretation(
       interpretation += `${dayStem}${dayBranch} 일주는 결단력이 있고 정확한 성향을 가지고 있습니다. `
       break
     case "water":
-      interpretation += `${dayStem}${dayBranch} 일주는 지혜롭고 유연한 성향을 가지고 있습니다. `
+      interpretation += `${dayStem}${dayBranch} 일주는 지혜롭고 유연��� 성향을 가지고 있습니다. `
       break
   }
 

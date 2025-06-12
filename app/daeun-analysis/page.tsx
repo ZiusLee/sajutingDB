@@ -410,7 +410,7 @@ export default async function DaeunAnalysisPage({
                 <Link
                   href={`/result?date=${date}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`}
                 >
-                  결과 페이지로 돌아가기
+                  결과 ��이지로 돌아가기
                 </Link>
               </Button>
             </div>

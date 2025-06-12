@@ -3,39 +3,19 @@
 import type React from "react"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import {
-  Loader2,
-  Send,
-  ChevronDown,
-  RefreshCw,
-  Menu,
-  User,
-  Mic,
-  ChevronUp,
-  Plus,
-  Users,
-  Heart,
-  Star,
-  Calculator,
-  LogIn,
-  X,
-  Brain,
-} from "lucide-react"
+import { ChevronDown, ArrowLeft, Settings, User, Database, Mic, Send } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
-import SajuDiagram from "@/components/saju-diagram"
-import ReactMarkdown from "react-markdown"
-import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
-import CompatibilityTool from "@/components/compatibility-tool"
-import UserProfileDropdown from "@/components/user-profile-dropdown"
-import MemoryBank from "@/components/memory-bank"
-import MemoryToast from "@/components/memory-toast"
-import { compressSaju, type CompressedSaju } from "@/lib/saju-compression"
+import { compressSaju } from "@/lib/saju-compression"
 import { memoryService } from "@/lib/memory-service"
+import SajuDiagram from "@/components/saju-diagram"
+import CompatibilityTool from "@/components/compatibility-tool"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { useAuth } from "@/contexts/auth-context"
+import { Badge } from "@/components/ui/badge"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -67,11 +47,13 @@ const useHideHeaderAndFooter = () => {
 
 const useForceDarkTheme = () => {
   useEffect(() => {
+    const wasAlreadyDark = document.documentElement.classList.contains("dark")
+    const currentTheme = localStorage.getItem("theme")
+
     document.documentElement.classList.add("dark")
 
     return () => {
-      const savedTheme = localStorage.getItem("theme")
-      if (savedTheme !== "dark") {
+      if (!wasAlreadyDark && currentTheme !== "dark") {
         document.documentElement.classList.remove("dark")
       }
     }
@@ -95,23 +77,6 @@ const useNetworkStatus = () => {
   }, [])
 
   return isOnline
-}
-
-const useMobileKeyboard = () => {
-  useEffect(() => {
-    const viewport = document.querySelector('meta[name="viewport"]')
-    if (viewport) {
-      const originalContent = viewport.getAttribute("content")
-
-      viewport.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no")
-
-      return () => {
-        if (originalContent) {
-          viewport.setAttribute("content", originalContent)
-        }
-      }
-    }
-  }, [])
 }
 
 interface BirthInfo {
@@ -183,11 +148,6 @@ const initialSuggestedQuestionsByType: Record<string, string[]> = {
   general: ["2025년 운세는 어떤가요?", "제 사주의 장단점은?", "가장 강한 기운은 무엇인가요?"],
 }
 
-function formatTodayDate() {
-  const today = new Date()
-  return `${today.getMonth() + 1}/${today.getDate()}`
-}
-
 function formatBirthInfo(birthInfo?: BirthInfo): string {
   if (!birthInfo) return ""
 
@@ -206,7 +166,6 @@ function formatBirthInfo(birthInfo?: BirthInfo): string {
 
 const getInitialMessageByRoomType = (name: string, roomType: string, birthInfo?: BirthInfo): string => {
   const currentYear = 2025
-  const today = formatTodayDate()
   const userName = name || "사용자"
   const birthDateStr = formatBirthInfo(birthInfo)
 
@@ -258,72 +217,11 @@ ${currentYear}년 을사년, 푸른 뱀의 해에 타로카드가 ${userName}님
 
 const generateSajupingInitialMessages = (name: string, saju: any, birthInfo?: BirthInfo): any[] => {
   const userName = name || "사용자"
-  const birthDateStr = formatBirthInfo(birthInfo)
-
-  const yearStem = saju?.yearStem || "?"
-  const yearBranch = saju?.yearBranch || "?"
-  const monthStem = saju?.monthStem || "?"
-  const monthBranch = saju?.monthBranch || "?"
-  const dayStem = saju?.dayStem || "?"
-  const dayBranch = saju?.dayBranch || "?"
-  const hourStem = saju?.hourStem || ""
-  const hourBranch = saju?.hourBranch || ""
-  const dayMaster = saju?.dayMaster || "?"
-
-  const yearStemSibseong = saju?.yearStemSibseong || "?"
-  const yearBranchSibseong = saju?.yearBranchSibseong || "?"
-  const monthStemSibseong = saju?.monthStemSibseong || "?"
-  const monthBranchSibseong = saju?.monthBranchSibseong || "?"
-  const dayStemSibseong = saju?.dayStemSibseong || "?"
-  const dayBranchSibseong = saju?.dayBranchSibseong || "?"
-  const hourStemSibseong = saju?.hourStemSibseong || "?"
-  const hourBranchSibseong = saju?.hourBranchSibseong || "?"
-
-  const yearAnimal = saju?.yearAnimal || "?"
-  const elements = saju?.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }
-
-  const stemElements: Record<string, string> = {
-    갑: "목",
-    을: "목",
-    병: "화",
-    정: "화",
-    무: "토",
-    기: "토",
-    경: "금",
-    신: "금",
-    임: "수",
-    계: "수",
-  }
-
-  const dayElement = saju?.dayStem ? stemElements[saju.dayStem] || "?" : "?"
-  const dayPillar = dayStem && dayBranch ? `${dayStem}${dayBranch}` : "?"
 
   const firstMessage = {
     id: "saju-analysis",
     role: "assistant" as const,
-    content: `안녕하세요, ${userName}님! 저는 사주핑이에요! 🔮✨
-
-${userName}님의 사주를 분석해보니 정말 흥미로운 특징들이 보이네요!
-
-📅 **${userName}님의 생년월일:** ${birthDateStr}
-
-🌟 **${userName}님의 사주 정보:**
-- 년주: ${yearStem}${yearBranch} (십성: ${yearStemSibseong}, ${yearBranchSibseong})
-- 월주: ${monthStem}${monthBranch} (십성: ${monthStemSibseong}, ${monthBranchSibseong})
-- 일주: ${dayStem}${dayBranch} (일간: ${dayMaster}) (십성: ${dayStemSibseong}, ${dayBranchSibseong})
-- 시주: ${hourStem || ""}${hourBranch || ""} ${hourStem ? `(십성: ${hourStemSibseong}, ${hourBranchSibseong})` : "(시간 미상)"}
-- 띠: ${yearAnimal}
-- 오행 분포: 목(${elements?.wood || 0}), 화(${elements?.fire || 0}), 토(${elements?.earth || 0}), 금(${elements?.metal || 0}), 수(${elements?.water || 0})
-
-🌟 **${userName}님의 사주 해석:**
-
-1. **인생의 큰 흐름과 중심 에너지** 💫
-${userName}님은 ${dayElement}의 기운을 가진 ${dayPillar}일주로, ${getLifeThemeDescription(dayStem, dayBranch, dayElement)}
-
-2. **성격과 기질** 🌱
-${getPersonalityDescription(dayStem, dayBranch, elements)}
-
-${userName}님만의 독특한 에너지와 잠재력이 느껴져요! 더 자세한 사항이 궁금하시면 편하게 물어보세요! ✨`,
+    content: getInitialMessageByRoomType(userName, "sajuping", birthInfo),
   }
 
   const secondMessage = {
@@ -333,45 +231,6 @@ ${userName}님만의 독특한 에너지와 잠재력이 느껴져요! 더 자�
   }
 
   return [firstMessage, secondMessage]
-}
-
-const getLifeThemeDescription = (dayStem: string, dayBranch: string, dayElement: string): string => {
-  switch (dayElement) {
-    case "목":
-      return "어린 시절부터 성장과 발전을 추구하는 성향이 강했을 것입니다. 청년기에는 새로운 아이디어와 도전을 통해 자신의 길을 개척하고, 중년기에는 자신만의 영역에서 안정적인 성장을 이루게 됩니다."
-    case "화":
-      return "타고난 열정과 에너지로 어린 시절부터 주변 사람들의 관심을 받았을 것입니다. 청년기에는 자신의 열정을 표현하고 다양한 경험을 통해 자신을 발견하는 시간을 가지게 됩니다."
-    case "토":
-      return "어린 시절부터 안정과 조화를 중요시하는 성향이 강했을 것입니다. 청년기에는 기초를 탄탄히 다지는 데 집중하고, 중년기에는 자신의 영역에서 안정적인 위치를 확보하게 됩니다."
-    case "금":
-      return "어린 시절부터 정확하고 원칙적인 성향이 강했을 것입니다. 청년기에는 자신의 가치관과 원칙을 확립하고, 중년기에는 이를 바탕으로 자신만의 영역에서 권위와 존경을 얻게 됩니다."
-    case "수":
-      return "어린 시절부터 깊은 사고와 통찰력을 가진 성향이 강했을 것입니다. 청년기에는 다양한 지식과 경험을 통해 자신만의 지혜를 쌓고, 중년기에는 이를 바탕으로 깊이 있는 통찰력을 발휘하게 됩니다."
-    default:
-      return "독특한 에너지와 잠재력을 가지고 있으며, 삶의 여정에서 자신만의 특별한 길을 걷게 될 것입니다."
-  }
-}
-
-const getPersonalityDescription = (dayStem: string, dayBranch: string, elements: any): string => {
-  switch (dayStem) {
-    case "갑":
-    case "을":
-      return "목(木)의 기운이 강한 당신은 성장과 발전을 추구하는 성향이 있습니다. 새로운 아이디어와 가능성을 발견하는 데 탁월하며, 창의적인 사고방식으로 문제를 해결합니다."
-    case "병":
-    case "정":
-      return "화(火)의 기운이 강한 당신은 열정적이고 활동적인 성향이 있습니다. 자신의 생각과 감정을 표현하는 데 능숙하며, 다른 사람들에게 영감을 주는 능력이 있습니다."
-    case "무":
-    case "기":
-      return "토(土)의 기운이 강한 당신은 안정적이고 신뢰할 수 있는 성향이 있습니다. 실용적이고 현실적인 접근 방식으로 문제를 해결하며, 다른 사람들을 돌보고 지원하는 데 능숙합니다."
-    case "경":
-    case "신":
-      return "금(金)의 기운이 강한 당신은 정확하고 원칙적인 성향이 있습니다. 분석적이고 논리적인 사고방식으로 문제를 해결하며, 효율성과 정확성을 중요시합니다."
-    case "임":
-    case "계":
-      return "수(水)의 기운이 강한 당신은 지혜롭고 적응력이 뛰어난 성향이 있습니다. 깊이 있는 사고와 통찰력으로 문제를 해결하며, 변화하는 상황에 유연하게 대응합니다."
-    default:
-      return "독특한 성향과 기질을 가지고 있으며, 자신만의 방식으로 세상을 바라보고 해석합니다."
-  }
 }
 
 function generateChatSessionKey(name: string, saju: any, roomType: string) {
@@ -384,6 +243,53 @@ function generateChatSessionKey(name: string, saju: any, roomType: string) {
   return `chat_${name}_${birthYear}${birthMonth}${birthDay}${birthHour}_${gender}_${roomType}`
 }
 
+// 마크다운 렌더링 함수 추가 (handleCompatibilityAnalysis 함수 위에)
+const renderMarkdown = (content: string) => {
+  return content
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="italic text-white/90">$1</em>')
+    .replace(
+      /### (.*?)(\n|$)/g,
+      '<h3 class="text-lg font-bold text-white mb-2 mt-4 border-b border-white/20 pb-1">$1</h3>',
+    )
+    .replace(
+      /## (.*?)(\n|$)/g,
+      '<h2 class="text-xl font-bold text-white mb-3 mt-4 border-b border-white/30 pb-2">$1</h2>',
+    )
+    .replace(
+      /# (.*?)(\n|$)/g,
+      '<h1 class="text-2xl font-bold text-white mb-4 mt-4 border-b border-white/40 pb-2">$1</h1>',
+    )
+    .replace(
+      /• (.*?)(\n|$)/g,
+      '<div class="flex items-start ml-4 mb-1"><span class="text-purple-400 mr-2 mt-1">•</span><span class="text-white/90 flex-1">$1</span></div>',
+    )
+    .replace(
+      /(\d+)\. (.*?)(\n|$)/g,
+      '<div class="flex items-start ml-4 mb-1"><span class="text-purple-400 mr-2 mt-1 font-semibold">$1.</span><span class="text-white/90 flex-1">$2</span></div>',
+    )
+}
+
+// 궁합 키워드 감지 및 자동 안내 함수
+const detectCompatibilityKeywords = (message: string): boolean => {
+  const keywords = ["궁합", "궁합보기", "상성", "사주궁합", "연인궁합", "부부궁합", "친구궁합", "동료궁합"]
+  return keywords.some((keyword) => message.includes(keyword))
+}
+
+const generateCompatibilityGuideMessage = (): string => {
+  const responses = [
+    `아, 궁합이 궁금하시군요! 😊 채팅창 하단에 있는 설정 버튼(⚙️)을 눌러보세요. 거기에 "궁합 보기" 메뉴가 있어요. 상대방의 생년월일만 입력해주시면 바로 사주 궁합을 분석해드릴게요! 💕`,
+
+    `궁합 분석이 필요하시네요! 🔮 화면 하단 입력창 왼쪽에 있는 도구 아이콘을 터치해보세요. "궁합 보기"를 선택하시고 상대방 정보를 입력하시면 상세한 궁합 분석을 해드려요! ✨`,
+
+    `오, 궁합이 궁금하시군요! 💫 아래쪽 채팅 입력창 옆에 작은 설정 버튼이 보이시죠? 그걸 누르시면 "궁합 보기" 기능이 있어요. 거기서 상대방 생년월일을 넣어주시면 제가 자세히 분석해드릴게요! 🎯`,
+
+    `궁합 보고 싶으시네요! 😄 입력창 왼쪽에 있는 도구 버튼(⚙️)을 눌러보세요. "궁합 보기"에서 상대방의 생년월일과 시간을 입력하시면 사주 기반으로 정확한 궁합을 알려드려요! 🌟`,
+  ]
+
+  return responses[Math.floor(Math.random() * responses.length)]
+}
+
 export default function SajuChat({
   saju,
   name,
@@ -391,120 +297,90 @@ export default function SajuChat({
   initialInterpretation,
   roomType,
   onBack,
-  isLoggedIn = false,
+  isLoggedIn: propIsLoggedIn,
   sessionKey,
   birthInfo,
 }: SajuChatProps) {
+  // 필수 훅 사용
+  useHideHeaderAndFooter()
+  useForceDarkTheme()
+  const isOnline = useNetworkStatus()
+
+  // AuthContext에서 로그인 상태 가져오기
+  const { user, isAuthenticated } = useAuth()
+  // props의 isLoggedIn과 AuthContext의 isAuthenticated를 모두 확인
+  const isLoggedIn = propIsLoggedIn || isAuthenticated
+  const userId = user?.id || null
+
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [isNewUser, setIsNewUser] = useState(true)
   const [messageIds, setMessageIds] = useState<Record<string, string>>({})
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [showCompatibilityTool, setShowCompatibilityTool] = useState(false)
+  const [showToolsDrawer, setShowToolsDrawer] = useState(false)
+  const [hasSeenToolsNotification, setHasSeenToolsNotification] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
   const [sessionInitialized, setSessionInitialized] = useState(false)
 
-  // 상태 추가 (기존 상태들 다음에)
-  const [showTools, setShowTools] = useState(false)
-  const [showCompatibilityTool, setShowCompatibilityTool] = useState(false)
-  const [showUserProfile, setShowUserProfile] = useState(false)
-  const [showMemoryBank, setShowMemoryBank] = useState(false)
-  const [memoryToast, setMemoryToast] = useState<{ message: string; isVisible: boolean }>({
-    message: "",
-    isVisible: false,
-  })
-  const [compatibilityTags, setCompatibilityTags] = useState<
-    Array<{
-      id: string
-      mainPerson: string
-      partners: string[]
-      isAnalyzing: boolean
-    }>
-  >([])
+  const router = useRouter()
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const [loginPromptMessage, setLoginPromptMessage] = useState("")
+  const [questionCount, setQuestionCount] = useState(0)
+  const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
+  const supabase = createClientComponentClient()
 
-  // 궁합 분석 데이터를 저장할 상태 추가
-  const [compatibilityData, setCompatibilityData] = useState<{
-    mainPerson: CompressedSaju | null
-    selectedPeople: CompressedSaju[]
-  }>({
-    mainPerson: null,
-    selectedPeople: [],
-  })
+  const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
 
-  const getExistingSessionId = useCallback(async () => {
-    if (sessionInitialized || databaseSessionId) {
-      return
-    }
-
-    try {
-      setSessionInitialized(true)
-
-      const storedSajuData = localStorage.getItem("tempSajuData")
-
-      if (storedSajuData) {
-        const sajuData = JSON.parse(storedSajuData)
-        if (sajuData.sessionId) {
-          setDatabaseSessionId(sajuData.sessionId)
-          return
-        }
-      }
-
-      const response = await fetch("/api/saju-sessions", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-
-        if (data.sessions && data.sessions.length > 0) {
-          const recentSession = data.sessions[0]
-          setDatabaseSessionId(recentSession.id)
-
-          const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-          storedData.sessionId = recentSession.id
-          localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-          return
-        }
-      }
-    } catch (error) {
-      console.error("Error getting existing session ID:", error)
-    }
-  }, [sessionInitialized, databaseSessionId, roomType])
-
+  // 툴 알림 확인 상태 로드
   useEffect(() => {
-    if (!sessionInitialized && !databaseSessionId) {
-      getExistingSessionId()
-    }
+    const hasSeenNotification = localStorage.getItem("hasSeenToolsNotification") === "true"
+    setHasSeenToolsNotification(hasSeenNotification)
   }, [])
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false)
-        setShowUserProfile(false)
-      }
+  // 툴 드로어 열 때 알림 상태 업데이트
+  const handleToolsDrawerOpen = () => {
+    setShowToolsDrawer(true)
+    if (!hasSeenToolsNotification) {
+      setHasSeenToolsNotification(true)
+      localStorage.setItem("hasSeenToolsNotification", "true")
     }
+  }
 
-    const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsDropdownOpen(false)
-        setShowUserProfile(false)
-      }
-    }
+  // 오늘의 운세 요청 함수
+  const handleTodaysFortune = () => {
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`
 
-    if (isDropdownOpen || showUserProfile) {
-      document.addEventListener("mousedown", handleClickOutside)
-      document.addEventListener("keydown", handleEscapeKey)
-    }
+    // 사용자의 일간지 정보 추출
+    const dayMaster = saju.dayStem + saju.dayBranch
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-      document.removeEventListener("keydown", handleEscapeKey)
-    }
-  }, [isDropdownOpen, showUserProfile])
+    const fortuneMessage = `오늘(${todayStr})의 운세를 알려주세요.
+
+제 사주 정보:
+- 일간지: ${dayMaster}
+- 성별: ${gender === "male" ? "남성" : "여성"}
+- 오행 분포: 목${saju.elements?.wood || 0} 화${saju.elements?.fire || 0} 토${saju.elements?.earth || 0} 금${saju.elements?.metal || 0} 수${saju.elements?.water || 0}
+
+다음 내용을 포함해서 오늘의 운세를 분석해주세요:
+1. 전체 운세 (오늘의 기운과 나의 사주 궁합)
+2. 연애운 (만남, 관계 발전 등)
+3. 직업운 (업무, 성과, 인간관계 등)
+4. 재물운 (금전, 투자, 소비 등)
+5. 건강운 (컨디션, 주의사항 등)
+6. 오늘의 행운 색상과 방향
+7. 오늘 주의할 점과 조언
+
+구체적이고 실용적인 조언을 부탁드립니다.`
+
+    append({
+      role: "user",
+      content: fortuneMessage,
+    })
+
+    setShowToolsDrawer(false)
+  }
 
   const saveMessagesToDatabase = useCallback(
     async (messages: any[], sessionId: string) => {
@@ -554,58 +430,97 @@ export default function SajuChat({
     [roomType, name, gender, saju, birthInfo],
   )
 
-  const handleScroll = useCallback(() => {
-    if (chatContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-      setShowScrollToBottom(!isNearBottom)
+  const getExistingSessionId = useCallback(async () => {
+    if (sessionInitialized || databaseSessionId) {
+      return
     }
-  }, [])
 
-  const scrollToBottomSmooth = useCallback(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      })
+    try {
+      setSessionInitialized(true)
+
+      // 로그인된 사용자의 경우 사용자별 세션을 찾음
+      if (isLoggedIn && userId) {
+        const response = await fetch("/api/saju-sessions", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.sessions && data.sessions.length > 0) {
+            // 현재 사주와 매칭되는 세션 찾기
+            const matchingSession = data.sessions.find(
+              (session: any) => session.name === name && session.gender === gender,
+            )
+
+            if (matchingSession) {
+              setDatabaseSessionId(matchingSession.id)
+              console.log("Found matching session for logged in user:", matchingSession.id)
+
+              // 기존 메시지 로드
+              await loadExistingMessages(matchingSession.id)
+              return
+            }
+
+            // 매칭되는 세션이 없으면 가장 최근 세션 사용
+            const recentSession = data.sessions[0]
+            setDatabaseSessionId(recentSession.id)
+            await loadExistingMessages(recentSession.id)
+            return
+          }
+        }
+      }
+
+      // 비로그인 사용자의 경우 로컬 스토리지에서 세션 ID 확인
+      const storedSajuData = localStorage.getItem("tempSajuData")
+      if (storedSajuData) {
+        const sajuData = JSON.parse(storedSajuData)
+        if (sajuData.sessionId) {
+          setDatabaseSessionId(sajuData.sessionId)
+          await loadExistingMessages(sajuData.sessionId)
+          return
+        }
+      }
+    } catch (error) {
+      console.error("Error getting existing session ID:", error)
     }
-  }, [])
+  }, [sessionInitialized, databaseSessionId, isLoggedIn, userId, name, gender])
 
-  useHideHeaderAndFooter()
-  useForceDarkTheme()
-  useMobileKeyboard()
-  const isOnline = useNetworkStatus()
+  const loadExistingMessages = useCallback(
+    async (sessionId: string) => {
+      try {
+        const response = await fetch(`/api/messages?sessionId=${sessionId}`)
 
-  const router = useRouter()
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
-  const [loginPromptMessage, setLoginPromptMessage] = useState("")
-  const [questionCount, setQuestionCount] = useState(0)
-  const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-  const supabase = createClientComponentClient()
+        if (response.ok) {
+          const data = await response.json()
+          if (data.messages && data.messages.length > 0) {
+            console.log(`Loaded ${data.messages.length} existing messages from database`)
 
-  const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
+            // 메시지를 올바른 형태로 변환
+            const formattedMessages = data.messages.map((msg: any) => ({
+              id: msg.id,
+              role: msg.role,
+              content: msg.content,
+            }))
 
-  const handleLogin = () => {
-    router.push("/login?returnUrl=" + encodeURIComponent(window.location.pathname))
-  }
-
-  const handleCloseLoginPrompt = () => {
-    setShowLoginPrompt(false)
-  }
+            // 기존 메시지 로딩 로직은 useAIChat 초기화 시점에서 처리
+            console.log("Messages loaded from database")
+          }
+        }
+      } catch (error) {
+        console.error("Error loading existing messages:", error)
+      }
+    },
+    [], // messages 의존성 제거
+  )
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        setUserId(user.id)
-      }
+    if (isLoggedIn && !sessionInitialized) {
+      getExistingSessionId()
     }
-
-    fetchUser()
-  }, [supabase])
+  }, [isLoggedIn, sessionInitialized, getExistingSessionId])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -740,93 +655,32 @@ export default function SajuChat({
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo,
       memoryContext: getMemoryContext(),
-      // 궁합 분석 데이터 추가
-      compatibilityData: compatibilityData,
     },
     onFinish: async (message) => {
       const qualityCheck = checkResponseQuality(message.content)
 
       if (!qualityCheck.isGoodQuality && retryCount < 2) {
         setRetryCount((prev) => prev + 1)
-
         setTimeout(() => {
           reload()
         }, 1000)
-
         return
       }
 
       const updatedMessages = [...messages, message]
 
-      if (databaseSessionId) {
-        saveMessagesToDatabase(updatedMessages, databaseSessionId)
-      }
-
-      // 메모리 추출 및 저장 - 더 적극적으로
-      if (userId && messages.length > 0) {
-        const lastUserMessage = messages[messages.length - 1]
-        if (lastUserMessage?.role === "user") {
-          try {
-            // 궁합 관련 정보 특별 처리
-            const userContent = lastUserMessage.content
-            const assistantContent = message.content
-
-            // 궁합 대상자 정보 추출
-            const nameMatch = userContent.match(/([가-힣]+)\s*(?:님?과?의?|랑|와)\s*궁합/i)
-            if (nameMatch) {
-              const targetName = nameMatch[1]
-
-              // 이전 대화에서 생년월일 정보 찾기
-              const allMessages = [...messages, message]
-              for (let i = allMessages.length - 1; i >= Math.max(0, allMessages.length - 10); i--) {
-                const msg = allMessages[i]
-                const birthMatch = msg.content.match(/(\d{4})\.(\d{1,2})\.(\d{1,2})/)
-                const genderMatch = msg.content.match(/(남성|여성|남|여)/i)
-
-                if (birthMatch && genderMatch) {
-                  const birth = `${birthMatch[1]}.${birthMatch[2].padStart(2, "0")}.${birthMatch[3].padStart(2, "0")}`
-                  const gender = genderMatch[1].includes("남") ? "male" : "female"
-
-                  await memoryService.saveCompatibilityTarget(userId, targetName, birth, gender, "궁합 분석 대상")
-
-                  setMemoryToast({
-                    message: `${targetName}님 정보 저장됨 (${birth}, ${gender === "male" ? "남성" : "여성"})`,
-                    isVisible: true,
-                  })
-                  break
-                }
-              }
-            }
-
-            // 기타 정보 추출
-            const savedMemories = await memoryService.extractAndSaveMemories(
-              userId,
-              lastUserMessage.content,
-              message.content,
-            )
-
-            if (savedMemories.length > 0) {
-              const memoryLabels = savedMemories.map((m) => `${m.label}: ${m.value}`).join(", ")
-              setMemoryToast({
-                message: memoryLabels,
-                isVisible: true,
-              })
-            }
-          } catch (error) {
-            console.error("Error extracting memories:", error)
-          }
+      // 데이터베이스에 메시지 저장 (로그인된 사용자의 경우)
+      if (databaseSessionId && isLoggedIn) {
+        try {
+          await saveMessagesToDatabase(updatedMessages, databaseSessionId)
+          console.log("Messages saved to database successfully")
+        } catch (error) {
+          console.error("Failed to save messages to database:", error)
         }
       }
 
-      // 궁합 분석 완료 시 태그 상태 업데이트
-      setCompatibilityTags((prev) => prev.map((tag) => (tag.isAnalyzing ? { ...tag, isAnalyzing: false } : tag)))
-
-      const newTime = new Date()
-      setLastMessageTime(newTime)
-      setLastMessageId(message.id)
-
+      // 로컬 세션에도 저장
       const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-
       const sessionData = {
         saju,
         name,
@@ -834,16 +688,21 @@ export default function SajuChat({
         interpretation: initialInterpretation,
         roomType,
         messages: updatedMessages,
-        lastMessageTime: newTime.toISOString(),
+        lastMessageTime: new Date().toISOString(),
         birthInfo,
+        databaseSessionId, // 데이터베이스 세션 ID도 저장
       }
 
       try {
         saveChatSession(currentSessionKey, sessionData)
         setActiveChatSession(sessionData)
       } catch (saveError) {
-        console.error("Error saving chat session:", saveError)
+        console.error("Error saving chat session to localStorage:", saveError)
       }
+
+      const newTime = new Date()
+      setLastMessageTime(newTime)
+      setLastMessageId(message.id)
 
       setShouldGenerateQuestions(true)
       setStreamingError(null)
@@ -924,20 +783,66 @@ export default function SajuChat({
   const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    if (!isOnline) {
-      setStreamingError("인터넷 연결이 없습니다. 연결 상태를 확인한 후 다시 시도해주세요.")
+    if (!input.trim()) {
       return
     }
 
-    if (!input.trim()) {
+    // 궁합 키워드 감지
+    if (detectCompatibilityKeywords(input.trim())) {
+      // 사용자 메시지 먼저 추가
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: "user" as const,
+        content: input.trim(),
+      }
+
+      // 자동 안내 메시지 생성
+      const guideMessage = {
+        id: `guide-${Date.now()}`,
+        role: "assistant" as const,
+        content: generateCompatibilityGuideMessage(),
+      }
+
+      // 메시지 추가 (useAIChat의 setMessages 대신 직접 추가)
+      const updatedMessages = [...messages, userMessage, guideMessage]
+
+      // 로컬 세션에 저장
+      const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
+      const sessionData = {
+        saju,
+        name,
+        gender,
+        interpretation: initialInterpretation,
+        roomType,
+        messages: updatedMessages,
+        lastMessageTime: new Date().toISOString(),
+        birthInfo,
+        databaseSessionId,
+      }
+
+      try {
+        saveChatSession(currentSessionKey, sessionData)
+        setActiveChatSession(sessionData)
+      } catch (saveError) {
+        console.error("Error saving chat session:", saveError)
+      }
+
+      // 입력창 초기화
+      setInput("")
+
+      // 스크롤 하단으로
+      setTimeout(() => {
+        scrollToBottom()
+      }, 100)
+
       return
     }
 
     const newQuestionCount = questionCount + 1
     setQuestionCount(newQuestionCount)
 
+    // 로그인 프롬프트 로직
     const shouldShowLoginPrompt = newQuestionCount >= 5 && !isLoggedIn && !hasShownLoginPrompt
-
     if (shouldShowLoginPrompt) {
       setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
       setShowLoginPrompt(true)
@@ -948,47 +853,70 @@ export default function SajuChat({
     setStreamingError(null)
     setRetryCount(0)
 
-    saveUserMessage(input)
+    // 일반 메시지 전송
     originalHandleSubmit(e)
   }
 
   const handleBackWithSave = () => {
     try {
-      try {
-        const sessionData = {
+      console.log("handleBackWithSave called")
+
+      // 세션 저장
+      const sessionData = {
+        saju,
+        name,
+        gender,
+        interpretation: initialInterpretation,
+        roomType,
+        messages,
+        lastMessageTime: new Date().toISOString(),
+        birthInfo,
+      }
+      saveChatSession(sessionKey, sessionData)
+
+      // 로컬 스토리지에 마지막 사주 데이터 저장
+      localStorage.setItem(
+        "last_chat_saju_data",
+        JSON.stringify({
           saju,
           name,
           gender,
           interpretation: initialInterpretation,
-          roomType,
-          messages,
-          lastMessageTime: new Date().toISOString(),
           birthInfo,
+        }),
+      )
+
+      // 마이페이지에서 온 경우 체크
+      const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
+      console.log("fromMyPage:", fromMyPage)
+
+      // 세션 스토리지 클리어 (먼저 클리어)
+      sessionStorage.removeItem("from_mypage")
+
+      if (fromMyPage) {
+        console.log("Returning to mypage via window.location")
+        // 즉시 리디렉션하지 말고 약간의 지연을 둠
+        setTimeout(() => {
+          window.location.href = "/mypage"
+        }, 100)
+      } else {
+        console.log("Calling onBack function")
+        // onBack 함수가 있는지 확인
+        if (typeof onBack === "function") {
+          onBack()
+        } else {
+          console.log("onBack is not a function, redirecting to home")
+          setTimeout(() => {
+            window.location.href = "/"
+          }, 100)
         }
-        saveChatSession(sessionKey, sessionData)
-      } catch (saveError) {
-        console.error("채팅 세션 저장 중 오류:", saveError)
       }
-
-      try {
-        localStorage.setItem(
-          "last_chat_saju_data",
-          JSON.stringify({
-            saju,
-            name,
-            gender,
-            interpretation: initialInterpretation,
-            birthInfo,
-          }),
-        )
-      } catch (storageError) {
-        console.error("사주 데이터 저장 중 오류:", storageError)
-      }
-
-      onBack()
     } catch (error) {
       console.error("뒤로가기 처리 중 오류:", error)
-      onBack()
+      // 오류 발생 시 기본 동작
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 100)
     }
   }
 
@@ -1051,7 +979,78 @@ export default function SajuChat({
     } finally {
       setIsGeneratingQuestions(false)
     }
-  }, [messages.length, roomType, shouldGenerateQuestions, isGeneratingQuestions, birthInfo])
+  }, [messages, roomType, shouldGenerateQuestions, isGeneratingQuestions, birthInfo, saju, name])
+
+  // 추천 질문 생성
+  useEffect(() => {
+    if (shouldGenerateQuestions && !isGeneratingQuestions && messages.length > 0) {
+      generateSuggestedQuestions()
+    }
+  }, [shouldGenerateQuestions, isGeneratingQuestions, messages, generateSuggestedQuestions])
+
+  const handleCompatibilityAnalysis = (mainPerson: any, selectedPeople: any[]) => {
+    console.log("handleCompatibilityAnalysis called in saju-chat")
+    console.log("mainPerson received:", mainPerson)
+    console.log("selectedPeople received:", selectedPeople)
+
+    try {
+      // 궁합 분석 메시지 생성 - 데이터 구조에 맞게 수정
+      const peopleNames = selectedPeople.map((p) => p.name).join(", ")
+
+      // 일주 정보 추출 - 다양한 데이터 구조에 대응
+      const getIlju = (person: any) => {
+        // 압축된 사주 데이터 구조
+        if (person.sajuPalja && person.sajuPalja.day) {
+          return `${person.sajuPalja.day.stem}${person.sajuPalja.day.branch}`
+        }
+        // 기본 사주 데이터 구조
+        if (person.dayStem && person.dayBranch) {
+          return `${person.dayStem}${person.dayBranch}`
+        }
+        // dayMaster가 있는 경우
+        if (person.dayMaster) {
+          return `${person.dayMaster}일주`
+        }
+        return "정보 없음"
+      }
+
+      const mainPersonIlju = getIlju(mainPerson)
+      const selectedPeopleInfo = selectedPeople.map((p) => `- ${p.name}: ${getIlju(p)}일주`).join("\n")
+
+      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 사주 궁합을 자세히 분석해주세요. 
+
+다음 정보를 포함해서 분석해주세요:
+1. 일간 궁합 (천간 상성)
+2. 오행 궁합 (오행 보완 관계)
+3. 십이지 궁합 (지지 상성)
+4. 성격 및 가치관 궁합
+5. 관계 발전 가능성
+6. 주의사항 및 조언
+7. 궁합 점수 (100점 만점)
+
+각 사람의 사주 정보:
+- ${mainPerson.name}: ${mainPersonIlju}일주
+${selectedPeopleInfo}
+
+상세하고 구체적인 분석을 부탁드립니다.`
+
+      console.log("Sending compatibility message:", compatibilityMessage)
+
+      // 메시지를 채팅에 추가
+      append({
+        role: "user",
+        content: compatibilityMessage,
+      })
+
+      console.log("Compatibility message appended to chat")
+
+      // 궁합 도구 닫기
+      setShowCompatibilityTool(false)
+    } catch (error) {
+      console.error("Error in handleCompatibilityAnalysis:", error)
+      alert("궁합 분석 요청 중 오류가 발생했습니다: " + error.message)
+    }
+  }
 
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
@@ -1083,208 +1082,52 @@ export default function SajuChat({
     }
   }, [isInitialized, isNewUser])
 
-  useEffect(() => {
-    if (!isOnline) {
-      setStreamingError("인터넷 연결이 끊어졌습니다. 연결 상태를 확인해주세요.")
-    } else if (streamingError?.includes("인터넷 연결")) {
-      setStreamingError(null)
+  const handleScroll = useCallback(() => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      setShowScrollToBottom(!isNearBottom)
     }
-  }, [isOnline, streamingError])
+  }, [])
 
-  const saveUserMessage = useCallback(
-    async (userMessage: string) => {
-      if (!databaseSessionId) {
-        return
-      }
-
-      const userMessageObj = {
-        id: `user-${Date.now()}`,
-        role: "user" as const,
-        content: userMessage,
-      }
-
-      const updatedMessages = [...messages, userMessageObj]
-
-      await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-
-      const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages: updatedMessages,
-        lastMessageTime: new Date().toISOString(),
-        birthInfo,
-      }
-
-      try {
-        saveChatSession(currentSessionKey, sessionData)
-        setActiveChatSession(sessionData)
-      } catch (saveError) {
-        console.error("Error saving user message to session:", saveError)
-      }
-    },
-    [
-      databaseSessionId,
-      saveMessagesToDatabase,
-      sessionKey,
-      name,
-      saju,
-      roomType,
-      gender,
-      initialInterpretation,
-      saveChatSession,
-      setActiveChatSession,
-      birthInfo,
-      messages,
-      messages.length,
-    ],
-  )
-
-  // 도구 목록 정의
-  const tools = [
-    {
-      id: "compatibility",
-      name: "궁합 보기",
-      icon: Heart,
-      description: "사주 궁합을 분석해보세요",
-    },
-    {
-      id: "fortune",
-      name: "운세 보기",
-      icon: Star,
-      description: "오늘의 운세를 확인하세요",
-    },
-    {
-      id: "calculator",
-      name: "사주 계산기",
-      icon: Calculator,
-      description: "새로운 사주를 계산하세요",
-    },
-  ]
-
-  // 도구 선택 핸들러 추가
-  const handleToolSelect = (toolId: string) => {
-    setShowTools(false)
-
-    switch (toolId) {
-      case "compatibility":
-        setShowCompatibilityTool(true)
-        break
-      case "fortune":
-        // 운세 보기 로직
-        break
-      case "calculator":
-        // 사주 계산기 로직
-        break
-    }
-  }
-
-  // 궁합 분석 핸들러 수정 - 정확한 사주 정보 전달 강화 및 로컬 스토리지 저장
-  const handleCompatibilityAnalysis = (mainPerson: CompressedSaju, selectedPeople: CompressedSaju[]) => {
-    // 궁합 데이터를 상태에 저장
-    setCompatibilityData({
-      mainPerson,
-      selectedPeople,
-    })
-
-    // 태그 생성
-    const tagId = `compatibility_${Date.now()}`
-    const newTag = {
-      id: tagId,
-      mainPerson: mainPerson.name,
-      partners: selectedPeople.map((p) => p.name),
-      isAnalyzing: true,
-    }
-
-    setCompatibilityTags((prev) => [...prev, newTag])
-
-    // 궁합 대상자들을 메모리에 저장 (압축된 사주 포함)
-    if (userId) {
-      selectedPeople.forEach(async (person) => {
-        try {
-          await memoryService.saveCompatibilityTarget(
-            userId,
-            person.name,
-            person.birth,
-            person.gender,
-            "궁합 분석 대상",
-            person, // 압축된 사주 전체 저장
-          )
-        } catch (error) {
-          console.error("Error saving compatibility target to memory:", error)
-        }
+  const scrollToBottomSmooth = useCallback(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
       })
     }
-
-    // 로컬 스토리지에도 저장
-    try {
-      const compatibilityDataToStore = {
-        mainPerson,
-        selectedPeople,
-        timestamp: new Date().toISOString(),
-      }
-      localStorage.setItem(`compatibility_${tagId}`, JSON.stringify(compatibilityDataToStore))
-      console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityDataToStore)
-    } catch (error) {
-      console.error("Error saving compatibility data to localStorage:", error)
-    }
-
-    console.log("궁합 분석 시작:", { mainPerson, selectedPeople })
-
-    // 사용자에게 보여줄 간단한 메시지 생성
-    const userMessage = `🔮 **궁합 분석 요청**
-
-**대표 사주:** ${mainPerson.name} (${mainPerson.birth}, ${mainPerson.gender === "male" ? "남성" : "여성"})
-**궁합 대상:** ${selectedPeople.map((p) => `${p.name} (${p.birth}, ${p.gender === "male" ? "남성" : "여성"})`).join(", ")}
-
-위 ${selectedPeople.length}명과의 정확한 사주 궁합을 분석해주세요.`
-
-    // 입력창에 메시지 설정하고 전송
-    setInput(userMessage)
-
-    // 실제 전송
-    setTimeout(() => {
-      const form = document.querySelector("form")
-      if (form) {
-        form.requestSubmit()
-      }
-    }, 100)
-  }
-
-  // 태그 제거 함수 추가
-  const removeCompatibilityTag = (tagId: string) => {
-    setCompatibilityTags((prev) => prev.filter((tag) => tag.id !== tagId))
-  }
+  }, [])
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-gray-900 text-white overflow-hidden">
-      {/* ChatGPT 스타일 헤더 */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 md:px-4 py-3 border-b border-gray-700 bg-gray-800">
-        <div className="flex items-center space-x-3">
-          <Button variant="ghost" size="sm" onClick={handleBackWithSave} className="p-1 text-gray-300 hover:text-white">
-            <Menu className="h-5 w-5" />
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
+      {/* 개선된 헤더 */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white/10 backdrop-blur-md border-b border-white/20 shadow-2xl transition-shadow duration-300 ease-in-out">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackWithSave}
+            className="mr-2 text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+          >
+            <ArrowLeft className="h-5 w-5" />
           </Button>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center">
           <div className="relative" ref={dropdownRef}>
             <Button
               variant="ghost"
-              className="flex items-center space-x-2 text-gray-100 hover:text-white"
+              className="flex items-center space-x-2 text-white hover:text-white hover:bg-white/20 px-4 py-2 rounded-lg transition-all duration-200"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
-              <span className="text-xl">{currentCharacter.emoji}</span>
-              <h1 className="text-lg font-medium hidden sm:block">{currentCharacter.name}</h1>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
-              />
+              <span className="text-lg">{currentCharacter.emoji}</span>
+              <span className="font-medium">{currentCharacter.name}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
             </Button>
 
             {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 animate-in fade-in-0 zoom-in-95 duration-200">
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-xl z-50">
                 <div className="py-2">
                   {pingCharacters.map((character) => (
                     <button
@@ -1293,16 +1136,15 @@ export default function SajuChat({
                         handleCharacterChange(character)
                         setIsDropdownOpen(false)
                       }}
-                      className={`w-full flex items-center space-x-3 p-3 text-left hover:bg-gray-700 transition-colors duration-150 ${
-                        character.roomType === roomType ? "bg-gray-700" : ""
+                      className={`w-full flex items-center space-x-3 p-3 text-left hover:bg-white/20 transition-colors rounded-lg mx-2 ${
+                        character.roomType === roomType ? "bg-white/20" : ""
                       }`}
                     >
-                      <span className="text-xl">{character.emoji}</span>
-                      <div className="flex-1">
-                        <div className={`font-medium ${character.color}`}>{character.name}</div>
-                        <div className="text-sm text-gray-400">{character.description}</div>
+                      <span className="text-lg">{character.emoji}</span>
+                      <div>
+                        <p className="font-medium text-white">{character.name}</p>
+                        <p className="text-xs text-white/70">{character.description}</p>
                       </div>
-                      {character.roomType === roomType && <div className="w-2 h-2 bg-green-400 rounded-full"></div>}
                     </button>
                   ))}
                 </div>
@@ -1313,514 +1155,284 @@ export default function SajuChat({
 
         <div className="flex items-center space-x-2">
           {isLoggedIn ? (
-            <div className="relative" ref={dropdownRef}>
+            <>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowUserProfile(!showUserProfile)}
-                className="p-1 text-gray-300 hover:text-white"
-                title="프로필"
+                onClick={() => router.push("/mypage")}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+                title="마이페이지"
               >
                 <User className="h-5 w-5" />
               </Button>
-              <UserProfileDropdown
-                isOpen={showUserProfile}
-                onClose={() => setShowUserProfile(false)}
-                onToggle={() => setShowUserProfile(!showUserProfile)}
-                currentName={name}
-              />
-            </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  /* 메모리뱅크 기능 */
+                }}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+                title="메모리뱅크"
+              >
+                <Database className="h-5 w-5" />
+              </Button>
+            </>
           ) : (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={handleLogin}
-              className="flex items-center space-x-1 px-2 py-1 text-gray-300 hover:text-white text-sm"
+              onClick={() => router.push("/login")}
+              className="text-white border-white/30 hover:bg-white/20 hover:text-white hover:border-white/50 px-3 py-1 rounded-lg transition-all duration-200 text-sm"
             >
-              <LogIn className="h-4 w-4" />
-              <span className="hidden sm:inline">로그인</span>
+              로그인
             </Button>
           )}
-
-          {/* 메모리 뱅크 버튼 */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowMemoryBank(true)}
-            className="p-1 text-gray-300 hover:text-white"
-            title="메모리 뱅크"
-          >
-            <Brain className="h-5 w-5" />
-          </Button>
         </div>
       </div>
 
-      {/* 궁합 분석 태그 영역 */}
-      {compatibilityTags.length > 0 && (
-        <div className="flex-shrink-0 bg-gray-800/95 border-b border-gray-700 px-3 md:px-4 py-2">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex flex-wrap gap-2">
-              {compatibilityTags.map((tag) => (
-                <div
-                  key={tag.id}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm border transition-all duration-200 ${
-                    tag.isAnalyzing
-                      ? "bg-purple-600/20 border-purple-500/50 text-purple-300"
-                      : "bg-blue-600/20 border-blue-500/50 text-blue-300"
-                  }`}
-                >
-                  <div className="flex items-center space-x-1">
-                    {tag.isAnalyzing ? (
-                      <div className="flex space-x-1">
-                        <div
-                          className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0ms" }}
-                        ></div>
-                        <div
-                          className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "150ms" }}
-                        ></div>
-                        <div
-                          className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "300ms" }}
-                        ></div>
-                      </div>
-                    ) : (
-                      <Heart className="h-3 w-3" />
-                    )}
-                    <span className="font-medium">{tag.isAnalyzing ? "궁합 분석 중..." : "궁합 보기"}</span>
-                  </div>
-                  <div className="text-xs opacity-80">
-                    {tag.mainPerson} ↔ {tag.partners.join(", ")}
-                  </div>
-                  {!tag.isAnalyzing && (
-                    <button
-                      onClick={() => removeCompatibilityTag(tag.id)}
-                      className="ml-1 hover:bg-blue-600/30 rounded-full p-0.5 transition-colors"
-                      title="태그 제거"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 사주 정보 카드 */}
-      {showSajuInfo && (
-        <div className="flex-shrink-0 bg-gradient-to-b from-gray-800 to-gray-900 border-b border-gray-700 shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-            <div className="flex items-center space-x-2">
-              <User className="h-5 w-5 text-purple-400" />
-              <h3 className="text-lg font-medium text-white">{name || "사용자"}님의 사주 정보</h3>
-              {birthInfo && <span className="text-sm text-gray-400">({formatBirthInfo(birthInfo)})</span>}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSajuInfo(false)}
-              className="p-1 text-gray-400 hover:text-white"
-              title="사주 정보 접기"
-            >
-              <ChevronUp className="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div className="p-4">
+      {/* 메인 채팅 영역 */}
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
+        <div className="pb-32 pt-6">
+          {/* 사주 다이어그램 - 개선된 스타일 */}
+          <div className="px-4 mb-6">
             <div className="max-w-3xl mx-auto">
-              <SajuDiagram saju={saju} name={name} />
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl transition-shadow duration-300 ease-in-out hover:shadow-3xl">
+                <SajuDiagram
+                  saju={saju}
+                  timeUnknown={birthInfo?.timeUnknown}
+                  size="md"
+                  name={name}
+                  gender={gender}
+                  solarYear={birthInfo?.solarYear?.toString()}
+                  solarMonth={birthInfo?.solarMonth?.toString()}
+                  solarDay={birthInfo?.solarDay?.toString()}
+                  hour={birthInfo?.solarHour?.toString()}
+                  minute={birthInfo?.solarMinute?.toString()}
+                  lunarYear={birthInfo?.lunarYear?.toString()}
+                  lunarMonth={birthInfo?.lunarMonth?.toString()}
+                  lunarDay={birthInfo?.lunarDay?.toString()}
+                  location="서울특별시"
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* 채팅 영역 */}
-      <div
-        className="flex-1 overflow-y-auto pb-[120px]"
-        ref={chatContainerRef}
-        style={{
-          scrollBehavior: "smooth",
-          WebkitOverflowScrolling: "touch",
-        }}
-      >
-        <div className="min-h-full flex flex-col">
-          <div className="flex-1 px-3 md:px-4 py-4 md:py-6">
-            <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
-              {messages.map((message, index) => (
-                <div key={message.id || index} className="space-y-4 group">
-                  {index === 0 && message.role === "assistant" && !showSajuInfo && (
-                    <div className="mb-6 p-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg border border-gray-700">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-2">
-                          <User className="h-5 w-5 text-purple-400" />
-                          <h3 className="text-lg font-medium text-white">{name || "사용자"}님의 사주</h3>
-                          {birthInfo && <span className="text-sm text-gray-400">({formatBirthInfo(birthInfo)})</span>}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowSajuInfo(true)}
-                          className="p-1 text-gray-400 hover:text-white"
-                          title="사주 정보 상단에 고정"
-                        >
-                          <ChevronUp className="h-5 w-5" />
-                        </Button>
-                      </div>
-                      <SajuDiagram saju={saju} name={name} />
-                    </div>
-                  )}
-
-                  {message.role === "user" ? (
-                    <div className="flex justify-end">
-                      <div className="bg-blue-600 rounded-2xl px-3 md:px-4 py-2 max-w-[85%] md:max-w-[80%]">
-                        <p className="text-white text-sm leading-relaxed">{message.content}</p>
-                      </div>
+          {messages.map((message, index) => (
+            <div key={message.id} className={`px-4 py-4 ${message.role === "assistant" ? "bg-white/5" : ""}`}>
+              <div className="max-w-3xl mx-auto flex space-x-4">
+                <div className="flex-shrink-0">
+                  {message.role === "assistant" ? (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                      {currentCharacter.emoji}
                     </div>
                   ) : (
-                    <div className="flex items-start space-x-2 md:space-x-3">
-                      <div className="flex-shrink-0 w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs md:text-sm font-medium">{currentCharacter.emoji}</span>
-                      </div>
-                      <div className="flex-1 space-y-2 min-w-0">
-                        <div className="prose prose-sm max-w-none prose-invert">
-                          <ReactMarkdown
-                            components={{
-                              p: ({ children }) => (
-                                <p className="text-gray-100 leading-relaxed mb-3 last:mb-0 text-sm md:text-base">
-                                  {children}
-                                </p>
-                              ),
-                              strong: ({ children }) => (
-                                <strong className="font-semibold text-white">{children}</strong>
-                              ),
-                              em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
-                              ul: ({ children }) => (
-                                <ul className="list-disc list-inside space-y-1 mb-3 text-gray-100 text-sm md:text-base">
-                                  {children}
-                                </ul>
-                              ),
-                              ol: ({ children }) => (
-                                <ol className="list-decimal list-inside space-y-1 mb-3 text-gray-100 text-sm md:text-base">
-                                  {children}
-                                </ol>
-                              ),
-                              li: ({ children }) => <li className="text-gray-100">{children}</li>,
-                              h1: ({ children }) => (
-                                <h1 className="text-lg md:text-xl font-bold mb-3 text-white">{children}</h1>
-                              ),
-                              h2: ({ children }) => (
-                                <h2 className="text-base md:text-lg font-semibold mb-2 text-white">{children}</h2>
-                              ),
-                              h3: ({ children }) => (
-                                <h3 className="text-sm md:text-base font-semibold mb-2 text-white">{children}</h3>
-                              ),
-                              blockquote: ({ children }) => (
-                                <blockquote className="border-l-4 border-gray-600 pl-4 italic text-gray-300 mb-3">
-                                  {children}
-                                </blockquote>
-                              ),
-                              code: ({ children }) => (
-                                <code className="bg-gray-800 px-1 py-0.5 rounded text-xs md:text-sm font-mono text-gray-200">
-                                  {children}
-                                </code>
-                              ),
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                        </div>
-
-                        <div className="mt-3">
-                          <MessageFeedbackButtons
-                            messageId={messageIds[message.id] || message.id}
-                            messageContent={message.content}
-                            sessionId={databaseSessionId}
-                            onRetry={() => {
-                              const lastUserMessageIndex = [...messages]
-                                .reverse()
-                                .findIndex((msg) => msg.role === "user")
-                              if (lastUserMessageIndex !== -1) {
-                                const lastUserMessage = [...messages].reverse()[lastUserMessageIndex]
-                                append({
-                                  role: "user",
-                                  content: lastUserMessage.content,
-                                })
-                              }
-                            }}
-                            onFeedback={async (messageId: string, feedback: "like" | "dislike") => {
-                              try {
-                                const response = await fetch("/api/message-feedback", {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    messageId,
-                                    feedback,
-                                    sessionId: databaseSessionId,
-                                  }),
-                                })
-
-                                if (!response.ok) {
-                                  console.error("Failed to save feedback")
-                                }
-                              } catch (error) {
-                                console.error("Error saving feedback:", error)
-                              }
-                            }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          />
-                        </div>
-                      </div>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs shadow-lg">
+                      나
                     </div>
                   )}
                 </div>
-              ))}
+                <div className="flex-1 prose prose-invert max-w-none">
+                  {message.content.split("\n").map((line, i) => {
+                    const renderedLine = renderMarkdown(line || "\u00A0")
+                    return (
+                      <div
+                        key={i}
+                        className={`${i === 0 ? "mt-0" : "mt-2"} text-white/90 leading-relaxed`}
+                        dangerouslySetInnerHTML={{ __html: renderedLine }}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
 
-              {isLoading && (
-                <div className="flex items-start space-x-2 md:space-x-3">
-                  <div className="flex-shrink-0 w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs md:text-sm font-medium">{currentCharacter.emoji}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <div className="flex space-x-1">
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0ms" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "150ms" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "300ms" }}
-                        ></div>
-                      </div>
-                    </div>
+          {isLoading && (
+            <div className="px-4 py-4 bg-white/5">
+              <div className="max-w-3xl mx-auto flex space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                    {currentCharacter.emoji}
                   </div>
                 </div>
-              )}
-
-              {streamingError && (
-                <div className="flex items-start space-x-2 md:space-x-3">
-                  <div className="flex-shrink-0 w-7 h-7 md:w-8 md:h-8 bg-red-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs md:text-sm font-medium">⚠️</span>
+                <div className="flex items-center">
+                  <div className="flex space-x-1">
+                    <div
+                      className="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
                   </div>
-                  <div className="flex-1">
-                    <div className="bg-red-900/50 border border-red-700 text-red-200 p-3 rounded-lg">
-                      <p className="text-sm mb-2">{streamingError}</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRetry}
-                        disabled={isRetrying}
-                        className="text-red-300 border-red-600 hover:bg-red-800/50"
-                      >
-                        {isRetrying ? (
-                          <>
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                            재시도 중...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-3 w-3 mr-1" />
-                            다시 시도
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-
-          {showScrollToBottom && (
-            <div className="fixed bottom-32 right-4 z-20">
-              <Button
-                onClick={scrollToBottomSmooth}
-                className="w-12 h-12 rounded-full bg-gray-700/90 hover:bg-gray-600/90 border border-gray-600/50 shadow-lg backdrop-blur-md transition-all duration-200"
-                size="sm"
-              >
-                <ChevronDown className="h-5 w-5 text-white" />
-              </Button>
-            </div>
-          )}
-
-          {suggestedQuestions.length > 0 && !isLoading && (
-            <div className="flex-shrink-0 px-3 md:px-4 py-3 bg-transparent">
-              <div className="max-w-3xl mx-auto">
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {suggestedQuestions.slice(0, 3).map((question, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSuggestedQuestionClick(question)}
-                      className="text-xs md:text-sm bg-gray-700/80 border-gray-600 text-gray-200 hover:bg-gray-600 rounded-full px-3 md:px-4 py-2 backdrop-blur-sm"
-                      disabled={isLoading}
-                    >
-                      {question}
-                    </Button>
-                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* 입력창 부분을 다음과 같이 수정: */}
-          <div className="flex-shrink-0 px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 bg-transparent fixed bottom-0 left-0 right-0 z-10 safe-area-inset-bottom">
-            <div className="max-w-3xl mx-auto space-y-2">
-              {/* 도구 버튼들 */}
-              {showTools && (
-                <div className="bg-gray-800/95 backdrop-blur-md rounded-2xl p-3 border border-gray-600/50 shadow-lg">
-                  <div className="grid grid-cols-1 gap-2">
-                    {tools.map((tool) => (
-                      <button
-                        key={tool.id}
-                        onClick={() => handleToolSelect(tool.id)}
-                        className="flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-700/50 transition-colors text-left"
-                      >
-                        <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
-                          <tool.icon className="h-4 w-4 text-gray-300" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-white font-medium text-sm">{tool.name}</div>
-                          <div className="text-gray-400 text-xs">{tool.description}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+          {streamingError && (
+            <div className="px-4 py-4">
+              <div className="max-w-3xl mx-auto">
+                <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 backdrop-blur-md">
+                  <p className="text-red-200 text-sm mb-3">{streamingError}</p>
+                  <Button
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600 text-white rounded-lg"
+                  >
+                    {isRetrying ? "재시도 중..." : "다시 시도"}
+                  </Button>
                 </div>
-              )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
-              <form onSubmit={customHandleSubmit} className="relative">
-                <div className="bg-gray-700/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-gray-600/50 shadow-lg">
-                  {/* 입력창 */}
-                  <div className="flex items-end px-3 sm:px-4 py-2.5 sm:py-3">
-                    <div className="flex-1 min-h-[40px] max-h-[120px]">
-                      <textarea
-                        ref={inputRef}
-                        value={input}
-                        onChange={(e) => {
-                          handleInputChange(e)
-                          // 자동 높이 조절
-                          e.target.style.height = "auto"
-                          e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
-                        }}
-                        placeholder={
-                          !isOnline
-                            ? "인터넷 연결을 확인해주세요"
-                            : isLoading
-                              ? "답변을 기다리는 중..."
-                              : "Ask anything"
-                        }
-                        className="w-full bg-transparent border-none focus:outline-none text-white placeholder-gray-400 text-base resize-none min-h-[40px] py-2"
-                        disabled={isLoading || !isOnline}
-                        style={{
-                          fontSize: "16px",
-                        }}
-                        rows={1}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            const form = e.currentTarget.closest("form")
-                            if (form) {
-                              form.requestSubmit()
-                            }
-                          }
-                        }}
-                      />
-                    </div>
+      {/* 하단 입력 영역 */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/90 to-transparent backdrop-blur-md">
+        {/* 추천 질문 영역 */}
+        {suggestedQuestions.length > 0 && !isLoading && (
+          <div className="px-4 py-3 border-t border-white/10">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex flex-wrap gap-2 justify-center">
+                {suggestedQuestions.slice(0, 3).map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSuggestedQuestionClick(question)}
+                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-3 py-1 backdrop-blur-md transition-all duration-200"
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-3 flex-shrink-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="p-1.5 sm:p-2 text-gray-400 hover:text-gray-200 rounded-full"
-                        disabled={isLoading}
-                      >
-                        <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </Button>
-
-                      <Button
-                        type="submit"
-                        disabled={isLoading || !input.trim() || !isOnline}
-                        className="bg-white hover:bg-gray-100 text-black rounded-full p-2 sm:p-2.5 shadow-md transition-all duration-200 flex-shrink-0"
-                      >
-                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* 하단 도구 버튼들 */}
-                  <div className="flex items-center justify-between px-3 sm:px-4 pb-2.5 sm:pb-3">
+        {/* 입력 영역 */}
+        <div className="px-4 py-4">
+          <div className="max-w-3xl mx-auto">
+            <form onSubmit={customHandleSubmit} className="relative">
+              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 focus-within:border-white/40 shadow-2xl transition-all duration-300 ease-in-out">
+                <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
+                  <SheetTrigger asChild>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowTools(!showTools)}
-                      className="p-1.5 sm:p-2 text-gray-400 hover:text-gray-200 rounded-full"
+                      className="ml-3 text-white/60 hover:text-white p-2 relative"
+                      onClick={handleToolsDrawerOpen}
                     >
-                      <Plus className={`h-4 w-4 sm:h-5 sm:w-5 transition-transform ${showTools ? "rotate-45" : ""}`} />
+                      <Settings className="h-4 w-4" />
+                      {!hasSeenToolsNotification && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-1 -right-1 h-4 w-8 text-xs px-1 bg-red-500 text-white animate-pulse"
+                        >
+                          new
+                        </Badge>
+                      )}
                     </Button>
-
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowCompatibilityTool(true)}
-                        className="p-1.5 sm:p-2 text-gray-400 hover:text-gray-200 rounded-full"
-                        title="궁합 보기"
-                      >
-                        <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="bg-slate-900/90 border-white/20 backdrop-blur-md">
+                    <div className="py-4">
+                      <h3 className="text-lg font-semibold text-white mb-4">Tools</h3>
+                      <div className="space-y-3">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-white hover:bg-white/20 p-4 rounded-lg relative"
+                          onClick={() => {
+                            setShowCompatibilityTool(true)
+                            setShowToolsDrawer(false)
+                          }}
+                        >
+                          <span className="mr-3">💕</span>
+                          궁합 보기
+                          {!hasSeenToolsNotification && (
+                            <Badge
+                              variant="destructive"
+                              className="ml-auto h-5 w-10 text-xs bg-red-500 text-white animate-pulse"
+                            >
+                              new
+                            </Badge>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-white hover:bg-white/20 p-4 rounded-lg"
+                          onClick={handleTodaysFortune}
+                        >
+                          <span className="mr-3">🔮</span>
+                          오늘의 운세
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </form>
-            </div>
+                  </SheetContent>
+                </Sheet>
+
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Ask anything"
+                  className="flex-1 bg-transparent border-none px-4 py-3 text-white placeholder-white/50 focus:outline-none"
+                  disabled={isLoading}
+                />
+
+                <Button type="button" variant="ghost" size="sm" className="text-white/60 hover:text-white p-2">
+                  <Mic className="h-5 w-5" />
+                </Button>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !input.trim()}
+                  className="mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:bg-gray-600 disabled:text-gray-400 rounded-full p-2 shadow-lg transition-all duration-300 ease-in-out"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
 
-      <LoginPromptDialog
-        isOpen={showLoginPrompt}
-        onClose={handleCloseLoginPrompt}
-        onLogin={handleLogin}
-        message={loginPromptMessage}
-      />
+      {/* 스크롤 하단 버튼 */}
+      {showScrollToBottom && (
+        <Button
+          onClick={scrollToBottomSmooth}
+          className="fixed bottom-24 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white shadow-2xl z-10 backdrop-blur-md border border-white/20 transition-all duration-300 ease-in-out hover:shadow-3xl"
+          size="sm"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      )}
 
-      {/* 메모리 뱅크 */}
-      <MemoryBank userId={userId} isOpen={showMemoryBank} onClose={() => setShowMemoryBank(false)} />
-
-      {/* 메모리 토스트 */}
-      <MemoryToast
-        message={memoryToast.message}
-        isVisible={memoryToast.isVisible}
-        onClose={() => setMemoryToast({ message: "", isVisible: false })}
-      />
-
-      {/* 컴포넌트 마지막에 CompatibilityTool 추가: */}
+      {/* 궁합 도구 모달 */}
       <CompatibilityTool
         isOpen={showCompatibilityTool}
-        onClose={() => setShowCompatibilityTool(false)}
+        onClose={() => {
+          console.log("Closing compatibility tool")
+          setShowCompatibilityTool(false)
+        }}
         currentSaju={saju}
         currentName={name}
         currentGender={gender}
         currentBirthInfo={birthInfo}
         isLoggedIn={isLoggedIn}
         userId={userId}
-        onCompatibilityAnalysis={handleCompatibilityAnalysis}
+        onCompatibilityAnalysis={(mainPerson, selectedPeople) => {
+          console.log("onCompatibilityAnalysis prop called")
+          handleCompatibilityAnalysis(mainPerson, selectedPeople)
+        }}
       />
     </div>
   )

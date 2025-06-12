@@ -6,9 +6,19 @@ interface ElementDisplayProps {
   maxSlots?: number
   showLabels?: boolean
   className?: string
+  displayMode?: "emoji" | "text" | "bar"
 }
 
-export function ElementDisplay({ elements, maxSlots = 12, showLabels = false, className = "" }: ElementDisplayProps) {
+export function ElementDisplay({
+  elements,
+  maxSlots = 12,
+  showLabels = false,
+  className = "",
+  displayMode = "text",
+}: ElementDisplayProps) {
+  // 오행 총합 계산
+  const totalElements = Object.values(elements).reduce((sum, count) => sum + count, 0)
+
   // 오행 배열 생성
   const elementArray: Element[] = []
   Object.entries(elements).forEach(([element, count]) => {
@@ -23,6 +33,53 @@ export function ElementDisplay({ elements, maxSlots = 12, showLabels = false, cl
     slots.push(null)
   }
 
+  // 텍스트 모드 렌더링
+  if (displayMode === "text") {
+    return (
+      <div className={`flex flex-wrap gap-2 ${className}`}>
+        {Object.entries(elements)
+          .filter(([_, count]) => count > 0) // 0인 요소는 표시하지 않음
+          .map(([element, count]) => (
+            <div
+              key={element}
+              className={`px-2 py-1 rounded-md ${elementTextColors[element as Element]} bg-opacity-10 border border-current flex items-center gap-1`}
+            >
+              <span className="font-medium">{elementNames[element as Element].split("(")[0]}</span>
+              <span className="font-bold">{count}</span>
+            </div>
+          ))}
+      </div>
+    )
+  }
+
+  // 바 차트 모드 렌더링
+  if (displayMode === "bar") {
+    return (
+      <div className={`space-y-2 w-full ${className}`}>
+        {Object.entries(elements).map(([element, count]) => {
+          const percentage = totalElements > 0 ? (count / totalElements) * 100 : 0
+          return (
+            <div key={element} className="w-full">
+              <div className="flex justify-between text-xs mb-1">
+                <span className={elementTextColors[element as Element]}>
+                  {elementNames[element as Element].split("(")[0]}
+                </span>
+                <span className="font-medium">{count}</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${elementColors[element as Element]}`}
+                  style={{ width: `${percentage}%` }}
+                ></div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // 기존 이모지 모드 (fallback)
   return (
     <div className={`flex flex-wrap gap-1 ${className}`}>
       {showLabels && (
