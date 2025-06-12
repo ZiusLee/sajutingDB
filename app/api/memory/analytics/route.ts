@@ -18,9 +18,12 @@ export async function GET(request: NextRequest) {
     const days = Number.parseInt(searchParams.get("days") || "30")
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
 
-    // Get basic stats
+    // auth.users.id를 사용 (로그인한 사용자)
+    const authUserId = user.id
+
+    // 기본 통계 가져오기
     const { data: stats, error: statsError } = await supabaseClient.rpc("get_user_memory_stats", {
-      p_user_id: user.id,
+      p_user_id: authUserId,
     })
 
     if (statsError) {
@@ -28,11 +31,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 })
     }
 
-    // Get entries for trend analysis
+    // 분석용 엔트리 가져오기
     const { data: entries, error: entriesError } = await supabaseClient
       .from("memory_entries")
       .select("entry_date, emotional_state, tags, category")
-      .eq("user_id", user.id)
+      .eq("user_id", authUserId)
+      .eq("is_deleted", false)
       .gte("entry_date", startDate)
       .order("entry_date", { ascending: true })
 
@@ -41,10 +45,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch entries" }, { status: 500 })
     }
 
-    // Process analytics data
+    // 분석 데이터 처리
     const analytics = processAnalyticsData(entries || [], days)
 
     return NextResponse.json({
+      success: true,
       stats,
       analytics,
       period: {
@@ -60,24 +65,24 @@ export async function GET(request: NextRequest) {
 }
 
 function processAnalyticsData(entries: any[], days: number) {
-  // Daily entry counts
+  // 일별 엔트리 수
   const dailyCounts: Record<string, number> = {}
   const emotionalTrends: Record<string, number[]> = {}
   const tagFrequency: Record<string, number> = {}
   const categoryDistribution: Record<string, number> = {}
 
-  // Initialize daily counts for the period
+  // 날짜 범위 초기화
   for (let i = 0; i < days; i++) {
     const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
     dailyCounts[date] = 0
   }
 
-  // Process entries
+  // 엔트리 처리
   entries.forEach((entry) => {
     const date = entry.entry_date
     dailyCounts[date] = (dailyCounts[date] || 0) + 1
 
-    // Process emotional states
+    // 감정 상태 처리
     if (entry.emotional_state && typeof entry.emotional_state === "object") {
       Object.keys(entry.emotional_state).forEach((emotion) => {
         if (entry.emotional_state[emotion]) {
@@ -92,24 +97,23 @@ function processAnalyticsData(entries: any[], days: number) {
       })
     }
 
-    // Process tags
+    // 태그 처리
     if (entry.tags && Array.isArray(entry.tags)) {
       entry.tags.forEach((tag: string) => {
         tagFrequency[tag] = (tagFrequency[tag] || 0) + 1
       })
     }
 
-    // Process categories
+    // 카테고리 처리
     if (entry.category) {
       categoryDistribution[entry.category] = (categoryDistribution[entry.category] || 0) + 1
     }
   })
 
-  // Calculate trends
+  // 통계 계산
   const totalEntries = Object.values(dailyCounts).reduce((sum, count) => sum + count, 0)
   const avgEntriesPerDay = totalEntries / days
 
-  // Get top tags and categories
   const topTags = Object.entries(tagFrequency)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10)

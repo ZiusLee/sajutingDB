@@ -69,8 +69,8 @@ class EnhancedMemoryService {
       const { data, error } = await supabase
         .from("memory_entries")
         .insert({
-          user_id: entry.userId,
-          session_id: entry.sessionId,
+          user_id: entry.userId, // auth.users.id
+          session_id: entry.sessionId, // saju_sessions.id (선택적)
           title: entry.title,
           content: entry.content,
           entry_date: entry.entryDate || new Date().toISOString().split("T")[0],
@@ -111,17 +111,19 @@ class EnhancedMemoryService {
     } = {},
   ): Promise<MemoryEntry[]> {
     try {
+      // auth.users.id를 사용 (로그인한 사용자)
       let query = supabase
         .from("memory_entries")
         .select(`
-          *,
-          memory_saju_links (
-            saju_session_id,
-            relevance_score,
-            link_type
-          )
-        `)
-        .eq("user_id", userId)
+        *,
+        memory_saju_links (
+          saju_session_id,
+          relevance_score,
+          link_type
+        )
+      `)
+        .eq("user_id", userId) // auth.users.id 사용
+        .eq("is_deleted", false) // soft delete 필터 추가
         .order("entry_date", { ascending: false })
         .order("entry_time", { ascending: false })
 
