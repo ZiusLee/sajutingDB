@@ -7,7 +7,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useEffect, useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { User, LogOut, Home } from "lucide-react"
+import { User, LogOut, Home, BookOpen } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -73,8 +73,8 @@ export function Navbar() {
           {user && (
             <Link href="/my-questions" passHref>
               <Button variant={pathname === "/my-questions" ? "default" : "ghost"}>
-                <User className="h-4 w-4 mr-2" />
-                개인 공간
+                <BookOpen className="h-4 w-4 mr-2" />
+                메모리 다이어리
               </Button>
             </Link>
           )}
