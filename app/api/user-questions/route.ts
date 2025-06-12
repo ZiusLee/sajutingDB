@@ -14,14 +14,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "인증이 필요합니다" }, { status: 401 })
     }
 
+    // 1단계: 현재 사용자의 세션 ID들을 가져오기
+    const { data: sessions, error: sessionError } = await supabase
+      .from("saju_sessions")
+      .select("id")
+      .eq("user_id", user.id)
+
+    if (sessionError) {
+      console.error("세션 조회 오류:", sessionError)
+      return NextResponse.json({ success: false, error: "세션을 불러올 수 없습니다" }, { status: 500 })
+    }
+
+    const sessionIds = sessions?.map((session) => session.id) || []
+
+    if (sessionIds.length === 0) {
+      return NextResponse.json({ success: true, data: [] })
+    }
+
+    // 2단계: 해당 세션들의 메시지를 가져오기
     const { searchParams } = new URL(request.url)
     const roomType = searchParams.get("roomType")
 
-    // messages 테이블에서 직접 조회 (room_type 필드가 있다고 가정)
     let query = supabase
       .from("messages")
       .select("id, content, room_type, created_at")
-      .eq("user_id", user.id)
+      .in("session_id", sessionIds)
       .eq("role", "user")
       .order("created_at", { ascending: false })
 
@@ -70,7 +87,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: "메시지 ID가 필요합니다" }, { status: 400 })
     }
 
-    const { error } = await supabase.from("messages").delete().eq("id", messageId).eq("user_id", user.id)
+    // 먼저 해당 메시지가 현재 사용자의 것인지 확인
+    const { data: messageData, error: checkError } = await supabase
+      .from("messages")
+      .select(`
+        id,
+        saju_sessions!inner(user_id)
+      `)
+      .eq("id", messageId)
+      .eq("saju_sessions.user_id", user.id)
+      .single()
+
+    if (checkError || !messageData) {
+      return NextResponse.json({ success: false, error: "삭제 권한이 없습니다" }, { status: 403 })
+    }
+
+    const { error } = await supabase.from("messages").delete().eq("id", messageId)
 
     if (error) {
       console.error("질문 삭제 오류:", error)
