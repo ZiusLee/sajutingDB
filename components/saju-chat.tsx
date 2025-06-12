@@ -7,7 +7,7 @@ import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ArrowLeft, Plus, Settings, User, Database, LogIn, Mic, Send } from "lucide-react"
+import { ChevronDown, ArrowLeft, Settings, User, Database, LogIn, Mic, Send } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import { compressSaju } from "@/lib/saju-compression"
 import { memoryService } from "@/lib/memory-service"
@@ -241,6 +241,17 @@ function generateChatSessionKey(name: string, saju: any, roomType: string) {
   const gender = saju.gender || ""
 
   return `chat_${name}_${birthYear}${birthMonth}${birthDay}${birthHour}_${gender}_${roomType}`
+}
+
+// 마크다운 렌더링 함수 추가 (handleCompatibilityAnalysis 함수 위에)
+const renderMarkdown = (content: string) => {
+  return content
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/### (.*?)(\n|$)/g, '<h3 class="text-lg font-semibold text-white mb-2 mt-4">$1</h3>')
+    .replace(/## (.*?)(\n|$)/g, '<h2 class="text-xl font-bold text-white mb-3 mt-4">$1</h2>')
+    .replace(/# (.*?)(\n|$)/g, '<h1 class="text-2xl font-bold text-white mb-4 mt-4">$1</h1>')
+    .replace(/• (.*?)(\n|$)/g, '<li class="ml-4 text-white/90">• $1</li>')
 }
 
 export default function SajuChat({
@@ -1004,7 +1015,7 @@ ${selectedPeopleInfo}
   return (
     <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
       {/* 개선된 헤더 */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white/10 backdrop-blur-md border-b border-white/20 shadow-lg">
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white/10 backdrop-blur-md border-b border-white/20 shadow-2xl transition-shadow duration-300 ease-in-out">
         <div className="flex items-center">
           <Button
             variant="ghost"
@@ -1099,7 +1110,7 @@ ${selectedPeopleInfo}
           {/* 사주 다이어그램 - 개선된 스타일 */}
           <div className="px-4 mb-6">
             <div className="max-w-3xl mx-auto">
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-xl">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl transition-shadow duration-300 ease-in-out hover:shadow-3xl">
                 <SajuDiagram
                   saju={saju}
                   timeUnknown={birthInfo?.timeUnknown}
@@ -1136,9 +1147,11 @@ ${selectedPeopleInfo}
                 </div>
                 <div className="flex-1 prose prose-invert max-w-none">
                   {message.content.split("\n").map((line, i) => (
-                    <p key={i} className={`${i === 0 ? "mt-0" : ""} text-white/90 leading-relaxed`}>
-                      {line || "\u00A0"}
-                    </p>
+                    <p
+                      key={i}
+                      className={`${i === 0 ? "mt-0" : ""} text-white/90 leading-relaxed`}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(line || "\u00A0") }}
+                    />
                   ))}
                 </div>
               </div>
@@ -1220,10 +1233,11 @@ ${selectedPeopleInfo}
         <div className="px-4 py-4">
           <div className="max-w-3xl mx-auto">
             <form onSubmit={customHandleSubmit} className="relative">
-              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 focus-within:border-white/40 shadow-xl transition-all duration-200">
-                <Button type="button" variant="ghost" size="sm" className="ml-3 text-white/60 hover:text-white p-2">
+              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 focus-within:border-white/40 shadow-2xl transition-all duration-300 ease-in-out">
+                {/* + 버튼 주석 처리 */}
+                {/* <Button type="button" variant="ghost" size="sm" className="ml-3 text-white/60 hover:text-white p-2">
                   <Plus className="h-5 w-5" />
-                </Button>
+                </Button> */}
 
                 <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
                   <SheetTrigger asChild>
@@ -1231,7 +1245,7 @@ ${selectedPeopleInfo}
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="text-white/60 hover:text-white p-2 relative"
+                      className="ml-3 text-white/60 hover:text-white p-2 relative"
                       onClick={handleToolsDrawerOpen}
                     >
                       <Settings className="h-4 w-4" />
@@ -1290,14 +1304,14 @@ ${selectedPeopleInfo}
                   disabled={isLoading}
                 />
 
-                <Button type="button" variant="ghost" size="sm" className="mr-2 text-white/60 hover:text-white p-2">
+                <Button type="button" variant="ghost" size="sm" className="mr-1 text-white/60 hover:text-white p-2">
                   <Mic className="h-5 w-5" />
                 </Button>
 
                 <Button
                   type="submit"
                   disabled={isLoading || !input.trim()}
-                  className="mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:bg-gray-600 disabled:text-gray-400 rounded-full p-2 shadow-lg transition-all duration-200"
+                  className="mr-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:bg-gray-600 disabled:text-gray-400 rounded-full p-2 shadow-lg transition-all duration-300 ease-in-out"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
@@ -1311,7 +1325,7 @@ ${selectedPeopleInfo}
       {showScrollToBottom && (
         <Button
           onClick={scrollToBottomSmooth}
-          className="fixed bottom-24 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white shadow-lg z-10 backdrop-blur-md border border-white/20 transition-all duration-200"
+          className="fixed bottom-24 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white shadow-2xl z-10 backdrop-blur-md border border-white/20 transition-all duration-300 ease-in-out hover:shadow-3xl"
           size="sm"
         >
           <ChevronDown className="h-4 w-4" />
