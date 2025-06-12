@@ -1127,28 +1127,33 @@ ${selectedPeopleInfo}
             </Button>
 
             {isDropdownOpen && (
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-xl z-50">
-                <div className="py-2">
-                  {pingCharacters.map((character) => (
-                    <button
-                      key={character.id}
-                      onClick={() => {
-                        handleCharacterChange(character)
-                        setIsDropdownOpen(false)
-                      }}
-                      className={`w-full flex items-center space-x-3 p-3 text-left hover:bg-white/20 transition-colors rounded-lg mx-2 ${
-                        character.roomType === roomType ? "bg-white/20" : ""
-                      }`}
-                    >
-                      <span className="text-lg">{character.emoji}</span>
-                      <div>
-                        <p className="font-medium text-white">{character.name}</p>
-                        <p className="text-xs text-white/70">{character.description}</p>
-                      </div>
-                    </button>
-                  ))}
+              <>
+                {/* 배경 오버레이 */}
+                <div className="fixed inset-0 z-[99998]" onClick={() => setIsDropdownOpen(false)} />
+                {/* 드롭다운 */}
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-xl z-[99999]">
+                  <div className="py-2">
+                    {pingCharacters.map((character) => (
+                      <button
+                        key={character.id}
+                        onClick={() => {
+                          handleCharacterChange(character)
+                          setIsDropdownOpen(false)
+                        }}
+                        className={`w-full flex items-center space-x-3 p-3 text-left hover:bg-white/20 transition-colors rounded-lg mx-2 ${
+                          character.roomType === roomType ? "bg-white/20" : ""
+                        }`}
+                      >
+                        <span className="text-lg">{character.emoji}</span>
+                        <div>
+                          <p className="font-medium text-white">{character.name}</p>
+                          <p className="text-xs text-white/70">{character.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -1299,16 +1304,19 @@ ${selectedPeopleInfo}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/90 to-transparent backdrop-blur-md">
         {/* 추천 질문 영역 */}
         {suggestedQuestions.length > 0 && !isLoading && (
-          <div className="px-4 py-3 border-t border-white/10">
-            <div className="max-w-3xl mx-auto">
-              <div className="flex flex-wrap gap-2 justify-center">
-                {suggestedQuestions.slice(0, 3).map((question, index) => (
+          <div className="px-4 py-3 border-t border-white/10 h-[60px] flex items-center">
+            <div className="max-w-3xl mx-auto w-full">
+              <div
+                className="flex gap-2 overflow-x-auto scrollbar-hide pb-1"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                {suggestedQuestions.slice(0, 6).map((question, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
                     onClick={() => handleSuggestedQuestionClick(question)}
-                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-3 py-1 backdrop-blur-md transition-all duration-200"
+                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-3 py-1 backdrop-blur-md transition-all duration-200 whitespace-nowrap flex-shrink-0"
                   >
                     {question}
                   </Button>
