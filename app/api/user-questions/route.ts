@@ -17,15 +17,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const roomType = searchParams.get("roomType")
 
+    // messages 테이블에서 직접 조회 (room_type 필드가 있다고 가정)
     let query = supabase
       .from("messages")
-      .select("id, content, created_at, chat_rooms(room_type)")
+      .select("id, content, room_type, created_at")
       .eq("user_id", user.id)
       .eq("role", "user")
       .order("created_at", { ascending: false })
 
-    if (roomType) {
-      query = query.eq("chat_rooms.room_type", roomType)
+    if (roomType && roomType !== "all") {
+      query = query.eq("room_type", roomType)
     }
 
     const { data, error } = await query.limit(100)
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
       data?.map((item: any) => ({
         id: item.id,
         question: item.content,
-        room_type: item.chat_rooms?.room_type || "unknown",
+        room_type: item.room_type || "personalized",
         created_at: item.created_at,
       })) || []
 
