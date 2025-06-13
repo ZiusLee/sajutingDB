@@ -316,6 +316,28 @@ export default function CompatibilityTool({
         mainPerson.gender === "male" || mainPerson.gender === "female" ? mainPerson.gender : "male"
       compressedMainPerson.name = mainPerson.name
 
+      // 전체 사주 정보 추가
+      compressedMainPerson.fullSaju = mainPerson.saju
+
+      // 생년월일 정보 추가
+      compressedMainPerson.birthYear = mainPerson.birthYear
+      compressedMainPerson.birthMonth = mainPerson.birthMonth
+      compressedMainPerson.birthDay = mainPerson.birthDay
+      compressedMainPerson.birthHour = mainPerson.birthHour
+      compressedMainPerson.birthMinute = mainPerson.birthMinute
+      compressedMainPerson.timeUnknown = mainPerson.saju?.timeUnknown || false
+
+      // 오행 정보 명시적으로 추가
+      if (mainPerson.saju && mainPerson.saju.elements) {
+        compressedMainPerson.elements = {
+          wood: mainPerson.saju.elements.wood || 0,
+          fire: mainPerson.saju.elements.fire || 0,
+          earth: mainPerson.saju.elements.earth || 0,
+          metal: mainPerson.saju.elements.metal || 0,
+          water: mainPerson.saju.elements.water || 0,
+        }
+      }
+
       const compressedSelectedPeople = selectedPeople.map((person) => {
         const compressed = compressSaju(
           person.saju,
@@ -330,6 +352,28 @@ export default function CompatibilityTool({
         // 성별과 이름 정보 정확히 설정
         compressed.gender = person.gender === "male" || person.gender === "female" ? person.gender : "male"
         compressed.name = person.name
+
+        // 전체 사주 정보 추가
+        compressed.fullSaju = person.saju
+
+        // 생년월일 정보 추가
+        compressed.birthYear = person.birthYear
+        compressed.birthMonth = person.birthMonth
+        compressed.birthDay = person.birthDay
+        compressed.birthHour = person.birthHour
+        compressed.birthMinute = person.birthMinute
+        compressed.timeUnknown = person.saju?.timeUnknown || false
+
+        // 오행 정보 명시적으로 추가
+        if (person.saju && person.saju.elements) {
+          compressed.elements = {
+            wood: person.saju.elements.wood || 0,
+            fire: person.saju.elements.fire || 0,
+            earth: person.saju.elements.earth || 0,
+            metal: person.saju.elements.metal || 0,
+            water: person.saju.elements.water || 0,
+          }
+        }
 
         return compressed
       })

@@ -1,29 +1,30 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseServiceKey) {
-  console.error("SUPABASE_SERVICE_ROLE_KEY is not defined")
-}
-
-const adminSupabase = createClient(supabaseUrl!, supabaseServiceKey!)
+import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { v4 as uuidv4 } from "uuid"
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
     const authUserId = searchParams.get("authUserId")
+    const name = searchParams.get("name")
+    const gender = searchParams.get("gender")
 
-    let query = adminSupabase.from("saju_sessions").select("*").order("created_at", { ascending: false }).limit(1)
+    // createClient 대신 createServerSupabaseClient 사용
+    const supabase = createServerSupabaseClient()
+    let query = supabase.from("saju_sessions").select("*").order("created_at", { ascending: false })
 
-    // Filter by user ID if provided
+    // 필터 적용
     if (userId) {
       query = query.eq("id", userId)
     } else if (authUserId) {
       query = query.eq("auth_user_id", authUserId)
+    } else if (name && gender) {
+      query = query.eq("user_name", name).eq("gender", gender)
     }
+
+    // 최신 세션 우선으로 가져오기
+    query = query.limit(10)
 
     const { data: sessions, error } = await query
 
@@ -41,34 +42,36 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, name, gender, saju, roomType, sessionKey } = await request.json()
+    const { userId, name, gender, saju, roomType, birthInfo } = await request.json()
 
-    // Create new session only if needed
+    // 세션 데이터 생성
+    const sessionId = uuidv4()
     const sessionData = {
-      id: crypto.randomUUID(),
+      id: sessionId,
       user_name: name,
       gender: gender,
-      birth_year: saju?.year,
-      birth_month: saju?.month,
-      birth_day: saju?.day,
-      birth_hour: saju?.hour,
+      birth_year: saju?.year || birthInfo?.solarYear,
+      birth_month: saju?.month || birthInfo?.solarMonth,
+      birth_day: saju?.day || birthInfo?.solarDay,
+      birth_hour: saju?.hour || birthInfo?.solarHour,
       day_stem: saju?.dayStem,
       day_branch: saju?.dayBranch,
-      session_key: sessionKey,
-      room_type: roomType,
+      room_type: roomType || "sajuping",
       auth_user_id: userId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    const { data, error } = await adminSupabase.from("saju_sessions").insert(sessionData).select("id").single()
+    // createClient 대신 createServerSupabaseClient 사용
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase.from("saju_sessions").insert(sessionData).select("id").single()
 
     if (error) {
       console.error("Error creating saju session:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ sessionId: data.id })
+    return NextResponse.json({ id: data.id, sessionId: data.id })
   } catch (error) {
     console.error("Error in saju-sessions POST API:", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })

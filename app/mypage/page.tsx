@@ -269,11 +269,32 @@ export default function MyPage() {
   // }
 
   // Navigate to chat with AI using main saju
-  const handleChatWithAI = () => {
+  const handleChatWithAI = async () => {
     const profileToUse = defaultProfile || (sajuProfiles.length > 0 ? sajuProfiles[0] : null)
 
     if (profileToUse) {
       try {
+        // 데이터베이스에서 saju 컬럼의 JSONB 데이터 가져오기
+        const supabase = createClientComponentClient()
+        const { data: sessionData, error: sessionError } = await supabase
+          .from("saju_sessions")
+          .select(`
+          id,
+          name,
+          gender,
+          saju
+        `)
+          .eq("id", profileToUse.id)
+          .single()
+
+        if (sessionError) {
+          console.error("Error fetching saju data:", sessionError)
+        }
+
+        // saju 컬럼에서 십성 정보 추출
+        const dbSaju = sessionData?.saju || {}
+        console.log("DB에서 가져온 사주 데이터:", dbSaju)
+
         // 사주 데이터 준비
         const sajuData = {
           saju: {
@@ -285,9 +306,18 @@ export default function MyPage() {
             dayBranch: profileToUse.saju.dayBranch,
             hourStem: profileToUse.saju.hourStem,
             hourBranch: profileToUse.saju.hourBranch,
+            // 십성 정보 추가 - saju JSONB에서 가져온 정보 우선 사용, 없으면 기존 정보 사용
+            yearStemSibseong: dbSaju.yearStemSibseong || profileToUse.saju.yearStemSibseong || "",
+            monthStemSibseong: dbSaju.monthStemSibseong || profileToUse.saju.monthStemSibseong || "",
+            dayStemSibseong: dbSaju.dayStemSibseong || profileToUse.saju.dayStemSibseong || "비견",
+            hourStemSibseong: dbSaju.hourStemSibseong || profileToUse.saju.hourStemSibseong || "",
+            yearBranchSibseong: dbSaju.yearBranchSibseong || profileToUse.saju.yearBranchSibseong || "",
+            monthBranchSibseong: dbSaju.monthBranchSibseong || profileToUse.saju.monthBranchSibseong || "",
+            dayBranchSibseong: dbSaju.dayBranchSibseong || profileToUse.saju.dayBranchSibseong || "",
+            hourBranchSibseong: dbSaju.hourBranchSibseong || profileToUse.saju.hourBranchSibseong || "",
             elements: profileToUse.saju.elements || elements,
-            dayMaster: profileToUse.saju.dayMaster || profileToUse.saju.dayStem,
-            dayMasterHanja: profileToUse.saju.dayMasterHanja || "",
+            dayMaster: dbSaju.dayMaster || profileToUse.saju.dayMaster || profileToUse.saju.dayStem,
+            dayMasterHanja: dbSaju.dayMasterHanja || profileToUse.saju.dayMasterHanja || "",
           },
           name: profileToUse.name,
           gender: profileToUse.gender,
@@ -313,6 +343,8 @@ export default function MyPage() {
             timeUnknown: profileToUse.timeUnknown,
           },
         }
+
+        console.log("Prepared saju data for chat:", sajuData)
 
         // 로컬 스토리지에 사주 데이터 저장
         localStorage.setItem("current_saju", JSON.stringify(sajuData))
