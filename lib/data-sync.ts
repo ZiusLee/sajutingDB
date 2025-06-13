@@ -22,6 +22,7 @@ export interface PartnerInfo {
   timeUnknown: boolean
   relationshipStatus?: string
   createdAt?: number
+  saju?: any // 사주 정보 필드 추가
 }
 
 // 로컬 스토리지에서 사주 데이터를 가져와 데이터베이스에 저장하는 함수
@@ -70,6 +71,59 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
     const userId = uuidv4()
     console.log("Generated new user ID:", userId)
 
+    // Prepare saju JSONB data
+    const sajuJsonb = {
+      yearStem: sajuData.yearStem,
+      yearBranch: sajuData.yearBranch,
+      yearStemHanja: sajuData.yearStemHanja || "",
+      yearBranchHanja: sajuData.yearBranchHanja || "",
+      monthStem: sajuData.monthStem,
+      monthBranch: sajuData.monthBranch,
+      monthStemHanja: sajuData.monthStemHanja || "",
+      monthBranchHanja: sajuData.monthBranchHanja || "",
+      dayStem: sajuData.dayStem,
+      dayBranch: sajuData.dayBranch,
+      dayStemHanja: sajuData.dayStemHanja || "",
+      dayBranchHanja: sajuData.dayBranchHanja || "",
+      hourStem: sajuData.hourStem || "?",
+      hourBranch: sajuData.hourBranch || "?",
+      hourStemHanja: sajuData.hourStemHanja || "",
+      hourBranchHanja: sajuData.hourBranchHanja || "",
+      dayMaster: sajuData.dayMaster || sajuData.dayStem,
+      dayMasterHanja: sajuData.dayMasterHanja || "",
+      yearAnimal: sajuData.yearAnimal || "",
+      elements: sajuData.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+      yearStemSibseong: sajuData.yearStemSibseong || "",
+      monthStemSibseong: sajuData.monthStemSibseong || "",
+      dayStemSibseong: "본원", // 일주의 천간은 나에 해당하는 부분으로 "본원"으로 저장
+      hourStemSibseong: sajuData.hourStemSibseong || "",
+      yearBranchSibseong: sajuData.yearBranchSibseong || "",
+      monthBranchSibseong: sajuData.monthBranchSibseong || "",
+      dayBranchSibseong: sajuData.dayBranchSibseong || "",
+      hourBranchSibseong: sajuData.hourBranchSibseong || "",
+      birthInfo: {
+        solar: {
+          year: sajuData.year,
+          month: sajuData.month,
+          day: sajuData.day,
+          hour: sajuData.hour,
+          minute: sajuData.minute,
+        },
+        lunar: {
+          year: sajuData.lunarYear || sajuData.year,
+          month: sajuData.lunarMonth || sajuData.month,
+          day: sajuData.lunarDay || sajuData.day,
+          isLeapMonth: Boolean(sajuData.isLeapMonth),
+        },
+        timeUnknown: sajuData.timeUnknown || sajuData.hour === undefined || sajuData.hour === null,
+        birthCityId: sajuData.birthCityId || "seoul",
+        timeStandard: sajuData.timeStandard || "동경135도",
+      },
+    }
+
+    // Prepare daeun JSONB data if available
+    const daeunJsonb = sajuData.daeun || null
+
     // API 라우트를 통해 데이터 저장
     try {
       console.log("Saving user data to database with user ID:", userId, "auth user ID:", authUserId || "none")
@@ -82,6 +136,8 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
           userId,
           authUserId, // 로그인된 사용자 ID 포함
           ...sajuData,
+          saju: sajuJsonb, // Add the saju JSONB data
+          daeun: daeunJsonb, // Add the daeun JSONB data
         }),
       })
 
@@ -113,6 +169,8 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
             gender: sajuData.gender || "unknown",
             relationship_status: sajuData.relationshipStatus || "unknown",
             auth_user_id: authUserId, // Include auth_user_id if available
+            saju: sajuJsonb, // Add the saju JSONB data
+            daeun: daeunJsonb, // Add the daeun JSONB data
           })
           .select()
 
@@ -364,7 +422,7 @@ export function saveCompatibilityResultToLocalStorage(data: {
       timestamp: data.timestamp || Date.now(),
     }
 
-    // 최대 10개까지만 저장 (오래된 것부터 삭제)
+    // 최대 10개까��만 저장 (오래된 것부터 삭제)
     if (existingData.length >= 10) {
       existingData.shift()
     }
@@ -527,6 +585,7 @@ export function savePartnerInfo(partner: PartnerInfo): string {
       ...partner,
       id: partnerId,
       createdAt: Date.now(),
+      saju: partner.saju || null, // 사주 정보 추가
     }
 
     // 이미 존재하는 파트너인지 확인 (ID로 확인)
@@ -602,6 +661,7 @@ export async function savePartnerToSupabase(partner: PartnerInfo): Promise<boole
           analysisText: "상대방 정보만 저장됨 (궁합 분석 없음)",
           modelUsed: "none",
           responseTime: "client-side",
+          partnerSaju: partner.saju || null, // 사주 정보 추가
         }),
       })
 

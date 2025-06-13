@@ -274,7 +274,7 @@ export default function SajuDiagram({
                 <div>{timeUnknown ? "" : saju.hourStemSibseong}</div>
               </td>
               <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
-                <div>{saju.dayStemSibseong}</div>
+                <div>{"비견"}</div>
               </td>
               <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.monthStemSibseong}</div>

@@ -12,7 +12,7 @@ if (!supabaseServiceKey) {
 
 const adminSupabase = createClient(supabaseUrl!, supabaseServiceKey!)
 
-// Update the POST function to handle privacy consent
+// Update the POST function to handle privacy consent and store saju data in JSONB columns
 export async function POST(request: NextRequest) {
   try {
     const sajuData = await request.json()
@@ -56,6 +56,79 @@ export async function POST(request: NextRequest) {
       console.log("Created new user with ID:", userId)
     }
 
+    // Prepare saju JSONB data - using the raw data structure
+    const sajuJsonb = {
+      yearStem: sajuData.yearStem,
+      yearBranch: sajuData.yearBranch,
+      yearStemHanja: sajuData.yearStemHanja || "",
+      yearBranchHanja: sajuData.yearBranchHanja || "",
+      monthStem: sajuData.monthStem,
+      monthBranch: sajuData.monthBranch,
+      monthStemHanja: sajuData.monthStemHanja || "",
+      monthBranchHanja: sajuData.monthBranchHanja || "",
+      dayStem: sajuData.dayStem,
+      dayBranch: sajuData.dayBranch,
+      dayStemHanja: sajuData.dayStemHanja || "",
+      dayBranchHanja: sajuData.dayBranchHanja || "",
+      hourStem: sajuData.hourStem || "?",
+      hourBranch: sajuData.hourBranch || "?",
+      hourStemHanja: sajuData.hourStemHanja || "",
+      hourBranchHanja: sajuData.hourBranchHanja || "",
+      dayMaster: sajuData.dayMaster || sajuData.dayStem,
+      dayMasterHanja: sajuData.dayMasterHanja || "",
+      yearAnimal: sajuData.yearAnimal || "",
+      elements: sajuData.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+      yearStemSibseong: sajuData.yearStemSibseong || "",
+      monthStemSibseong: sajuData.monthStemSibseong || "",
+      dayStemSibseong: "본원", // 일주의 천간은 나에 해당하는 부분으로 "본원"으로 저장
+      hourStemSibseong: sajuData.hourStemSibseong || "",
+      yearBranchSibseong: sajuData.yearBranchSibseong || "",
+      monthBranchSibseong: sajuData.monthBranchSibseong || "",
+      dayBranchSibseong: sajuData.dayBranchSibseong || "",
+      hourBranchSibseong: sajuData.hourBranchSibseong || "",
+      birthInfo: {
+        solar: {
+          year: Number.parseInt(sajuData.year),
+          month: Number.parseInt(sajuData.month),
+          day: Number.parseInt(sajuData.day),
+          hour: sajuData.hour !== undefined ? Number.parseInt(sajuData.hour) : null,
+          minute: sajuData.minute !== undefined ? Number.parseInt(sajuData.minute) : null,
+        },
+        lunar: {
+          year: Number.parseInt(sajuData.lunarYear || sajuData.year),
+          month: Number.parseInt(sajuData.lunarMonth || sajuData.month),
+          day: Number.parseInt(sajuData.lunarDay || sajuData.day),
+          isLeapMonth: Boolean(sajuData.isLeapMonth),
+        },
+        timeUnknown: sajuData.timeUnknown || sajuData.hour === undefined || sajuData.hour === null,
+        birthCityId: sajuData.birthCityId || "seoul",
+        timeStandard: sajuData.timeStandard || "동경135도",
+      },
+    }
+
+    // Prepare daeun JSONB data if available
+    const daeunJsonb = sajuData.daeun || null
+
+    // Insert into saju_sessions with the JSONB columns
+    const { data: sessionData, error: sessionError } = await adminSupabase
+      .from("saju_sessions")
+      .insert({
+        user_id: userId,
+        name: sajuData.name || "Anonymous User",
+        gender: sajuData.gender || "unknown",
+        relationship_status: sajuData.relationshipStatus || "unknown",
+        saju: sajuJsonb,
+        daeun: daeunJsonb,
+      })
+      .select("id")
+      .single()
+
+    if (sessionError) {
+      console.error("Error creating saju session:", sessionError)
+      return NextResponse.json({ error: sessionError.message }, { status: 500 })
+    }
+
+    // For backward compatibility, still save to the old tables
     // 생년월일 정보 저장
     if (sajuData.year && sajuData.month && sajuData.day) {
       const { error: birthError } = await adminSupabase.from("birth_info").insert({
@@ -145,7 +218,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, userId })
+    return NextResponse.json({ success: true, userId, sessionId: sessionData.id })
   } catch (error) {
     console.error("Error in save-saju-data API route:", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })

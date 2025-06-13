@@ -222,7 +222,7 @@ export async function POST(req: Request) {
         // 생년월일 정보가 포함된 메시지 감지 및 사주 계산
         const birthDateMatch = userMessage.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/g)
         if (birthDateMatch) {
-          console.log("생년월일 정��� 감지:", birthDateMatch)
+          console.log("생년월�� 정����� 감지:", birthDateMatch)
 
           // 각 생년월일에 대해 사주 계산
           for (const dateStr of birthDateMatch) {
@@ -584,11 +584,9 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 
 9. 수치나 과장된 표현은 지양합니다. (예: "90% 확률", "기적의 시기" 등)
 
-10. 궁합에 대해서 추천해줄때 혹은 궁금하냐고 물어볼때는 채팅창 하단에 궁합보기를 눌러서 상대방 생년월일을 계산해서 주면 더 정확히 볼수 있다고 안내해줘.
-
 ---
 
-🧠 메모리 사용 가이드 (Memory Logic)
+🧠 메모리 사용 가���드 (Memory Logic)
 - 유저의 다음 정보를 메모리에 저장하세요:
   - 직업, 연애 상태, 최근 이별, 사는 도시, 감정상태, 목표 등
   - 궁합 대상자 정보 (이름, 생년월일, 성별)

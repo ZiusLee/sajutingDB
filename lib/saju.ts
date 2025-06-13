@@ -491,7 +491,7 @@ function generateInterpretation(
 
     switch (element) {
       case "wood":
-        interpretation += "창의성과 성장에 유리합니다. 예술, 교육, 문학 분야에서 재능을 발휘할 수 있습니다. "
+        interpretation += "창의성과 성장에 유리합니다. 예술, 교육, 문학 분야에서 재��을 발휘할 수 있습니다. "
         break
       case "fire":
         interpretation += "열정과 리더십이 뛰어납니다. 연예, 마케팅, 영업 분야에서 두각을 나타낼 수 있습니다. "
