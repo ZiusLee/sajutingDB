@@ -165,9 +165,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
       setSaju(sajuResult)
 
-      // Calculate daeun data if available in sajuResult
-      const daeunData = sajuResult.daeun || null
-
       // Store calculation data in localStorage for later use
       const sajuDataToStore = {
         name,
@@ -184,37 +181,19 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         lunarYear: Number.parseInt(lunarData.year),
         lunarMonth: Number.parseInt(lunarData.month),
         lunarDay: Number.parseInt(lunarData.day),
-        isLeapMonth: lunarData.isLeapMonth,
         yearStem: sajuResult.yearStem,
         yearBranch: sajuResult.yearBranch,
-        yearStemHanja: sajuResult.yearStemHanja,
-        yearBranchHanja: sajuResult.yearBranchHanja,
         monthStem: sajuResult.monthStem,
         monthBranch: sajuResult.monthBranch,
-        monthStemHanja: sajuResult.monthStemHanja,
-        monthBranchHanja: sajuResult.monthBranchHanja,
         dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.dayBranch,
-        dayStemHanja: sajuResult.dayStemHanja,
-        dayBranchHanja: sajuResult.dayBranchHanja,
-        hourStem: sajuResult.hourStem,
+        dayBranch: sajuResult.hourStem,
         hourBranch: sajuResult.hourBranch,
-        hourStemHanja: sajuResult.hourStemHanja,
-        hourBranchHanja: sajuResult.hourBranchHanja,
-        dayMaster: sajuResult.dayMaster,
-        dayMasterHanja: sajuResult.dayMasterHanja,
-        yearAnimal: sajuResult.yearAnimal,
         elements: sajuResult.elements,
         interpretation: sajuResult.interpretation,
         yearStemSibseong: sajuResult.yearStemSibseong,
         monthStemSibseong: sajuResult.monthStemSibseong,
-        dayStemSibseong: "본원", // 일주의 천간은 나에 해당하는 부분으로 "본원"으로 저장
+        dayStemSibseong: sajuResult.dayStemSibseong,
         hourStemSibseong: sajuResult.hourStemSibseong,
-        yearBranchSibseong: sajuResult.yearBranchSibseong,
-        monthBranchSibseong: sajuResult.monthBranchSibseong,
-        dayBranchSibseong: sajuResult.dayBranchSibseong,
-        hourBranchSibseong: sajuResult.hourBranchSibseong,
-        daeun: daeunData, // Include daeun data
       }
 
       console.log("Storing saju data to localStorage:", sajuDataToStore)

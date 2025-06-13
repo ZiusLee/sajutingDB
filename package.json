@@ -43,7 +43,6 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/storage-js": "latest",
     "@supabase/supabase-js": "latest",
-    "@vercel/postgres": "latest",
     "ai": "latest",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "latest",
