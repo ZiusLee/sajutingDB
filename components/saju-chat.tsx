@@ -3,20 +3,22 @@
 import type React from "react"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ArrowLeft, Settings, User, Database, Mic, Send, Loader2 } from "lucide-react"
-import { useChat as useAIChat, type Message } from "ai/react"
+import { Send, ChevronDown, User, Mic, ArrowLeft, Settings, Database } from "lucide-react"
+import { useChat as useAIChat } from "ai/react"
+import SajuDiagram from "@/components/saju-diagram"
+import ReactMarkdown from "react-markdown"
+import CompatibilityTool from "@/components/compatibility-tool"
+import MemoryBank from "@/components/memory-bank"
 import { compressSaju } from "@/lib/saju-compression"
 import { memoryService } from "@/lib/memory-service"
-import SajuDiagram from "@/components/saju-diagram"
-import CompatibilityTool from "@/components/compatibility-tool"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useAuth } from "@/contexts/auth-context"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import MemoryBank from "@/components/memory-bank"
-import { createMemory } from "@/lib/memory-api-service"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -59,25 +61,6 @@ const useForceDarkTheme = () => {
       }
     }
   }, [])
-}
-
-const useNetworkStatus = () => {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true)
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-
-    return () => {
-      window.removeEventListener("online", handleOffline)
-      window.removeEventListener("offline", handleOffline)
-    }
-  }, [])
-
-  return isOnline
 }
 
 interface BirthInfo {
@@ -244,103 +227,54 @@ function generateChatSessionKey(name: string, saju: any, roomType: string) {
   return `chat_${name}_${birthYear}${birthMonth}${birthDay}${birthHour}_${gender}_${roomType}`
 }
 
-// 마크다운 렌더링 함수 추가 (handleCompatibilityAnalysis 함수 위에)
-const renderMarkdown = (content: string) => {
-  return content
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em class="italic text-white/90">$1</em>')
-    .replace(
-      /### (.*?)(\n|$)/g,
-      '<h3 class="text-lg font-bold text-white mb-2 mt-4 border-b border-white/20 pb-1">$1</h3>',
-    )
-    .replace(
-      /## (.*?)(\n|$)/g,
-      '<h2 class="text-xl font-bold text-white mb-3 mt-4 border-b border-white/30 pb-2">$1</h2>',
-    )
-    .replace(
-      /# (.*?)(\n|$)/g,
-      '<h1 class="text-2xl font-bold text-white mb-4 mt-4 border-b border-white/40 pb-2">$1</h1>',
-    )
-    .replace(
-      /• (.*?)(\n|$)/g,
-      '<div class="flex items-start ml-4 mb-1"><span class="text-purple-400 mr-2 mt-1">•</span><span class="text-white/90 flex-1">$1</span></div>',
-    )
-    .replace(
-      /(\d+)\. (.*?)(\n|$)/g,
-      '<div class="flex items-start ml-4 mb-1"><span class="text-purple-400 mr-2 mt-1 font-semibold">$1.</span><span class="text-white/90 flex-1">$2</span></div>',
-    )
-}
-
-// 궁합 키워드 감지 및 자동 안내 함수
-const detectCompatibilityKeywords = (message: string): boolean => {
-  const keywords = ["궁합", "궁합보기", "상성", "사주궁합", "연인궁합", "부부궁합", "친구궁합", "동료궁합"]
-  return keywords.some((keyword) => message.includes(keyword))
-}
-
-const generateCompatibilityGuideMessage = (): string => {
-  const responses = [
-    `아, 궁합이 궁금하시군요! 😊 채팅창 하단에 있는 설정 버튼(⚙️)을 눌러보세요. 거기에 "궁합 보기" 메뉴가 있어요. 상대방의 생년월일만 입력해주시면 바로 사주 궁합을 분석해드릴게요! 💕`,
-
-    `궁합 분석이 필요하시네요! 🔮 화면 하단 입력창 왼쪽에 있는 도구 아이콘을 터치해보세요. "궁합 보기"를 선택하시고 상대방 정보를 입력하시면 상세한 궁합 분석을 해드려요! ✨`,
-
-    `오, 궁합이 궁금하시군요! 💫 아래쪽 채팅 입력창 옆에 작은 설정 버튼이 보이시죠? 그걸 누르시면 "궁합 보기" 기능이 있어요. 거기서 상대방 생년월일을 넣어주시면 제가 자세히 분석해드릴게요! 🎯`,
-
-    `궁합 보고 싶으시네요! 😄 입력창 왼쪽에 있는 도구 버튼(⚙️)을 눌러보세요. "궁합 보기"에서 상대방의 생년월일과 시간을 입력하시면 사주 기반으로 정확한 궁합을 알려드려요! 🌟`,
-  ]
-
-  return responses[Math.floor(Math.random() * responses.length)]
-}
-
-function ChatInterface({
-  initialMessages,
+export default function SajuChat({
   saju,
   name,
   gender,
   initialInterpretation,
   roomType,
   onBack,
-  isLoggedIn,
+  isLoggedIn = false,
   sessionKey,
   birthInfo,
-  userId,
-  databaseSessionId,
-  setDatabaseSessionId,
-}: SajuChatProps & {
-  initialMessages: Message[]
-  userId: string | null
-  databaseSessionId: string | null
-  setDatabaseSessionId: (id: string | null) => void
-}) {
-  const { activeChatSession, setActiveChatSession, saveChatSession } = useChat()
-  const router = useRouter()
-  const [isMemoryBankOpen, setIsMemoryBankOpen] = useState(false)
+}: SajuChatProps) {
+  const { user, isAuthenticated } = useAuth()
+  const userId = user?.id || null
+  const actualIsLoggedIn = isAuthenticated || isLoggedIn
 
-  // ... (other states from original SajuChat component) ...
+  // States
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
+  const [isNewUser, setIsNewUser] = useState(true)
+  const [messageIds, setMessageIds] = useState<Record<string, string>>({})
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
+  const [sessionInitialized, setSessionInitialized] = useState(false)
   const [showCompatibilityTool, setShowCompatibilityTool] = useState(false)
+  const [showMemoryBank, setShowMemoryBank] = useState(false)
   const [showToolsDrawer, setShowToolsDrawer] = useState(false)
   const [hasSeenToolsNotification, setHasSeenToolsNotification] = useState(false)
+  const [questionCount, setQuestionCount] = useState(0)
+  const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const [loginPromptMessage, setLoginPromptMessage] = useState("")
+  const [streamingError, setStreamingError] = useState<string | null>(null)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
     initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
   )
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const [isNewUser, setIsNewUser] = useState(true)
-  const [messageIds, setMessageIds] = useState<Record<string, string>>({})
-  const [questionCount, setQuestionCount] = useState(0)
-  const [hasShownLoginPrompt, setHasShownLoginPrompt] = useState(false)
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
-  const [loginPromptMessage, setLoginPromptMessage] = useState("")
   const [isInitialized, setIsInitialized] = useState(false)
-  const [lastMessageTime, setLastMessageTime] = useState<Date>(new Date())
-  const [lastMessageId, setLastMessageId] = useState<string>("")
-  const [streamingError, setStreamingError] = useState<string | null>(null)
-  const [isRetrying, setIsRetrying] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+
+  const router = useRouter()
+  const supabase = createClientComponentClient()
+  const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
 
   const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
 
@@ -349,6 +283,90 @@ function ChatInterface({
     return memoryService.generateContextSummary(userId)
   }, [userId])
 
+  // 세션 ID 초기화
+  const getExistingSessionId = useCallback(async () => {
+    if (sessionInitialized || databaseSessionId) {
+      return
+    }
+
+    try {
+      setSessionInitialized(true)
+
+      const storedSajuData = localStorage.getItem("tempSajuData")
+
+      if (storedSajuData) {
+        const sajuData = JSON.parse(storedSajuData)
+        if (sajuData.sessionId) {
+          setDatabaseSessionId(sajuData.sessionId)
+          return
+        }
+      }
+
+      const response = await fetch("/api/saju-sessions", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+
+        if (data.sessions && data.sessions.length > 0) {
+          const recentSession = data.sessions[0]
+          setDatabaseSessionId(recentSession.id)
+
+          const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
+          storedData.sessionId = recentSession.id
+          localStorage.setItem("tempSajuData", JSON.stringify(storedData))
+          return
+        }
+      }
+    } catch (error) {
+      console.error("Error getting existing session ID:", error)
+    }
+  }, [sessionInitialized, databaseSessionId])
+
+  useEffect(() => {
+    if (!sessionInitialized && !databaseSessionId) {
+      getExistingSessionId()
+    }
+  }, [getExistingSessionId])
+
+  // 초기 메시지 설정
+  const savedSession = activeChatSession || getChatSession(sessionKey)
+
+  useEffect(() => {
+    const hasExistingSession = savedSession?.messages && savedSession.messages.length > 0
+    setIsNewUser(!hasExistingSession)
+  }, [savedSession])
+
+  let initialMessages: any[] = []
+  if (savedSession?.messages) {
+    initialMessages = savedSession.messages
+  } else if (roomType === "sajuping") {
+    try {
+      initialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
+    } catch (error) {
+      console.error("Error generating sajuping initial messages:", error)
+      initialMessages = [
+        {
+          id: "welcome",
+          role: "assistant" as const,
+          content: getInitialMessageByRoomType(name, roomType, birthInfo),
+        },
+      ]
+    }
+  } else {
+    initialMessages = [
+      {
+        id: "welcome",
+        role: "assistant" as const,
+        content: getInitialMessageByRoomType(name, roomType, birthInfo),
+      },
+    ]
+  }
+
   const {
     messages,
     input,
@@ -356,10 +374,9 @@ function ChatInterface({
     handleSubmit: aiHandleSubmit,
     isLoading,
     setInput,
-    append,
-    reload,
     error,
-    setMessages,
+    reload,
+    append,
   } = useAIChat({
     api: "/api/saju-chat",
     initialMessages,
@@ -387,25 +404,14 @@ function ChatInterface({
       try {
         const updatedMessages = [...messages, message]
 
-        // Auto-save memory (로그인한 사용자만)
-        if (userId) {
-          const memoryKeywords = ["기억해 둘게요", "저장했습니다", "기억하겠습니다", "중요한 정보네요"]
-          if (memoryKeywords.some((keyword) => message.content.includes(keyword))) {
-            const userMessage = messages[messages.length - 1]
-            try {
-              await createMemory(
-                "conversation",
-                { topic: "AI가 중요하다고 판단한 대화", messages: [userMessage.content, message.content] },
-                ["auto-saved", roomType],
-                userId,
-              )
-            } catch (error) {
-              console.error("Failed to save memory:", error)
-            }
-          }
+        // 데이터베이스에 저장 (로그인한 사용자만)
+        if (databaseSessionId && actualIsLoggedIn) {
+          console.log("[CLIENT] Saving assistant message to database")
+          await saveMessagesToDatabase(updatedMessages, databaseSessionId)
         }
 
-        // 항상 로컬 스토리지에 저장 (로그인 여부와 관계없이)
+        // 로컬 스토리지에 저장
+        const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
         const sessionData = {
           saju,
           name,
@@ -415,26 +421,13 @@ function ChatInterface({
           messages: updatedMessages,
           lastMessageTime: new Date().toISOString(),
           birthInfo,
-          databaseSessionId,
         }
 
         try {
-          saveChatSession(sessionKey, sessionData)
+          saveChatSession(currentSessionKey, sessionData)
           setActiveChatSession(sessionData)
-        } catch (storageError) {
-          console.error("Error saving to localStorage:", storageError)
-        }
-
-        // 로그인한 사용자만 데이터베이스에 저장 (백그라운드에서 비동기로)
-        if (isLoggedIn && userId) {
-          // 백그라운드에서 비동기로 저장 (UI 블로킹 없음)
-          setTimeout(async () => {
-            try {
-              await saveToDatabase(updatedMessages, sessionData)
-            } catch (error) {
-              console.error("Background database save failed:", error)
-            }
-          }, 0)
+        } catch (saveError) {
+          console.error("Error saving chat session:", saveError)
         }
 
         setShouldGenerateQuestions(true)
@@ -446,24 +439,7 @@ function ChatInterface({
     },
     onError: (error) => {
       console.error("Chat error:", error)
-
-      let errorMessage = "응답 생성 중 오류가 발생했습니다."
-
-      if (error.message) {
-        errorMessage = error.message
-
-        if (error.message.includes("network") || error.message.includes("fetch")) {
-          errorMessage = "네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요."
-        } else if (error.message.includes("timeout")) {
-          errorMessage = "요청 시간이 초과되었습니다. 다시 시도해주세요."
-        } else if (error.message.includes("model")) {
-          errorMessage = "AI 모델 로딩 중 오류가 발생했습니다. 다시 시도해주세요."
-        } else if (error.message.includes("parse") || error.message.includes("JSON")) {
-          errorMessage = "응답 처리 중 오류가 발생했습니다. 다시 시도해주세요."
-        }
-      }
-
-      setStreamingError(errorMessage)
+      setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
       setShouldGenerateQuestions(true)
     },
     onResponse: (response) => {
@@ -475,288 +451,85 @@ function ChatInterface({
           })
         }, 100)
       }
-
       setStreamingError(null)
-    },
-    options: {
-      timeout: 60000,
     },
   })
 
-  // 데이터베이스 저장 함수 (분리)
-  const saveToDatabase = async (updatedMessages: Message[], sessionData: any) => {
-    try {
-      // 세션 ID가 없으면 새로 생성
-      let sessionId = databaseSessionId
+  // 메시지를 데이터베이스에 저장하는 함수 (useAIChat 후에 정의)
+  const saveMessagesToDatabase = useCallback(
+    async (messagesToSave: any[], sessionId: string) => {
       if (!sessionId) {
-        console.log("Creating new session for user:", userId)
-        const createSessionResponse = await fetch("/api/saju-sessions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            userId,
-            name,
-            gender,
-            roomType,
-            saju,
-            birthInfo,
-          }),
-        })
-
-        if (createSessionResponse.ok) {
-          const sessionResult = await createSessionResponse.json()
-          sessionId = sessionResult.id || sessionResult.sessionId
-          console.log("New session created:", sessionId)
-          setDatabaseSessionId(sessionId)
-
-          // 세션 ID를 localStorage에도 저장
-          const updatedSessionData = {
-            ...sessionData,
-            databaseSessionId: sessionId,
-          }
-          saveChatSession(sessionKey, updatedSessionData)
-        } else {
-          console.error("Failed to create session:", await createSessionResponse.text())
-          return
-        }
+        console.log("No session ID available for database save")
+        return
       }
 
-      if (sessionId) {
-        console.log("Saving messages to database, sessionId:", sessionId)
-        const saveResponse = await fetch("/api/messages", {
+      try {
+        console.log(`[CLIENT] Saving ${messagesToSave.length} messages to database for session ${sessionId}`)
+
+        const response = await fetch("/api/messages", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Accept: "application/json",
           },
           body: JSON.stringify({
             sessionId,
-            messages: updatedMessages,
+            messages: messagesToSave,
             roomType,
-            sajuData: { name, gender, saju, birthInfo },
+            sajuData: {
+              name,
+              gender,
+              saju,
+              birthInfo,
+            },
           }),
         })
 
-        if (!saveResponse.ok) {
-          console.error("Failed to save messages:", await saveResponse.text())
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`[CLIENT] Successfully saved ${data.savedCount || 0} messages to database`)
+
+          if (data.messageIds && data.messageIds.length > 0) {
+            setTimeout(() => {
+              const newMessageIds: Record<string, string> = {}
+              const savableMessages = messagesToSave.filter((_, index) => index >= 2)
+              savableMessages.forEach((msg, index) => {
+                if (data.messageIds[index]) {
+                  newMessageIds[msg.id] = data.messageIds[index]
+                }
+              })
+              setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
+            }, 0)
+          }
+        } else {
+          const errorText = await response.text()
+          console.error("[CLIENT] Failed to save messages to database:", errorText)
         }
+      } catch (error) {
+        console.error("[CLIENT] Error saving messages to database:", error)
       }
-    } catch (error) {
-      console.error("Error saving to database:", error)
-    }
-  }
+    },
+    [roomType, name, gender, saju, birthInfo],
+  )
 
-  // 채팅 세션 저장 함수 (로컬 스토리지만)
-  const saveCurrentChatSession = useCallback(() => {
-    if (messages.length === 0) return
-
-    const sessionData = {
-      saju,
-      name,
-      gender,
-      interpretation: initialInterpretation,
-      roomType,
-      messages,
-      lastMessageTime: new Date().toISOString(),
-      birthInfo,
-      databaseSessionId,
-    }
-
-    try {
-      saveChatSession(sessionKey, sessionData)
-      setActiveChatSession(sessionData)
-      console.log("Chat session saved successfully", { sessionKey, messagesCount: messages.length })
-    } catch (error) {
-      console.error("Error saving chat session:", error)
-    }
-  }, [
-    messages,
-    saju,
-    name,
-    gender,
-    initialInterpretation,
-    roomType,
-    birthInfo,
-    databaseSessionId,
-    sessionKey,
-    saveChatSession,
-    setActiveChatSession,
-  ])
-
-  // 주기적으로 채팅 세션 저장 (로컬 스토리지만)
-  useEffect(() => {
-    const saveInterval = setInterval(() => {
-      saveCurrentChatSession()
-    }, 30000) // 30초마다 저장
-
-    return () => clearInterval(saveInterval)
-  }, [saveCurrentChatSession])
-
-  // 페이지 언로드 시 채팅 세션 저장
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      saveCurrentChatSession()
-    }
-
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [saveCurrentChatSession])
-
-  const handleCompatibilityAnalysis = (mainPerson: any, selectedPeople: any[]) => {
-    console.log("handleCompatibilityAnalysis called in saju-chat")
-    console.log("mainPerson received:", mainPerson)
-    console.log("selectedPeople received:", selectedPeople)
-
-    try {
-      // 궁합 분석 메시지 생성 - 데이터 구조에 맞게 수정
-      const peopleNames = selectedPeople.map((p) => p.name).join(", ")
-
-      // 사주 정보 추출 함수 - 더 상세한 정보 포함
-      const getSajuInfo = (person: any) => {
-        let info = ""
-
-        // 기본 정보 추가
-        info += `- 이름: ${person.name}\n`
-        info += `- 성별: ${person.gender === "male" ? "남성" : "여성"}\n`
-
-        // 생년월일 정보 추가
-        if (person.birthYear && person.birthMonth && person.birthDay) {
-          info += `- 생년월일: ${person.birthYear}년 ${person.birthMonth}월 ${person.birthDay}일`
-          if (!person.timeUnknown && person.birthHour) {
-            info += ` ${person.birthHour}시`
-            if (person.birthMinute) info += ` ${person.birthMinute}분`
-          }
-          info += "\n"
-        }
-
-        // 일주 정보 추가
-        if (person.sajuPalja && person.sajuPalja.day) {
-          info += `- 일주: ${person.sajuPalja.day.stem}${person.sajuPalja.day.branch}일주\n`
-        } else if (person.dayStem && person.dayBranch) {
-          info += `- 일주: ${person.dayStem}${person.dayBranch}일주\n`
-        } else if (person.dayMaster) {
-          info += `- 일주: ${person.dayMaster}일주\n`
-        }
-
-        // 사주 팔자 정보 추가
-        if (person.sajuPalja) {
-          info += "- 사주팔자:\n"
-          if (person.sajuPalja.year) {
-            info += `  • 년주: ${person.sajuPalja.year.stem}${person.sajuPalja.year.branch}\n`
-          }
-          if (person.sajuPalja.month) {
-            info += `  • 월주: ${person.sajuPalja.month.stem}${person.sajuPalja.month.branch}\n`
-          }
-          if (person.sajuPalja.day) {
-            info += `  • 일주: ${person.sajuPalja.day.stem}${person.sajuPalja.day.branch}\n`
-          }
-          if (person.sajuPalja.hour) {
-            info += `  • 시주: ${person.sajuPalja.hour.stem}${person.sajuPalja.hour.branch}\n`
-          }
-        }
-
-        // 오행 정보 추가 - 수정된 부분
-        const elements = person.elements ||
-          person.fullSaju?.elements ||
-          (person.fullSaju && {
-            wood: person.fullSaju.elements?.wood || 0,
-            fire: person.fullSaju.elements?.fire || 0,
-            earth: person.fullSaju.elements?.earth || 0,
-            metal: person.fullSaju.elements?.metal || 0,
-            water: person.fullSaju.elements?.water || 0,
-          }) || {
-            wood: 0,
-            fire: 0,
-            earth: 0,
-            metal: 0,
-            water: 0,
-          }
-
-        info += `- 오행: 목${elements.wood} 화${elements.fire} 토${elements.earth} 금${elements.metal} 수${elements.water}\n`
-
-        // 천간 지지 정보 추가
-        if (person.stems && person.branches) {
-          info += `- 천간: ${person.stems.join(", ")}\n`
-          info += `- 지지: ${person.branches.join(", ")}\n`
-        }
-
-        return info
+  // 사용자 메시지 저장 함수 (useAIChat 후에 정의)
+  const saveUserMessage = useCallback(
+    async (userMessage: string) => {
+      if (!databaseSessionId) {
+        console.log("[CLIENT] No database session ID available for user message save")
+        return
       }
 
-      const mainPersonInfo = getSajuInfo(mainPerson)
-      const selectedPeopleInfo = selectedPeople.map((person) => getSajuInfo(person)).join("\n")
-
-      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 사주 궁합을 자세히 분석해주세요. 
-
-다음 정보를 포함해서 분석해주세요:
-1. 일간 궁합 (천간 상성)
-2. 오행 궁합 (오행 보완 관계)
-3. 십이지 궁합 (지지 상성)
-4. 성격 및 가치관 궁합
-5. 관계 발전 가능성
-6. 주의사항 및 조언
-7. 궁합 점수 (100점 만점)
-
-각 사람의 사주 정보:
-【${mainPerson.name}님의 사주】
-${mainPersonInfo}
-
-【${peopleNames}님의 사주】
-${selectedPeopleInfo}
-
-상세하고 구체적인 분석을 부탁드립니다.
-
-`
-
-      console.log("Sending compatibility message:", compatibilityMessage)
-
-      // 메시지를 채팅에 추가
-      append({
-        role: "user",
-        content: compatibilityMessage,
-      })
-
-      console.log("Compatibility message appended to chat")
-
-      // 궁합 도구 닫기
-      setShowCompatibilityTool(false)
-    } catch (error) {
-      console.error("Error in handleCompatibilityAnalysis:", error)
-      alert("궁합 분석 요청 중 오류가 발생했습니다: " + error.message)
-    }
-  }
-
-  const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    if (!input.trim()) {
-      return
-    }
-
-    // 궁합 키워드 감지
-    if (detectCompatibilityKeywords(input.trim())) {
-      // 사용자 메시지 먼저 추가
-      const userMessage = {
+      const userMessageObj = {
         id: `user-${Date.now()}`,
         role: "user" as const,
-        content: input.trim(),
+        content: userMessage,
       }
 
-      // 자동 안내 메시지 생성
-      const guideMessage = {
-        id: `guide-${Date.now()}`,
-        role: "assistant" as const,
-        content: generateCompatibilityGuideMessage(),
-      }
+      const updatedMessages = [...messages, userMessageObj]
+      console.log(`[CLIENT] Saving user message to database`)
 
-      // 메시지 추가 (useAIChat의 setMessages 대신 직접 추가)
-      const updatedMessages = [...messages, userMessage, guideMessage]
-      setMessages(updatedMessages)
+      await saveMessagesToDatabase(updatedMessages, databaseSessionId)
 
-      // 로컬 세션에 저장
       const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
       const sessionData = {
         saju,
@@ -767,32 +540,43 @@ ${selectedPeopleInfo}
         messages: updatedMessages,
         lastMessageTime: new Date().toISOString(),
         birthInfo,
-        databaseSessionId,
       }
 
       try {
         saveChatSession(currentSessionKey, sessionData)
         setActiveChatSession(sessionData)
       } catch (saveError) {
-        console.error("Error saving chat session:", saveError)
+        console.error("Error saving user message to session:", saveError)
       }
+    },
+    [
+      databaseSessionId,
+      messages,
+      saveMessagesToDatabase,
+      sessionKey,
+      name,
+      saju,
+      roomType,
+      gender,
+      initialInterpretation,
+      saveChatSession,
+      setActiveChatSession,
+      birthInfo,
+    ],
+  )
 
-      // 입력창 초기화
-      setInput("")
+  const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
 
-      // 스크롤 하단으로
-      setTimeout(() => {
-        scrollToBottom()
-      }, 100)
-
+    if (!input.trim()) {
       return
     }
 
     const newQuestionCount = questionCount + 1
     setQuestionCount(newQuestionCount)
 
-    // 로그인 프롬프트 로직
-    const shouldShowLoginPrompt = newQuestionCount >= 5 && !isLoggedIn && !hasShownLoginPrompt
+    const shouldShowLoginPrompt = newQuestionCount >= 5 && !actualIsLoggedIn && !hasShownLoginPrompt
+
     if (shouldShowLoginPrompt) {
       setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
       setShowLoginPrompt(true)
@@ -803,16 +587,15 @@ ${selectedPeopleInfo}
     setStreamingError(null)
     setRetryCount(0)
 
-    // 일반 메시지 전송
+    // 사용자 메시지 저장
+    saveUserMessage(input)
+
+    // AI 채팅 제출
     aiHandleSubmit(e)
   }
 
   const handleBackWithSave = () => {
-    // ... (back logic is the same)
     try {
-      console.log("handleBackWithSave called")
-
-      // 세션 저장
       const sessionData = {
         saju,
         name,
@@ -822,11 +605,9 @@ ${selectedPeopleInfo}
         messages,
         lastMessageTime: new Date().toISOString(),
         birthInfo,
-        databaseSessionId,
       }
       saveChatSession(sessionKey, sessionData)
 
-      // 로컬 스토리지에 마지막 사주 데이터 저장
       localStorage.setItem(
         "last_chat_saju_data",
         JSON.stringify({
@@ -838,26 +619,17 @@ ${selectedPeopleInfo}
         }),
       )
 
-      // 마이페이지에서 온 경우 체크
       const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
-      console.log("fromMyPage:", fromMyPage)
-
-      // 세션 스토리지 클리어 (먼저 클리어)
       sessionStorage.removeItem("from_mypage")
 
       if (fromMyPage) {
-        console.log("Returning to mypage via window.location")
-        // 즉시 리디렉션하지 말고 약간의 지연을 둠
         setTimeout(() => {
           window.location.href = "/mypage"
         }, 100)
       } else {
-        console.log("Calling onBack function")
-        // onBack 함수가 있는지 확인
         if (typeof onBack === "function") {
           onBack()
         } else {
-          console.log("onBack is not a function, redirecting to home")
           setTimeout(() => {
             window.location.href = "/"
           }, 100)
@@ -865,7 +637,6 @@ ${selectedPeopleInfo}
       }
     } catch (error) {
       console.error("뒤로가기 처리 중 오류:", error)
-      // 오류 발생 시 기본 동작
       setTimeout(() => {
         window.location.href = "/"
       }, 100)
@@ -874,7 +645,6 @@ ${selectedPeopleInfo}
 
   const handleSuggestedQuestionClick = (question: string) => {
     if (isLoading) return
-
     setInput(question)
     setTimeout(() => {
       const form = document.querySelector("form")
@@ -884,97 +654,9 @@ ${selectedPeopleInfo}
     }, 100)
   }
 
-  const generateSuggestedQuestions = useCallback(async () => {
-    if (!shouldGenerateQuestions || isGeneratingQuestions || messages.length < 2) {
-      return
-    }
-
-    const lastMessage = messages[messages.length - 1]
-    if (lastMessage.role !== "assistant") {
-      return
-    }
-
-    setIsGeneratingQuestions(true)
-    setShouldGenerateQuestions(false)
-
-    try {
-      const defaultQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
-
-      const response = await fetch("/api/suggested-questions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: messages.slice(-6),
-          roomType,
-          saju,
-          name,
-          currentContext: lastMessage.content.slice(0, 500),
-          birthInfo,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
-          setSuggestedQuestions(data.questions.filter((q) => q.length > 5 && q.length < 50))
-        } else {
-          setSuggestedQuestions(defaultQuestions)
-        }
-      } else {
-        setSuggestedQuestions(defaultQuestions)
-      }
-    } catch (error) {
-      console.error("추천 질문 생성 오류:", error)
-      setSuggestedQuestions(initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general)
-    } finally {
-      setIsGeneratingQuestions(false)
-    }
-  }, [messages, roomType, shouldGenerateQuestions, isGeneratingQuestions, birthInfo, saju, name])
-
-  // 추천 질문 생성
-  useEffect(() => {
-    if (shouldGenerateQuestions && !isGeneratingQuestions && messages.length > 0) {
-      generateSuggestedQuestions()
-    }
-  }, [shouldGenerateQuestions, isGeneratingQuestions, messages, generateSuggestedQuestions])
-
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-    }
-  }, [])
-
-  useEffect(() => {
-    if (chatContainerRef.current && !isNewUser) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200
-
-      if (isNearBottom) {
-        setTimeout(() => {
-          scrollToBottom()
-        }, 100)
-      }
-    }
-  }, [messages, isNewUser, scrollToBottom])
-
-  useEffect(() => {
-    if (!isInitialized) {
-      setTimeout(() => {
-        if (!isNewUser) {
-          scrollToBottom()
-        }
-        setIsInitialized(true)
-      }, 100)
-    }
-  }, [isInitialized, isNewUser, scrollToBottom])
-
-  const handleScroll = useCallback(() => {
-    if (chatContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-      setShowScrollToBottom(!isNearBottom)
     }
   }, [])
 
@@ -987,31 +669,49 @@ ${selectedPeopleInfo}
     }
   }, [])
 
+  const handleScroll = useCallback(() => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      setShowScrollToBottom(!isNearBottom)
+    }
+  }, [])
+
   const handleRetry = () => {
     setIsRetrying(true)
     setRetryCount((prevCount) => prevCount + 1)
     reload()
   }
 
-  const handleToolsDrawerOpen = () => {
-    setShowToolsDrawer(true)
-    setHasSeenToolsNotification(true)
+  const handleCompatibilityAnalysis = (mainPerson: any, selectedPeople: any[]) => {
+    try {
+      const peopleNames = selectedPeople.map((p) => p.name).join(", ")
+      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 사주 궁합을 자세히 분석해주세요.`
+
+      append({
+        role: "user",
+        content: compatibilityMessage,
+      })
+
+      setShowCompatibilityTool(false)
+    } catch (error) {
+      console.error("Error in handleCompatibilityAnalysis:", error)
+    }
   }
 
-  const handleTodaysFortune = () => {
-    alert("오늘의 운세 기능은 아직 준비 중입니다.")
-  }
+  useHideHeaderAndFooter()
+  useForceDarkTheme()
 
   return (
     <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
-      {/* 개선된 헤더 */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white/10 backdrop-blur-md border-b border-white/20 shadow-2xl transition-shadow duration-300 ease-in-out">
+      {/* 헤더 */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white/10 backdrop-blur-md border-b border-white/20">
         <div className="flex items-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleBackWithSave}
-            className="mr-2 text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+            className="mr-2 text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -1021,7 +721,7 @@ ${selectedPeopleInfo}
           <div className="relative" ref={dropdownRef}>
             <Button
               variant="ghost"
-              className="flex items-center space-x-2 text-white hover:text-white hover:bg-white/20 px-4 py-2 rounded-lg transition-all duration-200"
+              className="flex items-center space-x-2 text-white hover:text-white hover:bg-white/20 px-4 py-2 rounded-lg"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <span className="text-lg">{currentCharacter.emoji}</span>
@@ -1031,16 +731,13 @@ ${selectedPeopleInfo}
 
             {isDropdownOpen && (
               <>
-                {/* 배경 오버레이 */}
                 <div className="fixed inset-0 z-[99998]" onClick={() => setIsDropdownOpen(false)} />
-                {/* 드롭다운 */}
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-xl z-[99999]">
                   <div className="py-2">
                     {pingCharacters.map((character) => (
                       <button
                         key={character.id}
                         onClick={() => {
-                          //handleCharacterChange(character)
                           router.push(
                             `/saju-chat/${character.roomType}?name=${name}&gender=${gender}&solarYear=${birthInfo?.solarYear}&solarMonth=${birthInfo?.solarMonth}&solarDay=${birthInfo?.solarDay}&solarHour=${birthInfo?.solarHour}&solarMinute=${birthInfo?.solarMinute}&timeUnknown=${birthInfo?.timeUnknown}`,
                           )
@@ -1065,13 +762,13 @@ ${selectedPeopleInfo}
         </div>
 
         <div className="flex items-center space-x-2">
-          {isLoggedIn ? (
+          {actualIsLoggedIn ? (
             <>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push("/mypage")}
-                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg"
                 title="마이페이지"
               >
                 <User className="h-5 w-5" />
@@ -1079,8 +776,8 @@ ${selectedPeopleInfo}
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsMemoryBankOpen(true)}
-                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+                onClick={() => setShowMemoryBank(true)}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg"
                 title="메모리뱅크"
               >
                 <Database className="h-5 w-5" />
@@ -1091,7 +788,7 @@ ${selectedPeopleInfo}
               variant="outline"
               size="sm"
               onClick={() => router.push("/login")}
-              className="text-white border-white/30 hover:bg-white/20 hover:text-white hover:border-white/50 px-3 py-1 rounded-lg transition-all duration-200 text-sm"
+              className="text-white border-white/30 hover:bg-white/20 hover:text-white hover:border-white/50 px-3 py-1 rounded-lg text-sm"
             >
               로그인
             </Button>
@@ -1102,10 +799,10 @@ ${selectedPeopleInfo}
       {/* 메인 채팅 영역 */}
       <div ref={chatContainerRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
         <div className="pb-32 pt-6">
-          {/* 사주 다이어그램 - 개선된 스타일 */}
+          {/* 사주 다이어그램 */}
           <div className="px-4 mb-6">
             <div className="max-w-3xl mx-auto">
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl transition-shadow duration-300 ease-in-out hover:shadow-3xl">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20">
                 <SajuDiagram
                   saju={saju}
                   timeUnknown={birthInfo?.timeUnknown}
@@ -1126,41 +823,52 @@ ${selectedPeopleInfo}
             </div>
           </div>
 
+          {/* 메시지들 */}
           {messages.map((message, index) => (
             <div key={message.id} className={`px-4 py-4 ${message.role === "assistant" ? "bg-white/5" : ""}`}>
               <div className="max-w-3xl mx-auto flex space-x-4">
                 <div className="flex-shrink-0">
                   {message.role === "assistant" ? (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
                       {currentCharacter.emoji}
                     </div>
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs shadow-lg">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
                       나
                     </div>
                   )}
                 </div>
                 <div className="flex-1 prose prose-invert max-w-none">
-                  {message.content.split("\n").map((line, i) => {
-                    const renderedLine = renderMarkdown(line || "\u00A0")
-                    return (
-                      <div
-                        key={i}
-                        className={`${i === 0 ? "mt-0" : "mt-2"} text-white/90 leading-relaxed`}
-                        dangerouslySetInnerHTML={{ __html: renderedLine }}
-                      />
-                    )
-                  })}
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="text-white/90 leading-relaxed mb-3 last:mb-0">{children}</p>,
+                      strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-white/80">{children}</em>,
+                      ul: ({ children }) => (
+                        <ul className="list-disc list-inside space-y-1 mb-3 text-white/90">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside space-y-1 mb-3 text-white/90">{children}</ol>
+                      ),
+                      li: ({ children }) => <li className="text-white/90">{children}</li>,
+                      h1: ({ children }) => <h1 className="text-xl font-bold mb-3 text-white">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-lg font-semibold mb-2 text-white">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-base font-semibold mb-2 text-white">{children}</h3>,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
                 </div>
               </div>
             </div>
           ))}
 
+          {/* 로딩 상태 */}
           {isLoading && (
             <div className="px-4 py-4 bg-white/5">
               <div className="max-w-3xl mx-auto flex space-x-4">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
                     {currentCharacter.emoji}
                   </div>
                 </div>
@@ -1184,16 +892,17 @@ ${selectedPeopleInfo}
             </div>
           )}
 
+          {/* 에러 상태 */}
           {streamingError && (
             <div className="px-4 py-4">
               <div className="max-w-3xl mx-auto">
-                <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 backdrop-blur-md">
+                <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4">
                   <p className="text-red-200 text-sm mb-3">{streamingError}</p>
                   <Button
                     onClick={handleRetry}
                     disabled={isRetrying}
                     size="sm"
-                    className="bg-red-500 hover:bg-red-600 text-white rounded-lg"
+                    className="bg-red-500 hover:bg-red-600 text-white"
                   >
                     {isRetrying ? "재시도 중..." : "다시 시도"}
                   </Button>
@@ -1206,21 +915,18 @@ ${selectedPeopleInfo}
 
       {/* 하단 입력 영역 */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/90 to-transparent backdrop-blur-md">
-        {/* 추천 질문 영역 */}
+        {/* 추천 질문 */}
         {suggestedQuestions.length > 0 && !isLoading && (
           <div className="px-4 py-3 border-t border-white/10 h-[60px] flex items-center">
             <div className="max-w-3xl mx-auto w-full">
-              <div
-                className="flex gap-2 overflow-x-auto scrollbar-hide pb-1"
-                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-              >
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {suggestedQuestions.slice(0, 6).map((question, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
                     onClick={() => handleSuggestedQuestionClick(question)}
-                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-3 py-1 backdrop-blur-md transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-3 py-1 whitespace-nowrap flex-shrink-0"
                   >
                     {question}
                   </Button>
@@ -1230,11 +936,11 @@ ${selectedPeopleInfo}
           </div>
         )}
 
-        {/* 입력 영역 */}
+        {/* 입력창 */}
         <div className="px-4 py-4">
           <div className="max-w-3xl mx-auto">
             <form onSubmit={customHandleSubmit} className="relative">
-              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 focus-within:border-white/40 shadow-2xl transition-all duration-300 ease-in-out">
+              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 focus-within:border-white/40">
                 <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
                   <SheetTrigger asChild>
                     <Button
@@ -1242,7 +948,10 @@ ${selectedPeopleInfo}
                       variant="ghost"
                       size="sm"
                       className="ml-3 text-white/60 hover:text-white p-2 relative"
-                      onClick={handleToolsDrawerOpen}
+                      onClick={() => {
+                        setShowToolsDrawer(true)
+                        setHasSeenToolsNotification(true)
+                      }}
                     >
                       <Settings className="h-4 w-4" />
                       {!hasSeenToolsNotification && (
@@ -1278,14 +987,6 @@ ${selectedPeopleInfo}
                             </Badge>
                           )}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-white hover:bg-white/20 p-4 rounded-lg"
-                          onClick={handleTodaysFortune}
-                        >
-                          <span className="mr-3">🔮</span>
-                          오늘의 운세
-                        </Button>
                       </div>
                     </div>
                   </SheetContent>
@@ -1307,7 +1008,7 @@ ${selectedPeopleInfo}
                 <Button
                   type="submit"
                   disabled={isLoading || !input.trim()}
-                  className="mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:bg-gray-600 disabled:text-gray-400 rounded-full p-2 shadow-lg transition-all duration-300 ease-in-out"
+                  className="mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-2"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
@@ -1321,7 +1022,7 @@ ${selectedPeopleInfo}
       {showScrollToBottom && (
         <Button
           onClick={scrollToBottomSmooth}
-          className="fixed bottom-24 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white shadow-2xl z-10 backdrop-blur-md border border-white/20 transition-all duration-300 ease-in-out hover:shadow-3xl"
+          className="fixed bottom-24 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white z-10"
           size="sm"
         >
           <ChevronDown className="h-4 w-4" />
@@ -1331,92 +1032,31 @@ ${selectedPeopleInfo}
       {/* 궁합 도구 모달 */}
       <CompatibilityTool
         isOpen={showCompatibilityTool}
-        onClose={() => {
-          console.log("Closing compatibility tool")
-          setShowCompatibilityTool(false)
-        }}
+        onClose={() => setShowCompatibilityTool(false)}
         currentSaju={saju}
         currentName={name}
         currentGender={gender}
         currentBirthInfo={birthInfo}
-        isLoggedIn={isLoggedIn}
+        isLoggedIn={actualIsLoggedIn}
         userId={userId}
         onCompatibilityAnalysis={handleCompatibilityAnalysis}
       />
+
+      {/* 메모리뱅크 */}
       <MemoryBank
-        isOpen={isMemoryBankOpen}
-        onClose={() => setIsMemoryBankOpen(false)}
+        isOpen={showMemoryBank}
+        onClose={() => setShowMemoryBank(false)}
         userId={userId}
         sessionId={!userId ? sessionKey : null}
       />
+
+      {/* 로그인 프롬프트 */}
+      <LoginPromptDialog
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        onLogin={() => router.push("/login")}
+        message={loginPromptMessage}
+      />
     </div>
-  )
-}
-
-export default function SajuChat(props: SajuChatProps) {
-  const { user, isAuthenticated } = useAuth()
-  const { getChatSession } = useChat()
-  const userId = user?.id || null
-  const isLoggedIn = isAuthenticated || props.isLoggedIn
-
-  const [initialMessages, setInitialMessages] = useState<Message[] | null>(null)
-  const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
-
-  useEffect(() => {
-    const loadChatHistory = async () => {
-      setIsLoadingHistory(true)
-      let loadedMessages: Message[] | null = null
-      let dbSessionId: string | null = null
-
-      try {
-        // 항상 로컬 스토리지에서 먼저 확인 (로그인 여부와 관계없이)
-        const savedSession = getChatSession(props.sessionKey)
-        if (savedSession?.messages && savedSession.messages.length > 0) {
-          loadedMessages = savedSession.messages
-          dbSessionId = savedSession.databaseSessionId || null
-          console.log(`Loaded ${savedSession.messages.length} messages from localStorage`)
-        }
-
-        // 메시지를 가져오지 못했으면 초기 메시지 생성
-        if (!loadedMessages || loadedMessages.length === 0) {
-          loadedMessages = generateSajupingInitialMessages(props.name, props.saju, props.birthInfo)
-          console.log("Generated initial messages")
-        }
-
-        setInitialMessages(loadedMessages)
-        setDatabaseSessionId(dbSessionId)
-      } catch (error) {
-        console.error("Error loading chat history:", error)
-        // 오류 발생 시 초기 메시지 생성
-        const defaultMessages = generateSajupingInitialMessages(props.name, props.saju, props.birthInfo)
-        setInitialMessages(defaultMessages)
-      } finally {
-        setIsLoadingHistory(false)
-      }
-    }
-
-    // 컴포넌트 마운트 시 한 번만 실행
-    loadChatHistory()
-  }, [props.sessionKey, props.name, props.saju, props.birthInfo, getChatSession])
-
-  if (isLoadingHistory || !initialMessages) {
-    return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
-        <p className="mt-4 text-lg">대화 기록을 불러오는 중...</p>
-      </div>
-    )
-  }
-
-  return (
-    <ChatInterface
-      {...props}
-      initialMessages={initialMessages}
-      userId={userId}
-      isLoggedIn={isLoggedIn}
-      databaseSessionId={databaseSessionId}
-      setDatabaseSessionId={setDatabaseSessionId}
-    />
   )
 }
