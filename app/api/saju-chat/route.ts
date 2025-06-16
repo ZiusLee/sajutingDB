@@ -193,17 +193,10 @@ function getModelForRoomType(roomType: string): string {
 
 export async function POST(req: Request) {
   try {
-    const {
-      messages,
-      compressedSaju,
-      name,
-      gender,
-      initialInterpretation,
-      roomType,
-      userId,
-      memoryContext,
-      compatibilityData,
-    } = await req.json()
+    const { messages, compressedSaju, name, gender, initialInterpretation, roomType, userId, memoryContext } =
+      await req.json()
+
+    // compatibilityData 관련 복잡한 처리 로직 제거하고 기본 사주 정보만 사용
 
     // 현재 날짜 정보 가져오기
     const dateInfo = getCurrentDateInfo()
@@ -222,7 +215,7 @@ export async function POST(req: Request) {
         // 생년월일 정보가 포함된 메시지 감지 및 사주 계산
         const birthDateMatch = userMessage.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/g)
         if (birthDateMatch) {
-          console.log("생년월�� 정����� 감지:", birthDateMatch)
+          console.log("생년월 정 감지:", birthDateMatch)
 
           // 각 생년월일에 대해 사주 계산
           for (const dateStr of birthDateMatch) {
@@ -374,47 +367,7 @@ export async function POST(req: Request) {
 특징: ${compressedSaju.summary}`
 
     // 궁합 분석 데이터가 있는 경우 추가 정보 생성
-    let compatibilityInfo = ""
-    if (
-      compatibilityData &&
-      compatibilityData.mainPerson &&
-      compatibilityData.selectedPeople &&
-      compatibilityData.selectedPeople.length > 0
-    ) {
-      const { mainPerson, selectedPeople } = compatibilityData
-
-      compatibilityInfo = `
-
-🔮 **궁합 분석 요청 데이터 (정확한 사주 계산 완료):**
-
-**대표 사주: ${mainPerson.name}**
-- 생년월일시: ${mainPerson.birth}
-- 성별: ${mainPerson.gender === "male" ? "남성" : "여성"}
-- 사주팔자: ${mainPerson.sajuPalja.year.stem}${mainPerson.sajuPalja.year.branch}년 ${mainPerson.sajuPalja.month.stem}${mainPerson.sajuPalja.month.branch}월 ${mainPerson.sajuPalja.day.stem}${mainPerson.sajuPalja.day.branch}일 ${mainPerson.sajuPalja.hour.stem}${mainPerson.sajuPalja.hour.branch}시
-- 일간: ${mainPerson.dayMaster}
-- 십성: 년간(${mainPerson.sibseong.yearStem}) 년지(${mainPerson.sibseong.yearBranch}) 월간(${mainPerson.sibseong.monthStem}) 월지(${mainPerson.sibseong.monthBranch}) 일간(${mainPerson.sibseong.dayStem}) 일지(${mainPerson.sibseong.dayBranch}) 시간(${mainPerson.sibseong.hourStem}) 시지(${mainPerson.sibseong.hourBranch})
-- 오행분포: 목${mainPerson.elements.목} 화${mainPerson.elements.화} 토${mainPerson.elements.토} 금${mainPerson.elements.금} 수${mainPerson.elements.수}
-
-**궁합 대상들:**
-${selectedPeople
-  .map(
-    (person, index) => `
-${index + 1}. **${person.name}**
-   - 생년월일시: ${person.birth}
-   - 성별: ${person.gender === "male" ? "남성" : "여성"}
-   - 사주팔자: ${person.sajuPalja.year.stem}${person.sajuPalja.year.branch}년 ${person.sajuPalja.month.stem}${person.sajuPalja.month.branch}월 ${person.sajuPalja.day.stem}${person.sajuPalja.day.branch}일 ${person.sajuPalja.hour.stem}${person.sajuPalja.hour.branch}시
-   - 일간: ${person.dayMaster}
-   - 십성: 년간(${person.sibseong.yearStem}) 년지(${person.sibseong.yearBranch}) 월간(${person.sibseong.monthStem}) 월지(${person.sibseong.monthBranch}) 일간(${person.sibseong.dayStem}) 일지(${person.sibseong.dayBranch}) 시간(${person.sibseong.hourStem}) 시지(${person.sibseong.hourBranch})
-   - 오행분포: 목${person.elements.목} 화${person.elements.화} 토${person.elements.토} 금${person.elements.금} 수${person.elements.수}
-`,
-  )
-  .join("")}
-
-⚠️ **중요 지침:**
-- 위 사주 정보는 시스템에서 정확히 계산된 결과입니다
-- 생년월일로부터 새로 계산하지 말고 위 정보를 그대로 사용하세요
-- 궁합 분석 시 위 정확한 사주팔자와 십성 정보를 활용하세요`
-    }
+    const compatibilityInfo = ""
 
     // 모델 선택 및 시스템 메시지 설정
     const modelName = getModelForRoomType(roomType)
@@ -586,7 +539,7 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 
 ---
 
-🧠 메모리 사용 가���드 (Memory Logic)
+🧠 메모리 사용 가드 (Memory Logic)
 - 유저의 다음 정보를 메모리에 저장하세요:
   - 직업, 연애 상태, 최근 이별, 사는 도시, 감정상태, 목표 등
   - 궁합 대상자 정보 (이름, 생년월일, 성별)

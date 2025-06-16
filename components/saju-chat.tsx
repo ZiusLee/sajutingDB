@@ -399,6 +399,21 @@ export default function SajuChat({
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo,
       memoryContext: getMemoryContext(),
+      // 임시 저장된 궁합 데이터 추가
+      compatibilityData: (() => {
+        try {
+          const tempData = localStorage.getItem("temp_compatibility_data")
+          if (tempData) {
+            const data = JSON.parse(tempData)
+            // 사용 후 삭제
+            localStorage.removeItem("temp_compatibility_data")
+            return data
+          }
+        } catch (error) {
+          console.error("Error parsing temp compatibility data:", error)
+        }
+        return null
+      })(),
     },
     onFinish: async (message) => {
       try {
@@ -685,9 +700,103 @@ export default function SajuChat({
 
   const handleCompatibilityAnalysis = (mainPerson: any, selectedPeople: any[]) => {
     try {
-      const peopleNames = selectedPeople.map((p) => p.name).join(", ")
-      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 사주 궁합을 자세히 분석해주세요.`
+      console.log("handleCompatibilityAnalysis called with:", { mainPerson, selectedPeople })
 
+      const peopleNames = selectedPeople.map((p) => p.name).join(", ")
+
+      // 출생시간 정보 포맷팅 함수
+      const formatBirthTime = (person: any) => {
+        const birthDate = person.birth || `${person.birthYear}.${person.birthMonth}.${person.birthDay}`
+        const gender = person.gender === "male" ? "남성" : person.gender === "female" ? "여성" : "성별미상"
+
+        // 시간 정보가 있고 timeUnknown이 아닌 경우
+        if (person.birthHour && person.birthMinute && !person.timeUnknown) {
+          return `${birthDate} ${person.birthHour}시 ${person.birthMinute}분 (${gender})`
+        } else if (person.timeUnknown) {
+          return `${birthDate} (시간 미상, ${gender})`
+        } else {
+          return `${birthDate} (${gender})`
+        }
+      }
+
+      // 사주 정보 직접 사용 (이미 완전한 데이터)
+      const mainPersonSaju = mainPerson.saju
+      const mainPersonBirthTime = formatBirthTime(mainPerson)
+
+      // 대표 사주 상세 정보
+      const mainPersonInfo = `
+🔮 **${mainPerson.name}님 사주 정보**
+- 생년월일: ${mainPersonBirthTime}
+- 사주팔자: ${mainPersonSaju.yearStem}${mainPersonSaju.yearBranch}년 ${mainPersonSaju.monthStem}${mainPersonSaju.monthBranch}월 ${mainPersonSaju.dayStem}${mainPersonSaju.dayBranch}일 ${mainPersonSaju.hourStem}${mainPersonSaju.hourBranch}시
+- 일간(日干): ${mainPersonSaju.dayMaster}
+- 띠: ${mainPersonSaju.yearAnimal}
+- 십성: 년간(${mainPersonSaju.yearStemSibseong}) 년지(${mainPersonSaju.yearBranchSibseong}) 월간(${mainPersonSaju.monthStemSibseong}) 월지(${mainPersonSaju.monthBranchSibseong}) 일간(${mainPersonSaju.dayStemSibseong}) 일지(${mainPersonSaju.dayBranchSibseong}) 시간(${mainPersonSaju.hourStemSibseong}) 시지(${mainPersonSaju.hourBranchSibseong})
+- 오행분포: 목${mainPersonSaju.elements.wood} 화${mainPersonSaju.elements.fire} 토${mainPersonSaju.elements.earth} 금${mainPersonSaju.elements.metal} 수${mainPersonSaju.elements.water}`
+
+      // 궁합 대상들 상세 정보
+      const selectedPeopleInfo = selectedPeople
+        .map((person) => {
+          const personSaju = person.saju
+          const personBirthTime = formatBirthTime(person)
+
+          return `
+🔮 **${person.name}님 사주 정보**
+- 생년월일: ${personBirthTime}
+- 사주팔자: ${personSaju.yearStem}${personSaju.yearBranch}년 ${personSaju.monthStem}${personSaju.monthBranch}월 ${personSaju.dayStem}${personSaju.dayBranch}일 ${personSaju.hourStem}${personSaju.hourBranch}시
+- 일간(日干): ${personSaju.dayMaster}
+- 띠: ${personSaju.yearAnimal}
+- 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${personSaju.monthStemSibseong}) 월지(${personSaju.monthBranchSibseong}) 일간(${personSaju.dayStemSibseong}) 일지(${personSaju.dayBranchSibseong}) 시간(${personSaju.hourStemSibseong}) 시지(${personSaju.hourBranchSibseong})
+- 오행분포: 목${personSaju.elements.wood} 화${personSaju.elements.fire} 토${personSaju.elements.earth} 금${personSaju.elements.metal} 수${personSaju.elements.water}`
+        })
+        .join("\n")
+
+      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 사주 궁합을 자세히 분석해주세요. 
+
+🔮 **궁합 분석 요청**
+
+${mainPersonInfo}
+
+${selectedPeopleInfo}
+
+다음 내용을 포함해서 분석해주세요:
+1. **사주팔자 궁합 분석**
+   - 연주(年柱) 궁합: 조상운, 초년운 상성
+   - 월주(月柱) 궁합: 부모운, 청년운 상성  
+   - 일주(日柱) 궁합: 본인운, 배우자운 상성
+   - 시주(時柱) 궁합: 자식운, 말년운 상성
+
+2. **십성(十星) 궁합 분석**
+   - 각자의 십성 배치와 상호 작용
+   - 보완 관계와 충돌 관계
+
+3. **오행(五行) 궁합 분석**
+   - 목화토금수 균형과 보완 관계
+   - 상생상극 관계 분석
+
+4. **천간지지 상성**
+   - 천간 합화 관계
+   - 지지 삼합, 육합, 충극 관계
+
+5. **성격 및 가치관 궁합**
+   - 일간을 통한 성격 분석
+   - 생활 패턴과 가치관 조화
+
+6. **관계 발전 가능성**
+   - 연애 궁합
+   - 결혼 궁합
+   - 사업 파트너십 가능성
+
+7. **주의사항 및 조언**
+   - 갈등 요소와 해결 방안
+   - 관계 발전을 위한 구체적 조언
+
+8. **종합 궁합 점수** (100점 만점)
+
+위 모든 사주 정보를 바탕으로 상세하고 전문적인 궁합 분석을 해주세요.`
+
+      console.log("Sending simplified compatibility message:", compatibilityMessage)
+
+      // 메시지 전송
       append({
         role: "user",
         content: compatibilityMessage,
@@ -696,6 +805,7 @@ export default function SajuChat({
       setShowCompatibilityTool(false)
     } catch (error) {
       console.error("Error in handleCompatibilityAnalysis:", error)
+      alert("궁합 분석 중 오류가 발생했습니다: " + error.message)
     }
   }
 
