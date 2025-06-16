@@ -399,21 +399,6 @@ export default function SajuChat({
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo,
       memoryContext: getMemoryContext(),
-      // 임시 저장된 궁합 데이터 추가
-      compatibilityData: (() => {
-        try {
-          const tempData = localStorage.getItem("temp_compatibility_data")
-          if (tempData) {
-            const data = JSON.parse(tempData)
-            // 사용 후 삭제
-            localStorage.removeItem("temp_compatibility_data")
-            return data
-          }
-        } catch (error) {
-          console.error("Error parsing temp compatibility data:", error)
-        }
-        return null
-      })(),
     },
     onFinish: async (message) => {
       try {
@@ -720,7 +705,7 @@ export default function SajuChat({
       }
 
       // 사주 정보 직접 사용 (이미 완전한 데이터)
-      const mainPersonSaju = mainPerson.saju
+      const mainPersonSaju = mainPerson.fullSaju || mainPerson.saju
       const mainPersonBirthTime = formatBirthTime(mainPerson)
 
       // 대표 사주 상세 정보
@@ -729,14 +714,14 @@ export default function SajuChat({
 - 생년월일: ${mainPersonBirthTime}
 - 사주팔자: ${mainPersonSaju.yearStem}${mainPersonSaju.yearBranch}년 ${mainPersonSaju.monthStem}${mainPersonSaju.monthBranch}월 ${mainPersonSaju.dayStem}${mainPersonSaju.dayBranch}일 ${mainPersonSaju.hourStem}${mainPersonSaju.hourBranch}시
 - 일간(日干): ${mainPersonSaju.dayMaster}
-- 띠: ${mainPersonSaju.yearAnimal}
+- 띠: ${mainPersonSaju.yearAnimal || "정보없음"}
 - 십성: 년간(${mainPersonSaju.yearStemSibseong}) 년지(${mainPersonSaju.yearBranchSibseong}) 월간(${mainPersonSaju.monthStemSibseong}) 월지(${mainPersonSaju.monthBranchSibseong}) 일간(${mainPersonSaju.dayStemSibseong}) 일지(${mainPersonSaju.dayBranchSibseong}) 시간(${mainPersonSaju.hourStemSibseong}) 시지(${mainPersonSaju.hourBranchSibseong})
 - 오행분포: 목${mainPersonSaju.elements.wood} 화${mainPersonSaju.elements.fire} 토${mainPersonSaju.elements.earth} 금${mainPersonSaju.elements.metal} 수${mainPersonSaju.elements.water}`
 
       // 궁합 대상들 상세 정보
       const selectedPeopleInfo = selectedPeople
         .map((person) => {
-          const personSaju = person.saju
+          const personSaju = person.fullSaju || person.saju
           const personBirthTime = formatBirthTime(person)
 
           return `
@@ -744,7 +729,7 @@ export default function SajuChat({
 - 생년월일: ${personBirthTime}
 - 사주팔자: ${personSaju.yearStem}${personSaju.yearBranch}년 ${personSaju.monthStem}${personSaju.monthBranch}월 ${personSaju.dayStem}${personSaju.dayBranch}일 ${personSaju.hourStem}${personSaju.hourBranch}시
 - 일간(日干): ${personSaju.dayMaster}
-- 띠: ${personSaju.yearAnimal}
+- 띠: ${personSaju.yearAnimal || "정보없음"}
 - 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${personSaju.monthStemSibseong}) 월지(${personSaju.monthBranchSibseong}) 일간(${personSaju.dayStemSibseong}) 일지(${personSaju.dayBranchSibseong}) 시간(${personSaju.hourStemSibseong}) 시지(${personSaju.hourBranchSibseong})
 - 오행분포: 목${personSaju.elements.wood} 화${personSaju.elements.fire} 토${personSaju.elements.earth} 금${personSaju.elements.metal} 수${personSaju.elements.water}`
         })
@@ -794,7 +779,7 @@ ${selectedPeopleInfo}
 
 위 모든 사주 정보를 바탕으로 상세하고 전문적인 궁합 분석을 해주세요.`
 
-      console.log("Sending simplified compatibility message:", compatibilityMessage)
+      console.log("Sending compatibility message:", compatibilityMessage)
 
       // 메시지 전송
       append({
