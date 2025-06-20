@@ -8,7 +8,8 @@ export async function POST(request: NextRequest) {
 
     const { paymentKey, orderId, amount } = await request.json()
 
-    console.log("결제 성공 처리 시작:", { paymentKey, orderId, amount })
+    console.log("=== 결제 성공 처리 시작 ===")
+    console.log("요청 파라미터:", { paymentKey, orderId, amount })
 
     if (!paymentKey || !orderId || !amount) {
       console.error("필수 파라미터 누락:", { paymentKey, orderId, amount })
@@ -31,13 +32,17 @@ export async function POST(request: NextRequest) {
     })
 
     const tossData = await tossResponse.json()
-    console.log("토스페이먼츠 응답:", { status: tossResponse.status, data: tossData })
+    console.log("토스페이먼츠 응답:", {
+      status: tossResponse.status,
+      ok: tossResponse.ok,
+      data: tossData,
+    })
 
     if (!tossResponse.ok) {
       console.error("토스페이먼츠 승인 실패:", tossData)
 
       // 주문 실패 처리
-      await supabase
+      const { error: updateError } = await supabase
         .from("payment_orders")
         .update({
           status: "failed",
@@ -46,19 +51,28 @@ export async function POST(request: NextRequest) {
         })
         .eq("order_id", orderId)
 
+      if (updateError) {
+        console.error("주문 실패 상태 업데이트 오류:", updateError)
+      }
+
       return NextResponse.json({ error: tossData.message || "결제 승인에 실패했습니다." }, { status: 400 })
     }
 
     // 주문 정보 조회
-    console.log("주문 정보 조회:", orderId)
+    console.log("주문 정보 조회 시작:", orderId)
     const { data: orderData, error: orderError } = await supabase
       .from("payment_orders")
       .select("*")
       .eq("order_id", orderId)
       .single()
 
-    if (orderError || !orderData) {
+    if (orderError) {
       console.error("주문 조회 오류:", orderError)
+      return NextResponse.json({ error: "주문 정보를 찾을 수 없습니다.", details: orderError }, { status: 404 })
+    }
+
+    if (!orderData) {
+      console.error("주문 데이터가 없음")
       return NextResponse.json({ error: "주문 정보를 찾을 수 없습니다." }, { status: 404 })
     }
 
@@ -71,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // complete_payment 함수 호출
-    console.log("complete_payment 함수 호출:", {
+    console.log("complete_payment 함수 호출 시작:", {
       orderId,
       userId: orderData.user_id,
       coins: orderData.coins,
@@ -87,16 +101,51 @@ export async function POST(request: NextRequest) {
     })
 
     if (transactionError) {
-      console.error("결제 처리 트랜잭션 오류:", transactionError)
-      return NextResponse.json({ error: "결제 처리 중 오류가 발생했습니다." }, { status: 500 })
+      console.error("complete_payment 함수 오류:", transactionError)
+      console.error("오류 세부사항:", {
+        message: transactionError.message,
+        details: transactionError.details,
+        hint: transactionError.hint,
+        code: transactionError.code,
+      })
+      return NextResponse.json(
+        {
+          error: "결제 처리 중 오류가 발생했습니다.",
+          details: transactionError.message,
+        },
+        { status: 500 },
+      )
     }
 
-    console.log("결제 처리 완료:", rpcData)
+    console.log("complete_payment 함수 결과:", rpcData)
 
     // 처리 완료 후 주문 상태 확인
-    const { data: updatedOrder } = await supabase.from("payment_orders").select("*").eq("order_id", orderId).single()
+    const { data: updatedOrder, error: checkError } = await supabase
+      .from("payment_orders")
+      .select("*")
+      .eq("order_id", orderId)
+      .single()
 
-    console.log("업데이트된 주문 상태:", updatedOrder)
+    if (checkError) {
+      console.error("업데이트된 주문 조회 오류:", checkError)
+    } else {
+      console.log("업데이트된 주문 상태:", updatedOrder)
+    }
+
+    // 사용자 코인 상태 확인
+    const { data: userCoins, error: coinsError } = await supabase
+      .from("user_coins")
+      .select("*")
+      .eq("user_id", orderData.user_id)
+      .single()
+
+    if (coinsError) {
+      console.error("사용자 코인 조회 오류:", coinsError)
+    } else {
+      console.log("사용자 코인 상태:", userCoins)
+    }
+
+    console.log("=== 결제 처리 완료 ===")
 
     return NextResponse.json({
       success: true,
@@ -104,9 +153,21 @@ export async function POST(request: NextRequest) {
       coins: orderData.coins,
       orderId,
       order: updatedOrder,
+      userCoins: userCoins,
+      rpcResult: rpcData,
     })
   } catch (error) {
-    console.error("결제 성공 처리 오류:", error)
-    return NextResponse.json({ error: "결제 처리 중 오류가 발생했습니다." }, { status: 500 })
+    console.error("=== 결제 성공 처리 최상위 오류 ===")
+    console.error("오류 타입:", typeof error)
+    console.error("오류 메시지:", error instanceof Error ? error.message : String(error))
+    console.error("오류 스택:", error instanceof Error ? error.stack : "스택 없음")
+
+    return NextResponse.json(
+      {
+        error: "결제 처리 중 오류가 발생했습니다.",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    )
   }
 }
