@@ -12,6 +12,7 @@ import { X, Plus, Users, Edit, ChevronDown, ChevronUp } from "lucide-react"
 import { calculateSaju } from "@/lib/saju"
 import { fetchLunarDate } from "@/lib/api-client"
 import { solarToLunar } from "@/lib/lunar-calendar"
+import { getUserSajuProfiles } from "@/lib/saju-session-service"
 
 interface BirthInfo {
   solarYear: number
@@ -50,7 +51,6 @@ interface CompatibilityToolProps {
   currentBirthInfo?: BirthInfo
   isLoggedIn?: boolean
   userId?: string | null
-  sessionId?: string | null // 추가
   onCompatibilityAnalysis: (mainPerson: any, selectedPeople: any[]) => void
 }
 
@@ -63,7 +63,6 @@ export default function CompatibilityTool({
   currentBirthInfo,
   isLoggedIn = false,
   userId,
-  sessionId, // 추가
   onCompatibilityAnalysis,
 }: CompatibilityToolProps) {
   const [mainPerson, setMainPerson] = useState<SajuPerson | null>(null)
@@ -121,39 +120,36 @@ export default function CompatibilityTool({
     }
   }
 
-  // 세션 기반으로 메인 사주 정보 불러오기
-  const loadMainPersonFromSession = async () => {
-    if (!sessionId) return
+  // 로그인된 사용자의 사주 프로필들 불러오기
+  const loadUserProfiles = async () => {
+    if (!isLoggedIn || !userId) return
 
     try {
-      const response = await fetch(`/api/saju-sessions?sessionId=${sessionId}`)
-      if (!response.ok) throw new Error("Failed to fetch session data")
+      const { profiles } = await getUserSajuProfiles()
+      const sajuPeople: SajuPerson[] = profiles.map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        gender: profile.gender,
+        birthYear: profile.birthYear,
+        birthMonth: profile.birthMonth,
+        birthDay: profile.birthDay,
+        birthHour: profile.birthHour,
+        birthMinute: profile.birthMinute,
+        saju: profile.saju,
+        createdAt: profile.createdAt,
+      }))
 
-      const sessionData = await response.json()
+      setAvailableMainPeople(sajuPeople)
 
-      if (sessionData.saju) {
-        const mainPersonFromSession: SajuPerson = {
-          id: sessionData.id,
-          name: sessionData.name || currentName || "나",
-          gender: sessionData.gender || currentGender || "unknown",
-          birthYear: sessionData.birthYear || currentBirthInfo?.solarYear?.toString() || "",
-          birthMonth: sessionData.birthMonth || currentBirthInfo?.solarMonth?.toString().padStart(2, "0") || "",
-          birthDay: sessionData.birthDay || currentBirthInfo?.solarDay?.toString().padStart(2, "0") || "",
-          birthHour: sessionData.birthHour || currentBirthInfo?.solarHour?.toString().padStart(2, "0") || "12",
-          birthMinute: sessionData.birthMinute || currentBirthInfo?.solarMinute?.toString().padStart(2, "0") || "0",
-          saju: sessionData.saju,
-          createdAt: sessionData.createdAt || new Date().toISOString(),
-        }
-
-        setMainPerson(mainPersonFromSession)
-      } else {
-        // 세션에 사주 데이터가 없으면 현재 사주 사용
-        setMainPerson(getCurrentSajuPerson())
+      // 가장 최근 프로필을 대표 사주로 설정 (기본값이 없는 경우)
+      if (sajuPeople.length > 0 && !mainPerson) {
+        const mostRecent = sajuPeople.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )[0]
+        setMainPerson(mostRecent)
       }
     } catch (error) {
-      console.error("Error loading session data:", error)
-      // 오류 시 현재 사주 사용
-      setMainPerson(getCurrentSajuPerson())
+      console.error("Error loading user profiles:", error)
     }
   }
 
@@ -162,14 +158,14 @@ export default function CompatibilityTool({
     if (isOpen) {
       loadRecentPeople()
 
-      if (sessionId) {
-        loadMainPersonFromSession()
+      if (isLoggedIn) {
+        loadUserProfiles()
       } else {
-        // sessionId가 없으면 현재 사주를 대표 사주로 설정
+        // 로그인하지 않은 경우 현재 사주를 대표 사주로 설정
         setMainPerson(getCurrentSajuPerson())
       }
     }
-  }, [isOpen, sessionId])
+  }, [isOpen, isLoggedIn, userId])
 
   // 로컬 스토리지에 최근 사람들 저장
   const saveRecentPeople = (people: SajuPerson[]) => {
