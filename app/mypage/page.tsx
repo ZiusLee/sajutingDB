@@ -319,7 +319,6 @@ export default function MyPage() {
             dayMaster: dbSaju.dayMaster || profileToUse.saju.dayMaster || profileToUse.saju.dayStem,
             dayMasterHanja: dbSaju.dayMasterHanja || profileToUse.saju.dayMasterHanja || "",
           },
-          sessionId: profileToUse.id, // 기존 프로필 ID를 sessionId로 사용
           name: profileToUse.name,
           gender: profileToUse.gender,
           year: profileToUse.birthYear,

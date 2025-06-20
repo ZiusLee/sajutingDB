@@ -260,8 +260,6 @@ export default function SajuChat({
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
-  const [isLoadingPastMessages, setIsLoadingPastMessages] = useState(false)
-  const [initialMessagesLoaded, setInitialMessagesLoaded] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -285,200 +283,89 @@ export default function SajuChat({
     return memoryService.generateContextSummary(userId)
   }, [userId])
 
-  // 과거 메시지와 초기 메시지를 합치는 함수
-  const combineMessagesWithInitial = useCallback(
-    (pastMessages: any[]) => {
-      // 초기 메시지 생성
-      let baseInitialMessages: any[] = []
-      if (roomType === "sajuping") {
-        baseInitialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
-      } else {
-        baseInitialMessages = [
-          {
-            id: "welcome",
-            role: "assistant" as const,
-            content: getInitialMessageByRoomType(name, roomType, birthInfo),
-          },
-        ]
-      }
-
-      if (pastMessages.length === 0) {
-        return baseInitialMessages
-      }
-
-      // 과거 메시지를 message_order 기준으로 정렬
-      const sortedPastMessages = [...pastMessages].sort((a, b) => a.messageOrder - b.messageOrder)
-
-      // 초기 메시지와 과거 메시지를 올바른 순서로 결합
-      const combinedMessages = [...baseInitialMessages]
-
-      // 과거 메시지를 순서대로 추가 (초기 메시지 이후부터)
-      sortedPastMessages.forEach((msg) => {
-        // message_order가 초기 메시지 개수보다 큰 경우에만 추가
-        const initialMessageCount = roomType === "sajuping" ? 2 : 1
-        if (msg.messageOrder >= initialMessageCount) {
-          combinedMessages.push({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-          })
-        }
-      })
-
-      console.log(
-        `[CLIENT] Combined ${baseInitialMessages.length} initial + ${sortedPastMessages.length} past messages = ${combinedMessages.length} total`,
-      )
-      return combinedMessages
-    },
-    [name, saju, birthInfo, roomType],
-  )
-
-  // 과거 메시지 불러오기 함수
-  const loadPastMessages = useCallback(async (sessionId: string) => {
-    if (!sessionId) return []
-
-    try {
-      setIsLoadingPastMessages(true)
-      console.log(`[CLIENT] Loading past messages for session: ${sessionId}`)
-
-      const response = await fetch(`/api/messages?sessionId=${sessionId}`)
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch messages: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      console.log(`[CLIENT] Loaded ${data.messages?.length || 0} past messages from database`)
-
-      return data.messages || []
-    } catch (error) {
-      console.error("[CLIENT] Error loading past messages:", error)
-      return []
-    } finally {
-      setIsLoadingPastMessages(false)
-    }
-  }, [])
-
-  // 세션 ID 초기화 및 초기 메시지 설정
-  const initializeSession = useCallback(async () => {
-    if (sessionInitialized || initialMessagesLoaded) {
-      return null
+  // 세션 ID 초기화
+  const getExistingSessionId = useCallback(async () => {
+    if (sessionInitialized || databaseSessionId) {
+      return
     }
 
     try {
       setSessionInitialized(true)
 
-      let sessionId: string | null = null
-      let pastMessages: any[] = []
+      const storedSajuData = localStorage.getItem("tempSajuData")
 
-      // 1. 먼저 전달받은 sessionKey 확인 (홈페이지에서 넘어온 경우)
-      if (sessionKey && sessionKey !== generateChatSessionKey(name, saju, roomType)) {
-        console.log("Using sessionKey from props (homepage flow):", sessionKey)
-        sessionId = sessionKey
-        setDatabaseSessionId(sessionId)
-
-        // 과거 메시지 불러오기 시도
-        pastMessages = await loadPastMessages(sessionId)
-      }
-      // 2. 마이페이지에서 온 경우 체크
-      else {
-        const fromMyPage = sessionStorage.getItem("from_mypage")
-        const storedSajuData = localStorage.getItem("current_saju")
-
-        if (fromMyPage === "true" && storedSajuData) {
-          console.log("Processing session from mypage")
-          const sajuData = JSON.parse(storedSajuData)
-
-          if (sajuData.sessionId) {
-            console.log("Using existing sessionId from mypage:", sajuData.sessionId)
-            sessionId = sajuData.sessionId
-            setDatabaseSessionId(sessionId)
-
-            // 과거 메시지 불러오기
-            pastMessages = await loadPastMessages(sessionId)
-
-            // 세션 스토리지에서 플래그 제거
-            sessionStorage.removeItem("from_mypage")
-          }
-        } else if (storedSajuData) {
-          // 일반적인 경우 처리
-          const sajuData = JSON.parse(storedSajuData)
-          if (sajuData.sessionId) {
-            sessionId = sajuData.sessionId
-            setDatabaseSessionId(sessionId)
-            pastMessages = await loadPastMessages(sessionId)
-          }
+      if (storedSajuData) {
+        const sajuData = JSON.parse(storedSajuData)
+        if (sajuData.sessionId) {
+          setDatabaseSessionId(sajuData.sessionId)
+          return
         }
       }
 
-      // 3. 여전히 sessionId가 없으면 새로 생성 (홈페이지 플로우용)
-      if (!sessionId) {
-        console.log("No existing session found, using sessionKey or generating new one")
-        sessionId = sessionKey || generateChatSessionKey(name, saju, roomType)
-        setDatabaseSessionId(sessionId)
+      const response = await fetch("/api/saju-sessions", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
 
-        // localStorage에 sessionId 저장
-        const storedData = JSON.parse(localStorage.getItem("current_saju") || "{}")
-        storedData.sessionId = sessionId
-        localStorage.setItem("current_saju", JSON.stringify(storedData))
+      if (response.ok) {
+        const data = await response.json()
+
+        if (data.sessions && data.sessions.length > 0) {
+          const recentSession = data.sessions[0]
+          setDatabaseSessionId(recentSession.id)
+
+          const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
+          storedData.sessionId = recentSession.id
+          localStorage.setItem("tempSajuData", JSON.stringify(storedData))
+          return
+        }
       }
-
-      console.log("Final sessionId:", sessionId)
-
-      // 초기 메시지와 과거 메시지 결합
-      const combinedMessages = combineMessagesWithInitial(pastMessages)
-      setInitialMessagesLoaded(true)
-
-      return combinedMessages
     } catch (error) {
-      console.error("Error initializing session:", error)
-      setInitialMessagesLoaded(true)
-
-      // 에러 발생 시에도 sessionKey 사용
-      if (sessionKey) {
-        setDatabaseSessionId(sessionKey)
-      }
-
-      return combineMessagesWithInitial([])
+      console.error("Error getting existing session ID:", error)
     }
-  }, [
-    sessionInitialized,
-    initialMessagesLoaded,
-    loadPastMessages,
-    combineMessagesWithInitial,
-    sessionKey,
-    name,
-    saju,
-    roomType,
-  ])
-
-  // 초기 메시지 설정
-  const [initialMessages, setInitialMessages] = useState<any[]>([])
+  }, [sessionInitialized, databaseSessionId])
 
   useEffect(() => {
-    const loadInitialMessages = async () => {
-      const messages = await initializeSession()
-      if (messages) {
-        setInitialMessages(messages)
-      }
+    if (!sessionInitialized && !databaseSessionId) {
+      getExistingSessionId()
     }
+  }, [getExistingSessionId])
 
-    if (!initialMessagesLoaded) {
-      loadInitialMessages()
+  // 초기 메시지 설정
+  const savedSession = activeChatSession || getChatSession(sessionKey)
+
+  useEffect(() => {
+    const hasExistingSession = savedSession?.messages && savedSession.messages.length > 0
+    setIsNewUser(!hasExistingSession)
+  }, [savedSession])
+
+  let initialMessages: any[] = []
+  if (savedSession?.messages) {
+    initialMessages = savedSession.messages
+  } else if (roomType === "sajuping") {
+    try {
+      initialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
+    } catch (error) {
+      console.error("Error generating sajuping initial messages:", error)
+      initialMessages = [
+        {
+          id: "welcome",
+          role: "assistant" as const,
+          content: getInitialMessageByRoomType(name, roomType, birthInfo),
+        },
+      ]
     }
-  }, [initializeSession, initialMessagesLoaded])
-
-  // 기본 초기 메시지 (로딩 중일 때 사용)
-  const defaultInitialMessages =
-    roomType === "sajuping"
-      ? generateSajupingInitialMessages(name, saju, birthInfo)
-      : [
-          {
-            id: "welcome",
-            role: "assistant" as const,
-            content: getInitialMessageByRoomType(name, roomType, birthInfo),
-          },
-        ]
+  } else {
+    initialMessages = [
+      {
+        id: "welcome",
+        role: "assistant" as const,
+        content: getInitialMessageByRoomType(name, roomType, birthInfo),
+      },
+    ]
+  }
 
   const {
     messages,
@@ -492,7 +379,7 @@ export default function SajuChat({
     append,
   } = useAIChat({
     api: "/api/saju-chat",
-    initialMessages: initialMessages.length > 0 ? initialMessages : defaultInitialMessages,
+    initialMessages,
     body: {
       compressedSaju: compressSaju(
         saju,
@@ -512,41 +399,15 @@ export default function SajuChat({
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo,
       memoryContext: getMemoryContext(),
-      // 임시 저장된 궁합 데이터 추가
-      compatibilityData: (() => {
-        try {
-          const tempData = localStorage.getItem("temp_compatibility_data")
-          if (tempData) {
-            const data = JSON.parse(tempData)
-            // 사용 후 삭제
-            localStorage.removeItem("temp_compatibility_data")
-            return data
-          }
-        } catch (error) {
-          console.error("Error parsing temp compatibility data:", error)
-        }
-        return null
-      })(),
     },
     onFinish: async (message) => {
       try {
-        // 현재 messages 배열에 새로운 assistant 메시지 추가
         const updatedMessages = [...messages, message]
-
-        console.log(`[CLIENT] onFinish called - Total messages: ${updatedMessages.length}`)
-        console.log(`[CLIENT] New assistant message:`, message.content.substring(0, 100) + "...")
 
         // 데이터베이스에 저장 (로그인한 사용자만)
         if (databaseSessionId && actualIsLoggedIn) {
           console.log("[CLIENT] Saving assistant message to database")
           await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-        } else {
-          console.log(
-            "[CLIENT] Skipping database save - sessionId:",
-            databaseSessionId,
-            "isLoggedIn:",
-            actualIsLoggedIn,
-          )
         }
 
         // 로컬 스토리지에 저장
@@ -565,7 +426,6 @@ export default function SajuChat({
         try {
           saveChatSession(currentSessionKey, sessionData)
           setActiveChatSession(sessionData)
-          console.log("[CLIENT] Successfully saved session to localStorage")
         } catch (saveError) {
           console.error("Error saving chat session:", saveError)
         }
@@ -845,7 +705,7 @@ export default function SajuChat({
       }
 
       // 사주 정보 직접 사용 (이미 완전한 데이터)
-      const mainPersonSaju = mainPerson.saju
+      const mainPersonSaju = mainPerson.fullSaju || mainPerson.saju
       const mainPersonBirthTime = formatBirthTime(mainPerson)
 
       // 대표 사주 상세 정보
@@ -854,14 +714,14 @@ export default function SajuChat({
 - 생년월일: ${mainPersonBirthTime}
 - 사주팔자: ${mainPersonSaju.yearStem}${mainPersonSaju.yearBranch}년 ${mainPersonSaju.monthStem}${mainPersonSaju.monthBranch}월 ${mainPersonSaju.dayStem}${mainPersonSaju.dayBranch}일 ${mainPersonSaju.hourStem}${mainPersonSaju.hourBranch}시
 - 일간(日干): ${mainPersonSaju.dayMaster}
-- 띠: ${mainPersonSaju.yearAnimal}
+- 띠: ${mainPersonSaju.yearAnimal || "정보없음"}
 - 십성: 년간(${mainPersonSaju.yearStemSibseong}) 년지(${mainPersonSaju.yearBranchSibseong}) 월간(${mainPersonSaju.monthStemSibseong}) 월지(${mainPersonSaju.monthBranchSibseong}) 일간(${mainPersonSaju.dayStemSibseong}) 일지(${mainPersonSaju.dayBranchSibseong}) 시간(${mainPersonSaju.hourStemSibseong}) 시지(${mainPersonSaju.hourBranchSibseong})
 - 오행분포: 목${mainPersonSaju.elements.wood} 화${mainPersonSaju.elements.fire} 토${mainPersonSaju.elements.earth} 금${mainPersonSaju.elements.metal} 수${mainPersonSaju.elements.water}`
 
       // 궁합 대상들 상세 정보
       const selectedPeopleInfo = selectedPeople
         .map((person) => {
-          const personSaju = person.saju
+          const personSaju = person.fullSaju || person.saju
           const personBirthTime = formatBirthTime(person)
 
           return `
@@ -869,7 +729,7 @@ export default function SajuChat({
 - 생년월일: ${personBirthTime}
 - 사주팔자: ${personSaju.yearStem}${personSaju.yearBranch}년 ${personSaju.monthStem}${personSaju.monthBranch}월 ${personSaju.dayStem}${personSaju.dayBranch}일 ${personSaju.hourStem}${personSaju.hourBranch}시
 - 일간(日干): ${personSaju.dayMaster}
-- 띠: ${personSaju.yearAnimal}
+- 띠: ${personSaju.yearAnimal || "정보없음"}
 - 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${personSaju.monthStemSibseong}) 월지(${personSaju.monthBranchSibseong}) 일간(${personSaju.dayStemSibseong}) 일지(${personSaju.dayBranchSibseong}) 시간(${personSaju.hourStemSibseong}) 시지(${personSaju.hourBranchSibseong})
 - 오행분포: 목${personSaju.elements.wood} 화${personSaju.elements.fire} 토${personSaju.elements.earth} 금${personSaju.elements.metal} 수${personSaju.elements.water}`
         })
@@ -919,7 +779,7 @@ ${selectedPeopleInfo}
 
 위 모든 사주 정보를 바탕으로 상세하고 전문적인 궁합 분석을 해주세요.`
 
-      console.log("Sending simplified compatibility message:", compatibilityMessage)
+      console.log("Sending compatibility message:", compatibilityMessage)
 
       // 메시지 전송
       append({
@@ -937,18 +797,6 @@ ${selectedPeopleInfo}
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
-  // 로딩 상태 표시
-  if (isLoadingPastMessages || !initialMessagesLoaded) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-white/80">대화 내용을 불러오는 중...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
       {/* 헤더 */}
@@ -962,12 +810,6 @@ ${selectedPeopleInfo}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          {/* 과거 메시지가 있으면 표시 */}
-          {initialMessages.length > (roomType === "sajuping" ? 2 : 1) && (
-            <div className="text-xs text-white/60 bg-white/10 px-2 py-1 rounded-full">
-              대화 이어가기 ({initialMessages.length - (roomType === "sajuping" ? 2 : 1)}개 메시지)
-            </div>
-          )}
         </div>
 
         <div className="flex items-center">
