@@ -3,13 +3,23 @@
 import type React from "react"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Button } from "@/components/ui/button"
+import { Send, ChevronDown, User, Mic, ArrowLeft, Settings, Database, Coins } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
+import SajuDiagram from "@/components/saju-diagram"
+import ReactMarkdown from "react-markdown"
+import CompatibilityTool from "@/components/compatibility-tool"
+import MemoryBank from "@/components/memory-bank"
 import { compressSaju } from "@/lib/saju-compression"
 import { memoryService } from "@/lib/memory-service"
 import { useAuth } from "@/contexts/auth-context"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Badge } from "@/components/ui/badge"
+import { CoinPurchaseModal } from "@/components/coin-purchase-modal"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -256,7 +266,7 @@ export default function SajuChat({
   const [userCoins, setUserCoins] = useState<number>(0)
   const [showCoinPurchase, setShowCoinPurchase] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
-  const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(new Set())
+  const [savingMessageId, setSavingMessageId] = useState<string | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -587,19 +597,19 @@ export default function SajuChat({
         console.log(`[CLIENT] onFinish called - Assistant message received`)
         console.log(`[CLIENT] Assistant message:`, message.content.substring(0, 100) + "...")
 
-        // 이미 저장된 메시지인지 확인
-        if (savedMessageIds.has(message.id)) {
-          console.log(`[CLIENT] Message ${message.id} already saved, skipping`)
+        // 중복 저장 방지 체크
+        if (savingMessageId === message.id) {
+          console.log("[CLIENT] Message already being saved, skipping duplicate save")
           return
         }
 
-        // Assistant 메시지를 즉시 데이터베이스에 저장
+        // 저장 시작 표시
+        setSavingMessageId(message.id)
+
+        // Assistant 메시지를 데이터베이스에 저장
         if (databaseSessionId && actualIsLoggedIn) {
           console.log("[CLIENT] Saving assistant message to database")
-          const messageId = await saveMessageToDatabase(message.content, "assistant", databaseSessionId)
-          if (messageId) {
-            setSavedMessageIds(prev => new Set(prev).add(message.id))
-          }
+          await saveMessageToDatabase(message.content, "assistant", databaseSessionId)
         }
 
         // 로컬 스토리지에 저장
@@ -629,6 +639,9 @@ export default function SajuChat({
         setRetryCount(0)
       } catch (error) {
         console.error("Error in onFinish handler:", error)
+      } finally {
+        // 저장 완료 후 상태 초기화
+        setSavingMessageId(null)
       }
     },
     onError: (error) => {
@@ -705,11 +718,7 @@ export default function SajuChat({
     // 사용자 메시지를 즉시 데이터베이스에 저장
     if (databaseSessionId && actualIsLoggedIn) {
       console.log("[CLIENT] Saving user message to database")
-      const userMessageId = `user-${Date.now()}-${Math.random()}`
-      if (!savedMessageIds.has(userMessageId)) {
-        await saveMessageToDatabase(input, "user", databaseSessionId)
-        setSavedMessageIds(prev => new Set(prev).add(userMessageId))
-      }
+      await saveMessageToDatabase(input, "user", databaseSessionId)
     }
 
     // AI 채팅 제출
@@ -897,4 +906,447 @@ ${selectedPeopleInfo}
    - 갈등 요소와 해결 방안
    - 관계 발전을 위한 구체적 조언
 
-8. **종합
+8. **종합 궁합 점수** (100점 만점)
+
+위 모든 사주 정보를 바탕으로 상세하고 전문적인 궁합 분석을 해주세요.`
+
+      console.log("Sending simplified compatibility message:", compatibilityMessage)
+
+      // 메시지 전송
+      append({
+        role: "user",
+        content: compatibilityMessage,
+      })
+
+      setShowCompatibilityTool(false)
+    } catch (error) {
+      console.error("Error in handleCompatibilityAnalysis:", error)
+      alert("궁합 분석 중 오류가 발생했습니다: " + error.message)
+    }
+  }
+
+  useHideHeaderAndFooter()
+  useForceDarkTheme()
+
+  // 기존의 스크롤 관련 useEffect들을 다음으로 교체
+  useEffect(() => {
+    if (chatContainerRef.current && messages.length > 0) {
+      const container = chatContainerRef.current
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150
+
+      // 사용자가 하단 근처에 있을 때만 자동 스크롤
+      if (isNearBottom) {
+        setTimeout(() => {
+          container.scrollTo({
+            top: scrollHeight,
+            behavior: "smooth",
+          })
+        }, 100)
+      }
+    }
+  }, [messages])
+
+  // 초기화 관련 useEffect 수정
+  useEffect(() => {
+    if (!isInitialized && initialMessagesLoaded) {
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+        }
+        setIsInitialized(true)
+      }, 300)
+    }
+  }, [isInitialized, initialMessagesLoaded])
+
+  // 로딩 상태 표시
+  if (isLoadingPastMessages || !initialMessagesLoaded) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white/80">대화 내용을 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
+      {/* 헤더 */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white/10 backdrop-blur-md border-b border-white/20">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackWithSave}
+            className="mr-2 text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="flex items-center">
+          <div className="relative" ref={dropdownRef}>
+            <Button
+              variant="ghost"
+              className="flex items-center space-x-2 text-white hover:text-white hover:bg-white/20 px-4 py-2 rounded-lg"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <span className="text-lg">{currentCharacter.emoji}</span>
+              <span className="font-medium">{currentCharacter.name}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
+            </Button>
+
+            {isDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-[99998]" onClick={() => setIsDropdownOpen(false)} />
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-xl z-[99999]">
+                  <div className="py-2">
+                    {pingCharacters.map((character) => (
+                      <button
+                        key={character.id}
+                        onClick={() => {
+                          router.push(
+                            `/saju-chat/${character.roomType}?name=${name}&gender=${gender}&solarYear=${birthInfo?.solarYear}&solarMonth=${birthInfo?.solarMonth}&solarDay=${birthInfo?.solarDay}&solarHour=${birthInfo?.solarHour}&solarMinute=${birthInfo?.solarMinute}&timeUnknown=${birthInfo?.timeUnknown}`,
+                          )
+                          setIsDropdownOpen(false)
+                        }}
+                        className={`w-full flex items-center space-x-3 p-3 text-left hover:bg-white/20 transition-colors rounded-lg mx-2 ${
+                          character.roomType === roomType ? "bg-white/20" : ""
+                        }`}
+                      >
+                        <span className="text-lg">{character.emoji}</span>
+                        <div>
+                          <p className="font-medium text-white">{character.name}</p>
+                          <p className="text-xs text-white/70">{character.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          {actualIsLoggedIn && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/coin-shop")}
+              className="flex items-center space-x-2 text-amber-400 hover:text-amber-300 hover:bg-white/20 px-3 py-2 rounded-lg"
+              title="코인 충전소"
+            >
+              <Coins className="h-4 w-4" />
+              <span className="text-sm font-medium">{userCoins}핑</span>
+            </Button>
+          )}
+          {actualIsLoggedIn ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/mypage")}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg"
+                title="마이페이지"
+              >
+                <User className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMemoryBank(true)}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg"
+                title="메모리뱅크"
+              >
+                <Database className="h-5 w-5" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/login")}
+              className="text-white border-white/30 hover:bg-white/20 hover:text-white hover:border-white/50 px-3 py-1 rounded-lg text-sm"
+            >
+              로그인
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* 메인 채팅 영역 */}
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
+        <div className="pb-32 pt-6">
+          {/* 사주 다이어그램 */}
+          <div className="px-4 mb-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20">
+                <SajuDiagram
+                  saju={saju}
+                  timeUnknown={birthInfo?.timeUnknown}
+                  size="md"
+                  name={name}
+                  gender={gender}
+                  solarYear={birthInfo?.solarYear?.toString()}
+                  solarMonth={birthInfo?.solarMonth?.toString()}
+                  solarDay={birthInfo?.solarDay?.toString()}
+                  hour={birthInfo?.solarHour?.toString()}
+                  minute={birthInfo?.solarMinute?.toString()}
+                  lunarYear={birthInfo?.lunarYear?.toString()}
+                  lunarMonth={birthInfo?.lunarMonth?.toString()}
+                  lunarDay={birthInfo?.lunarDay?.toString()}
+                  location="서울특별시"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 메시지들 */}
+          {messages.map((message, index) => (
+            <div key={message.id} className={`px-4 py-4 ${message.role === "assistant" ? "bg-white/5" : ""}`}>
+              <div className="max-w-3xl mx-auto flex space-x-4">
+                <div className="flex-shrink-0">
+                  {message.role === "assistant" ? (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+                      {currentCharacter.emoji}
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
+                      나
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 prose prose-invert max-w-none">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="text-white/90 leading-relaxed mb-3 last:mb-0">{children}</p>,
+                      strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-white/80">{children}</em>,
+                      ul: ({ children }) => (
+                        <ul className="list-disc list-inside space-y-1 mb-3 text-white/90">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside space-y-1 mb-3 text-white/90">{children}</ol>
+                      ),
+                      li: ({ children }) => <li className="text-white/90">{children}</li>,
+                      h1: ({ children }) => <h1 className="text-xl font-bold mb-3 text-white">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-lg font-semibold mb-2 text-white">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-base font-semibold mb-2 text-white">{children}</h3>,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* 로딩 상태 */}
+          {isLoading && (
+            <div className="px-4 py-4 bg-white/5">
+              <div className="max-w-3xl mx-auto flex space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+                    {currentCharacter.emoji}
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <div className="flex space-x-1">
+                    <div
+                      className="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 에러 상태 */}
+          {streamingError && (
+            <div className="px-4 py-4">
+              <div className="max-w-3xl mx-auto">
+                <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4">
+                  <p className="text-red-200 text-sm mb-3">{streamingError}</p>
+                  <Button
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600 text-white"
+                  >
+                    {isRetrying ? "재시도 중..." : "다시 시도"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 하단 입력 영역 */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/90 to-transparent backdrop-blur-md">
+        {/* 추천 질문 */}
+        {suggestedQuestions.length > 0 && !isLoading && (
+          <div className="px-4 py-3 border-t border-white/10 h-[60px] flex items-center">
+            <div className="max-w-3xl mx-auto w-full">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                {suggestedQuestions.slice(0, 6).map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSuggestedQuestionClick(question)}
+                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-3 py-1 whitespace-nowrap flex-shrink-0"
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 입력창 */}
+        <div className="px-4 py-4">
+          <div className="max-w-3xl mx-auto">
+            <form onSubmit={customHandleSubmit} className="relative">
+              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 focus-within:border-white/40">
+                <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
+                  <SheetTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ml-3 text-white/60 hover:text-white p-2 relative"
+                      onClick={() => {
+                        setShowToolsDrawer(true)
+                        setHasSeenToolsNotification(true)
+                      }}
+                    >
+                      <Settings className="h-4 w-4" />
+                      {!hasSeenToolsNotification && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-1 -right-1 h-4 w-8 text-xs px-1 bg-red-500 text-white animate-pulse"
+                        >
+                          new
+                        </Badge>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="bg-slate-900/90 border-white/20 backdrop-blur-md">
+                    <div className="py-4">
+                      <h3 className="text-lg font-semibold text-white mb-4">Tools</h3>
+                      <div className="space-y-3">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-white hover:bg-white/20 p-4 rounded-lg relative"
+                          onClick={() => {
+                            setShowCompatibilityTool(true)
+                            setShowToolsDrawer(false)
+                          }}
+                        >
+                          <span className="mr-3">💕</span>
+                          궁합 보기
+                          {!hasSeenToolsNotification && (
+                            <Badge
+                              variant="destructive"
+                              className="ml-auto h-5 w-10 text-xs bg-red-500 text-white animate-pulse"
+                            >
+                              new
+                            </Badge>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Ask anything"
+                  className="flex-1 bg-transparent border-none px-4 py-3 text-white placeholder-white/50 focus:outline-none"
+                  disabled={isLoading}
+                />
+
+                <Button type="button" variant="ghost" size="sm" className="text-white/60 hover:text-white p-2">
+                  <Mic className="h-5 w-5" />
+                </Button>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !input.trim()}
+                  className="mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-2"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* 스크롤 하단 버튼 */}
+      {showScrollToBottom && (
+        <Button
+          onClick={scrollToBottomSmooth}
+          className="fixed bottom-24 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white z-10"
+          size="sm"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      )}
+
+      {/* 궁합 도구 모달 */}
+      <CompatibilityTool
+        isOpen={showCompatibilityTool}
+        onClose={() => setShowCompatibilityTool(false)}
+        currentSaju={saju}
+        currentName={name}
+        currentGender={gender}
+        currentBirthInfo={birthInfo}
+        isLoggedIn={actualIsLoggedIn}
+        userId={userId}
+        onCompatibilityAnalysis={handleCompatibilityAnalysis}
+      />
+
+      {/* 메모리뱅크 */}
+      <MemoryBank
+        isOpen={showMemoryBank}
+        onClose={() => setShowMemoryBank(false)}
+        userId={userId}
+        sessionId={!userId ? sessionKey : null}
+      />
+
+      {/* 로그인 프롬프트 */}
+      <LoginPromptDialog
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        onLogin={() => router.push("/login")}
+        message={loginPromptMessage}
+      />
+
+      <CoinPurchaseModal
+        isOpen={showCoinPurchase}
+        onClose={() => setShowCoinPurchase(false)}
+        onSuccess={(coins) => {
+          setUserCoins((prev) => prev + coins)
+          setShowCoinPurchase(false)
+        }}
+      />
+    </div>
+  )
+}
