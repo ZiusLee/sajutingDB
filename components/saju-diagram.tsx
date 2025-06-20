@@ -31,7 +31,7 @@ export default function SajuDiagram({
   lunarYear = "",
   lunarMonth = "",
   lunarDay = "",
-  location = "서울특별시",
+  location,
 }: SajuDiagramProps) {
   // 오행 색상 매핑
   const elementColors = {
@@ -44,7 +44,7 @@ export default function SajuDiagram({
     unknown: "bg-gray-100 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-300 dark:text-gray-100",
   }
 
-  // 텍스트 색상�� 추출하는 함수
+  // 텍스트 색상 추출하는 함수
   const getTextColorClass = (elementColorClass: string) => {
     // Check if elementColorClass is undefined or null
     if (!elementColorClass) {
@@ -181,7 +181,7 @@ export default function SajuDiagram({
       {/* 상단 정보 섹션 */}
       <div className="flex items-center gap-3">
         <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-2xl">
-          {branchAnimals[saju.yearBranch as keyof typeof branchAnimals] || "?"}
+          {gender === "male" ? "👨" : gender === "female" ? "👩" : "👤"}
         </div>
         <div className="flex flex-col">
           <h2 className="text-xl font-bold">{displayName}</h2>
@@ -203,15 +203,15 @@ export default function SajuDiagram({
       <div className="space-y-1 text-base">
         <p className="text-gray-700 dark:text-gray-300">
           양 {solarYear}/{solarMonth}/{solarDay} {hour}:{minute}{" "}
-          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location}
+          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location || "위치 미상"}
         </p>
         <p className="text-blue-500">
           음(평달) {lunarYear}/{lunarMonth}/{lunarDay} {hour}:{minute}{" "}
-          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location}
+          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location || "위치 미상"}
         </p>
         <p className="text-gray-700 dark:text-gray-300">
           양 {solarYear}/{solarMonth}/{solarDay} {Number(hour) - 1}:{Number(minute) + 28}{" "}
-          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location} (지역시 -32분)
+          {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location || "위치 미상"} (지역시 -32분)
         </p>
       </div>
 
@@ -274,7 +274,7 @@ export default function SajuDiagram({
                 <div>{timeUnknown ? "" : saju.hourStemSibseong}</div>
               </td>
               <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
-                <div>{saju.dayStemSibseong}</div>
+                <div>{saju.dayStemSibseong || "비견"}</div>
               </td>
               <td className="p-3 border-b-2 border-r-2 border-gray-300 dark:border-gray-600 text-center">
                 <div>{saju.monthStemSibseong}</div>

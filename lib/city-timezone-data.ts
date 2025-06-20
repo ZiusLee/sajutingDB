@@ -400,7 +400,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   // UTC+0
   {
     id: "london",
-    city: "런던",
+    city: "���던",
     country: "영국",
     timezone: "Europe/London",
     utcOffset: 0,

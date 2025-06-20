@@ -1,45 +1,52 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server"
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import { sql } from "@vercel/postgres"
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const data = await request.json()
+    const { userSaju, partnerSaju, sessionId } = await req.json()
 
-    // Create a server-side Supabase client with admin privileges
-    const supabase = createServerSupabaseClient()
-
-    // Insert compatibility analysis data
-    const { data: analysisData, error: analysisError } = await supabase
-      .from("compatibility_analysis")
-      .insert({
-        user_id: data.userId,
-        partner_name: data.partnerName,
-        partner_gender: data.partnerGender,
-        partner_birth_year: data.partnerBirthYear,
-        partner_birth_month: data.partnerBirthMonth,
-        partner_birth_day: data.partnerBirthDay,
-        partner_birth_hour: data.partnerBirthHour,
-        partner_birth_minute: data.partnerBirthMinute,
-        partner_time_unknown: data.partnerTimeUnknown,
-        relationship_status: data.relationshipStatus || "unknown",
-        compatibility_score: data.compatibilityScore || 0,
-        analysis_text: data.analysisText || "",
-        model_used: data.modelUsed || "unknown",
-        response_time: data.responseTime || "client-side",
-      })
-      .select()
-
-    if (analysisError) {
-      console.error("Error inserting compatibility analysis:", analysisError)
-      return NextResponse.json({ error: analysisError.message }, { status: 500 })
+    if (!userSaju || !partnerSaju) {
+      return NextResponse.json({ error: "Missing userSaju or partnerSaju" }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true, id: analysisData?.[0]?.id })
+    // Save partnerSaju to saju_sessions table
+    const partnerSajuResult = await sql`
+      INSERT INTO saju_sessions (saju_data)
+      VALUES (${JSON.stringify(partnerSaju)})
+      RETURNING id;
+    `
+
+    const partnerSessionId = partnerSajuResult.rows[0].id
+
+    // Update compatibility_analysis table with partnerSessionId
+    if (sessionId) {
+      await sql`
+        UPDATE compatibility_analysis
+        SET partner_session_id = ${partnerSessionId}
+        WHERE id = ${sessionId};
+      `
+
+      return NextResponse.json(
+        { message: "Compatibility analysis updated successfully", partnerSessionId },
+        { status: 200 },
+      )
+    } else {
+      // If sessionId is not provided, create a new entry in compatibility_analysis
+      const newCompatibilityAnalysis = await sql`
+        INSERT INTO compatibility_analysis (user_session_id, partner_session_id)
+        VALUES ((SELECT id FROM saju_sessions WHERE saju_data = ${JSON.stringify(userSaju)}), ${partnerSessionId})
+        RETURNING id;
+      `
+
+      const newSessionId = newCompatibilityAnalysis.rows[0].id
+
+      return NextResponse.json(
+        { message: "Compatibility analysis created successfully", sessionId: newSessionId, partnerSessionId },
+        { status: 201 },
+      )
+    }
   } catch (error) {
-    console.error("Error in save-compatibility API route:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error occurred" },
-      { status: 500 },
-    )
+    console.error("Error saving compatibility:", error)
+    return NextResponse.json({ error: "Failed to save compatibility" }, { status: 500 })
   }
 }
