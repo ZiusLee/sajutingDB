@@ -26,6 +26,7 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
 import { useRouter } from "next/navigation"
+// import { savePartnerSajuSession } from "@/lib/api-client"
 
 interface AdditionalQuestionsProps {
   saju: any
@@ -1095,7 +1096,7 @@ export default function AdditionalQuestions({
                         <SelectItem value="unknown">선택 안함</SelectItem>
                         <SelectItem value="solo">솔로 (처음 만남)</SelectItem>
                         <SelectItem value="flirting">썸 타는 중</SelectItem>
-                        <SelectItem value="dating">연애 중</SelectItem>
+                        <SelectItem value="dating">연애 ��</SelectItem>
                         <SelectItem value="married">결혼 중</SelectItem>
                       </SelectContent>
                     </Select>

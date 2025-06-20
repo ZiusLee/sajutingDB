@@ -2,84 +2,112 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Coins, CreditCard, Gift, ArrowLeft } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
-import { toast } from "@/hooks/use-toast"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ArrowLeft, Coins, Crown, Zap, Star, Gift } from "lucide-react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { toast } from "@/components/ui/use-toast"
+import { loadTossPayments } from "@tosspayments/payment-sdk"
 
-interface CoinPackage {
-  id: string
-  name: string
-  coins: number
-  price: number
-  bonus?: number
-  popular?: boolean
-  description: string
-}
-
-const packages: CoinPackage[] = [
+const COIN_PACKAGES = [
   {
     id: "starter",
-    name: "스타터",
+    name: "스타터 패키지",
     coins: 30,
-    price: 1000,
-    description: "가볍게 시작하기",
+    price: 3000,
+    originalPrice: 3000,
+    description: "30핑 충전",
+    popular: false,
+    bonus: 0,
+    icon: <Coins className="h-6 w-6" />,
+    color: "from-blue-500 to-blue-600",
   },
   {
     id: "basic",
-    name: "베이직",
-    coins: 80,
-    price: 2500,
-    bonus: 5,
-    description: "기본 패키지",
+    name: "베이직 패키지",
+    coins: 60,
+    price: 5000,
+    originalPrice: 6000,
+    description: "60핑 충전",
+    popular: false,
+    bonus: 10,
+    icon: <Zap className="h-6 w-6" />,
+    color: "from-green-500 to-green-600",
   },
   {
     id: "standard",
-    name: "스탠다드",
-    coins: 170,
-    price: 5000,
-    bonus: 20,
+    name: "스탠다드 패키지",
+    coins: 130,
+    price: 10000,
+    originalPrice: 13000,
+    description: "130핑 충전",
     popular: true,
-    description: "가장 인기 있는 패키지",
+    bonus: 30,
+    icon: <Star className="h-6 w-6" />,
+    color: "from-purple-500 to-purple-600",
   },
   {
     id: "premium",
-    name: "프리미엄",
-    coins: 350,
-    price: 10000,
-    bonus: 50,
-    description: "많이 사용하는 분들께",
+    name: "프리미엄 패키지",
+    coins: 300,
+    price: 20000,
+    originalPrice: 30000,
+    description: "300핑 충전",
+    popular: false,
+    bonus: 100,
+    icon: <Crown className="h-6 w-6" />,
+    color: "from-amber-500 to-amber-600",
   },
   {
     id: "mega",
-    name: "메가",
+    name: "메가 패키지",
     coins: 650,
-    price: 18000,
-    bonus: 100,
-    description: "최대 용량",
+    price: 40000,
+    originalPrice: 65000,
+    description: "650핑 충전",
+    popular: false,
+    bonus: 250,
+    icon: <Gift className="h-6 w-6" />,
+    color: "from-pink-500 to-pink-600",
   },
 ]
 
 export default function CoinShopPage() {
-  const { user } = useAuth()
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [selectedPackage, setSelectedPackage] = useState<CoinPackage | null>(null)
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [userCoins, setUserCoins] = useState<number>(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
-    if (!user) {
-      router.push("/auth")
-      return
-    }
-    fetchUserCoins()
-  }, [user, router])
+    const checkAuth = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        if (!sessionData?.session) {
+          router.push("/login?returnUrl=/coin-shop")
+          return
+        }
 
-  const fetchUserCoins = async () => {
+        const { data: userData } = await supabase.auth.getUser()
+        if (userData.user) {
+          setUser(userData.user)
+          await loadUserCoins()
+        }
+      } catch (error) {
+        console.error("Auth check error:", error)
+        router.push("/login")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [router, supabase])
+
+  const loadUserCoins = async () => {
     try {
       const response = await fetch("/api/user-coins")
       if (response.ok) {
@@ -87,216 +115,210 @@ export default function CoinShopPage() {
         setUserCoins(data.coins || 0)
       }
     } catch (error) {
-      console.error("Failed to fetch user coins:", error)
+      console.error("코인 정보 로드 오류:", error)
     }
   }
 
-  const handlePurchase = async (pkg: CoinPackage) => {
-    if (!user) {
-      toast({
-        title: "로그인 필요",
-        description: "코인 구매를 위해 로그인해 주세요.",
-        variant: "destructive",
-      })
-      router.push("/auth")
-      return
-    }
+  const handlePurchase = async (packageId: string) => {
+    if (isProcessing || !user) return
 
-    setLoading(true)
+    setIsProcessing(true)
+    setSelectedPackage(packageId)
+
     try {
-      // 1. 주문 준비
+      // 결제 준비
       const prepareResponse = await fetch("/api/payments/prepare", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          packageId: pkg.id,
-          amount: pkg.price,
-          coins: pkg.coins + (pkg.bonus || 0),
-          orderName: `${pkg.name} 패키지 (${pkg.coins + (pkg.bonus || 0)}핑)`,
-        }),
+        body: JSON.stringify({ packageId }),
       })
 
       if (!prepareResponse.ok) {
-        const errorData = await prepareResponse.json()
-        throw new Error(errorData.error || "주문 준비 실패")
+        const error = await prepareResponse.json()
+        throw new Error(error.error || "결제 준비에 실패했습니다.")
       }
 
-      const { orderId, amount, orderName } = await prepareResponse.json()
+      const { orderId, amount, orderName, customerName, customerEmail } = await prepareResponse.json()
 
-      // 2. 토스페이먼츠 위젯 로드 및 실행
-      const { loadTossPayments } = await import("@tosspayments/payment-sdk")
+      // Toss Payments SDK 로드
+      const tossPayments = await loadTossPayments("test_ck_jExPeJWYVQeJJyXkjdgjV49R5gvN")
 
-      const tossPayments = await loadTossPayments(process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY!)
-
-      const payment = tossPayments.payment({
-        amount: amount,
-        orderId: orderId,
-        orderName: orderName,
-        customerName: user.user_metadata?.full_name || user.email?.split("@")[0] || "사용자",
+      // 결제 요청
+      await tossPayments.requestPayment("카드", {
+        amount,
+        orderId,
+        orderName,
+        customerName,
+        customerEmail,
         successUrl: `${window.location.origin}/payment/success`,
         failUrl: `${window.location.origin}/payment/fail`,
-      })
-
-      // 3. 결제 창 호출
-      await payment.requestPayment({
-        method: "CARD",
       })
     } catch (error) {
       console.error("결제 오류:", error)
       toast({
         title: "결제 오류",
-        description: error instanceof Error ? error.message : "결제 처리 중 오류가 발생했습니다.",
+        description: error instanceof Error ? error.message : "결제 중 오류가 발생했습니다.",
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsProcessing(false)
+      setSelectedPackage(null)
     }
   }
 
-  const confirmPurchase = () => {
-    if (selectedPackage) {
-      setShowConfirmDialog(false)
-      handlePurchase(selectedPackage)
-    }
-  }
-
-  if (!user) {
-    return null
+  if (isLoading) {
+    return (
+      <div className="container mx-auto flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* 헤더 */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            뒤로가기
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Coins className="w-8 h-8 text-yellow-500" />
-              코인 충전소
-            </h1>
-            <p className="text-gray-600 mt-2">
-              현재 보유 코인: <span className="font-semibold text-yellow-600">{userCoins}핑</span>
-            </p>
+          <div>
+            <h1 className="text-3xl font-bold">코인 충전소</h1>
+            <p className="text-muted-foreground">사주핑과 더 많은 대화를 나누세요</p>
           </div>
         </div>
-
-        {/* 패키지 그리드 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {packages.map((pkg) => (
-            <Card
-              key={pkg.id}
-              className={`relative transition-all hover:shadow-lg ${
-                pkg.popular ? "ring-2 ring-purple-500 shadow-lg" : ""
-              }`}
-            >
-              {pkg.popular && (
-                <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-purple-500 text-white">
-                  인기
-                </Badge>
-              )}
-
-              <CardHeader className="text-center">
-                <CardTitle className="text-xl">{pkg.name}</CardTitle>
-                <CardDescription>{pkg.description}</CardDescription>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-yellow-600">{pkg.coins}핑</div>
-                  {pkg.bonus && (
-                    <div className="flex items-center justify-center gap-1 text-sm text-green-600 mt-1">
-                      <Gift className="w-4 h-4" />
-                      보너스 +{pkg.bonus}핑
-                    </div>
-                  )}
-                  <div className="text-lg font-semibold mt-2">₩{pkg.price.toLocaleString()}</div>
-                </div>
-
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    setSelectedPackage(pkg)
-                    setShowConfirmDialog(true)
-                  }}
-                  disabled={loading}
-                >
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  구매하기
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center space-x-2 bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-full">
+          <Coins className="h-5 w-5 text-amber-600" />
+          <span className="font-semibold text-amber-700 dark:text-amber-400">보유 코인: {userCoins}핑</span>
         </div>
-
-        {/* 안내사항 */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="text-lg">💡 이용 안내</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>• 구매한 코인은 사주 상담, 궁합 분석 등에 사용됩니다</p>
-            <p>• 코인은 환불되지 않으니 신중하게 구매해 주세요</p>
-            <p>• 보너스 코인은 패키지와 함께 즉시 지급됩니다</p>
-            <p>• 결제는 토스페이먼츠를 통해 안전하게 처리됩니다</p>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* 구매 확인 다이얼로그 */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>구매 확인</DialogTitle>
-            <DialogDescription>선택한 패키지를 구매하시겠습니까?</DialogDescription>
-          </DialogHeader>
+      {/* 안내 메시지 */}
+      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 mb-8 border border-purple-200 dark:border-purple-800">
+        <div className="flex items-start space-x-4">
+          <div className="bg-purple-100 dark:bg-purple-800 p-3 rounded-full">
+            <Coins className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">핑(Ping) 사용 안내</h3>
+            <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
+              <li>• 질문 1개당 1핑이 소모됩니다</li>
+              <li>• 충전한 핑은 영구적으로 보관됩니다</li>
+              <li>• 패키지별로 보너스 핑을 추가로 드립니다</li>
+              <li>• 안전한 결제를 위해 토스페이먼츠를 사용합니다</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
-          {selectedPackage && (
-            <div className="py-4">
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span>패키지:</span>
-                  <span className="font-semibold">{selectedPackage.name}</span>
+      {/* 패키지 목록 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {COIN_PACKAGES.map((pkg) => (
+          <Card
+            key={pkg.id}
+            className={`relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-105 ${
+              pkg.popular ? "ring-2 ring-purple-500 shadow-lg" : "hover:shadow-md"
+            }`}
+          >
+            {pkg.popular && (
+              <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                인기
+              </div>
+            )}
+
+            <CardHeader className="text-center pb-4">
+              <div
+                className={`mx-auto w-16 h-16 rounded-full bg-gradient-to-r ${pkg.color} flex items-center justify-center text-white mb-4`}
+              >
+                {pkg.icon}
+              </div>
+              <CardTitle className="text-xl">{pkg.name}</CardTitle>
+              <p className="text-sm text-muted-foreground">{pkg.description}</p>
+            </CardHeader>
+
+            <CardContent className="text-center space-y-4">
+              {/* 가격 정보 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="text-3xl font-bold">{pkg.price.toLocaleString()}원</span>
+                  {pkg.originalPrice > pkg.price && (
+                    <span className="text-lg text-muted-foreground line-through">
+                      {pkg.originalPrice.toLocaleString()}원
+                    </span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span>기본 코인:</span>
-                  <span>{selectedPackage.coins}핑</span>
+                {pkg.originalPrice > pkg.price && (
+                  <Badge variant="destructive" className="text-xs">
+                    {Math.round(((pkg.originalPrice - pkg.price) / pkg.originalPrice) * 100)}% 할인
+                  </Badge>
+                )}
+              </div>
+
+              {/* 코인 정보 */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">기본 핑</span>
+                  <span className="font-semibold">{pkg.coins - pkg.bonus}핑</span>
                 </div>
-                {selectedPackage.bonus && (
-                  <div className="flex justify-between text-green-600">
-                    <span>보너스 코인:</span>
-                    <span>+{selectedPackage.bonus}핑</span>
+                {pkg.bonus > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-green-600 dark:text-green-400">보너스 핑</span>
+                    <span className="font-semibold text-green-600 dark:text-green-400">+{pkg.bonus}핑</span>
                   </div>
                 )}
-                <div className="border-t pt-2">
-                  <div className="flex justify-between font-semibold">
-                    <span>총 코인:</span>
-                    <span className="text-yellow-600">{selectedPackage.coins + (selectedPackage.bonus || 0)}핑</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>결제 금액:</span>
-                    <span>₩{selectedPackage.price.toLocaleString()}</span>
-                  </div>
+                <div className="border-t pt-2 flex items-center justify-between">
+                  <span className="font-semibold">총 핑</span>
+                  <span className="text-lg font-bold text-amber-600">{pkg.coins}핑</span>
                 </div>
               </div>
-            </div>
-          )}
 
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
-              취소
-            </Button>
-            <Button onClick={confirmPurchase} disabled={loading}>
-              {loading ? "처리 중..." : "결제하기"}
-            </Button>
+              {/* 구매 버튼 */}
+              <Button
+                onClick={() => handlePurchase(pkg.id)}
+                disabled={isProcessing}
+                className={`w-full bg-gradient-to-r ${pkg.color} hover:opacity-90 text-white font-semibold py-3`}
+              >
+                {isProcessing && selectedPackage === pkg.id ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>결제 처리 중...</span>
+                  </div>
+                ) : (
+                  "구매하기"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* 하단 안내 */}
+      <div className="mt-12 text-center space-y-4">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+          <h3 className="font-semibold mb-3">결제 관련 안내</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
+            <div>
+              <strong className="text-foreground">안전한 결제</strong>
+              <p>토스페이먼츠의 보안 시스템으로 안전하게 결제됩니다</p>
+            </div>
+            <div>
+              <strong className="text-foreground">즉시 충전</strong>
+              <p>결제 완료 즉시 핑이 계정에 충전됩니다</p>
+            </div>
+            <div>
+              <strong className="text-foreground">고객 지원</strong>
+              <p>결제 관련 문의사항은 고객센터로 연락주세요</p>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          결제 시 문제가 발생하면 새로고침 후 다시 시도해주세요. 중복 결제 방지를 위해 결제 완료 전까지 페이지를
+          새로고침하지 마세요.
+        </p>
+      </div>
     </div>
   )
 }

@@ -1,31 +1,42 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Coins, ArrowRight } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CheckCircle, XCircle, Loader2, Coins, ArrowLeft, AlertCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
 export default function PaymentSuccessPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const [status, setStatus] = useState<"processing" | "success" | "error">("processing")
+  const [message, setMessage] = useState("")
+  const [coins, setCoins] = useState(0)
+  const [orderId, setOrderId] = useState("")
   const [isProcessed, setIsProcessed] = useState(false)
-  const [processing, setProcessing] = useState(true)
-  const [orderInfo, setOrderInfo] = useState<any>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   const paymentKey = searchParams.get("paymentKey")
-  const orderId = searchParams.get("orderId")
+  const orderIdParam = searchParams.get("orderId")
   const amount = searchParams.get("amount")
 
   useEffect(() => {
-    if (!paymentKey || !orderId || !amount || isProcessed) {
-      return
-    }
-
     const processPayment = async () => {
+      // 이미 처리된 경우 중복 처리 방지
+      if (isProcessed) return
+
+      if (!paymentKey || !orderIdParam || !amount) {
+        setStatus("error")
+        setMessage("결제 정보가 누락되었습니다.")
+        return
+      }
+
+      setIsProcessed(true)
+      setOrderId(orderIdParam)
+
       try {
-        console.log("결제 성공 처리 시작:", { paymentKey, orderId, amount })
+        console.log("결제 승인 처리 시작:", { paymentKey, orderId: orderIdParam, amount })
 
         const response = await fetch("/api/payments/success", {
           method: "POST",
@@ -34,100 +45,127 @@ export default function PaymentSuccessPage() {
           },
           body: JSON.stringify({
             paymentKey,
-            orderId,
+            orderId: orderIdParam,
             amount: Number.parseInt(amount),
           }),
         })
 
         const data = await response.json()
-        console.log("결제 처리 응답:", data)
+        console.log("결제 승인 응답:", data)
 
         if (response.ok && data.success) {
-          setOrderInfo(data.order)
+          setStatus("success")
+          setMessage(data.message || "결제가 완료되었습니다.")
+          setCoins(data.coins || 0)
+
           toast({
             title: "결제 완료!",
-            description: `${data.order?.coins || 0}핑이 충전되었습니다.`,
+            description: `${data.coins}핑이 충전되었습니다.`,
           })
         } else {
-          throw new Error(data.error || "결제 처리 실패")
+          console.error("결제 승인 실패:", data)
+          setStatus("error")
+          setMessage(data.error || "결제 처리 중 오류가 발생했습니다.")
+
+          // 디버그 정보 가져오기
+          try {
+            const debugResponse = await fetch(`/api/debug/payment-status?orderId=${orderIdParam}`)
+            const debugData = await debugResponse.json()
+            setDebugInfo(debugData)
+            console.log("디버그 정보:", debugData)
+          } catch (debugError) {
+            console.error("디버그 정보 가져오기 실패:", debugError)
+          }
+
+          toast({
+            title: "결제 오류",
+            description: data.error || "결제 처리 중 오류가 발생했습니다.",
+            variant: "destructive",
+          })
         }
       } catch (error) {
         console.error("결제 처리 오류:", error)
+        setStatus("error")
+        setMessage("결제 처리 중 오류가 발생했습니다.")
+
         toast({
-          title: "처리 중 오류 발생",
-          description:
-            error instanceof Error
-              ? error.message
-              : "결제는 완료되었지만 처리 중 오류가 발생했습니다. 고객센터에 문의해 주세요.",
+          title: "결제 오류",
+          description: "결제 처리 중 오류가 발생했습니다.",
           variant: "destructive",
         })
-      } finally {
-        setProcessing(false)
-        setIsProcessed(true)
       }
     }
 
     processPayment()
-  }, [paymentKey, orderId, amount, isProcessed])
+  }, [paymentKey, orderIdParam, amount, isProcessed])
 
-  if (processing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
-        <Card className="w-full max-w-md mx-4">
-          <CardContent className="p-8 text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
-            <p className="text-lg font-semibold text-gray-700">결제 처리 중...</p>
-            <p className="text-sm text-gray-500 mt-2">잠시만 기다려 주세요</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  const handleGoBack = () => {
+    router.push("/coin-shop")
+  }
+
+  const handleGoHome = () => {
+    router.push("/")
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 p-6">
+    <div className="container mx-auto flex items-center justify-center min-h-screen px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <CheckCircle className="w-16 h-16 text-green-500" />
+            {status === "processing" && (
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+                <p className="text-sm text-muted-foreground">결제를 처리하고 있습니다...</p>
+              </div>
+            )}
+            {status === "success" && <CheckCircle className="h-12 w-12 text-green-500" />}
+            {status === "error" && <XCircle className="h-12 w-12 text-red-500" />}
           </div>
-          <CardTitle className="text-2xl text-green-600">결제 완료!</CardTitle>
+          <CardTitle className={status === "success" ? "text-green-700" : status === "error" ? "text-red-700" : ""}>
+            {status === "processing" && "결제 처리 중"}
+            {status === "success" && "결제 완료"}
+            {status === "error" && "결제 오류"}
+          </CardTitle>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          {orderInfo && (
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">주문번호:</span>
-                <span className="font-mono text-sm">{orderId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">결제금액:</span>
-                <span className="font-semibold">₩{Number.parseInt(amount).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">충전된 코인:</span>
-                <div className="flex items-center gap-1 text-yellow-600 font-bold">
-                  <Coins className="w-4 h-4" />
-                  {orderInfo.coins}핑
-                </div>
+        <CardContent className="text-center space-y-4">
+          <p className="text-muted-foreground">{message}</p>
+
+          {status === "success" && coins > 0 && (
+            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+              <div className="flex items-center justify-center space-x-2">
+                <Coins className="h-5 w-5 text-green-600" />
+                <span className="font-semibold text-green-700 dark:text-green-400">{coins}핑이 충전되었습니다!</span>
               </div>
             </div>
           )}
 
-          <div className="text-center text-gray-600">
-            <p>코인이 성공적으로 충전되었습니다!</p>
-            <p className="text-sm mt-1">이제 사주팅의 다양한 서비스를 이용해 보세요.</p>
-          </div>
+          {status === "error" && debugInfo && (
+            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg text-left">
+              <div className="flex items-center space-x-2 mb-2">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <span className="text-sm font-semibold text-red-700">디버그 정보</span>
+              </div>
+              <div className="text-xs text-red-600 space-y-1">
+                <p>주문 상태: {debugInfo.order?.status}</p>
+                <p>코인: {debugInfo.userCoins?.coins || "없음"}</p>
+                <p>주문 ID: {debugInfo.order?.order_id}</p>
+              </div>
+            </div>
+          )}
 
-          <div className="space-y-3">
-            <Button className="w-full" onClick={() => router.push("/saju-chat/general")}>
-              사주 상담 시작하기
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+          {orderId && <div className="text-xs text-muted-foreground">주문번호: {orderId}</div>}
 
-            <Button variant="outline" className="w-full" onClick={() => router.push("/mypage")}>
-              마이페이지로 이동
+          <div className="flex flex-col space-y-2 pt-4">
+            {status === "success" && (
+              <Button onClick={handleGoHome} className="w-full">
+                홈으로 이동
+              </Button>
+            )}
+
+            <Button variant={status === "success" ? "outline" : "default"} onClick={handleGoBack} className="w-full">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {status === "error" ? "다시 시도" : "코인 충전소로"}
             </Button>
           </div>
         </CardContent>

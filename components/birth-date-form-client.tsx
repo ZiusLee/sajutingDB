@@ -21,7 +21,12 @@ import { CitySearch } from "@/components/city-search"
 import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-export default function BirthDateFormClient() {
+interface BirthDateFormClientProps {
+  onSuccess?: (sessionId: string) => void
+  redirectAfterSave?: boolean
+}
+
+export default function BirthDateFormClient({ onSuccess, redirectAfterSave = true }: BirthDateFormClientProps) {
   const [birthdate, setBirthdate] = useState("")
   const [time, setTime] = useState<string>("")
   const [timeUnknown, setTimeUnknown] = useState(false)
@@ -160,6 +165,9 @@ export default function BirthDateFormClient() {
 
       setSaju(sajuResult)
 
+      // Calculate daeun data if available in sajuResult
+      const daeunData = sajuResult.daeun || null
+
       // Store calculation data in localStorage for later use
       const sajuDataToStore = {
         name,
@@ -176,19 +184,37 @@ export default function BirthDateFormClient() {
         lunarYear: Number.parseInt(lunarData.year),
         lunarMonth: Number.parseInt(lunarData.month),
         lunarDay: Number.parseInt(lunarData.day),
+        isLeapMonth: lunarData.isLeapMonth,
         yearStem: sajuResult.yearStem,
         yearBranch: sajuResult.yearBranch,
+        yearStemHanja: sajuResult.yearStemHanja,
+        yearBranchHanja: sajuResult.yearBranchHanja,
         monthStem: sajuResult.monthStem,
         monthBranch: sajuResult.monthBranch,
+        monthStemHanja: sajuResult.monthStemHanja,
+        monthBranchHanja: sajuResult.monthBranchHanja,
         dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.hourStem,
+        dayBranch: sajuResult.dayBranch,
+        dayStemHanja: sajuResult.dayStemHanja,
+        dayBranchHanja: sajuResult.dayBranchHanja,
+        hourStem: sajuResult.hourStem,
         hourBranch: sajuResult.hourBranch,
+        hourStemHanja: sajuResult.hourStemHanja,
+        hourBranchHanja: sajuResult.hourBranchHanja,
+        dayMaster: sajuResult.dayMaster,
+        dayMasterHanja: sajuResult.dayMasterHanja,
+        yearAnimal: sajuResult.yearAnimal,
         elements: sajuResult.elements,
         interpretation: sajuResult.interpretation,
         yearStemSibseong: sajuResult.yearStemSibseong,
         monthStemSibseong: sajuResult.monthStemSibseong,
-        dayStemSibseong: sajuResult.dayStemSibseong,
+        dayStemSibseong: "본원", // 일주의 천간은 나에 해당하는 부분으로 "본원"으로 저장
         hourStemSibseong: sajuResult.hourStemSibseong,
+        yearBranchSibseong: sajuResult.yearBranchSibseong,
+        monthBranchSibseong: sajuResult.monthBranchSibseong,
+        dayBranchSibseong: sajuResult.dayBranchSibseong,
+        hourBranchSibseong: sajuResult.hourBranchSibseong,
+        daeun: daeunData, // Include daeun data
       }
 
       console.log("Storing saju data to localStorage:", sajuDataToStore)
@@ -275,7 +301,7 @@ export default function BirthDateFormClient() {
           updateUserAuthId(userId)
         }
 
-        // 사주 계산 성공 후 바로 채팅으로 이동
+        // 사주 계산 성공 후 바로 채팅으로 이동 부분을 조건부로 변경
         if (sajuResult) {
           // 사주 데이터를 localStorage에 저장한 후
           localStorage.setItem(
@@ -304,8 +330,16 @@ export default function BirthDateFormClient() {
             }),
           )
 
-          // 채팅으로 리디렉션
-          router.push("/saju-chat/sajuping")
+          // 성공 콜백 호출
+          if (onSuccess && userId) {
+            onSuccess(userId)
+          }
+
+          // 리디렉션 여부에 따라 처리
+          if (redirectAfterSave) {
+            // 채팅으로 리디렉션
+            router.push("/saju-chat/sajuping")
+          }
         }
       } catch (e) {
         console.error("Error storing saju data:", e)
@@ -526,8 +560,10 @@ export default function BirthDateFormClient() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               계산 중...
             </>
-          ) : (
+          ) : redirectAfterSave ? (
             "사주 정보 저장하기"
+          ) : (
+            "사주 계산하기"
           )}
         </Button>
       </form>
