@@ -308,6 +308,46 @@ export default function SajuChat({
     }
   }, [actualIsLoggedIn, loadUserCoins])
 
+  // 단일 메시지를 데이터베이스에 저장하는 함수
+  const saveMessageToDatabase = useCallback(
+    async (message: string, role: "user" | "assistant", sessionId: string) => {
+      if (!sessionId || !actualIsLoggedIn) {
+        console.log("Skipping message save - no sessionId or not logged in")
+        return null
+      }
+
+      try {
+        const response = await fetch("/api/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId,
+            message,
+            role,
+            roomType,
+            modelUsed: role === "assistant" ? "gpt-4" : undefined,
+            responseTimeMs: role === "assistant" ? Date.now() : undefined,
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`[CLIENT] Successfully saved ${role} message to database`)
+          return data.messageId
+        } else {
+          console.error(`[CLIENT] Failed to save ${role} message to database`)
+          return null
+        }
+      } catch (error) {
+        console.error(`[CLIENT] Error saving ${role} message to database:`, error)
+        return null
+      }
+    },
+    [roomType, actualIsLoggedIn],
+  )
+
   // 과거 메시지와 초기 메시지를 합치는 함수
   const combineMessagesWithInitial = useCallback(
     (pastMessages: any[]) => {
@@ -553,27 +593,18 @@ export default function SajuChat({
     },
     onFinish: async (message) => {
       try {
-        // 현재 messages 배열에 새로운 assistant 메시지 추가
-        const updatedMessages = [...messages, message]
+        console.log(`[CLIENT] onFinish called - Assistant message received`)
+        console.log(`[CLIENT] Assistant message:`, message.content.substring(0, 100) + "...")
 
-        console.log(`[CLIENT] onFinish called - Total messages: ${updatedMessages.length}`)
-        console.log(`[CLIENT] New assistant message:`, message.content.substring(0, 100) + "...")
-
-        // 데이터베이스에 저장 (로그인한 사용자만)
+        // Assistant 메시지를 즉시 데이터베이스에 저장
         if (databaseSessionId && actualIsLoggedIn) {
           console.log("[CLIENT] Saving assistant message to database")
-          await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-        } else {
-          console.log(
-            "[CLIENT] Skipping database save - sessionId:",
-            databaseSessionId,
-            "isLoggedIn:",
-            actualIsLoggedIn,
-          )
+          await saveMessageToDatabase(message.content, "assistant", databaseSessionId)
         }
 
         // 로컬 스토리지에 저장
         const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
+        const updatedMessages = [...messages, message]
         const sessionData = {
           saju,
           name,
@@ -625,116 +656,6 @@ export default function SajuChat({
     },
   })
 
-  // 메시지를 데이터베이스에 저장하는 함수 (useAIChat 후에 정의)
-  const saveMessagesToDatabase = useCallback(
-    async (messagesToSave: any[], sessionId: string) => {
-      if (!sessionId) {
-        console.log("No session ID available for database save")
-        return
-      }
-
-      try {
-        console.log(`[CLIENT] Saving ${messagesToSave.length} messages to database for session ${sessionId}`)
-
-        const response = await fetch("/api/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            sessionId,
-            messages: messagesToSave,
-            roomType,
-            sajuData: {
-              name,
-              gender,
-              saju,
-              birthInfo,
-            },
-          }),
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          console.log(`[CLIENT] Successfully saved ${data.savedCount || 0} messages to database`)
-
-          if (data.messageIds && data.messageIds.length > 0) {
-            setTimeout(() => {
-              const newMessageIds: Record<string, string> = {}
-              const savableMessages = messagesToSave.filter((_, index) => index >= 2)
-              savableMessages.forEach((msg, index) => {
-                if (data.messageIds[index]) {
-                  newMessageIds[msg.id] = data.messageIds[index]
-                }
-              })
-              setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
-            }, 0)
-          }
-        } else {
-          const errorText = await response.text()
-          console.error("[CLIENT] Failed to save messages to database:", errorText)
-        }
-      } catch (error) {
-        console.error("[CLIENT] Error saving messages to database:", error)
-      }
-    },
-    [roomType, name, gender, saju, birthInfo],
-  )
-
-  // 사용자 메시지 저장 함수 (useAIChat 후에 정의)
-  const saveUserMessage = useCallback(
-    async (userMessage: string) => {
-      if (!databaseSessionId) {
-        console.log("[CLIENT] No database session ID available for user message save")
-        return
-      }
-
-      const userMessageObj = {
-        id: `user-${Date.now()}`,
-        role: "user" as const,
-        content: userMessage,
-      }
-
-      const updatedMessages = [...messages, userMessageObj]
-      console.log(`[CLIENT] Saving user message to database`)
-
-      await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-
-      const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages: updatedMessages,
-        lastMessageTime: new Date().toISOString(),
-        birthInfo,
-      }
-
-      try {
-        saveChatSession(currentSessionKey, sessionData)
-        setActiveChatSession(sessionData)
-      } catch (saveError) {
-        console.error("Error saving user message to session:", saveError)
-      }
-    },
-    [
-      databaseSessionId,
-      messages,
-      saveMessagesToDatabase,
-      sessionKey,
-      name,
-      saju,
-      roomType,
-      gender,
-      initialInterpretation,
-      saveChatSession,
-      setActiveChatSession,
-      birthInfo,
-    ],
-  )
-
   const customHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
@@ -781,8 +702,11 @@ export default function SajuChat({
     setStreamingError(null)
     setRetryCount(0)
 
-    // 사용자 메시지 저장
-    await saveUserMessage(input)
+    // 사용자 메시지를 즉시 데이터베이스에 저장
+    if (databaseSessionId && actualIsLoggedIn) {
+      console.log("[CLIENT] Saving user message to database")
+      await saveMessageToDatabase(input, "user", databaseSessionId)
+    }
 
     // AI 채팅 제출
     aiHandleSubmit(e)

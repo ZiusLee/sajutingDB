@@ -33,9 +33,6 @@ interface CreateMemoryPayload {
 
 // Helper to get user_id or session_id
 async function getAuthIdentifiers(req: NextRequest) {
-  // const user = await getCurrentUser(req); // Implement this based on your auth system (e.g., Supabase)
-  // For now, let's assume user_id might come from a header or a session cookie
-  // And session_id might come from the client for anonymous users
   const userId = req.headers.get("x-user-id") // Example: get user_id if authenticated
   return { userId: userId || null }
 }
@@ -56,17 +53,32 @@ export async function POST(req: NextRequest) {
 
     const sessionIdToSave = userId ? null : body.session_id
 
+    // memory_bank 테이블이 존재하는지 확인
+    const tableCheck = await query(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'memory_bank'
+      )`,
+      [],
+    )
+
+    if (!tableCheck.rows[0]?.exists) {
+      console.error("memory_bank table does not exist")
+      return NextResponse.json({ error: "Memory table not found" }, { status: 500 })
+    }
+
     const result = await query(
-      `INSERT INTO memory_bank (user_id, session_id, type, content, tags)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO memory_bank (user_id, session_id, type, content, tags, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
        RETURNING *`,
-      [userId, sessionIdToSave, body.type, body.content, body.tags || null],
+      [userId, sessionIdToSave, body.type, JSON.stringify(body.content), body.tags || null],
     )
 
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch (error) {
     console.error("Error creating memory:", error)
-    return NextResponse.json({ error: "Failed to create memory" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to create memory", details: error.message }, { status: 500 })
   }
 }
 
@@ -79,12 +91,28 @@ export async function GET(req: NextRequest) {
 
     console.log("Memory API - userId:", userId, "sessionId:", sessionId)
 
+    // memory_bank 테이블이 존재하는지 확인
+    const tableCheck = await query(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'memory_bank'
+      )`,
+      [],
+    )
+
+    if (!tableCheck.rows[0]?.exists) {
+      console.error("memory_bank table does not exist")
+      return NextResponse.json([], { status: 200 })
+    }
+
     if (!userId && !sessionId) {
-      return NextResponse.json({ error: "User ID or Session ID is required" }, { status: 401 })
+      return NextResponse.json([], { status: 200 })
     }
 
     const queryParams: any[] = []
-    let queryString = "SELECT * FROM memory_bank WHERE "
+    let queryString =
+      "SELECT id, user_id, session_id, type, content, tags, created_at as timestamp FROM memory_bank WHERE "
 
     if (userId) {
       queryString += "user_id = $1"
@@ -107,8 +135,18 @@ export async function GET(req: NextRequest) {
 
     console.log("Query result:", result.rows.length, "rows")
 
-    // 결과가 없어도 빈 배열 반환
-    return NextResponse.json(result.rows || [])
+    // content가 JSON 문자열인 경우 파싱
+    const processedRows = result.rows.map((row) => ({
+      ...row,
+      content:
+        typeof row.content === "string"
+          ? row.content.startsWith("{") || row.content.startsWith("[")
+            ? JSON.parse(row.content)
+            : row.content
+          : row.content,
+    }))
+
+    return NextResponse.json(processedRows || [])
   } catch (error) {
     console.error("Error fetching memories:", error)
     // 에러 발생시에도 빈 배열 반환하여 프론트엔드가 정상 작동하도록
