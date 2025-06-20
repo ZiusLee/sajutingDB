@@ -35,41 +35,9 @@ export default function SajuChatPage() {
       const parsedSaju = JSON.parse(savedSaju)
       setSaju(parsedSaju)
 
-      // sessionId 우선순위: 1) parsedSaju.sessionId, 2) tempSajuData.sessionId, 3) 새로 생성
-      let sessionId = parsedSaju.sessionId
-
-      // tempSajuData에서 sessionId 확인 (홈페이지 플로우)
-      if (!sessionId) {
-        const tempSajuData = localStorage.getItem("tempSajuData")
-        if (tempSajuData) {
-          try {
-            const tempData = JSON.parse(tempSajuData)
-            if (tempData.sessionId) {
-              sessionId = tempData.sessionId
-              console.log("Using sessionId from tempSajuData:", sessionId)
-
-              // current_saju에도 sessionId 저장
-              parsedSaju.sessionId = sessionId
-              localStorage.setItem("current_saju", JSON.stringify(parsedSaju))
-            }
-          } catch (error) {
-            console.error("Error parsing tempSajuData:", error)
-          }
-        }
-      }
-
-      // 여전히 없으면 새로 생성
-      if (!sessionId) {
-        sessionId = `chat_${parsedSaju.name || "user"}_${params.roomType}_${Date.now()}`
-        console.log("Generated new sessionId:", sessionId)
-
-        // current_saju에 sessionId 저장
-        parsedSaju.sessionId = sessionId
-        localStorage.setItem("current_saju", JSON.stringify(parsedSaju))
-      }
-
-      setSessionKey(sessionId)
-      console.log("Final sessionKey set:", sessionId)
+      // Generate a unique session key for this chat room
+      const generatedKey = `chat_${parsedSaju.name || "user"}_${params.roomType}`
+      setSessionKey(generatedKey)
 
       // 원래 경로 저장 (있는 경우)
       const lastChatData = loadSajuFromLocalStorage("last_chat_saju_data")
@@ -80,7 +48,6 @@ export default function SajuChatPage() {
       // 마이페이지에서 왔는지 확인 (더 안전하게)
       const fromMyPage = sessionStorage.getItem("from_mypage")
       console.log("from_mypage flag:", fromMyPage)
-      console.log("sessionId from parsedSaju:", sessionId)
       if (fromMyPage === "true") {
         console.log("Chat opened from mypage - flag confirmed")
         // 플래그는 saju-chat 컴포넌트에서 처리하므로 여기서는 제거하지 않음

@@ -39,7 +39,6 @@ export function createServerComponentClientWithCookies({ cookies }: { cookies: (
 }
 
 // This is the function that app/actions.tsx is trying to import
-// 기존 createClient 함수를 수정하여 cookies가 없을 때도 작동하도록 합니다
-export function createClient({ cookies } = { cookies: () => undefined }) {
+export function createClient({ cookies }: { cookies: () => any }) {
   return createServerComponentClient<Database>({ cookies })
 }

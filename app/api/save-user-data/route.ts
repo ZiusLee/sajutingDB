@@ -17,40 +17,63 @@ export async function POST(request: NextRequest) {
     const userData = await request.json()
     console.log("Received user data in API route:", userData)
 
-    // 사용자 ID 확인
+    // 사용자 ID 및 인증된 사용자 ID 추출
     const userId = userData.userId
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
+    const authUserId = userData.authUserId
+
+    // 기존 사용자 확인
+    if (userData.email) {
+      const { data: existingSessions } = await adminSupabase
+        .from("saju_sessions")
+        .select("id")
+        .eq("email", userData.email)
+
+      if (existingSessions && existingSessions.length > 0) {
+        const existingSessionId = existingSessions[0].id
+        console.log("Found existing session with ID:", existingSessionId)
+
+        // 인증된 사용자 ID가 있는 경우 업데이트
+        if (authUserId) {
+          const { error: updateError } = await adminSupabase
+            .from("saju_sessions")
+            .update({ auth_user_id: authUserId })
+            .eq("id", existingSessionId)
+
+          if (updateError) {
+            console.error("Error linking session ID to auth user ID:", updateError)
+          } else {
+            console.log("Updated auth_user_id for session:", existingSessionId)
+          }
+        }
+
+        return NextResponse.json({ success: true, userId: existingSessionId })
+      }
     }
 
-    // Ensure saju JSONB data has the correct dayStemSibseong value
-    if (userData.saju) {
-      userData.saju.dayStemSibseong = "본원" // 일주의 천간은 나에 해당하는 부분으로 "본원"으로 저장
-    }
-
-    // 사용자 세션 생성 또는 업데이트
-    const { data: sessionData, error: sessionError } = await adminSupabase
+    // 새 세션 생성
+    const { data: newSession, error: sessionError } = await adminSupabase
       .from("saju_sessions")
-      .upsert(
-        {
-          id: userId,
-          name: userData.name || "Anonymous User",
-          gender: userData.gender || "unknown",
-          relationship_status: userData.relationshipStatus || "unknown",
-          auth_user_id: userData.authUserId || null,
-          saju: userData.saju || null, // Include saju JSONB data
-          daeun: userData.daeun || null, // Include daeun JSONB data
-        },
-        { onConflict: "id" },
-      )
-      .select()
+      .insert({
+        id: userId,
+        name: userData.name || "Anonymous User",
+        email: userData.email || null,
+        gender: userData.gender || "unknown",
+        relationship_status: userData.relationshipStatus || "unknown",
+        is_beta_applicant: false,
+        phone: userData.phone || null,
+        privacy_consent: userData.privacyConsent || false,
+        auth_user_id: authUserId, // 인증된 사용자 ID 저장
+      })
+      .select("id")
+      .single()
 
     if (sessionError) {
-      console.error("Error creating/updating saju session:", sessionError)
+      console.error("Error creating session:", sessionError)
       return NextResponse.json({ error: sessionError.message }, { status: 500 })
     }
 
-    // For backward compatibility, still save to the old tables
+    console.log("Created new session with ID:", newSession.id)
+
     // 생년월일 정보 저장
     if (userData.year && userData.month && userData.day) {
       const { error: birthError } = await adminSupabase.from("birth_info").insert({

@@ -3,7 +3,7 @@
 import type React from "react"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { SiteHeader } from "@/components/site-header"
+import { Navbar } from "@/components/navbar"
 import { AuthProvider } from "@/contexts/auth-context"
 import { ChatProvider } from "@/contexts/chat-context"
 import { usePathname } from "next/navigation"
@@ -23,7 +23,7 @@ export default function ClientLayout({
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <AuthProvider>
         <ChatProvider>
-          {!shouldHideNavbar && <SiteHeader />}
+          {!shouldHideNavbar && <Navbar />}
           <main className={shouldHideNavbar ? "" : "min-h-screen"}>{children}</main>
           <Toaster />
         </ChatProvider>

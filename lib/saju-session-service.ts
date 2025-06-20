@@ -41,7 +41,6 @@ export async function getUserSajuProfiles() {
         created_at,
         auth_user_id,
         is_default,
-        saju,
         birth_info (
           id,
           solar_year,
@@ -63,7 +62,15 @@ export async function getUserSajuProfiles() {
           day_stem,
           day_branch,
           hour_stem,
-          hour_branch
+          hour_branch,
+          year_stem_sibseong,
+          month_stem_sibseong,
+          day_stem_sibseong,
+          hour_stem_sibseong,
+          year_branch_sibseong,
+          month_branch_sibseong,
+          day_branch_sibseong,
+          hour_branch_sibseong
         )
       `)
       .eq("auth_user_id", authUserId)
@@ -87,7 +94,6 @@ export async function getUserSajuProfiles() {
       // Get the first birth_info and saju_info records if they exist
       const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
       const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
-      const sajuJsonb = session.saju || {}
 
       return {
         id: session.id,
@@ -106,23 +112,22 @@ export async function getUserSajuProfiles() {
         birthInfoId: birthInfo?.id || null,
         isDefault: session.is_default || false,
         saju: {
-          yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem || "N/A",
-          yearBranch: sajuInfo?.year_branch || sajuJsonb.yearBranch || "N/A",
-          monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem || "N/A",
-          monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch || "N/A",
-          dayStem: sajuInfo?.day_stem || sajuJsonb.dayStem || "N/A",
-          dayBranch: sajuInfo?.day_branch || sajuJsonb.dayBranch || "N/A",
-          hourStem: sajuInfo?.hour_stem || sajuJsonb.hourStem || "N/A",
-          hourBranch: sajuInfo?.hour_branch || sajuJsonb.hourBranch || "N/A",
-          // 십성 정보는 saju JSONB에서 가져옴
-          yearStemSibseong: sajuJsonb.yearStemSibseong || "",
-          monthStemSibseong: sajuJsonb.monthStemSibseong || "",
-          dayStemSibseong: sajuJsonb.dayStemSibseong || "",
-          hourStemSibseong: sajuJsonb.hourStemSibseong || "",
-          yearBranchSibseong: sajuJsonb.yearBranchSibseong || "",
-          monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
-          dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
-          hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
+          yearStem: sajuInfo?.year_stem || "N/A",
+          yearBranch: sajuInfo?.year_branch || "N/A",
+          monthStem: sajuInfo?.month_stem || "N/A",
+          monthBranch: sajuInfo?.month_branch || "N/A",
+          dayStem: sajuInfo?.day_stem || "N/A",
+          dayBranch: sajuInfo?.day_branch || "N/A",
+          hourStem: sajuInfo?.hour_stem || "N/A",
+          hourBranch: sajuInfo?.hour_branch || "N/A",
+          yearStemSibseong: sajuInfo?.year_stem_sibseong || "",
+          monthStemSibseong: sajuInfo?.month_stem_sibseong || "",
+          dayStemSibseong: sajuInfo?.day_stem_sibseong || "",
+          hourStemSibseong: sajuInfo?.hour_stem_sibseong || "",
+          yearBranchSibseong: sajuInfo?.year_branch_sibseong || "",
+          monthBranchSibseong: sajuInfo?.month_branch_sibseong || "",
+          dayBranchSibseong: sajuInfo?.day_branch_sibseong || "",
+          hourBranchSibseong: sajuInfo?.hour_branch_sibseong || "",
         },
       }
     })
@@ -600,7 +605,6 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         name,
         gender,
         created_at,
-        saju,
         birth_info (
           id,
           solar_year,
@@ -644,9 +648,6 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     const birthInfo = data?.birth_info?.[0] || {}
     const sajuInfo = data?.saju_info?.[0] || {}
-    const sajuJsonb = data?.saju || {}
-
-    console.log("JSONB saju data from database:", sajuJsonb)
 
     return {
       id: data.id,
@@ -663,34 +664,25 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
       timeUnknown: birthInfo.time_unknown || false,
       createdAt: data.created_at || new Date().toISOString(),
       saju: {
-        yearStem: sajuInfo.year_stem || sajuJsonb.yearStem || "",
-        yearBranch: sajuInfo.year_branch || sajuJsonb.yearBranch || "",
-        monthStem: sajuInfo.month_stem || sajuJsonb.monthStem || "",
-        monthBranch: sajuInfo.month_branch || sajuJsonb.monthBranch || "",
-        dayStem: sajuInfo.day_stem || sajuJsonb.dayStem || "",
-        dayBranch: sajuInfo.day_branch || sajuJsonb.dayBranch || "",
-        hourStem: sajuInfo.hour_stem || sajuJsonb.hourStem || "",
-        hourBranch: sajuInfo.hour_branch || sajuJsonb.hourBranch || "",
-        yearStemHanja: sajuInfo.year_stem_hanja || sajuJsonb.yearStemHanja || "",
-        yearBranchHanja: sajuInfo.year_branch_hanja || sajuJsonb.yearBranchHanja || "",
-        monthStemHanja: sajuInfo.month_stem_hanja || sajuJsonb.monthStemHanja || "",
-        monthBranchHanja: sajuInfo.month_branch_hanja || sajuJsonb.monthBranchHanja || "",
-        dayStemHanja: sajuInfo.day_stem_hanja || sajuJsonb.dayStemHanja || "",
-        dayBranchHanja: sajuInfo.day_branch_hanja || sajuJsonb.dayBranchHanja || "",
-        hourStemHanja: sajuInfo.hour_stem_hanja || sajuJsonb.hourStemHanja || "",
-        hourBranchHanja: sajuInfo.hour_branch_hanja || sajuJsonb.hourBranchHanja || "",
-        dayMaster: sajuInfo.day_master || sajuJsonb.dayMaster || "",
-        dayMasterHanja: sajuInfo.day_master_hanja || sajuJsonb.dayMasterHanja || "",
-        // 십성 정보는 saju JSONB에서 가져옴
-        yearStemSibseong: sajuJsonb.yearStemSibseong || "",
-        monthStemSibseong: sajuJsonb.monthStemSibseong || "",
-        dayStemSibseong: sajuJsonb.dayStemSibseong || "비견",
-        hourStemSibseong: sajuJsonb.hourStemSibseong || "",
-        yearBranchSibseong: sajuJsonb.yearBranchSibseong || "",
-        monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
-        dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
-        hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-        elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+        yearStem: sajuInfo.year_stem || "",
+        yearBranch: sajuInfo.year_branch || "",
+        monthStem: sajuInfo.month_stem || "",
+        monthBranch: sajuInfo.month_branch || "",
+        dayStem: sajuInfo.day_stem || "",
+        dayBranch: sajuInfo.day_branch || "",
+        hourStem: sajuInfo.hour_stem || "",
+        hourBranch: sajuInfo.hour_branch || "",
+        yearStemHanja: sajuInfo.year_stem_hanja || "",
+        yearBranchHanja: sajuInfo.year_branch_hanja || "",
+        monthStemHanja: sajuInfo.month_stem_hanja || "",
+        monthBranchHanja: sajuInfo.month_branch_hanja || "",
+        dayStemHanja: sajuInfo.day_stem_hanja || "",
+        dayBranchHanja: sajuInfo.day_branch_hanja || "",
+        hourStemHanja: sajuInfo.hour_stem_hanja || "",
+        hourBranchHanja: sajuInfo.hour_branch_hanja || "",
+        dayMaster: sajuInfo.day_master || "",
+        dayMasterHanja: sajuInfo.day_master_hanja || "",
+        elements: { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
       },
     }
   } catch (error) {

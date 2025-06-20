@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { MoonIcon, SunIcon } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -82,11 +83,7 @@ export function SiteHeader() {
             <SajuLogo size="sm" showText={false} />
             <span className="font-bold text-lg text-primary dark:text-white">사주핑</span>
           </Link>
-          <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-            <Link href="/about" className="transition-colors hover:text-foreground/80 text-foreground/60">
-              사주핑 스토리
-            </Link>
-          </nav>
+          <MainNav />
         </div>
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
@@ -111,7 +108,7 @@ export function SiteHeader() {
               </Button>
             ) : (
               <Button variant="default" onClick={() => router.push("/login")}>
-                로그인
+                로그인/회원가입
               </Button>
             )}
             <ThemeToggle />

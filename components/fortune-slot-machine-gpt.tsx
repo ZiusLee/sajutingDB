@@ -585,7 +585,7 @@ export function FortuneSlotMachine({ coins, useCoins, addTalisman, sajuProfile, 
                   transition={{ delay: 0.5, type: "spring" }}
                 >
                   <p className="font-semibold text-yellow-800 dark:text-yellow-200">
-                    🎉 축하합니다! 부적을 획득했습���다!
+                    🎉 축하합니다! 부적을 획득했습니다!
                   </p>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300">{categoryInfo.name} 부적</p>
                 </motion.div>

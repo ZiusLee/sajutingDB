@@ -1,41 +1,33 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle, XCircle, Loader2, Coins, ArrowLeft } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { CheckCircle, Coins, ArrowLeft } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 export default function PaymentSuccessPage() {
-  const searchParams = useSearchParams()
   const router = useRouter()
-  const [status, setStatus] = useState<"processing" | "success" | "error">("processing")
-  const [message, setMessage] = useState("")
-  const [coins, setCoins] = useState(0)
-  const [orderId, setOrderId] = useState("")
-  const [isProcessed, setIsProcessed] = useState(false)
+  const searchParams = useSearchParams()
+  const [isProcessing, setIsProcessing] = useState(true)
+  const [paymentResult, setPaymentResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const processPayment = async () => {
-      // 이미 처리된 경우 중복 처리 방지
-      if (isProcessed) return
-
-      const paymentKey = searchParams.get("paymentKey")
       const orderId = searchParams.get("orderId")
+      const paymentKey = searchParams.get("paymentKey")
       const amount = searchParams.get("amount")
 
-      if (!paymentKey || !orderId || !amount) {
-        setStatus("error")
-        setMessage("결제 정보가 누락되었습니다.")
+      if (!orderId || !paymentKey || !amount) {
+        setError("결제 정보가 누락되었습니다.")
+        setIsProcessing(false)
         return
       }
 
-      setIsProcessed(true)
-      setOrderId(orderId)
-
       try {
-        console.log("결제 승인 처리 시작:", { paymentKey, orderId, amount })
+        console.log("결제 승인 요청:", { orderId, paymentKey, amount })
 
         const response = await fetch("/api/payments/success", {
           method: "POST",
@@ -43,8 +35,8 @@ export default function PaymentSuccessPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            paymentKey,
             orderId,
+            paymentKey,
             amount: Number.parseInt(amount),
           }),
         })
@@ -53,94 +45,100 @@ export default function PaymentSuccessPage() {
         console.log("결제 승인 응답:", data)
 
         if (response.ok && data.success) {
-          setStatus("success")
-          setMessage(data.message || "결제가 완료되었습니다.")
-          setCoins(data.coins || 0)
-
+          setPaymentResult(data)
           toast({
             title: "결제 완료!",
             description: `${data.coins}핑이 충전되었습니다.`,
           })
         } else {
-          console.error("결제 승인 실패:", data)
-          setStatus("error")
-          setMessage(data.error || "결제 처리 중 오류가 발생했습니다.")
-
-          toast({
-            title: "결제 오류",
-            description: data.error || "결제 처리 중 오류가 발생했습니다.",
-            variant: "destructive",
-          })
+          throw new Error(data.error || "결제 처리 중 오류가 발생했습니다.")
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("결제 처리 오류:", error)
-        setStatus("error")
-        setMessage("결제 처리 중 오류가 발생했습니다.")
-
+        setError(error.message)
         toast({
           title: "결제 오류",
-          description: "결제 처리 중 오류가 발생했습니다.",
+          description: error.message,
           variant: "destructive",
         })
+      } finally {
+        setIsProcessing(false)
       }
     }
 
     processPayment()
-  }, [searchParams, isProcessed])
+  }, [searchParams])
 
   const handleGoBack = () => {
     router.push("/coin-shop")
   }
 
-  const handleGoHome = () => {
-    router.push("/")
+  const handleGoToChat = () => {
+    router.push("/saju-chat/general")
+  }
+
+  if (isProcessing) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-md">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+            <p className="text-center text-muted-foreground">결제를 처리하고 있습니다...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-md">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <span className="text-red-600 text-2xl">✕</span>
+            </div>
+            <CardTitle className="text-red-600">결제 오류</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={handleGoBack} className="w-full">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              다시 시도
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <div className="container mx-auto flex items-center justify-center min-h-screen px-4">
-      <Card className="w-full max-w-md">
+    <div className="container mx-auto px-4 py-8 max-w-md">
+      <Card>
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4">
-            {status === "processing" && (
-              <div className="flex flex-col items-center space-y-4">
-                <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-                <p className="text-sm text-muted-foreground">결제를 처리하고 있습니다...</p>
-              </div>
-            )}
-            {status === "success" && <CheckCircle className="h-12 w-12 text-green-500" />}
-            {status === "error" && <XCircle className="h-12 w-12 text-red-500" />}
+          <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <CardTitle className={status === "success" ? "text-green-700" : status === "error" ? "text-red-700" : ""}>
-            {status === "processing" && "결제 처리 중"}
-            {status === "success" && "결제 완료"}
-            {status === "error" && "결제 오류"}
-          </CardTitle>
+          <CardTitle className="text-green-600">결제 완료!</CardTitle>
+          <CardDescription>핑 충전이 성공적으로 완료되었습니다.</CardDescription>
         </CardHeader>
-
-        <CardContent className="text-center space-y-4">
-          <p className="text-muted-foreground">{message}</p>
-
-          {status === "success" && coins > 0 && (
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-              <div className="flex items-center justify-center space-x-2">
-                <Coins className="h-5 w-5 text-green-600" />
-                <span className="font-semibold text-green-700 dark:text-green-400">{coins}핑이 충전되었습니다!</span>
+        <CardContent className="space-y-4">
+          {paymentResult && (
+            <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-600">
+                <Coins className="w-5 h-5" />
+                <span>+{paymentResult.coins}핑 충전</span>
               </div>
             </div>
           )}
 
-          {orderId && <div className="text-xs text-muted-foreground">주문번호: {orderId}</div>}
-
-          <div className="flex flex-col space-y-2 pt-4">
-            {status === "success" && (
-              <Button onClick={handleGoHome} className="w-full">
-                홈으로 이동
-              </Button>
-            )}
-
-            <Button variant={status === "success" ? "outline" : "default"} onClick={handleGoBack} className="w-full">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {status === "error" ? "다시 시도" : "코인 충전소로"}
+          <div className="space-y-2">
+            <Button onClick={handleGoToChat} className="w-full">
+              사주 채팅 시작하기
+            </Button>
+            <Button onClick={handleGoBack} variant="outline" className="w-full">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              코인샵으로 돌아가기
             </Button>
           </div>
         </CardContent>

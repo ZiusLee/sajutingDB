@@ -475,7 +475,7 @@ function generateInterpretation(
       interpretation += `${dayStem}${dayBranch} 일주는 결단력이 있고 정확한 성향을 가지고 있습니다. `
       break
     case "water":
-      interpretation += `${dayStem}${dayBranch} 일주는 지혜롭고 유연 성향을 가지고 있습니다. `
+      interpretation += `${dayStem}${dayBranch} 일주는 지혜롭고 유연한 성향을 가지고 있습니다. `
       break
   }
 
@@ -491,7 +491,7 @@ function generateInterpretation(
 
     switch (element) {
       case "wood":
-        interpretation += "창의성과 성장에 유리합니다. 예술, 교육, 문학 분야에서 재을 발휘할 수 있습니다. "
+        interpretation += "창의성과 성장에 유리합니다. 예술, 교육, 문학 분야에서 재능을 발휘할 수 있습니다. "
         break
       case "fire":
         interpretation += "열정과 리더십이 뛰어납니다. 연예, 마케팅, 영업 분야에서 두각을 나타낼 수 있습니다. "
@@ -848,7 +848,7 @@ export function calculateSaju(
     timeStandard,
     yearStemSibseong: calculateSibseong(dayStem, yearStem),
     monthStemSibseong: calculateSibseong(dayStem, monthStem),
-    dayStemSibseong: "본원",
+    dayStemSibseong: calculateSibseong(dayStem, dayStem),
     hourStemSibseong: hourStem !== "?" ? calculateSibseong(dayStem, hourStem) : "",
     yearBranchSibseong: calculateSibseong(dayStem, BRANCH_TO_STEM_MAP[yearBranch as keyof typeof BRANCH_TO_STEM_MAP]),
     monthBranchSibseong: calculateSibseong(dayStem, BRANCH_TO_STEM_MAP[monthBranch as keyof typeof BRANCH_TO_STEM_MAP]),

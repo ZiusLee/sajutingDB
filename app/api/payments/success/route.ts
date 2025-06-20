@@ -1,22 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase-server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient()
 
-    const { paymentKey, orderId, amount } = await request.json()
+    // 사용자 인증 확인
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (!paymentKey || !orderId || !amount) {
-      return NextResponse.json({ error: "필수 파라미터가 누락되었습니다." }, { status: 400 })
+    if (authError || !user) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
     }
 
-    // 토스페이먼츠 결제 승인 요청
+    const { orderId, paymentKey, amount } = await request.json()
+
+    console.log("결제 성공 처리 시작:", { orderId, paymentKey, amount, userId: user.id })
+
+    // 토스페이먼츠 결제 승인
     const tossResponse = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
       method: "POST",
       headers: {
-        Authorization: `Basic ${Buffer.from("test_sk_QbgMGZzorzyKYRdqXMbjVl5E1em4:").toString("base64")}`,
+        Authorization: `Basic ${Buffer.from(process.env.TOSS_PAYMENTS_SECRET_KEY + ":").toString("base64")}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -26,64 +33,77 @@ export async function POST(request: NextRequest) {
       }),
     })
 
-    const tossData = await tossResponse.json()
-
     if (!tossResponse.ok) {
-      console.error("토스페이먼츠 승인 실패:", tossData)
+      const errorData = await tossResponse.json()
+      console.error("토스페이먼츠 승인 실패:", errorData)
 
-      // 주문 실패 처리
+      // 주문 상태를 실패로 업데이트
       await supabase
         .from("payment_orders")
         .update({
           status: "failed",
-          failure_reason: tossData.message || "토스페이먼츠 승인 실패",
-          updated_at: new Date().toISOString(),
+          failure_reason: errorData.message || "결제 승인 실패",
         })
         .eq("order_id", orderId)
 
-      return NextResponse.json({ error: tossData.message || "결제 승인에 실패했습니다." }, { status: 400 })
+      return NextResponse.json({ error: "결제 승인에 실패했습니다." }, { status: 400 })
     }
+
+    const paymentData = await tossResponse.json()
+    console.log("토스페이먼츠 승인 성공:", paymentData)
 
     // 주문 정보 조회
     const { data: orderData, error: orderError } = await supabase
       .from("payment_orders")
       .select("*")
       .eq("order_id", orderId)
+      .eq("user_id", user.id)
       .single()
 
     if (orderError || !orderData) {
-      console.error("주문 조회 오류:", orderError)
+      console.error("주문 조회 실패:", orderError)
       return NextResponse.json({ error: "주문 정보를 찾을 수 없습니다." }, { status: 404 })
     }
 
-    // 결제 금액 검증
-    if (orderData.amount !== amount) {
-      console.error("결제 금액 불일치:", { expected: orderData.amount, received: amount })
-      return NextResponse.json({ error: "결제 금액이 일치하지 않습니다." }, { status: 400 })
+    // 이미 완료된 주문인지 확인
+    if (orderData.status === "completed") {
+      return NextResponse.json({
+        success: true,
+        message: "이미 처리된 주문입니다.",
+        coins: orderData.coins,
+      })
     }
 
-    // 기존 complete_payment 함수 사용
-    const { error: transactionError } = await supabase.rpc("complete_payment", {
-      p_order_id: orderId,
-      p_user_id: orderData.user_id,
-      p_coins: orderData.coins,
-      p_payment_key: paymentKey,
-      p_payment_data: tossData,
+    console.log("결제 완료 처리 함수 호출:", {
+      orderId,
+      userId: user.id,
+      coins: orderData.coins,
     })
 
-    if (transactionError) {
-      console.error("결제 처리 트랜잭션 오류:", transactionError)
-      return NextResponse.json({ error: "결제 처리 중 오류가 발생했습니다." }, { status: 500 })
+    // complete_payment 함수 호출
+    const { error: completeError } = await supabase.rpc("complete_payment", {
+      p_order_id: orderId,
+      p_user_id: user.id,
+      p_coins: orderData.coins,
+      p_payment_key: paymentKey,
+      p_payment_data: paymentData,
+    })
+
+    if (completeError) {
+      console.error("결제 완료 처리 실패:", completeError)
+      return NextResponse.json({ error: "결제 완료 처리 중 오류가 발생했습니다." }, { status: 500 })
     }
+
+    console.log("결제 완료 처리 성공")
 
     return NextResponse.json({
       success: true,
       message: "결제가 성공적으로 완료되었습니다.",
       coins: orderData.coins,
-      orderId,
+      paymentData,
     })
   } catch (error) {
     console.error("결제 성공 처리 오류:", error)
-    return NextResponse.json({ error: "결제 처리 중 오류가 발생했습니다." }, { status: 500 })
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 })
   }
 }

@@ -191,7 +191,7 @@ export async function getSajuInterpretation(
       throw new Error(`API 응답 오류: ${response.status}`)
     }
 
-    // 응답 텍스��가 비어있는지 확인
+    // 응답 텍스트가 비어있는지 확인
     if (!responseText || responseText.trim() === "") {
       console.error("Empty API response")
       return {
