@@ -13,7 +13,6 @@ import { calculateSaju } from "@/lib/saju"
 import { fetchLunarDate } from "@/lib/api-client"
 import { solarToLunar } from "@/lib/lunar-calendar"
 import { getUserSajuProfiles } from "@/lib/saju-session-service"
-import { compressSaju, type CompressedSaju } from "@/lib/saju-compression"
 
 interface BirthInfo {
   solarYear: number
@@ -52,7 +51,7 @@ interface CompatibilityToolProps {
   currentBirthInfo?: BirthInfo
   isLoggedIn?: boolean
   userId?: string | null
-  onCompatibilityAnalysis: (mainPerson: CompressedSaju, selectedPeople: CompressedSaju[]) => void
+  onCompatibilityAnalysis: (mainPerson: any, selectedPeople: any[]) => void
 }
 
 export default function CompatibilityTool({
@@ -90,7 +89,7 @@ export default function CompatibilityTool({
   // 현재 사주를 SajuPerson 형태로 변환
   const getCurrentSajuPerson = (): SajuPerson => {
     const sajuSummary = currentSaju
-      ? `${currentSaju.dayStem}${currentSaju.dayBranch}일주, ${currentSaju.yearAnimal || "띠정보없음"}, 오행: 목${currentSaju.elements?.wood || 0} 화${currentSaju.elements?.fire || 0} 토${currentSaju.elements?.earth || 0} 금${currentSaju.elements?.metal || 0} 수${currentSaju.elements?.water || 0}`
+      ? `${currentSaju.dayStem}${currentSaju.dayBranch}일주, ${currentSaju.yearAnimal}, 오행: 목${currentSaju.elements.wood} 화${currentSaju.elements.fire} 토${currentSaju.elements.earth} 금${currentSaju.elements.metal} 수${currentSaju.elements.water}`
       : ""
 
     return {
@@ -142,8 +141,13 @@ export default function CompatibilityTool({
 
       setAvailableMainPeople(sajuPeople)
 
-      // 현재 채팅 중인 사주가 이미 mainPerson으로 설정되어 있으므로
-      // 여기서는 추가 설정하지 않음
+      // 가장 최근 프로필을 대표 사주로 설정 (기본값이 없는 경우)
+      if (sajuPeople.length > 0 && !mainPerson) {
+        const mostRecent = sajuPeople.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )[0]
+        setMainPerson(mostRecent)
+      }
     } catch (error) {
       console.error("Error loading user profiles:", error)
     }
@@ -154,12 +158,11 @@ export default function CompatibilityTool({
     if (isOpen) {
       loadRecentPeople()
 
-      // 현재 채팅 중인 사주를 우선적으로 대표사주로 설정
-      const currentSajuPerson = getCurrentSajuPerson()
-      setMainPerson(currentSajuPerson)
-
       if (isLoggedIn) {
         loadUserProfiles()
+      } else {
+        // 로그인하지 않은 경우 현재 사주를 대표 사주로 설정
+        setMainPerson(getCurrentSajuPerson())
       }
     }
   }, [isOpen, isLoggedIn, userId])
@@ -296,120 +299,9 @@ export default function CompatibilityTool({
     }
 
     try {
-      // 사주 데이터 압축 (시간 정보 포함) - 더 정확한 데이터 전달
-      const compressedMainPerson = compressSaju(
-        mainPerson.saju,
-        mainPerson.birthYear,
-        mainPerson.birthMonth,
-        mainPerson.birthDay,
-        mainPerson.birthHour,
-        mainPerson.birthMinute,
-        mainPerson.saju?.timeUnknown || false,
-      )
-
-      // 성별과 이름 정보 정확히 설정
-      compressedMainPerson.gender =
-        mainPerson.gender === "male" || mainPerson.gender === "female" ? mainPerson.gender : "male"
-      compressedMainPerson.name = mainPerson.name
-
-      // 전체 사주 정보 추가
-      compressedMainPerson.fullSaju = mainPerson.saju
-
-      // 생년월일 정보 추가
-      compressedMainPerson.birthYear = mainPerson.birthYear
-      compressedMainPerson.birthMonth = mainPerson.birthMonth
-      compressedMainPerson.birthDay = mainPerson.birthDay
-      compressedMainPerson.birthHour = mainPerson.birthHour
-      compressedMainPerson.birthMinute = mainPerson.birthMinute
-      compressedMainPerson.timeUnknown = mainPerson.saju?.timeUnknown || false
-
-      // 오행 정보 명시적으로 추가
-      if (mainPerson.saju && mainPerson.saju.elements) {
-        compressedMainPerson.elements = {
-          wood: mainPerson.saju.elements.wood || 0,
-          fire: mainPerson.saju.elements.fire || 0,
-          earth: mainPerson.saju.elements.earth || 0,
-          metal: mainPerson.saju.elements.metal || 0,
-          water: mainPerson.saju.elements.water || 0,
-        }
-      }
-
-      const compressedSelectedPeople = selectedPeople.map((person) => {
-        const compressed = compressSaju(
-          person.saju,
-          person.birthYear,
-          person.birthMonth,
-          person.birthDay,
-          person.birthHour,
-          person.birthMinute,
-          person.saju?.timeUnknown || false,
-        )
-
-        // 성별과 이름 정보 정확히 설정
-        compressed.gender = person.gender === "male" || person.gender === "female" ? person.gender : "male"
-        compressed.name = person.name
-
-        // 전체 사주 정보 추가
-        compressed.fullSaju = person.saju
-
-        // 생년월일 정보 추가
-        compressed.birthYear = person.birthYear
-        compressed.birthMonth = person.birthMonth
-        compressed.birthDay = person.birthDay
-        compressed.birthHour = person.birthHour
-        compressed.birthMinute = person.birthMinute
-        compressed.timeUnknown = person.saju?.timeUnknown || false
-
-        // 오행 정보 명시적으로 추가
-        if (person.saju && person.saju.elements) {
-          compressed.elements = {
-            wood: person.saju.elements.wood || 0,
-            fire: person.saju.elements.fire || 0,
-            earth: person.saju.elements.earth || 0,
-            metal: person.saju.elements.metal || 0,
-            water: person.saju.elements.water || 0,
-          }
-        }
-
-        return compressed
-      })
-
-      console.log("궁합 분석 데이터 (상세):", {
-        mainPerson: compressedMainPerson,
-        selectedPeople: compressedSelectedPeople,
-      })
-
-      // 로컬 스토리지에 상세 데이터 저장
-      try {
-        const compatibilityData = {
-          mainPerson: compressedMainPerson,
-          selectedPeople: compressedSelectedPeople,
-          timestamp: new Date().toISOString(),
-          fullSajuData: {
-            main: mainPerson,
-            selected: selectedPeople,
-          },
-        }
-        localStorage.setItem(`compatibility_latest`, JSON.stringify(compatibilityData))
-        console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
-      } catch (error) {
-        console.error("Error saving compatibility data to localStorage:", error)
-      }
-
-      // 콜백 함수 호출 전에 로그 추가
-      console.log("Calling onCompatibilityAnalysis callback")
-      console.log("onCompatibilityAnalysis type:", typeof onCompatibilityAnalysis)
-
-      if (typeof onCompatibilityAnalysis === "function") {
-        onCompatibilityAnalysis(compressedMainPerson, compressedSelectedPeople)
-        console.log("onCompatibilityAnalysis callback executed successfully")
-      } else {
-        console.error("onCompatibilityAnalysis is not a function:", onCompatibilityAnalysis)
-        alert("궁합 분석 기능에 오류가 있습니다. 페이지를 새로고침해주세요.")
-        return
-      }
-
-      console.log("Closing compatibility tool")
+      // 원본 객체를 그대로 전달 (십성과 오행 정보 포함)
+      console.log("Calling onCompatibilityAnalysis with complete original data")
+      onCompatibilityAnalysis(mainPerson, selectedPeople)
       onClose()
     } catch (error) {
       console.error("Error in handleAnalyze:", error)
