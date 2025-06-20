@@ -559,7 +559,17 @@ export default function SajuChat({
     if (!isLoading && pendingSaveMessage) {
       const saveDelayedMessage = async () => {
         try {
-          const updatedMessages = [...messages, pendingSaveMessage]
+          // 현재 messages 배열에 pendingSaveMessage가 이미 포함되어 있는지 확인
+          const messageExists = messages.some((msg) => msg.id === pendingSaveMessage.id)
+
+          let updatedMessages
+          if (messageExists) {
+            // 이미 포함되어 있으면 현재 messages 사용
+            updatedMessages = messages
+          } else {
+            // 포함되어 있지 않으면 추가
+            updatedMessages = [...messages, pendingSaveMessage]
+          }
 
           console.log(`[CLIENT] Saving message after streaming completed - Total messages: ${updatedMessages.length}`)
 
@@ -601,7 +611,6 @@ export default function SajuChat({
     pendingSaveMessage,
     messages,
     databaseSessionId,
-    actualIsLoggedIn,
     saveMessagesToDatabase,
     sessionKey,
     name,
