@@ -6,21 +6,42 @@ import { fetchLunarDate } from "@/lib/api-client"
 
 export const runtime = "edge"
 
-// 현재 날짜 정보를 가져오는 함수를 수정
+// 현재 날짜 정보를 가져오는 함수를 수정 (캐싱 추가)
 function getCurrentDateInfo() {
   const now = new Date()
   const year = now.getFullYear()
-  const month = now.getMonth() + 1 // JavaScript에서 월은 0부터 시작
+  const month = now.getMonth() + 1
   const day = now.getDate()
   const hour = now.getHours()
   const minute = now.getMinutes()
 
-  try {
-    // 오늘 날짜의 사주 계산 (음력 변환 필요)
-    // 음력 변환을 위해 solarToLunar 함수 사용
-    const lunarDate = solarToLunar(year, month, day)
+  // 오늘 날짜 키 생성
+  const todayKey = `${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`
+  const cacheKey = `today_saju_${todayKey}`
 
-    // calculateSaju 함수를 사용하여 오늘 날짜의 사주 계산
+  // 캐시된 데이터 확인
+  if (typeof localStorage !== "undefined") {
+    try {
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        const cachedData = JSON.parse(cached)
+        // 캐시된 데이터에 현재 시간 정보 업데이트
+        return {
+          ...cachedData,
+          hour,
+          minute,
+          formattedDate: `${year}년 ${month}월 ${day}일`,
+          formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${cachedData.dayGanji})`,
+        }
+      }
+    } catch (error) {
+      // 캐시 읽기 실패 시 무시하고 계속 진행
+    }
+  }
+
+  try {
+    // 새로 계산
+    const lunarDate = solarToLunar(year, month, day)
     const todaySaju = calculateSaju(
       lunarDate.year,
       lunarDate.month,
@@ -30,25 +51,22 @@ function getCurrentDateInfo() {
       year,
       month,
       day,
-      "male", // 성별은 중요하지 않음 (날짜 정보만 필요)
+      "male",
       "오늘",
-      false, // 시간 미상 아님
+      false,
       lunarDate.isLeapMonth,
       lunarDate.monthStem,
       lunarDate.monthBranch,
       "동경135도",
     )
 
-    // 계산된 사주에서 간지 정보 추출
     const yearGanji = `${todaySaju.yearStem}${todaySaju.yearBranch}`
     const monthGanji = `${todaySaju.monthStem}${todaySaju.monthBranch}`
     const dayGanji = `${todaySaju.dayStem}${todaySaju.dayBranch}`
     const hourGanji = `${todaySaju.hourStem}${todaySaju.hourBranch}`
-
-    // 음력 날짜 정보
     const lunarInfo = `음력 ${lunarDate.year}년 ${lunarDate.month}월 ${lunarDate.day}일${lunarDate.isLeapMonth ? " (윤달)" : ""}`
 
-    return {
+    const result = {
       year,
       month,
       day,
@@ -60,8 +78,21 @@ function getCurrentDateInfo() {
       formattedDate: `${year}년 ${month}월 ${day}일`,
       formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${dayGanji})`,
     }
+
+    // 캐시에 저장 (시간 정보 제외)
+    if (typeof localStorage !== "undefined") {
+      try {
+        const cacheData = { ...result }
+        delete cacheData.hour
+        delete cacheData.minute
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData))
+      } catch (error) {
+        // 캐시 저장 실패 시 무시
+      }
+    }
+
+    return result
   } catch (error) {
-    console.error("날짜 정보 계산 중 오류 발생:", error)
     // 오류 발생 시 기본 정보만 반환
     return {
       year,
@@ -215,8 +246,6 @@ export async function POST(req: Request) {
         // 생년월일 정보가 포함된 메시지 감지 및 사주 계산
         const birthDateMatch = userMessage.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/g)
         if (birthDateMatch) {
-          console.log("생년월 정 감지:", birthDateMatch)
-
           // 각 생년월일에 대해 사주 계산
           for (const dateStr of birthDateMatch) {
             const match = dateStr.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/)
@@ -280,8 +309,6 @@ export async function POST(req: Request) {
                   lunarData.monthBranch,
                   "동경135도",
                 )
-
-                console.log(`${personName} 사주 계산 완료:`, calculatedSaju)
 
                 // 메모리에 저장 (궁합 대상자인 경우)
                 if (userId && userMessage.includes("궁합")) {

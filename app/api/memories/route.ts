@@ -1,105 +1,100 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { type NextRequest, NextResponse } from "next/server"
+import { query } from "@/lib/db"
+import type { MemoryType, MemoryContent } from "@/lib/memory-types"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get("userId")
-    const sessionId = searchParams.get("sessionId")
-    const memoryType = searchParams.get("type")
-
-    console.log("[MEMORY API] GET request - userId:", userId, "sessionId:", sessionId, "type:", memoryType)
-
-    if (!userId && !sessionId) {
-      console.log("[MEMORY API] Missing userId and sessionId")
-      return NextResponse.json([])
-    }
-
-    const supabase = createRouteHandlerClient({ cookies })
-
-    let query = supabase
-      .from("memory_bank")
-      .select("id, user_id, session_id, memory_type, content, summary, relevance_score, tags, created_at, updated_at")
-      .order("created_at", { ascending: false })
-
-    if (userId) {
-      query = query.eq("user_id", userId)
-    } else if (sessionId) {
-      query = query.eq("session_id", sessionId)
-    }
-
-    if (memoryType) {
-      query = query.eq("memory_type", memoryType)
-    }
-
-    const { data: memories, error } = await query
-
-    if (error) {
-      console.error("[MEMORY API] Database error:", error)
-      return NextResponse.json([])
-    }
-
-    console.log(`[MEMORY API] Found ${memories?.length || 0} memories`)
-
-    // 데이터 형식을 프론트엔드에서 기대하는 형식으로 변환
-    const formattedMemories = (memories || []).map((memory) => ({
-      id: memory.id,
-      user_id: memory.user_id,
-      session_id: memory.session_id,
-      type: memory.memory_type, // memory_type을 type으로 변환
-      content: memory.content,
-      summary: memory.summary,
-      relevance_score: memory.relevance_score,
-      tags: memory.tags,
-      timestamp: memory.created_at, // created_at을 timestamp로 변환
-      created_at: memory.created_at,
-      updated_at: memory.updated_at,
-    }))
-
-    return NextResponse.json(formattedMemories)
-  } catch (error) {
-    console.error("[MEMORY API] Unexpected error:", error)
-    return NextResponse.json([])
-  }
+async function getUserId() {
+  const supabase = createServerComponentClient({ cookies })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user?.id || null
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const body = await request.json()
-    const { userId, sessionId, type, content, summary, tags } = body
+interface CreateMemoryPayload {
+  session_id?: string // For anonymous users
+  type: MemoryType
+  content: MemoryContent
+  tags?: string[]
+}
 
-    if (!type || !content) {
+// Helper to get user_id or session_id
+async function getAuthIdentifiers(req: NextRequest) {
+  // const user = await getCurrentUser(req); // Implement this based on your auth system (e.g., Supabase)
+  // For now, let's assume user_id might come from a header or a session cookie
+  // And session_id might come from the client for anonymous users
+  const userId = req.headers.get("x-user-id") // Example: get user_id if authenticated
+  return { userId: userId || null }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { userId } = await getAuthIdentifiers(req)
+    const body = (await req.json()) as CreateMemoryPayload
+
+    if (!body.type || !body.content) {
       return NextResponse.json({ error: "Type and content are required" }, { status: 400 })
     }
 
-    if (!userId && !sessionId) {
-      return NextResponse.json({ error: "User ID or Session ID is required" }, { status: 400 })
+    // If not authenticated, a session_id must be provided by the client for anonymous memories
+    if (!userId && !body.session_id) {
+      return NextResponse.json({ error: "User ID or Session ID is required" }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from("memory_bank")
-      .insert({
-        user_id: userId || null,
-        session_id: sessionId || null,
-        memory_type: type, // type을 memory_type으로 저장
-        content: content,
-        summary: summary || null,
-        tags: tags || [],
-        relevance_score: 1.0,
-      })
-      .select()
+    const sessionIdToSave = userId ? null : body.session_id
 
-    if (error) {
-      console.error("[MEMORY API] Insert error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const result = await query(
+      `INSERT INTO memory_bank (user_id, session_id, type, content, tags)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [userId, sessionIdToSave, body.type, body.content, body.tags || null],
+    )
 
-    return NextResponse.json(data[0], { status: 201 })
+    return NextResponse.json(result.rows[0], { status: 201 })
   } catch (error) {
-    console.error("[MEMORY API] Unexpected error:", error)
+    console.error("Error creating memory:", error)
     return NextResponse.json({ error: "Failed to create memory" }, { status: 500 })
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const userId = await getUserId()
+    const { searchParams } = new URL(req.url)
+    const sessionId = searchParams.get("session_id")
+    const type = searchParams.get("type") as MemoryType | null
+
+    if (!userId && !sessionId) {
+      return NextResponse.json({ error: "User ID or Session ID is required" }, { status: 401 })
+    }
+
+    const queryParams: any[] = []
+    let queryString = "SELECT * FROM memory_bank WHERE "
+
+    if (userId) {
+      queryString += "user_id = $1"
+      queryParams.push(userId)
+    } else {
+      // Only use session_id if user is not logged in
+      queryString += "session_id = $1"
+      queryParams.push(sessionId)
+    }
+
+    if (type) {
+      queryString += ` AND type = $${queryParams.length + 1}`
+      queryParams.push(type)
+    }
+
+    queryString += " ORDER BY created_at DESC"
+
+    const result = await query(queryString, queryParams)
+
+    return NextResponse.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching memories:", error)
+    // Provide more specific error in development
+    const errorMessage = process.env.NODE_ENV === "development" ? (error as Error).message : "Failed to fetch memories"
+    return NextResponse.json({ error: "Failed to fetch memories", details: errorMessage }, { status: 500 })
   }
 }

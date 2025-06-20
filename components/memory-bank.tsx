@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Brain,
   Trash2,
@@ -20,7 +21,7 @@ import {
   Archive,
 } from "lucide-react"
 import { getMemories, deleteMemory } from "@/lib/memory-api-service"
-import type { MemoryEntry } from "@/lib/memory-api-service"
+import type { MemoryEntry, MemoryType } from "@/lib/memory-types"
 
 interface MemoryBankProps {
   userId: string | null
@@ -40,15 +41,11 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
       setMemories([])
       return
     }
-
     setIsLoading(true)
     try {
-      const fetchedMemories = await getMemories(userId, sessionId)
-
-      // 안전한 배열 처리
-      const safeMemories = Array.isArray(fetchedMemories) ? fetchedMemories : []
-      setMemories(safeMemories)
-      console.log(`메모리 뱅크 로드: ${safeMemories.length}개 항목`)
+      const fetchedMemories = await getMemories(userId, sessionId) // Use new service
+      setMemories(fetchedMemories)
+      console.log(`메모리 뱅크 로드: ${fetchedMemories.length}개 항목`)
     } catch (error) {
       console.error("Error loading memories:", error)
       setMemories([])
@@ -67,32 +64,31 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   // 메모리 삭제
   const handleDeleteMemory = async (memoryId: string) => {
     if (!userId) {
+      // Deletion currently requires userId
       console.warn("User ID is required to delete memory.")
+      // Optionally, show a toast or message to the user
       return
     }
-
     try {
-      await deleteMemory(memoryId, userId)
-      setMemories((prev) => {
-        const safePrev = Array.isArray(prev) ? prev : []
-        return safePrev.filter((memory) => memory.id !== memoryId)
-      })
+      await deleteMemory(memoryId, userId) // Use new service
+      setMemories((prev) => prev.filter((memory) => memory.id !== memoryId))
     } catch (error) {
       console.error("Error deleting memory:", error)
+      // Optionally, show a toast or message to the user
     }
   }
 
   // 타입별 아이콘
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: MemoryType) => {
     switch (type) {
       case "conversation":
-        return <MessageSquare className="h-4 w-4" />
+        return <MessageSquare className="h-4 w-4" /> // Example icon
       case "preference":
-        return <Settings2 className="h-4 w-4" />
+        return <Settings2 className="h-4 w-4" /> // Example icon
       case "insight":
-        return <Zap className="h-4 w-4" />
+        return <Zap className="h-4 w-4" /> // Example icon
       case "context":
-        return <Archive className="h-4 w-4" />
+        return <Archive className="h-4 w-4" /> // Example icon
       case "compatibility":
         return <Users className="h-4 w-4" />
       case "career":
@@ -109,7 +105,7 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   }
 
   // 타입별 색상
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type: MemoryType) => {
     switch (type) {
       case "conversation":
         return "bg-sky-500/20 text-sky-300 border-sky-500/30"
@@ -135,7 +131,7 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   }
 
   // 타입별 메모리 필터링
-  const getMemoriesByType = (type: string) => {
+  const getMemoriesByType = (type: MemoryType) => {
     return memories.filter((memory) => memory.type === type)
   }
 
@@ -217,48 +213,100 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
               <p className="text-sm text-gray-500 mt-2">대화를 나누면 자동으로 중요한 정보가 저장됩니다.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {memories.map((memory) => (
-                <Card key={memory.id} className="bg-gray-700/50 border-gray-600">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          {getTypeIcon(memory.type)}
-                          <Badge variant="secondary" className={getTypeColor(memory.type)}>
-                            {memory.type}
-                          </Badge>
-                          <span className="text-xs text-gray-500">{formatDate(memory.timestamp)}</span>
-                        </div>
-                        {memory.summary && <p className="text-white text-sm font-medium mb-1">{memory.summary}</p>}
-                        <p className="text-gray-300 text-sm whitespace-pre-wrap">
-                          {typeof memory.content === "string"
-                            ? memory.content
-                            : JSON.stringify(memory.content, null, 2)}
-                        </p>
-                        {memory.tags && memory.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {memory.tags.map((tag, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid w-full grid-cols-5 bg-gray-700">
+                <TabsTrigger value="all" className="text-xs">
+                  전체
+                </TabsTrigger>
+                <TabsTrigger value="conversation" className="text-xs">
+                  대화
+                </TabsTrigger>
+                <TabsTrigger value="preference" className="text-xs">
+                  선호도
+                </TabsTrigger>
+                <TabsTrigger value="insight" className="text-xs">
+                  인사이트
+                </TabsTrigger>
+                <TabsTrigger value="context" className="text-xs">
+                  컨텍스트
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="all" className="space-y-3 mt-4">
+                {memories.map((memory) => (
+                  <Card key={memory.id} className="bg-gray-700/50 border-gray-600">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            {getTypeIcon(memory.type)}
+                            <Badge variant="secondary" className={getTypeColor(memory.type)}>
+                              {memory.type}
+                            </Badge>
+                            <span className="text-xs text-gray-500">{formatDate(memory.timestamp)}</span>
                           </div>
-                        )}
+                          <p className="text-white text-sm whitespace-pre-wrap">
+                            {typeof memory.content === "string"
+                              ? memory.content
+                              : JSON.stringify(memory.content, null, 2)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteMemory(memory.id)}
+                          className="text-gray-400 hover:text-red-400 p-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteMemory(memory.id)}
-                        className="text-gray-400 hover:text-red-400 p-1"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </TabsContent>
+
+              {(["conversation", "preference", "insight", "context"] as const).map((type) => (
+                <TabsContent key={type} value={type} className="space-y-3 mt-4">
+                  {getMemoriesByType(type).length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-gray-600 mb-2">{getTypeIcon(type)}</div>
+                      <p className="text-gray-400 text-sm">이 카테고리에 저장된 메모리가 없습니다.</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  ) : (
+                    getMemoriesByType(type).map((memory) => (
+                      <Card key={memory.id} className="bg-gray-700/50 border-gray-600">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                {getTypeIcon(memory.type)}
+                                <Badge variant="secondary" className={getTypeColor(memory.type)}>
+                                  {memory.type}
+                                </Badge>
+                                <span className="text-xs text-gray-500">{formatDate(memory.timestamp)}</span>
+                              </div>
+                              <p className="text-white text-sm whitespace-pre-wrap">
+                                {typeof memory.content === "string"
+                                  ? memory.content
+                                  : JSON.stringify(memory.content, null, 2)}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteMemory(memory.id)}
+                              className="text-gray-400 hover:text-red-400 p-1"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
               ))}
-            </div>
+            </Tabs>
           )}
         </div>
       </DialogContent>

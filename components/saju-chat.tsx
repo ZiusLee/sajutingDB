@@ -265,8 +265,6 @@ export default function SajuChat({
   const [initialMessagesLoaded, setInitialMessagesLoaded] = useState(false)
   const [userCoins, setUserCoins] = useState<number>(0)
   const [showCoinPurchase, setShowCoinPurchase] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
-  const [savingMessageId, setSavingMessageId] = useState<string | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -277,6 +275,7 @@ export default function SajuChat({
   )
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   const router = useRouter()
   const supabase = createClientComponentClient()
@@ -308,46 +307,6 @@ export default function SajuChat({
       loadUserCoins()
     }
   }, [actualIsLoggedIn, loadUserCoins])
-
-  // 단일 메시지를 데이터베이스에 저장하는 함수
-  const saveMessageToDatabase = useCallback(
-    async (message: string, role: "user" | "assistant", sessionId: string) => {
-      if (!sessionId || !actualIsLoggedIn) {
-        console.log("Skipping message save - no sessionId or not logged in")
-        return null
-      }
-
-      try {
-        const response = await fetch("/api/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            sessionId,
-            message,
-            role,
-            roomType,
-            modelUsed: role === "assistant" ? "gpt-4" : undefined,
-            responseTimeMs: role === "assistant" ? Date.now() : undefined,
-          }),
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          console.log(`[CLIENT] Successfully saved ${role} message to database`)
-          return data.messageId
-        } else {
-          console.error(`[CLIENT] Failed to save ${role} message to database`)
-          return null
-        }
-      } catch (error) {
-        console.error(`[CLIENT] Error saving ${role} message to database:`, error)
-        return null
-      }
-    },
-    [roomType, actualIsLoggedIn],
-  )
 
   // 과거 메시지와 초기 메시지를 합치는 함수
   const combineMessagesWithInitial = useCallback(
@@ -576,43 +535,10 @@ export default function SajuChat({
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo,
       memoryContext: getMemoryContext(),
-      // 임시 저장된 궁합 데이터 추가
-      compatibilityData: (() => {
-        try {
-          const tempData = localStorage.getItem("temp_compatibility_data")
-          if (tempData) {
-            const data = JSON.parse(tempData)
-            // 사용 후 삭제
-            localStorage.removeItem("temp_compatibility_data")
-            return data
-          }
-        } catch (error) {
-          console.error("Error parsing temp compatibility data:", error)
-        }
-        return null
-      })(),
     },
     onFinish: async (message) => {
       try {
-        console.log(`[CLIENT] onFinish called - Assistant message received`)
-        console.log(`[CLIENT] Assistant message:`, message.content.substring(0, 100) + "...")
-
-        // 중복 저장 방지 체크
-        if (savingMessageId === message.id) {
-          console.log("[CLIENT] Message already being saved, skipping duplicate save")
-          return
-        }
-
-        // 저장 시작 표시
-        setSavingMessageId(message.id)
-
-        // Assistant 메시지를 데이터베이스에 저장
-        if (databaseSessionId && actualIsLoggedIn) {
-          console.log("[CLIENT] Saving assistant message to database")
-          await saveMessageToDatabase(message.content, "assistant", databaseSessionId)
-        }
-
-        // 로컬 스토리지에 저장
+        // 로컬 스토리지에만 저장 (단순화)
         const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
         const updatedMessages = [...messages, message]
         const sessionData = {
@@ -626,44 +552,29 @@ export default function SajuChat({
           birthInfo,
         }
 
-        try {
-          saveChatSession(currentSessionKey, sessionData)
-          setActiveChatSession(sessionData)
-          console.log("[CLIENT] Successfully saved session to localStorage")
-        } catch (saveError) {
-          console.error("Error saving chat session:", saveError)
-        }
+        saveChatSession(currentSessionKey, sessionData)
+        setActiveChatSession(sessionData)
 
         setShouldGenerateQuestions(true)
         setStreamingError(null)
         setRetryCount(0)
       } catch (error) {
         console.error("Error in onFinish handler:", error)
-      } finally {
-        // 저장 완료 후 상태 초기화
-        setSavingMessageId(null)
       }
     },
     onError: (error) => {
-      console.error("Chat error:", error)
       setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
       setShouldGenerateQuestions(true)
     },
     onResponse: (response) => {
-      // 스크롤 로직을 더 부드럽게 수정
+      // 스크롤 최적화
       if (chatContainerRef.current) {
-        const container = chatContainerRef.current
-        const { scrollTop, scrollHeight, clientHeight } = container
-        const isNearBottom = scrollHeight - scrollTop - clientHeight < 150
-
-        if (isNearBottom) {
-          setTimeout(() => {
-            container.scrollTo({
-              top: scrollHeight,
-              behavior: "smooth",
-            })
-          }, 200)
-        }
+        setTimeout(() => {
+          chatContainerRef.current?.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: "smooth",
+          })
+        }, 100)
       }
       setStreamingError(null)
     },
@@ -676,28 +587,32 @@ export default function SajuChat({
       return
     }
 
+    // 입력창 즉시 클리어
+    const userInput = input.trim()
+    setInput("")
+
     // 로그인한 사용자의 경우 코인 차감
     if (actualIsLoggedIn) {
       if (userCoins <= 0) {
         setShowCoinPurchase(true)
+        setInput(userInput) // 코인 부족시 입력 복원
         return
       }
 
-      // 코인 차감
-      try {
-        const response = await fetch("/api/user-coins", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "use", amount: 1 }),
+      // 코인 차감 (비동기로 처리하여 UI 블로킹 방지)
+      fetch("/api/user-coins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "use", amount: 1 }),
+      })
+        .then((response) => {
+          if (response.ok) {
+            response.json().then((data) => setUserCoins(data.coins))
+          }
         })
-
-        if (response.ok) {
-          const data = await response.json()
-          setUserCoins(data.coins)
-        }
-      } catch (error) {
-        console.error("코인 차감 오류:", error)
-      }
+        .catch((error) => {
+          console.error("코인 차감 오류:", error)
+        })
     }
 
     const newQuestionCount = questionCount + 1
@@ -715,14 +630,11 @@ export default function SajuChat({
     setStreamingError(null)
     setRetryCount(0)
 
-    // 사용자 메시지를 즉시 데이터베이스에 저장
-    if (databaseSessionId && actualIsLoggedIn) {
-      console.log("[CLIENT] Saving user message to database")
-      await saveMessageToDatabase(input, "user", databaseSessionId)
-    }
-
-    // AI 채팅 제출
-    aiHandleSubmit(e)
+    // AI 채팅 제출 (입력값을 직접 전달)
+    append({
+      role: "user",
+      content: userInput,
+    })
   }
 
   const handleBackWithSave = () => {
@@ -928,44 +840,15 @@ ${selectedPeopleInfo}
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
-  // 기존의 스크롤 관련 useEffect들을 다음으로 교체
-  useEffect(() => {
-    if (chatContainerRef.current && messages.length > 0) {
-      const container = chatContainerRef.current
-      const { scrollTop, scrollHeight, clientHeight } = container
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150
-
-      // 사용자가 하단 근처에 있을 때만 자동 스크롤
-      if (isNearBottom) {
-        setTimeout(() => {
-          container.scrollTo({
-            top: scrollHeight,
-            behavior: "smooth",
-          })
-        }, 100)
-      }
-    }
-  }, [messages])
-
-  // 초기화 관련 useEffect 수정
-  useEffect(() => {
-    if (!isInitialized && initialMessagesLoaded) {
-      setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-        }
-        setIsInitialized(true)
-      }, 300)
-    }
-  }, [isInitialized, initialMessagesLoaded])
+  // 컴포넌트 언마운트 시 타이머 정리
 
   // 로딩 상태 표시
   if (isLoadingPastMessages || !initialMessagesLoaded) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-white/80">대화 내용을 불러오는 중...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+          <p className="text-white/80 text-sm">로딩 중...</p>
         </div>
       </div>
     )
@@ -1320,6 +1203,7 @@ ${selectedPeopleInfo}
         currentBirthInfo={birthInfo}
         isLoggedIn={actualIsLoggedIn}
         userId={userId}
+        sessionId={databaseSessionId}
         onCompatibilityAnalysis={handleCompatibilityAnalysis}
       />
 
