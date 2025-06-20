@@ -2,39 +2,25 @@ import { streamText } from "ai"
 import { openai } from "@ai-sdk/openai"
 import { calculateSaju } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
+import { fetchLunarDate } from "@/lib/api-client"
 
 export const runtime = "edge"
 
-// 현재 날짜 정보를 가져오는 함수 (캐싱 추가)
+// 현재 날짜 정보를 가져오는 함수를 수정
 function getCurrentDateInfo() {
   const now = new Date()
   const year = now.getFullYear()
-  const month = now.getMonth() + 1
+  const month = now.getMonth() + 1 // JavaScript에서 월은 0부터 시작
   const day = now.getDate()
   const hour = now.getHours()
   const minute = now.getMinutes()
 
-  // 오늘 날짜 키 생성
-  const todayKey = `${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`
-  const cacheKey = `today_saju_${todayKey}`
-
-  // 캐시된 데이터 확인 (서버에서는 메모리 캐시 사용)
-  if (typeof globalThis !== "undefined" && globalThis.todaySajuCache) {
-    const cached = globalThis.todaySajuCache[cacheKey]
-    if (cached) {
-      return {
-        ...cached,
-        hour,
-        minute,
-        formattedDate: `${year}년 ${month}월 ${day}일`,
-        formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${cached.dayGanji})`,
-      }
-    }
-  }
-
   try {
-    // 새로 계산
+    // 오늘 날짜의 사주 계산 (음력 변환 필요)
+    // 음력 변환을 위해 solarToLunar 함수 사용
     const lunarDate = solarToLunar(year, month, day)
+
+    // calculateSaju 함수를 사용하여 오늘 날짜의 사주 계산
     const todaySaju = calculateSaju(
       lunarDate.year,
       lunarDate.month,
@@ -44,22 +30,25 @@ function getCurrentDateInfo() {
       year,
       month,
       day,
-      "male",
+      "male", // 성별은 중요하지 않음 (날짜 정보만 필요)
       "오늘",
-      false,
+      false, // 시간 미상 아님
       lunarDate.isLeapMonth,
       lunarDate.monthStem,
       lunarDate.monthBranch,
       "동경135도",
     )
 
+    // 계산된 사주에서 간지 정보 추출
     const yearGanji = `${todaySaju.yearStem}${todaySaju.yearBranch}`
     const monthGanji = `${todaySaju.monthStem}${todaySaju.monthBranch}`
     const dayGanji = `${todaySaju.dayStem}${todaySaju.dayBranch}`
     const hourGanji = `${todaySaju.hourStem}${todaySaju.hourBranch}`
+
+    // 음력 날짜 정보
     const lunarInfo = `음력 ${lunarDate.year}년 ${lunarDate.month}월 ${lunarDate.day}일${lunarDate.isLeapMonth ? " (윤달)" : ""}`
 
-    const result = {
+    return {
       year,
       month,
       day,
@@ -71,20 +60,8 @@ function getCurrentDateInfo() {
       formattedDate: `${year}년 ${month}월 ${day}일`,
       formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${dayGanji})`,
     }
-
-    // 메모리 캐시에 저장
-    if (typeof globalThis !== "undefined") {
-      if (!globalThis.todaySajuCache) {
-        globalThis.todaySajuCache = {}
-      }
-      const cacheData = { ...result }
-      delete cacheData.hour
-      delete cacheData.minute
-      globalThis.todaySajuCache[cacheKey] = cacheData
-    }
-
-    return result
   } catch (error) {
+    console.error("날짜 정보 계산 중 오류 발생:", error)
     // 오류 발생 시 기본 정보만 반환
     return {
       year,
@@ -199,27 +176,19 @@ async function processMessagesForContext(messages: any[], compressedSaju: any, n
 }
 
 function getModelForRoomType(roomType: string): string {
-  switch (roomType) {
-    case "sajuping":
-      return "gpt-4o" // 빠른 응답을 위해 gpt-4o 사용
-    case "tarot":
-      return "gpt-4o" // 빠른 응답을 위해 gpt-4o 사용
-    default:
-      return "gpt-4o"
+  try {
+    switch (roomType) {
+      case "sajuping":
+        return "gpt-4.1" // 사주핑용 gpt-4.1 모델
+      case "tarot":
+        return "gpt-4.1" // 타로핑용 gpt-4.1 모델
+      default:
+        return "gpt-4o"
+    }
+  } catch (error) {
+    console.error("Error in getModelForRoomType:", error)
+    return "gpt-4o"
   }
-}
-
-// Helper function to fetch lunar date
-async function fetchLunarDate(year: string, month: string, day: string) {
-  const apiUrl = `https://lunar.day/api/v1/lunar/${year}/${month}/${day}`
-  const response = await fetch(apiUrl)
-
-  if (!response.ok) {
-    throw new Error(`Lunar date fetch failed with status ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data
 }
 
 export async function POST(req: Request) {
@@ -246,6 +215,8 @@ export async function POST(req: Request) {
         // 생년월일 정보가 포함된 메시지 감지 및 사주 계산
         const birthDateMatch = userMessage.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/g)
         if (birthDateMatch) {
+          console.log("생년월 정 감지:", birthDateMatch)
+
           // 각 생년월일에 대해 사주 계산
           for (const dateStr of birthDateMatch) {
             const match = dateStr.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/)
@@ -309,6 +280,8 @@ export async function POST(req: Request) {
                   lunarData.monthBranch,
                   "동경135도",
                 )
+
+                console.log(`${personName} 사주 계산 완료:`, calculatedSaju)
 
                 // 메모리에 저장 (궁합 대상자인 경우)
                 if (userId && userMessage.includes("궁합")) {
@@ -614,7 +587,7 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 - 이전 대화 요약이 제공되면 반드시 참고하여 일관성 있는 상담 진행
 - 사용자가 이전에 뽑은 카드들과 해석 내용을 기억하고 연결
 - 반복적인 기본 설명보다는 심화된 타로 해석과 조언 제공
-- 사용자의 변화하는 관심사와 질문 패턴을 파악하여 응답
+- 사용자의 변화하는 관심사와 질문 패턴을 파악하여 맞춤형 응답
 
 타로핑 AI 프롬프트 (최종 텍스트 버전 – 78장 번호 선택형)
 
