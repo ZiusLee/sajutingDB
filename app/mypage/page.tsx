@@ -13,6 +13,7 @@ import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
 import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession } from "@/lib/saju-session-service"
 import BirthDateFormClient from "@/components/birth-date-form-client"
+import { calculateSaju } from "@/lib/saju"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -279,11 +280,11 @@ export default function MyPage() {
         const { data: sessionData, error: sessionError } = await supabase
           .from("saju_sessions")
           .select(`
-          id,
-          name,
-          gender,
-          saju
-        `)
+        id,
+        name,
+        gender,
+        saju
+      `)
           .eq("id", profileToUse.id)
           .single()
 
@@ -292,8 +293,68 @@ export default function MyPage() {
         }
 
         // saju 컬럼에서 십성 정보 추출
-        const dbSaju = sessionData?.saju || {}
+        let dbSaju = sessionData?.saju || {}
         console.log("DB에서 가져온 사주 데이터:", dbSaju)
+
+        // 불완전한 데이터 체크 및 업데이트
+        const needsUpdate =
+          // 시간 정보가 "?"인 경우
+          dbSaju.hourStem === "?" ||
+          dbSaju.hourBranch === "?" ||
+          // 십성 정보가 없는 경우
+          !dbSaju.yearStemSibseong ||
+          !dbSaju.monthStemSibseong ||
+          !dbSaju.dayStemSibseong ||
+          !dbSaju.yearBranchSibseong ||
+          !dbSaju.monthBranchSibseong ||
+          !dbSaju.dayBranchSibseong ||
+          // 오행 정보가 없는 경우
+          !dbSaju.elements ||
+          Object.keys(dbSaju.elements || {}).length === 0
+
+        if (needsUpdate) {
+          console.log("불완전한 사주 데이터 발견, 재계산 중...")
+
+          // birth_info 테이블에서 상세 정보 가져오기
+          const { data: birthInfo, error: birthError } = await supabase
+            .from("birth_info")
+            .select("*")
+            .eq("user_id", profileToUse.id)
+            .single()
+
+          if (!birthError && birthInfo) {
+            // calculateSaju 함수로 완전한 사주 데이터 계산
+            const updatedSaju = calculateSaju(
+              birthInfo.lunar_year,
+              birthInfo.lunar_month,
+              birthInfo.lunar_day,
+              birthInfo.solar_hour || 0,
+              birthInfo.solar_minute || 0,
+              birthInfo.solar_year,
+              birthInfo.solar_month,
+              birthInfo.solar_day,
+              profileToUse.gender,
+              profileToUse.name,
+              birthInfo.time_unknown,
+              birthInfo.is_leap_month,
+            )
+
+            console.log("재계산된 사주 데이터:", updatedSaju)
+
+            // 데이터베이스 업데이트
+            const { error: updateError } = await supabase
+              .from("saju_sessions")
+              .update({ saju: updatedSaju })
+              .eq("id", profileToUse.id)
+
+            if (updateError) {
+              console.error("사주 데이터 업데이트 오류:", updateError)
+            } else {
+              console.log("사주 데이터 업데이트 완료")
+              dbSaju = updatedSaju
+            }
+          }
+        }
 
         // 사주 데이터 준비
         const sajuData = {
@@ -306,7 +367,7 @@ export default function MyPage() {
             dayBranch: profileToUse.saju.dayBranch,
             hourStem: profileToUse.saju.hourStem,
             hourBranch: profileToUse.saju.hourBranch,
-            // 십성 정보 추가 - saju JSONB에서 가져온 정보 우선 사용, 없으면 기존 정보 사용
+            // 십성 정보 추가 - 업데이트된 saju JSONB에서 가져온 정보 우선 사용
             yearStemSibseong: dbSaju.yearStemSibseong || profileToUse.saju.yearStemSibseong || "",
             monthStemSibseong: dbSaju.monthStemSibseong || profileToUse.saju.monthStemSibseong || "",
             dayStemSibseong: dbSaju.dayStemSibseong || profileToUse.saju.dayStemSibseong || "비견",
@@ -315,7 +376,7 @@ export default function MyPage() {
             monthBranchSibseong: dbSaju.monthBranchSibseong || profileToUse.saju.monthBranchSibseong || "",
             dayBranchSibseong: dbSaju.dayBranchSibseong || profileToUse.saju.dayBranchSibseong || "",
             hourBranchSibseong: dbSaju.hourBranchSibseong || profileToUse.saju.hourBranchSibseong || "",
-            elements: profileToUse.saju.elements || elements,
+            elements: dbSaju.elements || profileToUse.saju.elements || elements,
             dayMaster: dbSaju.dayMaster || profileToUse.saju.dayMaster || profileToUse.saju.dayStem,
             dayMasterHanja: dbSaju.dayMasterHanja || profileToUse.saju.dayMasterHanja || "",
           },
