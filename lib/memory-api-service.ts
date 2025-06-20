@@ -22,21 +22,30 @@ export async function createMemory(
   content: MemoryContent,
   tags?: string[],
   userId?: string | null,
-  sessionId?: string, // sessionId is required if userId is null
-): Promise<MemoryEntry> {
-  if (!userId && !sessionId) {
-    throw new Error("Either userId or sessionId must be provided to create a memory.")
+  sessionId?: string,
+): Promise<MemoryEntry | null> {
+  try {
+    if (!userId && !sessionId) {
+      console.error("Either userId or sessionId must be provided to create a memory.")
+      return null
+    }
+
+    const response = await fetch(API_BASE_URL, {
+      method: "POST",
+      headers: getAuthHeaders(userId),
+      body: JSON.stringify({ type, content, tags, session_id: userId ? undefined : sessionId }),
+    })
+
+    if (!response.ok) {
+      console.error(`Create memory error: ${response.status}`)
+      return null
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error creating memory:", error)
+    return null
   }
-  const response = await fetch(API_BASE_URL, {
-    method: "POST",
-    headers: getAuthHeaders(userId),
-    body: JSON.stringify({ type, content, tags, session_id: userId ? undefined : sessionId }),
-  })
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: "Failed to create memory" }))
-    throw new Error(errorData.error || `HTTP error ${response.status}`)
-  }
-  return response.json()
 }
 
 export async function getMemories(
@@ -44,27 +53,42 @@ export async function getMemories(
   sessionId?: string | null,
   type?: MemoryType,
 ): Promise<MemoryEntry[]> {
-  if (!userId && !sessionId) {
-    // Or return empty array, or let API handle error
-    throw new Error("Either userId or sessionId must be provided to fetch memories.")
-  }
-  const params = new URLSearchParams()
-  if (sessionId && !userId) {
-    // Prioritize userId if both somehow provided
-    params.append("session_id", sessionId)
-  }
-  if (type) {
-    params.append("type", type)
-  }
+  try {
+    if (!userId && !sessionId) {
+      console.warn("Either userId or sessionId must be provided to fetch memories.")
+      return []
+    }
 
-  const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
-    headers: getAuthHeaders(userId),
-  })
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: "Failed to fetch memories" }))
-    throw new Error(errorData.error || `HTTP error ${response.status}`)
+    const params = new URLSearchParams()
+    if (sessionId && !userId) {
+      params.append("session_id", sessionId)
+    }
+    if (type) {
+      params.append("type", type)
+    }
+
+    const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
+      headers: getAuthHeaders(userId),
+    })
+
+    if (!response.ok) {
+      console.error(`Memory API error: ${response.status}`)
+      return []
+    }
+
+    const data = await response.json()
+
+    // 응답이 배열인지 확인
+    if (!Array.isArray(data)) {
+      console.error("Memory API returned non-array data:", data)
+      return []
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error fetching memories:", error)
+    return []
   }
-  return response.json()
 }
 
 export async function getMemoryById(id: string, userId?: string | null): Promise<MemoryEntry> {

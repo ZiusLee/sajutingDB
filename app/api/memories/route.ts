@@ -5,11 +5,23 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 async function getUserId() {
-  const supabase = createServerComponentClient({ cookies })
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user?.id || null
+  try {
+    const supabase = createServerComponentClient({ cookies })
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+
+    if (error) {
+      console.error("Supabase auth error:", error)
+      return null
+    }
+
+    return user?.id || null
+  } catch (error) {
+    console.error("Error getting user ID:", error)
+    return null
+  }
 }
 
 interface CreateMemoryPayload {
@@ -65,6 +77,8 @@ export async function GET(req: NextRequest) {
     const sessionId = searchParams.get("session_id")
     const type = searchParams.get("type") as MemoryType | null
 
+    console.log("Memory API - userId:", userId, "sessionId:", sessionId)
+
     if (!userId && !sessionId) {
       return NextResponse.json({ error: "User ID or Session ID is required" }, { status: 401 })
     }
@@ -76,7 +90,6 @@ export async function GET(req: NextRequest) {
       queryString += "user_id = $1"
       queryParams.push(userId)
     } else {
-      // Only use session_id if user is not logged in
       queryString += "session_id = $1"
       queryParams.push(sessionId)
     }
@@ -88,13 +101,17 @@ export async function GET(req: NextRequest) {
 
     queryString += " ORDER BY created_at DESC"
 
+    console.log("Executing query:", queryString, "with params:", queryParams)
+
     const result = await query(queryString, queryParams)
 
-    return NextResponse.json(result.rows)
+    console.log("Query result:", result.rows.length, "rows")
+
+    // 결과가 없어도 빈 배열 반환
+    return NextResponse.json(result.rows || [])
   } catch (error) {
     console.error("Error fetching memories:", error)
-    // Provide more specific error in development
-    const errorMessage = process.env.NODE_ENV === "development" ? (error as Error).message : "Failed to fetch memories"
-    return NextResponse.json({ error: "Failed to fetch memories", details: errorMessage }, { status: 500 })
+    // 에러 발생시에도 빈 배열 반환하여 프론트엔드가 정상 작동하도록
+    return NextResponse.json([], { status: 200 })
   }
 }

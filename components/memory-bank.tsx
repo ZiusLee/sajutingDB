@@ -41,11 +41,15 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
       setMemories([])
       return
     }
+
     setIsLoading(true)
     try {
-      const fetchedMemories = await getMemories(userId, sessionId) // Use new service
-      setMemories(fetchedMemories)
-      console.log(`메모리 뱅크 로드: ${fetchedMemories.length}개 항목`)
+      const fetchedMemories = await getMemories(userId, sessionId)
+
+      // 안전한 배열 처리
+      const safeMemories = Array.isArray(fetchedMemories) ? fetchedMemories : []
+      setMemories(safeMemories)
+      console.log(`메모리 뱅크 로드: ${safeMemories.length}개 항목`)
     } catch (error) {
       console.error("Error loading memories:", error)
       setMemories([])
@@ -64,17 +68,18 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   // 메모리 삭제
   const handleDeleteMemory = async (memoryId: string) => {
     if (!userId) {
-      // Deletion currently requires userId
       console.warn("User ID is required to delete memory.")
-      // Optionally, show a toast or message to the user
       return
     }
+
     try {
-      await deleteMemory(memoryId, userId) // Use new service
-      setMemories((prev) => prev.filter((memory) => memory.id !== memoryId))
+      await deleteMemory(memoryId, userId)
+      setMemories((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : []
+        return safePrev.filter((memory) => memory.id !== memoryId)
+      })
     } catch (error) {
       console.error("Error deleting memory:", error)
-      // Optionally, show a toast or message to the user
     }
   }
 
