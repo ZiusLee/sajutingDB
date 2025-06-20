@@ -265,6 +265,7 @@ export default function SajuChat({
   const [initialMessagesLoaded, setInitialMessagesLoaded] = useState(false)
   const [userCoins, setUserCoins] = useState<number>(0)
   const [showCoinPurchase, setShowCoinPurchase] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -275,7 +276,6 @@ export default function SajuChat({
   )
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-  const [isInitialized, setIsInitialized] = useState(false)
 
   const router = useRouter()
   const supabase = createClientComponentClient()
@@ -606,13 +606,20 @@ export default function SajuChat({
       setShouldGenerateQuestions(true)
     },
     onResponse: (response) => {
+      // 스크롤 로직을 더 부드럽게 수정
       if (chatContainerRef.current) {
-        setTimeout(() => {
-          chatContainerRef.current?.scrollTo({
-            top: chatContainerRef.current.scrollHeight,
-            behavior: "smooth",
-          })
-        }, 100)
+        const container = chatContainerRef.current
+        const { scrollTop, scrollHeight, clientHeight } = container
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 150
+
+        if (isNearBottom) {
+          setTimeout(() => {
+            container.scrollTo({
+              top: scrollHeight,
+              behavior: "smooth",
+            })
+          }, 200)
+        }
       }
       setStreamingError(null)
     },
@@ -984,6 +991,37 @@ ${selectedPeopleInfo}
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
+  // 기존의 스크롤 관련 useEffect들을 다음으로 교체
+  useEffect(() => {
+    if (chatContainerRef.current && messages.length > 0) {
+      const container = chatContainerRef.current
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150
+
+      // 사용자가 하단 근처에 있을 때만 자동 스크롤
+      if (isNearBottom) {
+        setTimeout(() => {
+          container.scrollTo({
+            top: scrollHeight,
+            behavior: "smooth",
+          })
+        }, 100)
+      }
+    }
+  }, [messages])
+
+  // 초기화 관련 useEffect 수정
+  useEffect(() => {
+    if (!isInitialized && initialMessagesLoaded) {
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+        }
+        setIsInitialized(true)
+      }, 300)
+    }
+  }, [isInitialized, initialMessagesLoaded])
+
   // 로딩 상태 표시
   if (isLoadingPastMessages || !initialMessagesLoaded) {
     return (
@@ -1009,12 +1047,6 @@ ${selectedPeopleInfo}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          {/* 과거 메시지가 있으면 표시 */}
-          {initialMessages.length > (roomType === "sajuping" ? 2 : 1) && (
-            <div className="text-xs text-white/60 bg-white/10 px-2 py-1 rounded-full">
-              대화 이어가기 ({initialMessages.length - (roomType === "sajuping" ? 2 : 1)}개 메시지)
-            </div>
-          )}
         </div>
 
         <div className="flex items-center">
