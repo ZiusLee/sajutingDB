@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Coins, Calendar } from "lucide-react"
 import { motion } from "framer-motion"
-import { useState } from "react"
-import { CoinPurchaseModal } from "@/components/coin-purchase-modal"
+import { useRouter } from "next/navigation"
 
 interface CoinManagerProps {
   coins: number
@@ -14,7 +13,7 @@ interface CoinManagerProps {
 }
 
 export function CoinManager({ coins, lastCheckIn, onCheckIn }: CoinManagerProps) {
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false)
+  const router = useRouter()
   const today = new Date().toISOString().split("T")[0]
   const canCheckIn = lastCheckIn !== today
 
@@ -52,22 +51,14 @@ export function CoinManager({ coins, lastCheckIn, onCheckIn }: CoinManagerProps)
               variant="outline"
               size="sm"
               className="border-amber-500 text-amber-400 hover:bg-amber-900/50 ml-2"
-              onClick={() => setShowPurchaseModal(true)}
+              onClick={() => router.push("/coin-shop")}
             >
               <Coins className="h-4 w-4 mr-1" />
-              충전
+              {coins}핑
             </Button>
           </div>
         </CardContent>
       </Card>
-      <CoinPurchaseModal
-        isOpen={showPurchaseModal}
-        onClose={() => setShowPurchaseModal(false)}
-        onSuccess={(coins) => {
-          // 코인 충전 성공 시 처리
-          window.location.reload() // 간단하게 페이지 새로고침
-        }}
-      />
     </div>
   )
 }
