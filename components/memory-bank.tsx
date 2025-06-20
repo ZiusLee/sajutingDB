@@ -64,17 +64,16 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   // 메모리 삭제
   const handleDeleteMemory = async (memoryId: string) => {
     if (!userId) {
-      // Deletion currently requires userId
       console.warn("User ID is required to delete memory.")
-      // Optionally, show a toast or message to the user
       return
     }
-    try {
-      await deleteMemory(memoryId, userId) // Use new service
+
+    const success = await deleteMemory(memoryId, userId)
+    if (success) {
       setMemories((prev) => prev.filter((memory) => memory.id !== memoryId))
-    } catch (error) {
-      console.error("Error deleting memory:", error)
-      // Optionally, show a toast or message to the user
+    } else {
+      console.error("Failed to delete memory")
+      // Optionally show a toast or error message to user
     }
   }
 
