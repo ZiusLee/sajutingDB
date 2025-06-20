@@ -380,10 +380,8 @@ export default function SajuChat({
         sessionId = sessionKey
         setDatabaseSessionId(sessionId)
 
-        // 로그인한 사용자만 과거 메시지 불러오기
-        if (actualIsLoggedIn) {
-          pastMessages = await loadPastMessages(sessionId)
-        }
+        // 모든 사용자의 과거 메시지 불러오기
+        pastMessages = await loadPastMessages(sessionId)
       }
 
       // localStorage에 sessionId 저장
@@ -516,8 +514,8 @@ export default function SajuChat({
   // 메시지를 데이터베이스에 저장하는 함수
   const saveMessagesToDatabase = useCallback(
     async (messagesToSave: any[], sessionId: string) => {
-      if (!sessionId || !actualIsLoggedIn) {
-        console.log("No session ID or not logged in, skipping database save")
+      if (!sessionId) {
+        console.log("No session ID available for database save")
         return
       }
 
@@ -553,7 +551,7 @@ export default function SajuChat({
         console.error("[CLIENT] Error saving messages to database:", error)
       }
     },
-    [roomType, name, gender, saju, birthInfo, actualIsLoggedIn],
+    [roomType, name, gender, saju, birthInfo],
   )
 
   // isLoading이 false가 되면 대기 중인 메시지 저장
@@ -565,8 +563,8 @@ export default function SajuChat({
 
           console.log(`[CLIENT] Saving message after streaming completed - Total messages: ${updatedMessages.length}`)
 
-          // 데이터베이스에 저장 (로그인한 사용자만)
-          if (databaseSessionId && actualIsLoggedIn) {
+          // 데이터베이스에 저장 (모든 사용자)
+          if (databaseSessionId) {
             console.log("[CLIENT] Saving assistant message to database (after streaming)")
             await saveMessagesToDatabase(updatedMessages, databaseSessionId)
           }
@@ -664,8 +662,8 @@ export default function SajuChat({
 
     setStreamingError(null)
 
-    // 사용자 메시지 즉시 데이터베이스에 저장 (로그인한 사용자만)
-    if (databaseSessionId && actualIsLoggedIn) {
+    // 사용자 메시지 즉시 데이터베이스에 저장 (모든 사용자)
+    if (databaseSessionId) {
       const userMessageObj = {
         id: `user-${Date.now()}`,
         role: "user" as const,
