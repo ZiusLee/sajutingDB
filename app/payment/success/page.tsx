@@ -2,32 +2,30 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Coins, ArrowLeft } from "lucide-react"
+import { CheckCircle, Coins, ArrowRight } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
 export default function PaymentSuccessPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [isProcessing, setIsProcessing] = useState(true)
-  const [paymentResult, setPaymentResult] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [isProcessed, setIsProcessed] = useState(false)
+  const [processing, setProcessing] = useState(true)
+  const [orderInfo, setOrderInfo] = useState<any>(null)
+
+  const paymentKey = searchParams.get("paymentKey")
+  const orderId = searchParams.get("orderId")
+  const amount = searchParams.get("amount")
 
   useEffect(() => {
+    if (!paymentKey || !orderId || !amount || isProcessed) {
+      return
+    }
+
     const processPayment = async () => {
-      const orderId = searchParams.get("orderId")
-      const paymentKey = searchParams.get("paymentKey")
-      const amount = searchParams.get("amount")
-
-      if (!orderId || !paymentKey || !amount) {
-        setError("결제 정보가 누락되었습니다.")
-        setIsProcessing(false)
-        return
-      }
-
       try {
-        console.log("결제 승인 요청:", { orderId, paymentKey, amount })
+        console.log("결제 성공 처리 시작:", { paymentKey, orderId, amount })
 
         const response = await fetch("/api/payments/success", {
           method: "POST",
@@ -35,77 +33,51 @@ export default function PaymentSuccessPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            orderId,
             paymentKey,
+            orderId,
             amount: Number.parseInt(amount),
           }),
         })
 
         const data = await response.json()
-        console.log("결제 승인 응답:", data)
+        console.log("결제 처리 응답:", data)
 
         if (response.ok && data.success) {
-          setPaymentResult(data)
+          setOrderInfo(data.order)
           toast({
             title: "결제 완료!",
-            description: `${data.coins}핑이 충전되었습니다.`,
+            description: `${data.order?.coins || 0}핑이 충전되었습니다.`,
           })
         } else {
-          throw new Error(data.error || "결제 처리 중 오류가 발생했습니다.")
+          throw new Error(data.error || "결제 처리 실패")
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error("결제 처리 오류:", error)
-        setError(error.message)
         toast({
-          title: "결제 오류",
-          description: error.message,
+          title: "처리 중 오류 발생",
+          description:
+            error instanceof Error
+              ? error.message
+              : "결제는 완료되었지만 처리 중 오류가 발생했습니다. 고객센터에 문의해 주세요.",
           variant: "destructive",
         })
       } finally {
-        setIsProcessing(false)
+        setProcessing(false)
+        setIsProcessed(true)
       }
     }
 
     processPayment()
-  }, [searchParams])
+  }, [paymentKey, orderId, amount, isProcessed])
 
-  const handleGoBack = () => {
-    router.push("/coin-shop")
-  }
-
-  const handleGoToChat = () => {
-    router.push("/saju-chat/general")
-  }
-
-  if (isProcessing) {
+  if (processing) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-md">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-            <p className="text-center text-muted-foreground">결제를 처리하고 있습니다...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-md">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-red-600 text-2xl">✕</span>
-            </div>
-            <CardTitle className="text-red-600">결제 오류</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button onClick={handleGoBack} className="w-full">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              다시 시도
-            </Button>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
+            <p className="text-lg font-semibold text-gray-700">결제 처리 중...</p>
+            <p className="text-sm text-gray-500 mt-2">잠시만 기다려 주세요</p>
           </CardContent>
         </Card>
       </div>
@@ -113,32 +85,49 @@ export default function PaymentSuccessPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-md">
-      <Card>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 p-6">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="mx-auto mb-4">
+            <CheckCircle className="w-16 h-16 text-green-500" />
           </div>
-          <CardTitle className="text-green-600">결제 완료!</CardTitle>
-          <CardDescription>핑 충전이 성공적으로 완료되었습니다.</CardDescription>
+          <CardTitle className="text-2xl text-green-600">결제 완료!</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {paymentResult && (
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-600">
-                <Coins className="w-5 h-5" />
-                <span>+{paymentResult.coins}핑 충전</span>
+
+        <CardContent className="space-y-6">
+          {orderInfo && (
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">주문번호:</span>
+                <span className="font-mono text-sm">{orderId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">결제금액:</span>
+                <span className="font-semibold">₩{Number.parseInt(amount).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">충전된 코인:</span>
+                <div className="flex items-center gap-1 text-yellow-600 font-bold">
+                  <Coins className="w-4 h-4" />
+                  {orderInfo.coins}핑
+                </div>
               </div>
             </div>
           )}
 
-          <div className="space-y-2">
-            <Button onClick={handleGoToChat} className="w-full">
-              사주 채팅 시작하기
+          <div className="text-center text-gray-600">
+            <p>코인이 성공적으로 충전되었습니다!</p>
+            <p className="text-sm mt-1">이제 사주팅의 다양한 서비스를 이용해 보세요.</p>
+          </div>
+
+          <div className="space-y-3">
+            <Button className="w-full" onClick={() => router.push("/saju-chat/general")}>
+              사주 상담 시작하기
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <Button onClick={handleGoBack} variant="outline" className="w-full">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              코인샵으로 돌아가기
+
+            <Button variant="outline" className="w-full" onClick={() => router.push("/mypage")}>
+              마이페이지로 이동
             </Button>
           </div>
         </CardContent>
