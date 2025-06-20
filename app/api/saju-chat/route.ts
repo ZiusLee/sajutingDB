@@ -2,11 +2,10 @@ import { streamText } from "ai"
 import { openai } from "@ai-sdk/openai"
 import { calculateSaju } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
-import { fetchLunarDate } from "@/lib/api-client"
 
 export const runtime = "edge"
 
-// 현재 날짜 정보를 가져오는 함수를 수정 (캐싱 추가)
+// 현재 날짜 정보를 가져오는 함수 (캐싱 추가)
 function getCurrentDateInfo() {
   const now = new Date()
   const year = now.getFullYear()
@@ -19,23 +18,17 @@ function getCurrentDateInfo() {
   const todayKey = `${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`
   const cacheKey = `today_saju_${todayKey}`
 
-  // 캐시된 데이터 확인
-  if (typeof localStorage !== "undefined") {
-    try {
-      const cached = localStorage.getItem(cacheKey)
-      if (cached) {
-        const cachedData = JSON.parse(cached)
-        // 캐시된 데이터에 현재 시간 정보 업데이트
-        return {
-          ...cachedData,
-          hour,
-          minute,
-          formattedDate: `${year}년 ${month}월 ${day}일`,
-          formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${cachedData.dayGanji})`,
-        }
+  // 캐시된 데이터 확인 (서버에서는 메모리 캐시 사용)
+  if (typeof globalThis !== "undefined" && globalThis.todaySajuCache) {
+    const cached = globalThis.todaySajuCache[cacheKey]
+    if (cached) {
+      return {
+        ...cached,
+        hour,
+        minute,
+        formattedDate: `${year}년 ${month}월 ${day}일`,
+        formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${cached.dayGanji})`,
       }
-    } catch (error) {
-      // 캐시 읽기 실패 시 무시하고 계속 진행
     }
   }
 
@@ -79,16 +72,15 @@ function getCurrentDateInfo() {
       formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${dayGanji})`,
     }
 
-    // 캐시에 저장 (시간 정보 제외)
-    if (typeof localStorage !== "undefined") {
-      try {
-        const cacheData = { ...result }
-        delete cacheData.hour
-        delete cacheData.minute
-        localStorage.setItem(cacheKey, JSON.stringify(cacheData))
-      } catch (error) {
-        // 캐시 저장 실패 시 무시
+    // 메모리 캐시에 저장
+    if (typeof globalThis !== "undefined") {
+      if (!globalThis.todaySajuCache) {
+        globalThis.todaySajuCache = {}
       }
+      const cacheData = { ...result }
+      delete cacheData.hour
+      delete cacheData.minute
+      globalThis.todaySajuCache[cacheKey] = cacheData
     }
 
     return result
@@ -207,19 +199,27 @@ async function processMessagesForContext(messages: any[], compressedSaju: any, n
 }
 
 function getModelForRoomType(roomType: string): string {
-  try {
-    switch (roomType) {
-      case "sajuping":
-        return "gpt-4.1" // 사주핑용 gpt-4.1 모델
-      case "tarot":
-        return "gpt-4.1" // 타로핑용 gpt-4.1 모델
-      default:
-        return "gpt-4o"
-    }
-  } catch (error) {
-    console.error("Error in getModelForRoomType:", error)
-    return "gpt-4o"
+  switch (roomType) {
+    case "sajuping":
+      return "gpt-4o" // 빠른 응답을 위해 gpt-4o 사용
+    case "tarot":
+      return "gpt-4o" // 빠른 응답을 위해 gpt-4o 사용
+    default:
+      return "gpt-4o"
   }
+}
+
+// Helper function to fetch lunar date
+async function fetchLunarDate(year: string, month: string, day: string) {
+  const apiUrl = `https://lunar.day/api/v1/lunar/${year}/${month}/${day}`
+  const response = await fetch(apiUrl)
+
+  if (!response.ok) {
+    throw new Error(`Lunar date fetch failed with status ${response.status}`)
+  }
+
+  const data = await response.json()
+  return data
 }
 
 export async function POST(req: Request) {
@@ -614,7 +614,7 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 - 이전 대화 요약이 제공되면 반드시 참고하여 일관성 있는 상담 진행
 - 사용자가 이전에 뽑은 카드들과 해석 내용을 기억하고 연결
 - 반복적인 기본 설명보다는 심화된 타로 해석과 조언 제공
-- 사용자의 변화하는 관심사와 질문 패턴을 파악하여 맞춤형 응답
+- 사용자의 변화하는 관심사와 질문 패턴을 파악하여 응답
 
 타로핑 AI 프롬프트 (최종 텍스트 버전 – 78장 번호 선택형)
 
