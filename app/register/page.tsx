@@ -11,7 +11,6 @@ import { SajuLogo } from "@/components/saju-logo"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -22,7 +21,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const supabase = createClientComponentClient()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,25 +60,35 @@ export default function RegisterPage() {
     }
 
     try {
-      // Register with Supabase
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
+      // Use the existing API route for registration
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+        }),
       })
 
-      if (signUpError) throw signUpError
+      const data = await response.json()
 
-      setSuccess("회원가입이 완료되었습니다. 이메일 인증 후 로그인해주세요.")
+      if (!response.ok) {
+        throw new Error(data.message || "회원가입 중 오류가 발생했습니다.")
+      }
 
-      // Redirect to login page after a delay
-      setTimeout(() => {
-        router.push("/mypage")
-      }, 3000)
+      if (data.success) {
+        setSuccess("회원가입이 완료되었습니다!")
+
+        // Redirect to the specified page or default to chat-list
+        setTimeout(() => {
+          router.push(data.redirectTo || "/chat-list")
+        }, 2000)
+      } else {
+        throw new Error(data.message || "회원가입에 실패했습니다.")
+      }
     } catch (err) {
       console.error("회원가입 오류:", err)
       setError(err instanceof Error ? err.message : "회원가입 중 오류가 발생했습니다.")
