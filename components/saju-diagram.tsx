@@ -1,4 +1,7 @@
 import type { Saju } from "@/lib/saju"
+import { InfoIcon } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Button } from "@/components/ui/button"
 
 interface SajuDiagramProps {
   saju: Saju
@@ -184,7 +187,26 @@ export default function SajuDiagram({
           {gender === "male" ? "👨" : gender === "female" ? "👩" : "👤"}
         </div>
         <div className="flex flex-col">
-          <h2 className="text-xl font-bold">{displayName}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold">{displayName}의 사주</h2>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                  <InfoIcon className="h-4 w-4" />
+                  <span className="sr-only">사주 설명</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-3 text-sm">
+                <div className="space-y-2">
+                  <p className="font-semibold">사주란?</p>
+                  <p>사주는 태어난 년, 월, 일, 시의 천간과 지지를 나타내는 8개의 글자로 구성됩니다.</p>
+                  <p>• 천간: 갑을병정무기경신임계 (10개)</p>
+                  <p>• 지지: 자축인묘진사오미신유술해 (12개)</p>
+                  <p>• 십성: 각 글자가 일간(나)과의 관계를 나타냅니다.</p>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
           {dayMasterInfo.ilju && (
             <div className="flex flex-col">
               <span className={`text-sm ${dayMasterTextColor}`}>

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, name, gender, saju, roomType, birthInfo } = await request.json()
+    const { userId, name, gender, saju, roomType, birthInfo, daeun } = await request.json()
 
     // 세션 데이터 생성
     const sessionId = uuidv4()
@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
       day_branch: saju?.dayBranch,
       room_type: roomType || "sajuping",
       auth_user_id: userId,
+      saju: saju ? JSON.stringify(saju) : null, // 사주 데이터를 JSONB로 저장
+      daeun: daeun ? JSON.stringify(daeun) : null, // 대운 데이터를 JSONB로 저장
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }

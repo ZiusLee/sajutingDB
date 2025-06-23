@@ -19,6 +19,7 @@ import { memoryService } from "@/lib/memory-service"
 import { useAuth } from "@/contexts/auth-context"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
+import DaeunDiagram from "@/components/daeun-diagram"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -217,16 +218,6 @@ const generateSajupingInitialMessages = (name: string, saju: any, birthInfo?: Bi
   return [firstMessage, secondMessage]
 }
 
-function generateChatSessionKey(name: string, saju: any, roomType: string) {
-  const birthYear = saju.year || ""
-  const birthMonth = saju.month || ""
-  const birthDay = saju.day || ""
-  const birthHour = saju.hour || ""
-  const gender = saju.gender || ""
-
-  return `chat_${name}_${birthYear}${birthMonth}${birthDay}${birthHour}_${gender}_${roomType}`
-}
-
 export default function SajuChat({
   saju,
   name,
@@ -244,11 +235,9 @@ export default function SajuChat({
 
   // States
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
-  const [isNewUser, setIsNewUser] = useState(true)
   const [messageIds, setMessageIds] = useState<Record<string, string>>({})
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
-  const [sessionInitialized, setSessionInitialized] = useState(false)
   const [showCompatibilityTool, setShowCompatibilityTool] = useState(false)
   const [showMemoryBank, setShowMemoryBank] = useState(false)
   const [showToolsDrawer, setShowToolsDrawer] = useState(false)
@@ -260,6 +249,8 @@ export default function SajuChat({
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [initialMessages, setInitialMessages] = useState<any[]>([])
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -268,9 +259,7 @@ export default function SajuChat({
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
     initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
   )
-  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
   const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-  const [isInitialized, setIsInitialized] = useState(false)
 
   const router = useRouter()
   const supabase = createClientComponentClient()
@@ -283,89 +272,173 @@ export default function SajuChat({
     return memoryService.generateContextSummary(userId)
   }, [userId])
 
-  // 세션 ID 초기화
-  const getExistingSessionId = useCallback(async () => {
-    if (sessionInitialized || databaseSessionId) {
-      return
-    }
-
+  // 현재 세션 ID 가져오기 (로그인/비로그인 구분)
+  const getCurrentSessionId = useCallback(async (): Promise<string | null> => {
     try {
-      setSessionInitialized(true)
-
-      const storedSajuData = localStorage.getItem("tempSajuData")
-
-      if (storedSajuData) {
-        const sajuData = JSON.parse(storedSajuData)
+      // 1. mypage에서 온 경우 - current_saju에서 세션 ID 확인
+      const currentSajuData = localStorage.getItem("current_saju")
+      if (currentSajuData) {
+        const sajuData = JSON.parse(currentSajuData)
         if (sajuData.sessionId) {
-          setDatabaseSessionId(sajuData.sessionId)
-          return
+          console.log("[CHAT] mypage에서 전달된 세션 ID:", sajuData.sessionId)
+          return sajuData.sessionId
         }
       }
 
-      const response = await fetch("/api/saju-sessions", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
+      if (actualIsLoggedIn && userId) {
+        // 2. 로그인 상태: DB에서 사용자 세션 조회
+        console.log("[CHAT] 로그인 상태 - 사용자 세션 조회")
+
+        const { data: sessions, error } = await supabase
+          .from("saju_sessions")
+          .select("id, name, created_at")
+          .eq("auth_user_id", userId)
+          .eq("name", name)
+          .order("created_at", { ascending: false })
+          .limit(1)
+
+        if (error) {
+          console.error("[CHAT] 세션 조회 오류:", error)
+          return null
+        }
+
+        if (sessions && sessions.length > 0) {
+          console.log("[CHAT] 찾은 세션:", sessions[0])
+          return sessions[0].id
+        }
+
+        console.log("[CHAT] 해당 사용자의 세션을 찾을 수 없음")
+        return null
+      } else {
+        // 3. 비로그인 상태: localStorage에서 세션 ID 가져오기
+        console.log("[CHAT] 비로그인 상태 - localStorage에서 세션 ID 조회")
+
+        const storedSajuData = localStorage.getItem("tempSajuData")
+        if (storedSajuData) {
+          const sajuData = JSON.parse(storedSajuData)
+          console.log("[CHAT] localStorage 세션 ID:", sajuData.sessionId)
+          return sajuData.sessionId || null
+        }
+
+        // user_id도 확인 (이전 버전 호환성)
+        const userId = localStorage.getItem("user_id")
+        if (userId) {
+          console.log("[CHAT] localStorage user_id:", userId)
+          return userId
+        }
+
+        console.log("[CHAT] localStorage에서 세션 ID를 찾을 수 없음")
+        return null
+      }
+    } catch (error) {
+      console.error("[CHAT] 세션 ID 조회 오류:", error)
+      return null
+    }
+  }, [actualIsLoggedIn, userId, name, supabase])
+
+  // DB에서 채팅 히스토리 로드
+  const loadChatHistory = useCallback(async () => {
+    try {
+      setIsLoadingMessages(true)
+
+      const sessionId = await getCurrentSessionId()
+
+      if (!sessionId) {
+        console.log("[CHAT] 세션 ID가 없음 - 초기 메시지 생성")
+        const newInitialMessages =
+          roomType === "sajuping"
+            ? generateSajupingInitialMessages(name, saju, birthInfo)
+            : [
+                {
+                  id: "welcome",
+                  role: "assistant" as const,
+                  content: getInitialMessageByRoomType(name, roomType, birthInfo),
+                },
+              ]
+
+        setInitialMessages(newInitialMessages)
+        setIsLoadingMessages(false)
+        return
+      }
+
+      setDatabaseSessionId(sessionId)
+      console.log("[CHAT] 메시지 로딩 시작 - 세션 ID:", sessionId)
+
+      // DB에서 메시지 로드
+      const response = await fetch(`/api/messages?sessionId=${sessionId}`)
 
       if (response.ok) {
         const data = await response.json()
+        const dbMessages = data.messages || []
 
-        if (data.sessions && data.sessions.length > 0) {
-          const recentSession = data.sessions[0]
-          setDatabaseSessionId(recentSession.id)
+        console.log("[CHAT] DB에서 로드된 메시지 수:", dbMessages.length)
 
-          const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-          storedData.sessionId = recentSession.id
-          localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-          return
+        if (dbMessages.length > 0) {
+          // DB에 메시지가 있으면 사용
+          const formattedMessages = dbMessages.map((msg: any) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+          }))
+
+          console.log("[CHAT] 포맷된 메시지:", formattedMessages.length)
+          setInitialMessages(formattedMessages)
+        } else {
+          // DB에 메시지가 없으면 초기 메시지 생성
+          console.log("[CHAT] DB에 메시지 없음 - 초기 메시지 생성")
+          const newInitialMessages =
+            roomType === "sajuping"
+              ? generateSajupingInitialMessages(name, saju, birthInfo)
+              : [
+                  {
+                    id: "welcome",
+                    role: "assistant" as const,
+                    content: getInitialMessageByRoomType(name, roomType, birthInfo),
+                  },
+                ]
+
+          setInitialMessages(newInitialMessages)
         }
+      } else {
+        console.error("[CHAT] 메시지 로드 실패:", response.status, response.statusText)
+        // 실패 시 초기 메시지 생성
+        const newInitialMessages =
+          roomType === "sajuping"
+            ? generateSajupingInitialMessages(name, saju, birthInfo)
+            : [
+                {
+                  id: "welcome",
+                  role: "assistant" as const,
+                  content: getInitialMessageByRoomType(name, roomType, birthInfo),
+                },
+              ]
+
+        setInitialMessages(newInitialMessages)
       }
     } catch (error) {
-      console.error("Error getting existing session ID:", error)
-    }
-  }, [sessionInitialized, databaseSessionId])
+      console.error("[CHAT] 채팅 히스토리 로드 오류:", error)
+      // 에러 시 초기 메시지 생성
+      const newInitialMessages =
+        roomType === "sajuping"
+          ? generateSajupingInitialMessages(name, saju, birthInfo)
+          : [
+              {
+                id: "welcome",
+                role: "assistant" as const,
+                content: getInitialMessageByRoomType(name, roomType, birthInfo),
+              },
+            ]
 
+      setInitialMessages(newInitialMessages)
+    } finally {
+      setIsLoadingMessages(false)
+    }
+  }, [getCurrentSessionId, roomType, name, saju, birthInfo])
+
+  // 컴포넌트 마운트 시 채팅 히스토리 로드
   useEffect(() => {
-    if (!sessionInitialized && !databaseSessionId) {
-      getExistingSessionId()
-    }
-  }, [getExistingSessionId])
-
-  // 초기 메시지 설정
-  const savedSession = activeChatSession || getChatSession(sessionKey)
-
-  useEffect(() => {
-    const hasExistingSession = savedSession?.messages && savedSession.messages.length > 0
-    setIsNewUser(!hasExistingSession)
-  }, [savedSession])
-
-  let initialMessages: any[] = []
-  if (savedSession?.messages) {
-    initialMessages = savedSession.messages
-  } else if (roomType === "sajuping") {
-    try {
-      initialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
-    } catch (error) {
-      console.error("Error generating sajuping initial messages:", error)
-      initialMessages = [
-        {
-          id: "welcome",
-          role: "assistant" as const,
-          content: getInitialMessageByRoomType(name, roomType, birthInfo),
-        },
-      ]
-    }
-  } else {
-    initialMessages = [
-      {
-        id: "welcome",
-        role: "assistant" as const,
-        content: getInitialMessageByRoomType(name, roomType, birthInfo),
-      },
-    ]
-  }
+    loadChatHistory()
+  }, [loadChatHistory])
 
   const {
     messages,
@@ -404,41 +477,21 @@ export default function SajuChat({
       try {
         const updatedMessages = [...messages, message]
 
-        // 데이터베이스에 저장 (로그인한 사용자만)
-        if (databaseSessionId && actualIsLoggedIn) {
-          console.log("[CLIENT] Saving assistant message to database")
+        // 항상 DB에 저장 (세션 ID가 있는 경우)
+        if (databaseSessionId) {
+          console.log("[CHAT] 어시스턴트 메시지 DB 저장")
           await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-        }
-
-        // 로컬 스토리지에 저장
-        const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-        const sessionData = {
-          saju,
-          name,
-          gender,
-          interpretation: initialInterpretation,
-          roomType,
-          messages: updatedMessages,
-          lastMessageTime: new Date().toISOString(),
-          birthInfo,
-        }
-
-        try {
-          saveChatSession(currentSessionKey, sessionData)
-          setActiveChatSession(sessionData)
-        } catch (saveError) {
-          console.error("Error saving chat session:", saveError)
         }
 
         setShouldGenerateQuestions(true)
         setStreamingError(null)
         setRetryCount(0)
       } catch (error) {
-        console.error("Error in onFinish handler:", error)
+        console.error("onFinish 핸들러 오류:", error)
       }
     },
     onError: (error) => {
-      console.error("Chat error:", error)
+      console.error("채팅 오류:", error)
       setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
       setShouldGenerateQuestions(true)
     },
@@ -455,16 +508,16 @@ export default function SajuChat({
     },
   })
 
-  // 메시지를 데이터베이스에 저장하는 함수 (useAIChat 후에 정의)
+  // 메시지를 데이터베이스에 저장하는 함수
   const saveMessagesToDatabase = useCallback(
     async (messagesToSave: any[], sessionId: string) => {
       if (!sessionId) {
-        console.log("No session ID available for database save")
+        console.log("[CHAT] 세션 ID 없음 - DB 저장 건너뜀")
         return
       }
 
       try {
-        console.log(`[CLIENT] Saving ${messagesToSave.length} messages to database for session ${sessionId}`)
+        console.log(`[CHAT] DB 저장 시작 - ${messagesToSave.length}개 메시지, 세션: ${sessionId}`)
 
         const response = await fetch("/api/messages", {
           method: "POST",
@@ -486,7 +539,7 @@ export default function SajuChat({
 
         if (response.ok) {
           const data = await response.json()
-          console.log(`[CLIENT] Successfully saved ${data.savedCount || 0} messages to database`)
+          console.log(`[CHAT] DB 저장 성공 - ${data.savedCount || 0}개 메시지`)
 
           if (data.messageIds && data.messageIds.length > 0) {
             setTimeout(() => {
@@ -502,20 +555,20 @@ export default function SajuChat({
           }
         } else {
           const errorText = await response.text()
-          console.error("[CLIENT] Failed to save messages to database:", errorText)
+          console.error("[CHAT] DB 저장 실패:", errorText)
         }
       } catch (error) {
-        console.error("[CLIENT] Error saving messages to database:", error)
+        console.error("[CHAT] DB 저장 오류:", error)
       }
     },
     [roomType, name, gender, saju, birthInfo],
   )
 
-  // 사용자 메시지 저장 함수 (useAIChat 후에 정의)
+  // 사용자 메시지 저장 함수
   const saveUserMessage = useCallback(
     async (userMessage: string) => {
       if (!databaseSessionId) {
-        console.log("[CLIENT] No database session ID available for user message save")
+        console.log("[CHAT] 세션 ID 없음 - 사용자 메시지 저장 건너뜀")
         return
       }
 
@@ -526,43 +579,11 @@ export default function SajuChat({
       }
 
       const updatedMessages = [...messages, userMessageObj]
-      console.log(`[CLIENT] Saving user message to database`)
+      console.log(`[CHAT] 사용자 메시지 DB 저장`)
 
       await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-
-      const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages: updatedMessages,
-        lastMessageTime: new Date().toISOString(),
-        birthInfo,
-      }
-
-      try {
-        saveChatSession(currentSessionKey, sessionData)
-        setActiveChatSession(sessionData)
-      } catch (saveError) {
-        console.error("Error saving user message to session:", saveError)
-      }
     },
-    [
-      databaseSessionId,
-      messages,
-      saveMessagesToDatabase,
-      sessionKey,
-      name,
-      saju,
-      roomType,
-      gender,
-      initialInterpretation,
-      saveChatSession,
-      setActiveChatSession,
-      birthInfo,
-    ],
+    [databaseSessionId, messages, saveMessagesToDatabase],
   )
 
   const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -596,18 +617,6 @@ export default function SajuChat({
 
   const handleBackWithSave = () => {
     try {
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages,
-        lastMessageTime: new Date().toISOString(),
-        birthInfo,
-      }
-      saveChatSession(sessionKey, sessionData)
-
       localStorage.setItem(
         "last_chat_saju_data",
         JSON.stringify({
@@ -797,6 +806,38 @@ ${selectedPeopleInfo}
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
+  // 대운 데이터 변환 함수
+  const convertDaeunData = (daeunData: any) => {
+    if (!daeunData || !daeunData.pillars || !Array.isArray(daeunData.pillars)) {
+      return []
+    }
+
+    return daeunData.pillars.map((pillar: any, index: number) => ({
+      age: pillar.startAge || index * 10,
+      startYear: pillar.startYear || 0,
+      endYear: pillar.endYear || 0,
+      stem: pillar.stemKorean || pillar.stem || "",
+      branch: pillar.branchKorean || pillar.branch || "",
+      stemHanja: pillar.stemHanja || pillar.stem || "",
+      branchHanja: pillar.branchHanja || pillar.branch || "",
+      description: pillar.description || "",
+    }))
+  }
+
+  // 로딩 중일 때 표시
+  if (isLoadingMessages) {
+    return (
+      <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white/70">채팅 내역을 불러오는 중...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
       {/* 헤더 */}
@@ -917,6 +958,22 @@ ${selectedPeopleInfo}
               </div>
             </div>
           </div>
+
+          {/* 대운 다이어그램 */}
+          {saju.daeun && (
+            <div className="px-4 mb-6">
+              <div className="max-w-3xl mx-auto">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20">
+                  <DaeunDiagram
+                    daeun={convertDaeunData(saju.daeun)}
+                    birthInfo={birthInfo}
+                    name={name}
+                    gender={gender}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 메시지들 */}
           {messages.map((message, index) => (

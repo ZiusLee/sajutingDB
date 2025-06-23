@@ -13,6 +13,8 @@ import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
 import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession } from "@/lib/saju-session-service"
 import BirthDateFormClient from "@/components/birth-date-form-client"
+import type { Saju } from "@/lib/saju" // Import Saju type
+import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -31,41 +33,8 @@ interface SajuProfile {
   lunarMonth?: string
   lunarDay?: string
   isDefault?: boolean
-  saju: {
-    yearStem: string
-    yearBranch: string
-    monthStem: string
-    monthBranch: string
-    dayStem: string
-    dayBranch: string
-    hourStem: string
-    hourBranch: string
-    yearStemSibseong?: string
-    monthStemSibseong?: string
-    dayStemSibseong?: string
-    hourStemSibseong?: string
-    yearBranchSibseong?: string
-    monthBranchSibseong?: string
-    dayBranchSibseong?: string
-    hourBranchSibseong?: string
-    yearStemHanja?: string
-    yearBranchHanja?: string
-    monthStemHanja?: string
-    monthBranchHanja?: string
-    dayStemHanja?: string
-    dayBranchHanja?: string
-    hourStemHanja?: string
-    hourBranchHanja?: string
-    elements?: {
-      wood: number
-      fire: number
-      earth: number
-      metal: number
-      water: number
-    }
-    dayMaster?: string
-    dayMasterHanja?: string
-  }
+  saju: Saju // Use the imported Saju type
+  daeun?: any // To store calculated Daeun info
 }
 
 export default function MyPage() {
@@ -93,14 +62,12 @@ export default function MyPage() {
     try {
       setIsLoading(true)
 
-      // Check if user is authenticated
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
       if (sessionError || !sessionData?.session) {
         router.push("/login?returnUrl=/mypage")
         return
       }
 
-      // Get user info
       const { data: userData } = await supabase.auth.getUser()
       if (userData.user) {
         const userId = userData.user.id
@@ -109,23 +76,18 @@ export default function MyPage() {
         setUserEmail(userData.user.email || "")
       }
 
-      // Get all saju profiles
       const { profiles } = await getUserSajuProfiles()
-      // Sort by creation date (newest first)
       const sortedProfiles = profiles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       setSajuProfiles(sortedProfiles)
 
-      // 메인 사주 프로필 가져오기
       if (userData.user) {
         const userId = userData.user.id
         try {
           const defaultSession = await getDefaultSajuSession(userId)
           if (defaultSession) {
-            const profile = await getSajuProfileBySessionId(defaultSession.id)
+            const profile = (await getSajuProfileBySessionId(defaultSession.id)) as SajuProfile | null
             if (profile) {
               setDefaultProfile(profile)
-
-              // 오행 계산
               const calculatedElements = calculateElementsFromSaju(
                 profile.saju.yearStem,
                 profile.saju.yearBranch,
@@ -136,11 +98,9 @@ export default function MyPage() {
                 profile.saju.hourStem,
                 profile.saju.hourBranch,
               )
-
               setElements(calculatedElements)
             }
           } else if (sortedProfiles.length > 0) {
-            // If no default is set, use the first profile as default
             setDefaultProfile(sortedProfiles[0])
             const calculatedElements = calculateElementsFromSaju(
               sortedProfiles[0].saju.yearStem,
@@ -170,26 +130,16 @@ export default function MyPage() {
     }
   }
 
-  // Load data on mount
   useEffect(() => {
     loadUserData()
   }, [router, supabase])
 
-  // 다이얼로그 상태 모니터링을 위한 useEffect 추가 (loadUserData useEffect 다음에)
-  useEffect(() => {
-    console.log("다이얼로그 상태 변경:", isDialogOpen)
-  }, [isDialogOpen])
-
-  // Set as main saju
   const handleSetAsMain = async (profile: SajuProfile) => {
     if (!authUserId) return
-
     try {
       const success = await setDefaultSajuSession(authUserId, profile.id)
       if (success) {
         setDefaultProfile(profile)
-
-        // Calculate elements for the new default profile
         const calculatedElements = calculateElementsFromSaju(
           profile.saju.yearStem,
           profile.saju.yearBranch,
@@ -201,7 +151,6 @@ export default function MyPage() {
           profile.saju.hourBranch,
         )
         setElements(calculatedElements)
-
         toast({
           title: "메인 사주 설정 완료",
           description: `${profile.name}님의 사주가 메인 사주로 설정되었습니다.`,
@@ -223,101 +172,77 @@ export default function MyPage() {
     }
   }
 
-  // View profile details
-  // const handleViewDetails = (profile: SajuProfile) => {
-  //   const sajuData = {
-  //     yearStem: profile.saju.yearStem,
-  //     yearBranch: profile.saju.yearBranch,
-  //     monthStem: profile.saju.monthStem,
-  //     monthBranch: profile.saju.monthBranch,
-  //     dayStem: profile.saju.dayStem,
-  //     dayBranch: profile.saju.dayBranch,
-  //     hourStem: profile.saju.hourStem,
-  //     hourBranch: profile.saju.hourBranch,
-  //     yearStemSibseong: profile.saju.yearStemSibseong || "",
-  //     monthStemSibseong: profile.saju.monthStemSibseong || "",
-  //     dayStemSibseong: profile.saju.dayStemSibseong || "",
-  //     hourStemSibseong: profile.saju.hourStemSibseong || "",
-  //     yearBranchSibseong: profile.saju.yearBranchSibseong || "",
-  //     monthBranchSibseong: profile.saju.monthBranchSibseong || "",
-  //     dayBranchSibseong: profile.saju.dayBranchSibseong || "",
-  //     hourBranchSibseong: profile.saju.hourBranchSibseong || "",
-  //     yearStemHanja: profile.saju.yearStemHanja || "",
-  //     yearBranchHanja: profile.saju.yearBranchHanja || "",
-  //     monthStemHanja: profile.saju.monthStemHanja || "",
-  //     monthBranchHanja: profile.saju.monthBranchHanja || "",
-  //     dayStemHanja: profile.saju.dayStemHanja || "",
-  //     dayBranchHanja: profile.saju.dayBranchHanja || "",
-  //     hourStemHanja: profile.saju.hourStemHanja || "",
-  //     hourBranchHanja: profile.saju.hourBranchHanja || "",
-  //     elements: profile.saju.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
-  //     dayMaster: profile.saju.dayMaster || profile.saju.dayStem,
-  //     dayMasterHanja: profile.saju.dayMasterHanja || "",
-  //     year: profile.birthYear,
-  //     month: profile.birthMonth,
-  //     day: profile.birthDay,
-  //     hour: profile.birthHour,
-  //     minute: profile.birthMinute,
-  //     lunarYear: profile.lunarYear || profile.birthYear,
-  //     lunarMonth: profile.lunarMonth || profile.birthMonth,
-  //     lunarDay: profile.lunarDay || profile.birthDay,
-  //     timeUnknown: profile.timeUnknown,
-  //   }
-
-  //   const encodedSaju = encodeURIComponent(JSON.stringify(sajuData))
-  //   router.push(`/result?saju=${encodedSaju}&name=${encodeURIComponent(profile.name)}&gender=${profile.gender}`)
-  // }
-
-  // Navigate to chat with AI using main saju
   const handleChatWithAI = async () => {
     const profileToUse = defaultProfile || (sajuProfiles.length > 0 ? sajuProfiles[0] : null)
 
     if (profileToUse) {
       try {
-        // 데이터베이스에서 saju 컬럼의 JSONB 데이터 가져오기
-        const supabase = createClientComponentClient()
         const { data: sessionData, error: sessionError } = await supabase
           .from("saju_sessions")
-          .select(`
-          id,
-          name,
-          gender,
-          saju
-        `)
+          .select(`id, name, gender, saju, daeun`)
           .eq("id", profileToUse.id)
           .single()
 
-        if (sessionError) {
-          console.error("Error fetching saju data:", sessionError)
+        if (sessionError) throw new Error("사주 데이터를 가져오는데 실패했습니다.")
+
+        const dbSaju = (sessionData?.saju as Saju) || {}
+        let dbDaeun = sessionData?.daeun
+
+        if (!dbDaeun || !dbDaeun.pillars || !Array.isArray(dbDaeun.pillars) || dbDaeun.pillars.length === 0) {
+          console.log("대운 데이터가 없거나 유효하지 않아 계산 중...")
+          try {
+            const normalizedGender =
+              profileToUse.gender.toLowerCase() === "male" ||
+              profileToUse.gender === "남성" ||
+              profileToUse.gender === "남자"
+                ? "male"
+                : "female"
+
+            // Ensure saju object for calculateDaeunInfo has the minimally required fields
+            const sajuForDaeunCalc: Pick<Saju, "yearStem" | "monthStem" | "monthBranch"> = {
+              yearStem: profileToUse.saju.yearStem,
+              monthStem: profileToUse.saju.monthStem,
+              monthBranch: profileToUse.saju.monthBranch,
+            }
+
+            const daeunData = calculateDaeunInfo(
+              sajuForDaeunCalc,
+              Number.parseInt(profileToUse.birthYear),
+              Number.parseInt(profileToUse.birthMonth),
+              Number.parseInt(profileToUse.birthDay),
+              normalizedGender,
+              profileToUse.timeUnknown ? undefined : Number.parseInt(profileToUse.birthHour),
+              profileToUse.timeUnknown ? undefined : Number.parseInt(profileToUse.birthMinute),
+              profileToUse.timeUnknown,
+            )
+            console.log("계산된 대운 데이터:", daeunData)
+
+            const { error: updateError } = await supabase
+              .from("saju_sessions")
+              .update({ daeun: daeunData })
+              .eq("id", profileToUse.id)
+
+            if (updateError) {
+              console.error("대운 데이터 저장 실패:", updateError)
+              toast({ title: "대운 데이터 저장 실패", variant: "destructive" })
+            } else {
+              console.log("대운 데이터 저장 성공")
+              dbDaeun = daeunData
+            }
+          } catch (daeunError) {
+            console.error("대운 계산 실패:", daeunError)
+            toast({ title: "대운 계산 실패", variant: "destructive" })
+          }
         }
 
-        // saju 컬럼에서 십성 정보 추출
-        const dbSaju = sessionData?.saju || {}
-        console.log("DB에서 가져온 사주 데이터:", dbSaju)
-
-        // 사주 데이터 준비
-        const sajuData = {
+        const finalSajuData = {
+          sessionId: profileToUse.id, // 세션 ID 추가
           saju: {
-            yearStem: profileToUse.saju.yearStem,
-            yearBranch: profileToUse.saju.yearBranch,
-            monthStem: profileToUse.saju.monthStem,
-            monthBranch: profileToUse.saju.monthBranch,
-            dayStem: profileToUse.saju.dayStem,
-            dayBranch: profileToUse.saju.dayBranch,
-            hourStem: profileToUse.saju.hourStem,
-            hourBranch: profileToUse.saju.hourBranch,
-            // 십성 정보 추가 - saju JSONB에서 가져온 정보 우선 사용, 없으면 기존 정보 사용
-            yearStemSibseong: dbSaju.yearStemSibseong || profileToUse.saju.yearStemSibseong || "",
-            monthStemSibseong: dbSaju.monthStemSibseong || profileToUse.saju.monthStemSibseong || "",
-            dayStemSibseong: dbSaju.dayStemSibseong || profileToUse.saju.dayStemSibseong || "비견",
-            hourStemSibseong: dbSaju.hourStemSibseong || profileToUse.saju.hourStemSibseong || "",
-            yearBranchSibseong: dbSaju.yearBranchSibseong || profileToUse.saju.yearBranchSibseong || "",
-            monthBranchSibseong: dbSaju.monthBranchSibseong || profileToUse.saju.monthBranchSibseong || "",
-            dayBranchSibseong: dbSaju.dayBranchSibseong || profileToUse.saju.dayBranchSibseong || "",
-            hourBranchSibseong: dbSaju.hourBranchSibseong || profileToUse.saju.hourBranchSibseong || "",
+            ...dbSaju,
+            daeun: dbDaeun,
             elements: profileToUse.saju.elements || elements,
-            dayMaster: dbSaju.dayMaster || profileToUse.saju.dayMaster || profileToUse.saju.dayStem,
-            dayMasterHanja: dbSaju.dayMasterHanja || profileToUse.saju.dayMasterHanja || "",
+            dayMaster: dbSaju.dayMaster || profileToUse.saju.dayStem,
+            dayMasterHanja: dbSaju.dayMasterHanja || "",
           },
           name: profileToUse.name,
           gender: profileToUse.gender,
@@ -330,7 +255,7 @@ export default function MyPage() {
           lunarMonth: profileToUse.lunarMonth || profileToUse.birthMonth,
           lunarDay: profileToUse.lunarDay || profileToUse.birthDay,
           timeUnknown: profileToUse.timeUnknown,
-          interpretation: "", // 기본값
+          interpretation: "",
           birthInfo: {
             solarYear: Number.parseInt(profileToUse.birthYear),
             solarMonth: Number.parseInt(profileToUse.birthMonth),
@@ -344,26 +269,14 @@ export default function MyPage() {
           },
         }
 
-        console.log("Prepared saju data for chat:", sajuData)
-
-        // 로컬 스토리지에 사주 데이터 저장
-        localStorage.setItem("current_saju", JSON.stringify(sajuData))
-
-        // 세션 스토리지에 출처 표시 (더 명확하게)
+        localStorage.setItem("current_saju", JSON.stringify(finalSajuData))
         sessionStorage.setItem("from_mypage", "true")
-        console.log("Set from_mypage flag to true")
-
-        // 약간의 지연 후 이동
         setTimeout(() => {
           window.location.href = "/saju-chat/sajuping"
         }, 100)
       } catch (error) {
         console.error("Error preparing chat data:", error)
-        toast({
-          title: "오류 발생",
-          description: "채팅 준비 중 오류가 발생했습니다.",
-          variant: "destructive",
-        })
+        toast({ title: "오류 발생", description: "채팅 준비 중 오류가 발생했습니다.", variant: "destructive" })
       }
     } else {
       toast({
@@ -375,62 +288,33 @@ export default function MyPage() {
     }
   }
 
-  // Handle logout
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
-      toast({
-        title: "로그아웃 성공",
-        description: "성공적으로 로그아웃되었습니다.",
-      })
+      toast({ title: "로그아웃 성공", description: "성공적으로 로그아웃되었습니다." })
       router.push("/")
     } catch (error) {
       console.error("로그아웃 오류:", error)
-      toast({
-        title: "로그아웃 오류",
-        description: "로그아웃 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
+      toast({ title: "로그아웃 오류", variant: "destructive" })
     }
   }
 
-  // Handle new saju addition success
   const handleNewSajuSuccess = async (sessionId: string) => {
     try {
-      // 다이얼로그 닫기
       setIsDialogOpen(false)
-
-      // 새로 추가된 ID 저장 (NEW 태그 표시용)
       setRecentlyAddedId(sessionId)
-
-      // 데이터 새로고침
       await loadUserData()
-
-      toast({
-        title: "사주 정보 추가 완료",
-        description: "새로운 사주 정보가 성공적으로 추가되었습니다.",
-      })
-
-      // 3초 후 NEW 태그 제거
+      toast({ title: "사주 정보 추가 완료", description: "새로운 사주 정보가 성공적으로 추가되었습니다." })
       setTimeout(() => {
         setRecentlyAddedId(null)
       }, 3000)
     } catch (error) {
       console.error("Error refreshing data:", error)
-      toast({
-        title: "데이터 새로고침 오류",
-        description: "새 사주 정보는 추가되었지만 화면 새로고침에 실패했습니다.",
-        variant: "destructive",
-      })
+      toast({ title: "데이터 새로고침 오류", variant: "destructive" })
     }
   }
 
-  // Get avatar based on gender
-  const getAvatarContent = (gender: string) => {
-    return gender === "male" ? "👨" : "👩"
-  }
-
-  // Get profiles to display (first 3 or all if showAll is true)
+  const getAvatarContent = (gender: string) => (gender === "male" ? "👨" : "👩")
   const profilesToShow = showAllProfiles ? sajuProfiles : sajuProfiles.slice(0, 3)
   const hasMoreProfiles = sajuProfiles.length > 3
 
@@ -444,7 +328,6 @@ export default function MyPage() {
 
   return (
     <div className="container mx-auto pb-20">
-      {/* 상단 로그아웃 버튼 */}
       <div className="flex justify-between items-center pt-4 px-4">
         <h1 className="text-xl font-bold">내 사주</h1>
         <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500">
@@ -453,7 +336,6 @@ export default function MyPage() {
         </Button>
       </div>
 
-      {/* 메인 사주 프로필 */}
       {defaultProfile && (
         <div className="px-4 pt-4 pb-6">
           <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
@@ -478,7 +360,6 @@ export default function MyPage() {
                 </div>
               </div>
             </div>
-
             <Button onClick={handleChatWithAI} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white">
               <MessageCircle className="h-4 w-4 mr-2" />
               대표 사주로 사주핑과 대화하기
@@ -487,7 +368,6 @@ export default function MyPage() {
         </div>
       )}
 
-      {/* 등록된 사주 정보 섹션 */}
       <div className="px-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">등록된 사주 정보 ({sajuProfiles.length}명)</h3>
@@ -533,21 +413,15 @@ export default function MyPage() {
                 profile.saju.hourStem,
                 profile.saju.hourBranch,
               )
-
               return (
                 <div
                   key={profile.id}
-                  className={`bg-white dark:bg-gray-800 rounded-lg p-4 border ${
-                    isMainProfile
-                      ? "border-yellow-300 bg-yellow-50 dark:bg-yellow-900/10"
-                      : "border-gray-200 dark:border-gray-700"
-                  }`}
+                  className={`bg-white dark:bg-gray-800 rounded-lg p-4 border ${isMainProfile ? "border-yellow-300 bg-yellow-50 dark:bg-yellow-900/10" : "border-gray-200 dark:border-gray-700"}`}
                 >
                   <div className="flex items-start">
                     <Avatar className="h-12 w-12 mr-3">
                       <AvatarFallback className="bg-primary/10">{getAvatarContent(profile.gender)}</AvatarFallback>
                     </Avatar>
-
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center mb-1">
                         <h4 className="font-semibold truncate mr-2">{profile.name}</h4>
@@ -558,13 +432,11 @@ export default function MyPage() {
                           </span>
                         )}
                       </div>
-
                       <p className="text-sm text-muted-foreground mb-2">
                         {profile.gender === "male" ? "남성" : "여성"} • {profile.birthYear}.{profile.birthMonth}.
                         {profile.birthDay}
                         {profile.timeUnknown ? " (시간미상)" : ` ${profile.birthHour}:${profile.birthMinute}`}
                       </p>
-
                       <div className="text-xs text-muted-foreground mb-2">
                         {profile.saju.yearStem}
                         {profile.saju.yearBranch} {profile.saju.monthStem}
@@ -572,11 +444,9 @@ export default function MyPage() {
                         {profile.saju.dayBranch} {profile.saju.hourStem}
                         {profile.saju.hourBranch}
                       </div>
-
                       <div className="mb-3">
                         <ElementDisplay elements={profileElements} maxSlots={8} displayMode="text" />
                       </div>
-
                       <div className="flex gap-2">
                         {!isMainProfile && (
                           <Button
@@ -599,18 +469,10 @@ export default function MyPage() {
         )}
       </div>
 
-      {/* 하단 고정 버튼 */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={() => {
-                console.log("버튼 클릭됨, 현재 다이얼로그 상태:", isDialogOpen)
-                setIsDialogOpen(true)
-              }}
-            >
+            <Button className="w-full" size="lg" onClick={() => setIsDialogOpen(true)}>
               <Plus className="h-5 w-5 mr-2" />새 사주 정보 추가하기
             </Button>
           </DialogTrigger>

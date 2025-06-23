@@ -20,6 +20,7 @@ import { updateAuthUserId } from "@/lib/db-service"
 import { CitySearch } from "@/components/city-search"
 import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 
 interface BirthDateFormClientProps {
   onSuccess?: (sessionId: string) => void
@@ -165,8 +166,18 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
       setSaju(sajuResult)
 
-      // Calculate daeun data if available in sajuResult
-      const daeunData = sajuResult.daeun || null
+      // 대운 계산 추가
+      const daeunData = calculateDaeunInfo(
+        sajuResult,
+        Number.parseInt(year),
+        Number.parseInt(month),
+        Number.parseInt(day),
+        gender,
+        timeUnknown ? undefined : hour,
+        timeUnknown ? undefined : minute,
+      )
+
+      console.log("Calculated daeun data:", daeunData)
 
       // Store calculation data in localStorage for later use
       const sajuDataToStore = {
@@ -280,6 +291,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
             returnPath: router.asPath,
             timeStandard: getTimeStandardFromCity(),
             birthCityId,
+            daeun: daeunData, // 대운 데이터 추가
             birthInfo: {
               solarYear: Number.parseInt(year),
               solarMonth: Number.parseInt(month),
@@ -314,6 +326,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
               returnPath: "/",
               timeStandard: getTimeStandardFromCity(),
               birthCityId,
+              daeun: daeunData, // 대운 데이터 추가
               birthInfo: {
                 solarYear: Number.parseInt(year),
                 solarMonth: Number.parseInt(month),

@@ -222,7 +222,7 @@ export async function POST(req: Request) {
         // 생년월일 정보가 포함된 메시지 감지 및 사주 계산
         const birthDateMatch = userMessage.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/g)
         if (birthDateMatch) {
-          console.log("생년월�� 정����� 감지:", birthDateMatch)
+          console.log("생년월일 정보 감지:", birthDateMatch)
 
           // 각 생년월일에 대해 사주 계산
           for (const dateStr of birthDateMatch) {
@@ -362,7 +362,7 @@ export async function POST(req: Request) {
     // 컨텍스트 최적화된 메시지 처리 - 개선된 버전
     const optimizedMessages = await processMessagesForContext(messages, compressedSaju, name, roomType)
 
-    // 압축된 사주 정보를 문자열로 변환
+    // 압축된 사주 정보를 문자열로 변환 (대운 정보 포함)
     const sajuInfo = `
 이름: ${compressedSaju.name}
 생년월일시: ${compressedSaju.birth}
@@ -371,7 +371,7 @@ export async function POST(req: Request) {
 일간: ${compressedSaju.dayMaster}
 십성: 년간(${compressedSaju.sibseong.yearStem}) 년지(${compressedSaju.sibseong.yearBranch}) 월간(${compressedSaju.sibseong.monthStem}) 월지(${compressedSaju.sibseong.monthBranch}) 일간(${compressedSaju.sibseong.dayStem}) 일지(${compressedSaju.sibseong.dayBranch}) 시간(${compressedSaju.sibseong.hourStem}) 시지(${compressedSaju.sibseong.hourBranch})
 오행분포: 목${compressedSaju.elements.목} 화${compressedSaju.elements.화} 토${compressedSaju.elements.토} 금${compressedSaju.elements.금} 수${compressedSaju.elements.수}
-특징: ${compressedSaju.summary}`
+특징: ${compressedSaju.summary}${compressedSaju.daeun ? `\n대운: ${compressedSaju.daeun}` : ""}${compressedSaju.currentAge ? ` (현재 ${compressedSaju.currentAge}세)` : ""}`
 
     // 궁합 분석 데이터가 있는 경우 추가 정보 생성
     let compatibilityInfo = ""
@@ -539,9 +539,9 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 
 🛠️ 활용 방식 예시
 
-✅ [O] 사용자의 사주에 삼형살이 있다면: “극단적 변화와 고비가 자주 있지만, 이를 통해 개혁적 에너지를 가진 사람입니다. 안정된 환경을 만들려는 노력과 더불어 새로운 길을 개척하는 데 강점을 보입니다.”
+✅ [O] 사용자의 사주에 삼형살이 있다면: "극단적 변화와 고비가 자주 있지만, 이를 통해 개혁적 에너지를 가진 사람입니다. 안정된 환경을 만들려는 노력과 더불어 새로운 길을 개척하는 데 강점을 보입니다."
 
-❌ [X] “삼형살이 있어 불운이 많고 위험합니다” 같은 단정적 해석은 금지
+❌ [X] "삼형살이 있어 불운이 많고 위험합니다" 같은 단정적 해석은 금지
 
 
 🔄 **대화 연속성 유지 지침:**
@@ -586,7 +586,7 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 
 ---
 
-🧠 메모리 사용 가���드 (Memory Logic)
+🧠 메모리 사용 가이드 (Memory Logic)
 - 유저의 다음 정보를 메모리에 저장하세요:
   - 직업, 연애 상태, 최근 이별, 사는 도시, 감정상태, 목표 등
   - 궁합 대상자 정보 (이름, 생년월일, 성별)
