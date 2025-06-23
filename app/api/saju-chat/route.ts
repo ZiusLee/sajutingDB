@@ -6,6 +6,10 @@ import { fetchLunarDate } from "@/lib/api-client"
 
 export const runtime = "edge"
 
+// 임시로 API 키를 직접 설정 (나중에 환경변수로 변경해야 함)
+const TEMP_OPENAI_API_KEY =
+  "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"
+
 // 현재 날짜 정보를 가져오는 함수를 수정
 function getCurrentDateInfo() {
   const now = new Date()
@@ -121,7 +125,7 @@ ${conversationText}
 400자 이내로 핵심만 간결하게 정리:`
 
     const summary = await streamText({
-      model: openai("gpt-4o-mini"), // 요약용으로는 더 빠른 모델 사용
+      model: openai("gpt-4o-mini", { apiKey: TEMP_OPENAI_API_KEY }), // 임시 API 키 사용
       prompt: summaryPrompt,
       maxTokens: 500,
     })
@@ -179,9 +183,9 @@ function getModelForRoomType(roomType: string): string {
   try {
     switch (roomType) {
       case "sajuping":
-        return "gpt-4.1" // 사주핑용 gpt-4.1 모델
+        return "gpt-4o" // gpt-4.1을 gpt-4o로 변경
       case "tarot":
-        return "gpt-4.1" // 타로핑용 gpt-4.1 모델
+        return "gpt-4o" // gpt-4.1을 gpt-4o로 변경
       default:
         return "gpt-4o"
     }
@@ -193,17 +197,16 @@ function getModelForRoomType(roomType: string): string {
 
 export async function POST(req: Request) {
   try {
-    const {
-      messages,
-      compressedSaju,
-      name,
-      gender,
-      initialInterpretation,
-      roomType,
-      userId,
-      memoryContext,
-      compatibilityData,
-    } = await req.json()
+    // API 키 확인 로깅 추가
+    const apiKey = process.env.OPENAI_API_KEY || TEMP_OPENAI_API_KEY
+    console.log("OPENAI_API_KEY exists:", !!apiKey)
+    console.log("OPENAI_API_KEY length:", apiKey?.length || 0)
+    console.log("OPENAI_API_KEY starts with sk-:", apiKey?.startsWith("sk-") || false)
+
+    const { messages, compressedSaju, name, gender, initialInterpretation, roomType, userId, memoryContext } =
+      await req.json()
+
+    // compatibilityData 관련 복잡한 처리 로직 제거하고 기본 사주 정보만 사용
 
     // 현재 날짜 정보 가져오기
     const dateInfo = getCurrentDateInfo()
@@ -222,7 +225,7 @@ export async function POST(req: Request) {
         // 생년월일 정보가 포함된 메시지 감지 및 사주 계산
         const birthDateMatch = userMessage.match(/(\d{4})[년.\-/\s]*(\d{1,2})[월.\-/\s]*(\d{1,2})[일]?/g)
         if (birthDateMatch) {
-          console.log("생년월�� 정����� 감지:", birthDateMatch)
+          console.log("생년월 정 감지:", birthDateMatch)
 
           // 각 생년월일에 대해 사주 계산
           for (const dateStr of birthDateMatch) {
@@ -374,51 +377,11 @@ export async function POST(req: Request) {
 특징: ${compressedSaju.summary}`
 
     // 궁합 분석 데이터가 있는 경우 추가 정보 생성
-    let compatibilityInfo = ""
-    if (
-      compatibilityData &&
-      compatibilityData.mainPerson &&
-      compatibilityData.selectedPeople &&
-      compatibilityData.selectedPeople.length > 0
-    ) {
-      const { mainPerson, selectedPeople } = compatibilityData
-
-      compatibilityInfo = `
-
-🔮 **궁합 분석 요청 데이터 (정확한 사주 계산 완료):**
-
-**대표 사주: ${mainPerson.name}**
-- 생년월일시: ${mainPerson.birth}
-- 성별: ${mainPerson.gender === "male" ? "남성" : "여성"}
-- 사주팔자: ${mainPerson.sajuPalja.year.stem}${mainPerson.sajuPalja.year.branch}년 ${mainPerson.sajuPalja.month.stem}${mainPerson.sajuPalja.month.branch}월 ${mainPerson.sajuPalja.day.stem}${mainPerson.sajuPalja.day.branch}일 ${mainPerson.sajuPalja.hour.stem}${mainPerson.sajuPalja.hour.branch}시
-- 일간: ${mainPerson.dayMaster}
-- 십성: 년간(${mainPerson.sibseong.yearStem}) 년지(${mainPerson.sibseong.yearBranch}) 월간(${mainPerson.sibseong.monthStem}) 월지(${mainPerson.sibseong.monthBranch}) 일간(${mainPerson.sibseong.dayStem}) 일지(${mainPerson.sibseong.dayBranch}) 시간(${mainPerson.sibseong.hourStem}) 시지(${mainPerson.sibseong.hourBranch})
-- 오행분포: 목${mainPerson.elements.목} 화${mainPerson.elements.화} 토${mainPerson.elements.토} 금${mainPerson.elements.금} 수${mainPerson.elements.수}
-
-**궁합 대상들:**
-${selectedPeople
-  .map(
-    (person, index) => `
-${index + 1}. **${person.name}**
-   - 생년월일시: ${person.birth}
-   - 성별: ${person.gender === "male" ? "남성" : "여성"}
-   - 사주팔자: ${person.sajuPalja.year.stem}${person.sajuPalja.year.branch}년 ${person.sajuPalja.month.stem}${person.sajuPalja.month.branch}월 ${person.sajuPalja.day.stem}${person.sajuPalja.day.branch}일 ${person.sajuPalja.hour.stem}${person.sajuPalja.hour.branch}시
-   - 일간: ${person.dayMaster}
-   - 십성: 년간(${person.sibseong.yearStem}) 년지(${person.sibseong.yearBranch}) 월간(${person.sibseong.monthStem}) 월지(${person.sibseong.monthBranch}) 일간(${person.sibseong.dayStem}) 일지(${person.sibseong.dayBranch}) 시간(${person.sibseong.hourStem}) 시지(${person.sibseong.hourBranch})
-   - 오행분포: 목${person.elements.목} 화${person.elements.화} 토${person.elements.토} 금${person.elements.금} 수${person.elements.수}
-`,
-  )
-  .join("")}
-
-⚠️ **중요 지침:**
-- 위 사주 정보는 시스템에서 정확히 계산된 결과입니다
-- 생년월일로부터 새로 계산하지 말고 위 정보를 그대로 사용하세요
-- 궁합 분석 시 위 정확한 사주팔자와 십성 정보를 활용하세요`
-    }
+    const compatibilityInfo = ""
 
     // 모델 선택 및 시스템 메시지 설정
     const modelName = getModelForRoomType(roomType)
-    const model = openai(modelName)
+    const model = openai(modelName, { apiKey: apiKey }) // API 키 명시적으로 전달
     let systemMessage = ""
 
     // 룸 타입에 따른 시스템 메시지 설정 (메모리 컨텍스트 포함)
@@ -539,9 +502,9 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 
 🛠️ 활용 방식 예시
 
-✅ [O] 사용자의 사주에 삼형살이 있다면: “극단적 변화와 고비가 자주 있지만, 이를 통해 개혁적 에너지를 가진 사람입니다. 안정된 환경을 만들려는 노력과 더불어 새로운 길을 개척하는 데 강점을 보입니다.”
+✅ [O] 사용자의 사주에 삼형살이 있다면: "극단적 변화와 고비가 자주 있지만, 이를 통해 개혁적 에너지를 가진 사람입니다. 안정된 환경을 만들려는 노력과 더불어 새로운 길을 개척하는 데 강점을 보입니다."
 
-❌ [X] “삼형살이 있어 불운이 많고 위험합니다” 같은 단정적 해석은 금지
+❌ [X] "삼형살이 있어 불운이 많고 위험합니다" 같은 단정적 해석은 금지
 
 
 🔄 **대화 연속성 유지 지침:**
@@ -586,7 +549,7 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
 
 ---
 
-🧠 메모리 사용 가���드 (Memory Logic)
+🧠 메모리 사용 가드 (Memory Logic)
 - 유저의 다음 정보를 메모리에 저장하세요:
   - 직업, 연애 상태, 최근 이별, 사는 도시, 감정상태, 목표 등
   - 궁합 대상자 정보 (이름, 생년월일, 성별)
@@ -735,6 +698,8 @@ ${currentMemoryContext ? `\n${currentMemoryContext}\n` : ""}
       return result.toDataStreamResponse()
     } catch (streamError) {
       console.error("Error in streamText:", streamError)
+      console.error("Model used:", modelName) // 어떤 모델을 사용했는지 로깅
+      console.error("API Messages length:", apiMessages.length) // 메시지 개수 로깅
 
       return new Response(
         JSON.stringify({

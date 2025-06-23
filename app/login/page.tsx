@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import Link from "next/link"
 import { getSupabase } from "@/lib/supabase-client"
 
 export default function LoginPage() {
@@ -73,7 +74,6 @@ export default function LoginPage() {
     checkUser()
   }, [router, supabase.auth])
 
-  // Rest of the component remains the same...
   // Handle Kakao login
   const handleKakaoLogin = async () => {
     setIsLoading(true)
@@ -133,20 +133,29 @@ export default function LoginPage() {
       }
 
       console.log("Email login successful:", data.user?.id)
-      // Store user info in localStorage for compatibility with existing code
-      if (data.user) {
-        localStorage.setItem("user_authenticated", "true")
-        localStorage.setItem("user_id", data.user.id)
-        localStorage.setItem("user_email", data.user.email || "")
-        // Extract name from metadata if available
-        const userName = data.user.user_metadata?.name || data.user.email?.split("@")[0] || "User"
-        localStorage.setItem("user_name", userName)
-      }
 
-      router.push("/mypage")
+      // 로그인 성공 시 AuthContext가 자동으로 처리하므로
+      // 수동으로 localStorage 설정하지 않음
+
+      // 잠시 기다린 후 리다이렉트 (AuthContext가 상태를 업데이트할 시간을 줌)
+      setTimeout(() => {
+        router.push("/mypage")
+      }, 100)
     } catch (err) {
       console.error("이메일 로그인 오류:", err)
-      setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다. 이메일과 비밀번호를 확인해주세요.")
+      let errorMessage = "로그인 중 오류가 발생했습니다."
+
+      if (err instanceof Error) {
+        if (err.message.includes("Invalid login credentials")) {
+          errorMessage = "이메일 또는 비밀번호가 올바르지 않습니다."
+        } else if (err.message.includes("Email not confirmed")) {
+          errorMessage = "이메일 인증이 필요합니다. 이메일을 확인해주세요."
+        } else {
+          errorMessage = err.message
+        }
+      }
+
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -181,7 +190,47 @@ export default function LoginPage() {
     }
   }
 
-  // Rest of the component remains the same...
+  // Handle login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    try {
+      console.log("로그인 시도:", email)
+
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) {
+        console.error("로그인 오류:", authError)
+        setError("이메일 또는 비밀번호가 올바르지 않습니다.")
+        return
+      }
+
+      if (data.user) {
+        console.log("로그인 성공:", data.user.id)
+
+        // 로그인 상태를 localStorage에 저장
+        localStorage.setItem("user_authenticated", "true")
+        localStorage.setItem("user_id", data.user.id)
+        if (data.user.email) {
+          localStorage.setItem("user_email", data.user.email)
+        }
+
+        // 마이페이지로 리다이렉트
+        router.push("/mypage")
+      }
+    } catch (error) {
+      console.error("로그인 중 오류:", error)
+      setError("로그인 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* 헤더 */}
@@ -316,6 +365,7 @@ export default function LoginPage() {
                         <div className="flex items-center justify-between">
                           <Label htmlFor="password">비밀번호</Label>
                           <Button
+                            type="button"
                             variant="link"
                             className="p-0 h-auto text-sm"
                             onClick={(e) => {
@@ -368,9 +418,9 @@ export default function LoginPage() {
           <div className="mt-8 text-center">
             <p className="text-center text-sm text-muted-foreground">
               계정이 없으신가요?{" "}
-              <Button variant="link" className="p-0 h-auto font-normal" onClick={() => router.push("/register")}>
+              <Link href="/register" className="text-blue-600 hover:text-blue-500 font-medium">
                 회원가입
-              </Button>
+              </Link>
             </p>
           </div>
         </div>

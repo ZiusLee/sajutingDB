@@ -6,19 +6,18 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Send, ChevronDown, User, Mic, ArrowLeft, Settings, Database } from "lucide-react"
+import { Send, ChevronDown, User, Mic, ArrowLeft, Settings, Database, Coins } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
 import CompatibilityTool from "@/components/compatibility-tool"
 import MemoryBank from "@/components/memory-bank"
 import { compressSaju } from "@/lib/saju-compression"
-import { memoryService } from "@/lib/memory-service"
 import { useAuth } from "@/contexts/auth-context"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
+import { CoinPurchaseModal } from "@/components/coin-purchase-modal"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -244,8 +243,6 @@ export default function SajuChat({
 
   // States
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
-  const [isNewUser, setIsNewUser] = useState(true)
-  const [messageIds, setMessageIds] = useState<Record<string, string>>({})
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
   const [sessionInitialized, setSessionInitialized] = useState(false)
@@ -259,7 +256,12 @@ export default function SajuChat({
   const [loginPromptMessage, setLoginPromptMessage] = useState("")
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
+  const [isLoadingPastMessages, setIsLoadingPastMessages] = useState(false)
+  const [initialMessagesLoaded, setInitialMessagesLoaded] = useState(false)
+  const [userCoins, setUserCoins] = useState<number>(0)
+  const [showCoinPurchase, setShowCoinPurchase] = useState(false)
+  const [pendingSaveMessage, setPendingSaveMessage] = useState<any>(null)
+  const [lastSavedMessageId, setLastSavedMessageId] = useState<string | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -268,104 +270,180 @@ export default function SajuChat({
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
     initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
   )
-  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
-  const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
-  const [isInitialized, setIsInitialized] = useState(false)
 
   const router = useRouter()
-  const supabase = createClientComponentClient()
-  const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
+  const { activeChatSession, setActiveChatSession, saveChatSession } = useChat()
 
   const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
 
-  const getMemoryContext = useCallback(() => {
-    if (!userId) return ""
-    return memoryService.generateContextSummary(userId)
-  }, [userId])
+  const loadUserCoins = useCallback(async () => {
+    if (!actualIsLoggedIn) return
 
-  // 세션 ID 초기화
-  const getExistingSessionId = useCallback(async () => {
-    if (sessionInitialized || databaseSessionId) {
-      return
+    try {
+      const response = await fetch("/api/user-coins")
+      if (response.ok) {
+        const data = await response.json()
+        setUserCoins(data.coins || 0)
+      }
+    } catch (error) {
+      console.error("코인 정보 로드 오류:", error)
+    }
+  }, [actualIsLoggedIn])
+
+  useEffect(() => {
+    if (actualIsLoggedIn) {
+      loadUserCoins()
+    }
+  }, [actualIsLoggedIn, loadUserCoins])
+
+  // 과거 메시지와 초기 메시지를 합치는 함수
+  const combineMessagesWithInitial = useCallback(
+    (pastMessages: any[]) => {
+      // 초기 메시지 생성
+      let baseInitialMessages: any[] = []
+      if (roomType === "sajuping") {
+        baseInitialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
+      } else {
+        baseInitialMessages = [
+          {
+            id: "welcome",
+            role: "assistant" as const,
+            content: getInitialMessageByRoomType(name, roomType, birthInfo),
+          },
+        ]
+      }
+
+      if (pastMessages.length === 0) {
+        return baseInitialMessages
+      }
+
+      // 과거 메시지를 message_order 기준으로 정렬
+      const sortedPastMessages = [...pastMessages].sort((a, b) => a.messageOrder - b.messageOrder)
+
+      // 초기 메시지와 과거 메시지를 올바른 순서로 결합
+      const combinedMessages = [...baseInitialMessages]
+
+      // 과거 메시지를 순서대로 추가 (초기 메시지 이후부터)
+      sortedPastMessages.forEach((msg) => {
+        // message_order가 초기 메시지 개수보다 큰 경우에만 추가
+        const initialMessageCount = roomType === "sajuping" ? 2 : 1
+        if (msg.messageOrder >= initialMessageCount) {
+          combinedMessages.push({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+          })
+        }
+      })
+
+      return combinedMessages
+    },
+    [name, saju, birthInfo, roomType],
+  )
+
+  // 과거 메시지 불러오기 함수
+  const loadPastMessages = useCallback(async (sessionId: string) => {
+    if (!sessionId) return []
+
+    try {
+      setIsLoadingPastMessages(true)
+      const response = await fetch(`/api/messages?sessionId=${sessionId}`)
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch messages: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      return data.messages || []
+    } catch (error) {
+      console.error("Error loading past messages:", error)
+      return []
+    } finally {
+      setIsLoadingPastMessages(false)
+    }
+  }, [])
+
+  // 세션 ID 초기화 및 초기 메시지 설정
+  const initializeSession = useCallback(async () => {
+    if (sessionInitialized || initialMessagesLoaded) {
+      return null
     }
 
     try {
       setSessionInitialized(true)
 
-      const storedSajuData = localStorage.getItem("tempSajuData")
+      let sessionId: string | null = null
+      let pastMessages: any[] = []
 
-      if (storedSajuData) {
-        const sajuData = JSON.parse(storedSajuData)
-        if (sajuData.sessionId) {
-          setDatabaseSessionId(sajuData.sessionId)
-          return
-        }
+      // sessionKey 사용
+      if (sessionKey) {
+        sessionId = sessionKey
+        setDatabaseSessionId(sessionId)
+
+        // 모든 사용자의 과거 메시지 불러오기
+        pastMessages = await loadPastMessages(sessionId)
       }
 
-      const response = await fetch("/api/saju-sessions", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
+      // localStorage에 sessionId 저장
+      const storedData = JSON.parse(localStorage.getItem("current_saju") || "{}")
+      storedData.sessionId = sessionId
+      localStorage.setItem("current_saju", JSON.stringify(storedData))
 
-      if (response.ok) {
-        const data = await response.json()
+      // 초기 메시지와 과거 메시지 결합
+      const combinedMessages = combineMessagesWithInitial(pastMessages)
+      setInitialMessagesLoaded(true)
 
-        if (data.sessions && data.sessions.length > 0) {
-          const recentSession = data.sessions[0]
-          setDatabaseSessionId(recentSession.id)
-
-          const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-          storedData.sessionId = recentSession.id
-          localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-          return
-        }
-      }
+      return combinedMessages
     } catch (error) {
-      console.error("Error getting existing session ID:", error)
-    }
-  }, [sessionInitialized, databaseSessionId])
+      console.error("Error initializing session:", error)
+      setInitialMessagesLoaded(true)
 
-  useEffect(() => {
-    if (!sessionInitialized && !databaseSessionId) {
-      getExistingSessionId()
+      if (sessionKey) {
+        setDatabaseSessionId(sessionKey)
+      }
+
+      return combineMessagesWithInitial([])
     }
-  }, [getExistingSessionId])
+  }, [
+    sessionInitialized,
+    initialMessagesLoaded,
+    loadPastMessages,
+    combineMessagesWithInitial,
+    sessionKey,
+    actualIsLoggedIn,
+    name,
+    saju,
+    birthInfo,
+    roomType,
+  ])
 
   // 초기 메시지 설정
-  const savedSession = activeChatSession || getChatSession(sessionKey)
+  const [initialMessages, setInitialMessages] = useState<any[]>([])
 
   useEffect(() => {
-    const hasExistingSession = savedSession?.messages && savedSession.messages.length > 0
-    setIsNewUser(!hasExistingSession)
-  }, [savedSession])
-
-  let initialMessages: any[] = []
-  if (savedSession?.messages) {
-    initialMessages = savedSession.messages
-  } else if (roomType === "sajuping") {
-    try {
-      initialMessages = generateSajupingInitialMessages(name, saju, birthInfo)
-    } catch (error) {
-      console.error("Error generating sajuping initial messages:", error)
-      initialMessages = [
-        {
-          id: "welcome",
-          role: "assistant" as const,
-          content: getInitialMessageByRoomType(name, roomType, birthInfo),
-        },
-      ]
+    const loadInitialMessages = async () => {
+      const messages = await initializeSession()
+      if (messages) {
+        setInitialMessages(messages)
+      }
     }
-  } else {
-    initialMessages = [
-      {
-        id: "welcome",
-        role: "assistant" as const,
-        content: getInitialMessageByRoomType(name, roomType, birthInfo),
-      },
-    ]
-  }
+
+    if (!initialMessagesLoaded) {
+      loadInitialMessages()
+    }
+  }, [initializeSession, initialMessagesLoaded])
+
+  // 기본 초기 메시지 (로딩 중일 때 사용)
+  const defaultInitialMessages =
+    roomType === "sajuping"
+      ? generateSajupingInitialMessages(name, saju, birthInfo)
+      : [
+          {
+            id: "welcome",
+            role: "assistant" as const,
+            content: getInitialMessageByRoomType(name, roomType, birthInfo),
+          },
+        ]
 
   const {
     messages,
@@ -379,7 +457,7 @@ export default function SajuChat({
     append,
   } = useAIChat({
     api: "/api/saju-chat",
-    initialMessages,
+    initialMessages: initialMessages.length > 0 ? initialMessages : defaultInitialMessages,
     body: {
       compressedSaju: compressSaju(
         saju,
@@ -395,44 +473,23 @@ export default function SajuChat({
       initialInterpretation,
       roomType,
       userId,
-      currentYear: 2025,
-      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo,
-      memoryContext: getMemoryContext(),
     },
     onFinish: async (message) => {
       try {
-        const updatedMessages = [...messages, message]
+        console.log(`[CLIENT] onFinish called - Message:`, message.content.substring(0, 100) + "...")
 
-        // 데이터베이스에 저장 (로그인한 사용자만)
-        if (databaseSessionId && actualIsLoggedIn) {
-          console.log("[CLIENT] Saving assistant message to database")
-          await saveMessagesToDatabase(updatedMessages, databaseSessionId)
+        // 중복 저장 방지: 이미 저장된 메시지인지 확인
+        if (lastSavedMessageId === message.id) {
+          console.log("[CLIENT] Message already saved, skipping...")
+          return
         }
 
-        // 로컬 스토리지에 저장
-        const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-        const sessionData = {
-          saju,
-          name,
-          gender,
-          interpretation: initialInterpretation,
-          roomType,
-          messages: updatedMessages,
-          lastMessageTime: new Date().toISOString(),
-          birthInfo,
-        }
+        // 스트리밍 완료 후 저장을 위해 메시지 저장
+        setPendingSaveMessage(message)
+        setLastSavedMessageId(message.id)
 
-        try {
-          saveChatSession(currentSessionKey, sessionData)
-          setActiveChatSession(sessionData)
-        } catch (saveError) {
-          console.error("Error saving chat session:", saveError)
-        }
-
-        setShouldGenerateQuestions(true)
         setStreamingError(null)
-        setRetryCount(0)
       } catch (error) {
         console.error("Error in onFinish handler:", error)
       }
@@ -440,7 +497,6 @@ export default function SajuChat({
     onError: (error) => {
       console.error("Chat error:", error)
       setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
-      setShouldGenerateQuestions(true)
     },
     onResponse: (response) => {
       if (chatContainerRef.current) {
@@ -455,7 +511,7 @@ export default function SajuChat({
     },
   })
 
-  // 메시지를 데이터베이스에 저장하는 함수 (useAIChat 후에 정의)
+  // 메시지를 데이터베이스에 저장하는 함수
   const saveMessagesToDatabase = useCallback(
     async (messagesToSave: any[], sessionId: string) => {
       if (!sessionId) {
@@ -487,19 +543,6 @@ export default function SajuChat({
         if (response.ok) {
           const data = await response.json()
           console.log(`[CLIENT] Successfully saved ${data.savedCount || 0} messages to database`)
-
-          if (data.messageIds && data.messageIds.length > 0) {
-            setTimeout(() => {
-              const newMessageIds: Record<string, string> = {}
-              const savableMessages = messagesToSave.filter((_, index) => index >= 2)
-              savableMessages.forEach((msg, index) => {
-                if (data.messageIds[index]) {
-                  newMessageIds[msg.id] = data.messageIds[index]
-                }
-              })
-              setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
-            }, 0)
-          }
         } else {
           const errorText = await response.text()
           console.error("[CLIENT] Failed to save messages to database:", errorText)
@@ -511,65 +554,108 @@ export default function SajuChat({
     [roomType, name, gender, saju, birthInfo],
   )
 
-  // 사용자 메시지 저장 함수 (useAIChat 후에 정의)
-  const saveUserMessage = useCallback(
-    async (userMessage: string) => {
-      if (!databaseSessionId) {
-        console.log("[CLIENT] No database session ID available for user message save")
-        return
+  // isLoading이 false가 되면 대기 중인 메시지 저장
+  useEffect(() => {
+    if (!isLoading && pendingSaveMessage) {
+      const saveDelayedMessage = async () => {
+        try {
+          // 현재 messages 배열에 pendingSaveMessage가 이미 포함되어 있는지 확인
+          const messageExists = messages.some((msg) => msg.id === pendingSaveMessage.id)
+
+          let updatedMessages
+          if (messageExists) {
+            // 이미 포함되어 있으면 현재 messages 사용
+            updatedMessages = messages
+          } else {
+            // 포함되어 있지 않으면 추가
+            updatedMessages = [...messages, pendingSaveMessage]
+          }
+
+          console.log(`[CLIENT] Saving message after streaming completed - Total messages: ${updatedMessages.length}`)
+
+          // 데이터베이스에 저장 (모든 사용자)
+          if (databaseSessionId) {
+            console.log("[CLIENT] Saving assistant message to database (after streaming)")
+            await saveMessagesToDatabase(updatedMessages, databaseSessionId)
+          }
+
+          // 로컬 스토리지에 저장
+          const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
+          const sessionData = {
+            saju,
+            name,
+            gender,
+            interpretation: initialInterpretation,
+            roomType,
+            messages: updatedMessages,
+            lastMessageTime: new Date().toISOString(),
+            birthInfo,
+          }
+
+          saveChatSession(currentSessionKey, sessionData)
+          setActiveChatSession(sessionData)
+          console.log("[CLIENT] Successfully saved session after streaming completed")
+
+          setPendingSaveMessage(null)
+        } catch (error) {
+          console.error("Error saving message after streaming:", error)
+          setPendingSaveMessage(null)
+        }
       }
 
-      const userMessageObj = {
-        id: `user-${Date.now()}`,
-        role: "user" as const,
-        content: userMessage,
-      }
+      // 1초 지연 후 저장
+      setTimeout(saveDelayedMessage, 1000)
+    }
+  }, [
+    isLoading,
+    pendingSaveMessage,
+    messages,
+    databaseSessionId,
+    saveMessagesToDatabase,
+    sessionKey,
+    name,
+    saju,
+    roomType,
+    gender,
+    initialInterpretation,
+    saveChatSession,
+    setActiveChatSession,
+    birthInfo,
+  ])
 
-      const updatedMessages = [...messages, userMessageObj]
-      console.log(`[CLIENT] Saving user message to database`)
-
-      await saveMessagesToDatabase(updatedMessages, databaseSessionId)
-
-      const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
-      const sessionData = {
-        saju,
-        name,
-        gender,
-        interpretation: initialInterpretation,
-        roomType,
-        messages: updatedMessages,
-        lastMessageTime: new Date().toISOString(),
-        birthInfo,
-      }
-
-      try {
-        saveChatSession(currentSessionKey, sessionData)
-        setActiveChatSession(sessionData)
-      } catch (saveError) {
-        console.error("Error saving user message to session:", saveError)
-      }
-    },
-    [
-      databaseSessionId,
-      messages,
-      saveMessagesToDatabase,
-      sessionKey,
-      name,
-      saju,
-      roomType,
-      gender,
-      initialInterpretation,
-      saveChatSession,
-      setActiveChatSession,
-      birthInfo,
-    ],
-  )
-
-  const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const customHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!input.trim()) {
       return
+    }
+
+    // 입력창 즉시 클리어
+    const userInput = input.trim()
+    setInput("")
+
+    // 로그인한 사용자의 경우 코인 차감
+    if (actualIsLoggedIn) {
+      if (userCoins <= 0) {
+        setShowCoinPurchase(true)
+        setInput(userInput) // 코인 부족시 입력 복원
+        return
+      }
+
+      // 코인 차감 (비동기로 처리하여 UI 블로킹 방지)
+      fetch("/api/user-coins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "use", amount: 1 }),
+      })
+        .then((response) => {
+          if (response.ok) {
+            response.json().then((data) => setUserCoins(data.coins))
+          }
+        })
+        .catch((error) => {
+          console.error("코인 차감 오류:", error)
+        })
     }
 
     const newQuestionCount = questionCount + 1
@@ -583,15 +669,43 @@ export default function SajuChat({
       setHasShownLoginPrompt(true)
     }
 
-    setShouldGenerateQuestions(false)
     setStreamingError(null)
-    setRetryCount(0)
 
-    // 사용자 메시지 저장
-    saveUserMessage(input)
+    // 사용자 메시지 즉시 데이터베이스에 저장 (모든 사용자)
+    if (databaseSessionId) {
+      const userMessageObj = {
+        id: `user-${Date.now()}`,
+        role: "user" as const,
+        content: userInput,
+      }
 
-    // AI 채팅 제출
-    aiHandleSubmit(e)
+      const updatedMessagesWithUser = [...messages, userMessageObj]
+
+      // 사용자 메시지 저장
+      saveMessagesToDatabase(updatedMessagesWithUser, databaseSessionId)
+
+      // 로컬 스토리지에도 저장
+      const currentSessionKey = sessionKey || generateChatSessionKey(name, saju, roomType)
+      const sessionData = {
+        saju,
+        name,
+        gender,
+        interpretation: initialInterpretation,
+        roomType,
+        messages: updatedMessagesWithUser,
+        lastMessageTime: new Date().toISOString(),
+        birthInfo,
+      }
+
+      saveChatSession(currentSessionKey, sessionData)
+      setActiveChatSession(sessionData)
+    }
+
+    // AI 채팅 제출 (입력값을 직접 전달)
+    append({
+      role: "user",
+      content: userInput,
+    })
   }
 
   const handleBackWithSave = () => {
@@ -654,12 +768,6 @@ export default function SajuChat({
     }, 100)
   }
 
-  const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-    }
-  }, [])
-
   const scrollToBottomSmooth = useCallback(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTo({
@@ -679,22 +787,17 @@ export default function SajuChat({
 
   const handleRetry = () => {
     setIsRetrying(true)
-    setRetryCount((prevCount) => prevCount + 1)
     reload()
   }
 
   const handleCompatibilityAnalysis = (mainPerson: any, selectedPeople: any[]) => {
     try {
-      console.log("handleCompatibilityAnalysis called with:", { mainPerson, selectedPeople })
-
       const peopleNames = selectedPeople.map((p) => p.name).join(", ")
 
-      // 출생시간 정보 포맷팅 함수
       const formatBirthTime = (person: any) => {
         const birthDate = person.birth || `${person.birthYear}.${person.birthMonth}.${person.birthDay}`
         const gender = person.gender === "male" ? "남성" : person.gender === "female" ? "여성" : "성별미상"
 
-        // 시간 정보가 있고 timeUnknown이 아닌 경우
         if (person.birthHour && person.birthMinute && !person.timeUnknown) {
           return `${birthDate} ${person.birthHour}시 ${person.birthMinute}분 (${gender})`
         } else if (person.timeUnknown) {
@@ -704,24 +807,19 @@ export default function SajuChat({
         }
       }
 
-      // 사주 정보 직접 사용 (이미 완전한 데이터)
-      const mainPersonSaju = mainPerson.fullSaju || mainPerson.saju
+      const mainPersonSaju = mainPerson.saju
       const mainPersonBirthTime = formatBirthTime(mainPerson)
 
-      // 대표 사주 상세 정보
       const mainPersonInfo = `
 🔮 **${mainPerson.name}님 사주 정보**
 - 생년월일: ${mainPersonBirthTime}
 - 사주팔자: ${mainPersonSaju.yearStem}${mainPersonSaju.yearBranch}년 ${mainPersonSaju.monthStem}${mainPersonSaju.monthBranch}월 ${mainPersonSaju.dayStem}${mainPersonSaju.dayBranch}일 ${mainPersonSaju.hourStem}${mainPersonSaju.hourBranch}시
 - 일간(日干): ${mainPersonSaju.dayMaster}
-- 띠: ${mainPersonSaju.yearAnimal || "정보없음"}
-- 십성: 년간(${mainPersonSaju.yearStemSibseong}) 년지(${mainPersonSaju.yearBranchSibseong}) 월간(${mainPersonSaju.monthStemSibseong}) 월지(${mainPersonSaju.monthBranchSibseong}) 일간(${mainPersonSaju.dayStemSibseong}) 일지(${mainPersonSaju.dayBranchSibseong}) 시간(${mainPersonSaju.hourStemSibseong}) 시지(${mainPersonSaju.hourBranchSibseong})
-- 오행분포: 목${mainPersonSaju.elements.wood} 화${mainPersonSaju.elements.fire} 토${mainPersonSaju.elements.earth} 금${mainPersonSaju.elements.metal} 수${mainPersonSaju.elements.water}`
+- 띠: ${mainPersonSaju.yearAnimal}`
 
-      // 궁합 대상들 상세 정보
       const selectedPeopleInfo = selectedPeople
         .map((person) => {
-          const personSaju = person.fullSaju || person.saju
+          const personSaju = person.saju
           const personBirthTime = formatBirthTime(person)
 
           return `
@@ -729,59 +827,18 @@ export default function SajuChat({
 - 생년월일: ${personBirthTime}
 - 사주팔자: ${personSaju.yearStem}${personSaju.yearBranch}년 ${personSaju.monthStem}${personSaju.monthBranch}월 ${personSaju.dayStem}${personSaju.dayBranch}일 ${personSaju.hourStem}${personSaju.hourBranch}시
 - 일간(日干): ${personSaju.dayMaster}
-- 띠: ${personSaju.yearAnimal || "정보없음"}
-- 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${personSaju.monthStemSibseong}) 월지(${personSaju.monthBranchSibseong}) 일간(${personSaju.dayStemSibseong}) 일지(${personSaju.dayBranchSibseong}) 시간(${personSaju.hourStemSibseong}) 시지(${personSaju.hourBranchSibseong})
-- 오행분포: 목${personSaju.elements.wood} 화${personSaju.elements.fire} 토${personSaju.elements.earth} 금${personSaju.elements.metal} 수${personSaju.elements.water}`
+- 띠: ${personSaju.yearAnimal}`
         })
         .join("\n")
 
-      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 사주 궁합을 자세히 분석해주세요. 
-
-🔮 **궁합 분석 요청**
+      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 사주 궁합을 분석해주세요.
 
 ${mainPersonInfo}
 
 ${selectedPeopleInfo}
 
-다음 내용을 포함해서 분석해주세요:
-1. **사주팔자 궁합 분석**
-   - 연주(年柱) 궁합: 조상운, 초년운 상성
-   - 월주(月柱) 궁합: 부모운, 청년운 상성  
-   - 일주(日柱) 궁합: 본인운, 배우자운 상성
-   - 시주(時柱) 궁합: 자식운, 말년운 상성
+사주팔자 궁합, 십성 궁합, 오행 궁합을 중심으로 상세히 분석해주세요.`
 
-2. **십성(十星) 궁합 분석**
-   - 각자의 십성 배치와 상호 작용
-   - 보완 관계와 충돌 관계
-
-3. **오행(五行) 궁합 분석**
-   - 목화토금수 균형과 보완 관계
-   - 상생상극 관계 분석
-
-4. **천간지지 상성**
-   - 천간 합화 관계
-   - 지지 삼합, 육합, 충극 관계
-
-5. **성격 및 가치관 궁합**
-   - 일간을 통한 성격 분석
-   - 생활 패턴과 가치관 조화
-
-6. **관계 발전 가능성**
-   - 연애 궁합
-   - 결혼 궁합
-   - 사업 파트너십 가능성
-
-7. **주의사항 및 조언**
-   - 갈등 요소와 해결 방안
-   - 관계 발전을 위한 구체적 조언
-
-8. **종합 궁합 점수** (100점 만점)
-
-위 모든 사주 정보를 바탕으로 상세하고 전문적인 궁합 분석을 해주세요.`
-
-      console.log("Sending compatibility message:", compatibilityMessage)
-
-      // 메시지 전송
       append({
         role: "user",
         content: compatibilityMessage,
@@ -796,6 +853,18 @@ ${selectedPeopleInfo}
 
   useHideHeaderAndFooter()
   useForceDarkTheme()
+
+  // 로딩 상태 표시
+  if (isLoadingPastMessages || !initialMessagesLoaded) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+          <p className="text-white/80 text-sm">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
@@ -857,6 +926,18 @@ ${selectedPeopleInfo}
         </div>
 
         <div className="flex items-center space-x-2">
+          {actualIsLoggedIn && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/coin-shop")}
+              className="flex items-center space-x-2 text-amber-400 hover:text-amber-300 hover:bg-white/20 px-3 py-2 rounded-lg"
+              title="코인 충전소"
+            >
+              <Coins className="h-4 w-4" />
+              <span className="text-sm font-medium">{userCoins}핑</span>
+            </Button>
+          )}
           {actualIsLoggedIn ? (
             <>
               <Button
@@ -1134,6 +1215,7 @@ ${selectedPeopleInfo}
         currentBirthInfo={birthInfo}
         isLoggedIn={actualIsLoggedIn}
         userId={userId}
+        sessionId={databaseSessionId}
         onCompatibilityAnalysis={handleCompatibilityAnalysis}
       />
 
@@ -1151,6 +1233,15 @@ ${selectedPeopleInfo}
         onClose={() => setShowLoginPrompt(false)}
         onLogin={() => router.push("/login")}
         message={loginPromptMessage}
+      />
+
+      <CoinPurchaseModal
+        isOpen={showCoinPurchase}
+        onClose={() => setShowCoinPurchase(false)}
+        onSuccess={(coins) => {
+          setUserCoins((prev) => prev + coins)
+          setShowCoinPurchase(false)
+        }}
       />
     </div>
   )

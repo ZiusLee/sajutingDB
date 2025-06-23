@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Coins, Calendar } from "lucide-react"
 import { motion } from "framer-motion"
+import { useState } from "react"
+import { CoinPurchaseModal } from "@/components/coin-purchase-modal"
 
 interface CoinManagerProps {
   coins: number
@@ -12,6 +14,7 @@ interface CoinManagerProps {
 }
 
 export function CoinManager({ coins, lastCheckIn, onCheckIn }: CoinManagerProps) {
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false)
   const today = new Date().toISOString().split("T")[0]
   const canCheckIn = lastCheckIn !== today
 
@@ -45,9 +48,29 @@ export function CoinManager({ coins, lastCheckIn, onCheckIn }: CoinManagerProps)
               <Calendar className="h-4 w-4 mr-1" />
               출석체크
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-500 text-amber-400 hover:bg-amber-900/50 ml-2"
+              onClick={() => setShowPurchaseModal(true)}
+            >
+              <Coins className="h-4 w-4 mr-1" />
+              충전
+            </Button>
           </div>
         </CardContent>
       </Card>
+      {/* ===== 결제 모달 (현재 비활성화됨) ===== */}
+      {/* 결제 기능이 준비되면 모달에서 실제 결제가 진행됩니다 */}
+      <CoinPurchaseModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        onSuccess={(coins) => {
+          // TODO: 결제 성공 시 처리 로직
+          // 현재는 페이지 새로고침으로 간단히 처리
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }
