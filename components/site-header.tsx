@@ -7,7 +7,7 @@ import { useTheme } from "next-themes"
 import { useRouter } from "next/navigation"
 import { SajuLogo } from "./saju-logo"
 import { useEffect, useState } from "react"
-import { getSupabase } from "@/lib/supabase-client"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export function SiteHeader() {
@@ -15,7 +15,7 @@ export function SiteHeader() {
   const [user, setUser] = useState<any>(null)
   const [userName, setUserName] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = getSupabase()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -66,7 +66,7 @@ export function SiteHeader() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase])
 
   // Function to navigate to mypage
   const goToMyPage = () => {

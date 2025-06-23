@@ -1,4 +1,5 @@
-import { getSupabase } from "./supabase-client"
+import { db } from "./db"
+import bcrypt from "bcryptjs"
 
 // Update type definition to SajuSession
 export type SajuSession = {
@@ -24,46 +25,32 @@ export async function createSajuSession({
   auth_user_id?: string
 }): Promise<SajuSession> {
   try {
-    const supabase = getSupabase()
+    //비밀번호 해싱
+    const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Supabase 클라이언트를 사용하여 데이터 삽입
-    const { data, error } = await supabase
-      .from("saju_sessions")
-      .insert([
-        {
-          email,
-          name,
-          auth_user_id,
-          gender: "unknown",
-          relationship_status: "solo",
-          is_beta_applicant: false,
-          privacy_consent: true,
-          is_default: false,
-        },
-      ])
-      .select()
-      .single()
+    // Update table name from users to saju_sessions
+    const result = await db.query(
+      `INSERT INTO saju_sessions (email, password, name, auth_user_id) 
+       VALUES ($1, $2, $3, $4) 
+       RETURNING id, email, name, auth_user_id, created_at, updated_at`,
+      [email, hashedPassword, name, auth_user_id],
+    )
 
-    if (error) {
-      console.error("Supabase 삽입 오류:", error)
-      throw error
-    }
+    const session = result.rows[0]
 
     return {
-      id: data.id,
-      email: data.email,
-      name: data.name,
-      auth_user_id: data.auth_user_id,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
+      id: session.id,
+      email: session.email,
+      name: session.name,
+      auth_user_id: session.auth_user_id,
+      createdAt: session.created_at,
+      updatedAt: session.updated_at,
     }
   } catch (error) {
-    console.error("사주 세션 생성 오류 - 상세 정보:")
-    console.error("- Error message:", error?.message)
-    console.error("- Error code:", error?.code)
-    console.error("- Error detail:", error?.detail)
-    console.error("- Full error:", JSON.stringify(error, null, 2))
+    console.error("사주 세션 생성 오류:", error)
 
+    // 임시 구현: 데이터베이스 연결 실패 시 임시 세션 반환
+    // 실제 환경에서는 이 부분을 제거하고 오류를 throw해야 함
     if (process.env.NODE_ENV === "development") {
       console.warn("개발 환경에서 임시 세션 생성")
       return {
@@ -81,32 +68,75 @@ export async function createSajuSession({
 // Update function to get session by email
 export async function getSajuSessionByEmail(email: string): Promise<SajuSession | null> {
   try {
-    const supabase = getSupabase()
+    // Update table name from users to saju_sessions
+    const result = await db.query(`SELECT * FROM saju_sessions WHERE email = $1`, [email])
 
-    const { data, error } = await supabase.from("saju_sessions").select("*").eq("email", email).single()
-
-    if (error) {
-      if (error.code === "PGRST116") {
-        // No rows found
-        return null
-      }
-      throw error
+    if (result.rows.length === 0) {
+      return null
     }
 
+    const session = result.rows[0]
+
     return {
-      id: data.id,
-      email: data.email,
-      name: data.name,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      auth_user_id: data.auth_user_id,
+      id: session.id,
+      email: session.email,
+      name: session.name,
+      password: session.password,
+      createdAt: session.created_at,
+      updatedAt: session.updated_at,
+      auth_user_id: session.auth_user_id,
     }
   } catch (error) {
     console.error("사주 세션 조회 오류:", error)
 
+    // 임시 구현: 데이터베이스 연결 실패 시 null 반환
+    // 실제 환경에서는 이 부분을 제거하고 오류를 throw해야 함
     if (process.env.NODE_ENV === "development") {
       console.warn("개발 환경에서 임시 세션 조회")
+      // 테스트 계정만 확인
       if (email === "test@example.com") {
+        return {
+          id: "temp-test-session",
+          email: "test@example.com",
+          name: "테스트 사용자",
+          password: "$2a$10$XQCg1z4YSl5K1fZqufz8aO5x.xBWO7uVCUDP.xvFxe9HCCpx5rIFy", // "password123"의 해시
+          auth_user_id: "test-auth-id",
+        }
+      }
+      return null
+    }
+
+    throw error
+  }
+}
+
+// Update function to authenticate session
+export async function authenticateSession(email: string, password: string): Promise<SajuSession | null> {
+  try {
+    const session = await getSajuSessionByEmail(email)
+
+    if (!session || !session.password) {
+      return null
+    }
+
+    const passwordMatch = await bcrypt.compare(password, session.password)
+
+    if (!passwordMatch) {
+      return null
+    }
+
+    // 비밀번호 필드 제거 후 반환
+    const { password: _, ...sessionWithoutPassword } = session
+    return sessionWithoutPassword
+  } catch (error) {
+    console.error("사주 세션 인증 오류:", error)
+
+    // 임시 구현: 데이터베이스 연결 실패 시 임시 인증
+    // 실제 환경에서는 이 부분을 제거하고 오류를 throw해야 함
+    if (process.env.NODE_ENV === "development") {
+      console.warn("개발 환경에서 임시 세션 인증")
+      // 테스트 계정만 인증
+      if (email === "test@example.com" && password === "password123") {
         return {
           id: "temp-test-session",
           email: "test@example.com",
@@ -121,40 +151,35 @@ export async function getSajuSessionByEmail(email: string): Promise<SajuSession 
   }
 }
 
-// Update function to authenticate session
-export async function authenticateSession(email: string, password: string): Promise<SajuSession | null> {
-  // Supabase Auth를 사용하므로 여기서는 세션 정보만 반환
-  return await getSajuSessionByEmail(email)
-}
-
 // Update function to get session by ID
 export async function getSajuSessionById(id: string): Promise<SajuSession | null> {
   try {
-    const supabase = getSupabase()
+    // Update table name from users to saju_sessions
+    const result = await db.query(`SELECT * FROM saju_sessions WHERE id = $1`, [id])
 
-    const { data, error } = await supabase.from("saju_sessions").select("*").eq("id", id).single()
-
-    if (error) {
-      if (error.code === "PGRST116") {
-        // No rows found
-        return null
-      }
-      throw error
+    if (result.rows.length === 0) {
+      return null
     }
 
+    const session = result.rows[0]
+
+    // 비밀번호 필드 제거 후 반환
     return {
-      id: data.id,
-      email: data.email,
-      name: data.name,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      auth_user_id: data.auth_user_id,
+      id: session.id,
+      email: session.email,
+      name: session.name,
+      createdAt: session.created_at,
+      updatedAt: session.updated_at,
+      auth_user_id: session.auth_user_id,
     }
   } catch (error) {
     console.error("사주 세션 조회 오류:", error)
 
+    // 임시 구현: 데이터베이스 연결 실패 시 임시 세션 반환
+    // 실제 환경에서는 이 부분을 제거하고 오류를 throw해야 함
     if (process.env.NODE_ENV === "development") {
       console.warn("개발 환경에서 임시 세션 조회")
+      // 테스트 ID만 반환
       if (id === "temp-test-session") {
         return {
           id: "temp-test-session",
@@ -171,5 +196,26 @@ export async function getSajuSessionById(id: string): Promise<SajuSession | null
 }
 
 export async function getUserById(id: string): Promise<SajuSession | null> {
-  return await getSajuSessionById(id)
+  try {
+    const result = await db.query(`SELECT * FROM saju_sessions WHERE id = $1`, [id])
+
+    if (result.rows.length === 0) {
+      return null
+    }
+
+    const session = result.rows[0]
+
+    // 비밀번호 필드 제거 후 반환
+    return {
+      id: session.id,
+      email: session.email,
+      name: session.name,
+      createdAt: session.created_at,
+      updatedAt: session.updated_at,
+      auth_user_id: session.auth_user_id,
+    }
+  } catch (error) {
+    console.error("사주 세션 조회 오류:", error)
+    return null
+  }
 }

@@ -7,13 +7,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/use-toast"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { MessageCircle, LogOut, Plus, Star, ChevronDown, ChevronUp, Calendar, Coins } from "lucide-react"
+import { MessageCircle, LogOut, Plus, Star, ChevronDown, ChevronUp, Calendar } from "lucide-react"
 import { getUserSajuProfiles } from "@/lib/saju-session-service"
 import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
 import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession } from "@/lib/saju-session-service"
 import BirthDateFormClient from "@/components/birth-date-form-client"
-import { calculateSaju } from "@/lib/saju"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -280,11 +279,11 @@ export default function MyPage() {
         const { data: sessionData, error: sessionError } = await supabase
           .from("saju_sessions")
           .select(`
-        id,
-        name,
-        gender,
-        saju
-      `)
+          id,
+          name,
+          gender,
+          saju
+        `)
           .eq("id", profileToUse.id)
           .single()
 
@@ -293,68 +292,8 @@ export default function MyPage() {
         }
 
         // saju 컬럼에서 십성 정보 추출
-        let dbSaju = sessionData?.saju || {}
+        const dbSaju = sessionData?.saju || {}
         console.log("DB에서 가져온 사주 데이터:", dbSaju)
-
-        // 불완전한 데이터 체크 및 업데이트
-        const needsUpdate =
-          // 시간 정보가 "?"인 경우
-          dbSaju.hourStem === "?" ||
-          dbSaju.hourBranch === "?" ||
-          // 십성 정보가 없는 경우
-          !dbSaju.yearStemSibseong ||
-          !dbSaju.monthStemSibseong ||
-          !dbSaju.dayStemSibseong ||
-          !dbSaju.yearBranchSibseong ||
-          !dbSaju.monthBranchSibseong ||
-          !dbSaju.dayBranchSibseong ||
-          // 오행 정보가 없는 경우
-          !dbSaju.elements ||
-          Object.keys(dbSaju.elements || {}).length === 0
-
-        if (needsUpdate) {
-          console.log("불완전한 사주 데이터 발견, 재계산 중...")
-
-          // birth_info 테이블에서 상세 정보 가져오기
-          const { data: birthInfo, error: birthError } = await supabase
-            .from("birth_info")
-            .select("*")
-            .eq("user_id", profileToUse.id)
-            .single()
-
-          if (!birthError && birthInfo) {
-            // calculateSaju 함수로 완전한 사주 데이터 계산
-            const updatedSaju = calculateSaju(
-              birthInfo.lunar_year,
-              birthInfo.lunar_month,
-              birthInfo.lunar_day,
-              birthInfo.solar_hour || 0,
-              birthInfo.solar_minute || 0,
-              birthInfo.solar_year,
-              birthInfo.solar_month,
-              birthInfo.solar_day,
-              profileToUse.gender,
-              profileToUse.name,
-              birthInfo.time_unknown,
-              birthInfo.is_leap_month,
-            )
-
-            console.log("재계산된 사주 데이터:", updatedSaju)
-
-            // 데이터베이스 업데이트
-            const { error: updateError } = await supabase
-              .from("saju_sessions")
-              .update({ saju: updatedSaju })
-              .eq("id", profileToUse.id)
-
-            if (updateError) {
-              console.error("사주 데이터 업데이트 오류:", updateError)
-            } else {
-              console.log("사주 데이터 업데이트 완료")
-              dbSaju = updatedSaju
-            }
-          }
-        }
 
         // 사주 데이터 준비
         const sajuData = {
@@ -367,7 +306,7 @@ export default function MyPage() {
             dayBranch: profileToUse.saju.dayBranch,
             hourStem: profileToUse.saju.hourStem,
             hourBranch: profileToUse.saju.hourBranch,
-            // 십성 정보 추가 - 업데이트된 saju JSONB에서 가져온 정보 우선 사용
+            // 십성 정보 추가 - saju JSONB에서 가져온 정보 우선 사용, 없으면 기존 정보 사용
             yearStemSibseong: dbSaju.yearStemSibseong || profileToUse.saju.yearStemSibseong || "",
             monthStemSibseong: dbSaju.monthStemSibseong || profileToUse.saju.monthStemSibseong || "",
             dayStemSibseong: dbSaju.dayStemSibseong || profileToUse.saju.dayStemSibseong || "비견",
@@ -376,11 +315,10 @@ export default function MyPage() {
             monthBranchSibseong: dbSaju.monthBranchSibseong || profileToUse.saju.monthBranchSibseong || "",
             dayBranchSibseong: dbSaju.dayBranchSibseong || profileToUse.saju.dayBranchSibseong || "",
             hourBranchSibseong: dbSaju.hourBranchSibseong || profileToUse.saju.hourBranchSibseong || "",
-            elements: dbSaju.elements || profileToUse.saju.elements || elements,
+            elements: profileToUse.saju.elements || elements,
             dayMaster: dbSaju.dayMaster || profileToUse.saju.dayMaster || profileToUse.saju.dayStem,
             dayMasterHanja: dbSaju.dayMasterHanja || profileToUse.saju.dayMasterHanja || "",
           },
-          sessionId: profileToUse.id, // 기존 프로필 ID를 sessionId로 사용
           name: profileToUse.name,
           gender: profileToUse.gender,
           year: profileToUse.birthYear,
@@ -509,21 +447,10 @@ export default function MyPage() {
       {/* 상단 로그아웃 버튼 */}
       <div className="flex justify-between items-center pt-4 px-4">
         <h1 className="text-xl font-bold">내 사주</h1>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push("/coin-shop")}
-            className="text-amber-600 border-amber-300 hover:bg-amber-50"
-          >
-            <Coins className="h-4 w-4 mr-2" />
-            코인충전
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500">
-            <LogOut className="h-4 w-4 mr-2" />
-            로그아웃
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500">
+          <LogOut className="h-4 w-4 mr-2" />
+          로그아웃
+        </Button>
       </div>
 
       {/* 메인 사주 프로필 */}

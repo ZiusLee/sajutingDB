@@ -91,9 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session?.user?.id)
-
-      if (event === "SIGNED_IN" && session?.user) {
-        console.log("User signed in:", session.user.id)
+      if (session?.user) {
         setUser(session.user)
 
         // 로그인 상태를 localStorage에 저장
@@ -106,9 +104,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem("user_email", session.user.email)
         }
 
-        setIsLoading(false)
-      } else if (event === "SIGNED_OUT" || !session?.user) {
-        console.log("User signed out")
+        // 로그인 상태가 변경되었고 사용자가 있는 경우 마이페이지로 리다이렉션
+        // 단, 이미 /mypage 경로에 있는 경우는 제외
+        const currentPath = window.location.pathname
+        const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list"]
+        const shouldRedirect = !excludedPaths.some((path) => currentPath.startsWith(path))
+
+        // from_mypage 플래그가 있으면 리디렉션하지 않음
+        const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
+
+        if (shouldRedirect && !fromMyPage) {
+          router.push("/mypage")
+        }
+      } else {
         setUser(null)
 
         // 로그아웃 시 localStorage에서 사용자 정보 제거
@@ -116,13 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("user_id")
         localStorage.removeItem("user_name")
         localStorage.removeItem("user_email")
-
-        setIsLoading(false)
-      } else if (session?.user) {
-        // 기존 세션이 있는 경우
-        setUser(session.user)
-        setIsLoading(false)
       }
+      setIsLoading(false)
     })
 
     // 클린업 함수

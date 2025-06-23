@@ -11,6 +11,7 @@ import { SajuLogo } from "@/components/saju-logo"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -21,6 +22,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const supabase = createClientComponentClient()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,50 +62,25 @@ export default function RegisterPage() {
     }
 
     try {
-      console.log("회원가입 API 호출 시작...")
-
-      // 우리가 만든 API 사용
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // Register with Supabase
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
         },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-        }),
       })
 
-      console.log("API 응답 상태:", response.status)
-      console.log("API 응답 헤더:", response.headers.get("content-type"))
+      if (signUpError) throw signUpError
 
-      // 응답이 JSON인지 확인
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        // JSON이 아닌 경우 텍스트로 읽기
-        const textResponse = await response.text()
-        console.error("JSON이 아닌 응답:", textResponse)
-        throw new Error(`서버 오류 (${response.status}): ${textResponse.substring(0, 100)}...`)
-      }
+      setSuccess("회원가입이 완료되었습니다. 이메일 인증 후 로그인해주세요.")
 
-      const data = await response.json()
-      console.log("API 응답 데이터:", data)
-
-      if (!response.ok) {
-        throw new Error(data.message || "회원가입 중 오류가 발생했습니다.")
-      }
-
-      if (data.success) {
-        setSuccess("회원가입이 완료되었습니다!")
-
-        // 성공 시 리다이렉트
-        setTimeout(() => {
-          router.push(data.redirectTo || "/mypage")
-        }, 2000)
-      } else {
-        throw new Error(data.message || "회원가입에 실패했습니다.")
-      }
+      // Redirect to login page after a delay
+      setTimeout(() => {
+        router.push("/mypage")
+      }, 3000)
     } catch (err) {
       console.error("회원가입 오류:", err)
       setError(err instanceof Error ? err.message : "회원가입 중 오류가 발생했습니다.")

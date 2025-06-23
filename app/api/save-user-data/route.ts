@@ -15,12 +15,6 @@ const adminSupabase = createClient(supabaseUrl!, supabaseServiceKey!)
 export async function POST(request: NextRequest) {
   try {
     const userData = await request.json()
-    console.log("=== SAVE USER DATA API START ===")
-    console.log("Received user data keys:", Object.keys(userData))
-    console.log("User ID:", userData.userId)
-    console.log("Auth User ID:", userData.authUserId)
-    console.log("Name:", userData.name)
-    console.log("Gender:", userData.gender)
     console.log("Received user data in API route:", userData)
 
     // 사용자 ID 확인
@@ -35,16 +29,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 사용자 세션 생성 또는 업데이트
-    console.log("Attempting to upsert saju session with data:", {
-      id: userId,
-      name: userData.name || "Anonymous User",
-      gender: userData.gender || "unknown",
-      relationship_status: userData.relationshipStatus || "unknown",
-      auth_user_id: userData.authUserId || null,
-      hasSaju: !!userData.saju,
-      hasDaeun: !!userData.daeun,
-    })
-
     const { data: sessionData, error: sessionError } = await adminSupabase
       .from("saju_sessions")
       .upsert(
@@ -62,20 +46,8 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (sessionError) {
-      console.error("Error creating/updating saju session:")
-      console.error("- Error message:", sessionError.message)
-      console.error("- Error details:", sessionError.details)
-      console.error("- Error hint:", sessionError.hint)
-      console.error("- Error code:", sessionError.code)
-      console.error("- Full error object:", JSON.stringify(sessionError, null, 2))
-      return NextResponse.json(
-        {
-          error: sessionError.message || "Database error occurred",
-          details: sessionError.details,
-          code: sessionError.code,
-        },
-        { status: 500 },
-      )
+      console.error("Error creating/updating saju session:", sessionError)
+      return NextResponse.json({ error: sessionError.message }, { status: 500 })
     }
 
     // For backward compatibility, still save to the old tables

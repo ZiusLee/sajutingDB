@@ -1,56 +1,4 @@
-import { getSupabase } from "./supabase-client"
-
-/**
- * Check if a saju profile has valid data
- */
-function isValidSajuProfile(profile: any): boolean {
-  // Check if essential birth info is valid
-  if (!profile.birthYear || profile.birthYear === "N/A" || profile.birthYear === "") {
-    return false
-  }
-  if (!profile.birthMonth || profile.birthMonth === "N/A" || profile.birthMonth === "") {
-    return false
-  }
-  if (!profile.birthDay || profile.birthDay === "N/A" || profile.birthDay === "") {
-    return false
-  }
-
-  // Check if name is valid
-  if (!profile.name || profile.name === "무명" || profile.name === "" || profile.name === "N/A") {
-    return false
-  }
-
-  // Check if saju data is valid
-  if (!profile.saju) {
-    return false
-  }
-
-  const saju = profile.saju
-  if (
-    !saju.yearStem ||
-    saju.yearStem === "N/A" ||
-    saju.yearStem === "" ||
-    !saju.yearBranch ||
-    saju.yearBranch === "N/A" ||
-    saju.yearBranch === "" ||
-    !saju.monthStem ||
-    saju.monthStem === "N/A" ||
-    saju.monthStem === "" ||
-    !saju.monthBranch ||
-    saju.monthBranch === "N/A" ||
-    saju.monthBranch === "" ||
-    !saju.dayStem ||
-    saju.dayStem === "N/A" ||
-    saju.dayStem === "" ||
-    !saju.dayBranch ||
-    saju.dayBranch === "N/A" ||
-    saju.dayBranch === ""
-  ) {
-    return false
-  }
-
-  return true
-}
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 /**
  * Get all saju profiles for the current authenticated user
@@ -58,7 +6,7 @@ function isValidSajuProfile(profile: any): boolean {
  */
 export async function getUserSajuProfiles() {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
     const { data: userData } = await supabase.auth.getUser()
 
     if (!userData.user) {
@@ -135,7 +83,7 @@ export async function getUserSajuProfiles() {
     }
 
     // Map the data to our profile format
-    const allProfiles = sessions.map((session) => {
+    const profiles = sessions.map((session) => {
       // Get the first birth_info and saju_info records if they exist
       const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
       const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
@@ -179,29 +127,8 @@ export async function getUserSajuProfiles() {
       }
     })
 
-    // ===== 유효한 사주 프로필만 필터링 =====
-    const validProfiles = allProfiles.filter(isValidSajuProfile)
-
-    console.log(`Filtered ${allProfiles.length} profiles down to ${validProfiles.length} valid profiles`)
-
-    // 유효하지 않은 프로필들을 로그로 출력 (디버깅용)
-    const invalidProfiles = allProfiles.filter((profile) => !isValidSajuProfile(profile))
-    if (invalidProfiles.length > 0) {
-      console.log(
-        "Invalid profiles filtered out:",
-        invalidProfiles.map((p) => ({
-          id: p.id,
-          name: p.name,
-          birthYear: p.birthYear,
-          birthMonth: p.birthMonth,
-          birthDay: p.birthDay,
-          saju: p.saju,
-        })),
-      )
-    }
-
-    console.log(`Returning ${validProfiles.length} valid profiles`)
-    return { profiles: validProfiles, authUserId }
+    console.log(`Returning ${profiles.length} profiles`)
+    return { profiles, authUserId }
   } catch (error) {
     console.error("Error in getUserSajuProfiles:", error)
     return { profiles: [], authUserId: null }
@@ -214,7 +141,7 @@ export async function getUserSajuProfiles() {
  */
 export async function linkSessionToUser(sessionId: string): Promise<boolean> {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
     const { data: userData } = await supabase.auth.getUser()
 
     if (!userData.user) {
@@ -280,7 +207,7 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
  */
 export async function findAndLinkSessions(): Promise<{ success: boolean; linkedCount: number }> {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
     const { data: userData } = await supabase.auth.getUser()
 
     if (!userData.user) {
@@ -372,7 +299,7 @@ export async function findAndLinkSessions(): Promise<{ success: boolean; linkedC
  */
 async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Promise<boolean> {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
 
     // Check if the session exists and is not linked
     const { data: session, error: checkError } = await supabase
@@ -428,7 +355,7 @@ async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Pro
  */
 export async function getSajuDataByUuid(uuid: string) {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
     console.log(`Fetching saju data for UUID: ${uuid}`)
 
     // First try to get the session directly
@@ -550,7 +477,7 @@ export async function getSajuDataByUuid(uuid: string) {
  */
 export async function debugCheckSessions(authUserId: string) {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
 
     // Check for sessions with this auth_user_id
     const { data: sessions, error } = await supabase
@@ -576,7 +503,7 @@ export async function debugCheckSessions(authUserId: string) {
  */
 export async function getUserSajuSessions(authUserId: string): Promise<any[]> {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
 
     const { data, error } = await supabase
       .from("saju_sessions")
@@ -601,7 +528,7 @@ export async function getUserSajuSessions(authUserId: string): Promise<any[]> {
  */
 export async function setDefaultSajuSession(authUserId: string, sessionId: string): Promise<boolean> {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
 
     // First, reset all sessions for this user to not be default
     const { error: resetError } = await supabase
@@ -638,50 +565,21 @@ export async function setDefaultSajuSession(authUserId: string, sessionId: strin
  */
 export async function getDefaultSajuSession(authUserId: string): Promise<any | null> {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
 
-    // First, check how many default sessions exist for this user
-    const { data: defaultSessions, error: checkError } = await supabase
+    const { data, error } = await supabase
       .from("saju_sessions")
       .select("*")
       .eq("auth_user_id", authUserId)
       .eq("is_default", true)
+      .single()
 
-    if (checkError) {
-      console.error("Error checking default sessions:", checkError)
+    if (error) {
+      console.error("Error getting default saju session:", error)
       return null
     }
 
-    console.log(`Found ${defaultSessions?.length || 0} default sessions for user ${authUserId}`)
-
-    // If no default session, return null
-    if (!defaultSessions || defaultSessions.length === 0) {
-      console.log("No default session found")
-      return null
-    }
-
-    // If multiple default sessions, fix by keeping only the first one
-    if (defaultSessions.length > 1) {
-      console.log("Multiple default sessions found, fixing...")
-
-      // Reset all to non-default
-      await supabase.from("saju_sessions").update({ is_default: false }).eq("auth_user_id", authUserId)
-
-      // Set the first one as default
-      const { error: updateError } = await supabase
-        .from("saju_sessions")
-        .update({ is_default: true })
-        .eq("id", defaultSessions[0].id)
-
-      if (updateError) {
-        console.error("Error fixing multiple defaults:", updateError)
-      }
-
-      return defaultSessions[0]
-    }
-
-    // Return the single default session
-    return defaultSessions[0]
+    return data
   } catch (error) {
     console.error("Error in getDefaultSajuSession:", error)
     return null
@@ -693,7 +591,7 @@ export async function getDefaultSajuSession(authUserId: string): Promise<any | n
  */
 export async function getSajuProfileBySessionId(sessionId: string): Promise<any | null> {
   try {
-    const supabase = getSupabase()
+    const supabase = createClientComponentClient()
 
     const { data, error } = await supabase
       .from("saju_sessions")
@@ -750,7 +648,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     console.log("JSONB saju data from database:", sajuJsonb)
 
-    const profile = {
+    return {
       id: data.id,
       name: data.name || "Unknown",
       gender: data.gender || "unknown",
@@ -795,14 +693,6 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
       },
     }
-
-    // ===== 유효성 검사 추가 =====
-    if (!isValidSajuProfile(profile)) {
-      console.log("Profile failed validation:", profile)
-      return null
-    }
-
-    return profile
   } catch (error) {
     console.error("Error in getSajuProfileBySessionId:", error)
     return null

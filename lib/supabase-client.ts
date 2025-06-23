@@ -6,9 +6,7 @@ let supabaseInstance: SupabaseClient | null = null
 
 export function getSupabase() {
   if (!supabaseInstance) {
-    if (process.env.NODE_ENV === "development") {
-      console.log("Creating new Supabase client instance")
-    }
+    // 세션 지속성을 'local'로 설정하여 브라우저를 닫아도 세션이 유지되도록 함
     supabaseInstance = createClientComponentClient({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://tqrwktpmyylxyhgsrwlo.supabase.co",
       supabaseKey:
@@ -23,8 +21,6 @@ export function getSupabase() {
         },
       },
     })
-  } else if (process.env.NODE_ENV === "development") {
-    console.log("Using existing Supabase client instance")
   }
   return supabaseInstance
 }
@@ -37,10 +33,6 @@ const supabaseAnonKey =
 
 // Cache for file URLs to prevent duplicate fetches
 const fileUrlCache: Record<string, string> = {}
-
-// IMPORTANT: Only export the singleton getter, not a direct instance
-// Remove the direct export to prevent multiple instances
-// export const supabase = getSupabase() // ← 이 줄을 제거
 
 // Export the supabase client for backward compatibility
 // Use a getter to ensure we're always using the singleton
