@@ -185,9 +185,73 @@ export default function MyPage() {
 
         if (sessionError) throw new Error("사주 데이터를 가져오는데 실패했습니다.")
 
-        const dbSaju = (sessionData?.saju as Saju) || {}
+        let dbSaju = (sessionData?.saju as Saju) || {}
         let dbDaeun = sessionData?.daeun
 
+        // 사주 데이터 완성도 체크 및 재계산
+        const isSajuIncomplete =
+          !dbSaju ||
+          !dbSaju.yearStem ||
+          !dbSaju.yearBranch ||
+          !dbSaju.monthStem ||
+          !dbSaju.monthBranch ||
+          !dbSaju.dayStem ||
+          !dbSaju.dayBranch ||
+          !dbSaju.hourStem ||
+          !dbSaju.hourBranch ||
+          !dbSaju.yearStemSibseong ||
+          !dbSaju.monthStemSibseong ||
+          !dbSaju.dayBranchSibseong ||
+          !dbSaju.hourBranchSibseong ||
+          !dbSaju.elements
+
+        if (isSajuIncomplete) {
+          console.log("사주 데이터가 불완전하여 재계산 중...")
+
+          try {
+            // calculateSaju 함수 import 필요
+            const { calculateSaju } = await import("@/lib/saju")
+
+            const recalculatedSaju = calculateSaju(
+              Number.parseInt(profileToUse.lunarYear || profileToUse.birthYear),
+              Number.parseInt(profileToUse.lunarMonth || profileToUse.birthMonth),
+              Number.parseInt(profileToUse.lunarDay || profileToUse.birthDay),
+              profileToUse.timeUnknown ? 12 : Number.parseInt(profileToUse.birthHour),
+              profileToUse.timeUnknown ? 0 : Number.parseInt(profileToUse.birthMinute),
+              Number.parseInt(profileToUse.birthYear),
+              Number.parseInt(profileToUse.birthMonth),
+              Number.parseInt(profileToUse.birthDay),
+              profileToUse.gender,
+              profileToUse.name,
+              profileToUse.timeUnknown,
+              false, // isLeapMonth
+              undefined, // apiMonthStem
+              undefined, // apiMonthBranch
+              "동경135도", // timeStandard
+            )
+
+            console.log("재계산된 사주 데이터:", recalculatedSaju)
+
+            // DB에 재계산된 사주 데이터 저장
+            const { error: updateSajuError } = await supabase
+              .from("saju_sessions")
+              .update({ saju: recalculatedSaju })
+              .eq("id", profileToUse.id)
+
+            if (updateSajuError) {
+              console.error("사주 데이터 저장 실패:", updateSajuError)
+              toast({ title: "사주 데이터 저장 실패", variant: "destructive" })
+            } else {
+              console.log("사주 데이터 저장 성공")
+              dbSaju = recalculatedSaju
+            }
+          } catch (sajuError) {
+            console.error("사주 재계산 실패:", sajuError)
+            toast({ title: "사주 재계산 실패", variant: "destructive" })
+          }
+        }
+
+        // 대운 데이터 체크 및 계산
         if (!dbDaeun || !dbDaeun.pillars || !Array.isArray(dbDaeun.pillars) || dbDaeun.pillars.length === 0) {
           console.log("대운 데이터가 없거나 유효하지 않아 계산 중...")
           try {
@@ -200,9 +264,9 @@ export default function MyPage() {
 
             // Ensure saju object for calculateDaeunInfo has the minimally required fields
             const sajuForDaeunCalc: Pick<Saju, "yearStem" | "monthStem" | "monthBranch"> = {
-              yearStem: profileToUse.saju.yearStem,
-              monthStem: profileToUse.saju.monthStem,
-              monthBranch: profileToUse.saju.monthBranch,
+              yearStem: dbSaju.yearStem || profileToUse.saju.yearStem,
+              monthStem: dbSaju.monthStem || profileToUse.saju.monthStem,
+              monthBranch: dbSaju.monthBranch || profileToUse.saju.monthBranch,
             }
 
             const daeunData = calculateDaeunInfo(
@@ -240,7 +304,7 @@ export default function MyPage() {
           saju: {
             ...dbSaju,
             daeun: dbDaeun,
-            elements: profileToUse.saju.elements || elements,
+            elements: dbSaju.elements || profileToUse.saju.elements || elements,
             dayMaster: dbSaju.dayMaster || profileToUse.saju.dayStem,
             dayMasterHanja: dbSaju.dayMasterHanja || "",
           },
