@@ -200,7 +200,7 @@ export default function CompatibleMatches({
             age: 32,
             birthYear: "1992년생",
             saju: "임신-계유-갑술-을해",
-            compatibility: "안정적인 가정을 이루고 서로를 ��지하는 든든한 배우자 관계",
+            compatibility: "안정적인 가정을 이루고 서로를 지지하는 든든한 배우자 관계",
             compatibilityScore: 95,
             imageUrl: "/placeholder.svg?height=150&width=150",
           },

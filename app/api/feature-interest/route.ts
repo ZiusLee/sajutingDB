@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       [featureType, userId || null, ip],
     )
 
-    // 해당 기능에 대한 총 관심������� 카운트 (중복 제거)
+    // 해당 기능에 대한 총 관심����� 카운트 (중복 제거)
     const result = await query(
       `SELECT COUNT(DISTINCT COALESCE(user_id::text, ip_address)) as interest_count 
        FROM feature_interest 

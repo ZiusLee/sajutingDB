@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button"
 
 interface DaeunPeriod {
   age: number
-  start: string // "2001.1.6" 형태의 날짜 문자열
-  startYear?: number
-  endYear?: number
+  startYear: number
+  endYear: number
   stem: string
   branch: string
   stemHanja?: string
@@ -32,22 +31,6 @@ interface DaeunDiagramProps {
   gender?: string
 }
 
-// 대운 기간 파싱 함수
-const parseDaeunPeriod = (period: DaeunPeriod) => {
-  if (period.startYear && period.endYear) {
-    return { startYear: period.startYear, endYear: period.endYear }
-  }
-
-  // start 필드에서 연도 파싱 (예: "2001.1.6" -> 2001)
-  if (period.start) {
-    const startYear = Number.parseInt(period.start.split(".")[0])
-    const endYear = startYear + 9 // 대운은 10년 단위
-    return { startYear, endYear }
-  }
-
-  return { startYear: 0, endYear: 0 }
-}
-
 const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gender }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<DaeunPeriod | null>(null)
   const currentYear = new Date().getFullYear()
@@ -55,10 +38,7 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
   // 현재 대운 찾기
   const getCurrentDaeun = () => {
     if (!Array.isArray(daeun)) return null
-    return daeun.find((period) => {
-      const { startYear, endYear } = parseDaeunPeriod(period)
-      return currentYear >= startYear && currentYear <= endYear
-    })
+    return daeun.find((period) => currentYear >= period.startYear && currentYear <= period.endYear)
   }
 
   const currentDaeun = getCurrentDaeun()
@@ -67,7 +47,7 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
   const daeunExplanation = `
 대운(大運)은 10년 단위로 변화하는 인생의 큰 흐름을 나타냅니다.
 
-• **현재 대운**: ${currentDaeun ? `${currentDaeun.stem}${currentDaeun.branch} (${parseDaeunPeriod(currentDaeun).startYear}-${parseDaeunPeriod(currentDaeun).endYear})` : "해당 없음"}
+• **현재 대운**: ${currentDaeun ? `${currentDaeun.stem}${currentDaeun.branch} (${currentDaeun.startYear}-${currentDaeun.endYear})` : "해당 없음"}
 • **대운의 의미**: 각 10년마다 다른 천간지지가 영향을 미쳐 운세의 흐름이 바뀝니다
 • **활용법**: 대운을 통해 인생의 전환점과 중요한 시기를 파악할 수 있습니다
 
@@ -121,10 +101,9 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
       <div className="overflow-x-auto">
         <div className="flex gap-2 min-w-max pb-2">
           {daeun.slice(0, 8).map((period, index) => {
-            const { startYear, endYear } = parseDaeunPeriod(period)
-            const isCurrent = currentYear >= startYear && currentYear <= endYear
-            const isPast = currentYear > endYear
-            const isFuture = currentYear < startYear
+            const isCurrent = currentYear >= period.startYear && currentYear <= period.endYear
+            const isPast = currentYear > period.endYear
+            const isFuture = currentYear < period.startYear
 
             return (
               <div
@@ -156,7 +135,7 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
                     )}
                   </div>
                   <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>
-                    {parseDaeunPeriod(period).startYear}-{parseDaeunPeriod(period).endYear}
+                    {period.startYear}-{period.endYear}
                   </div>
                 </div>
               </div>
@@ -170,7 +149,7 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
         <div className="mt-4 p-3 bg-yellow-400/20 border border-yellow-400/30 rounded-lg">
           <div className="text-yellow-200 text-sm font-medium">
             현재 대운: {currentDaeun.stem}
-            {currentDaeun.branch} ({parseDaeunPeriod(currentDaeun).startYear}-{parseDaeunPeriod(currentDaeun).endYear})
+            {currentDaeun.branch} ({currentDaeun.startYear}-{currentDaeun.endYear})
           </div>
           <div className="text-yellow-100/80 text-xs mt-1">{currentDaeun.age}세부터 시작된 10년 운세 기간</div>
         </div>
@@ -183,8 +162,7 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
             <DialogHeader>
               <DialogTitle className="text-white">
                 {selectedPeriod.stem}
-                {selectedPeriod.branch} 대운 ({parseDaeunPeriod(selectedPeriod).startYear}-
-                {parseDaeunPeriod(selectedPeriod).endYear})
+                {selectedPeriod.branch} 대운 ({selectedPeriod.startYear}-{selectedPeriod.endYear})
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 text-white/90">
@@ -197,7 +175,7 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
               <div>
                 <div className="text-sm text-white/60">기간</div>
                 <div className="font-medium">
-                  {parseDaeunPeriod(selectedPeriod).startYear}년 ~ {parseDaeunPeriod(selectedPeriod).endYear}년
+                  {selectedPeriod.startYear}년 ~ {selectedPeriod.endYear}년
                 </div>
               </div>
               <div>

@@ -179,16 +179,6 @@ export default function SajuDiagram({
   // 이름 처리 로직 개선
   const displayName = name || "사용자"
 
-  const adjustedTime = (() => {
-    const totalMinutes = Number(hour) * 60 + Number(minute) - 32
-    const adjustedHour = Math.floor(totalMinutes / 60)
-    const adjustedMinute = totalMinutes % 60
-    return {
-      hour: adjustedHour < 0 ? adjustedHour + 24 : adjustedHour,
-      minute: adjustedMinute < 0 ? adjustedMinute + 60 : adjustedMinute,
-    }
-  })()
-
   return (
     <div className="space-y-4">
       {/* 상단 정보 섹션 */}
@@ -242,8 +232,7 @@ export default function SajuDiagram({
           {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location || "위치 미상"}
         </p>
         <p className="text-gray-700 dark:text-gray-300">
-          만세력 {solarYear}/{solarMonth}/{solarDay} {adjustedTime.hour.toString().padStart(2, "0")}:
-          {adjustedTime.minute.toString().padStart(2, "0")}{" "}
+          양 {solarYear}/{solarMonth}/{solarDay} {Number(hour) - 1}:{Number(minute) + 28}{" "}
           {gender === "male" ? "남자" : gender === "female" ? "여자" : ""} {location || "위치 미상"} (지역시 -32분)
         </p>
       </div>

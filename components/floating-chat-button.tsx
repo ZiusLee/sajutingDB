@@ -20,7 +20,7 @@ export default function FloatingChatButton({ defaultProfile }: FloatingChatButto
   const handleSendMessage = () => {
     if (!message.trim()) return
 
-    // 메시지와 함께 채팅방으로 ���동
+    // 메시지와 함께 채팅방으로 이동
     const encodedMessage = encodeURIComponent(message)
     router.push(`/saju-chat/general?message=${encodedMessage}`)
   }

@@ -106,7 +106,7 @@ export default function UserProfileDropdown({ isOpen, onClose, onToggle, current
             <User className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1">
-            <div className="font-medium text-white">{currentName || "사���자"}님</div>
+            <div className="font-medium text-white">{currentName || "사용자"}님</div>
             <div className="text-sm text-gray-400">로그인됨</div>
           </div>
         </div>
