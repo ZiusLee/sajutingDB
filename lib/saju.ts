@@ -361,7 +361,7 @@ function getHourBranch(hour: number, minute: number, timeStandard: TimeStandard 
     // 00:30-02:30 자(子)시
     if (totalHours >= 0.5 && totalHours < 2.5) return "자"
     // 02:30-04:30 축(丑)시
-    if (totalHours >= 2.5 && totalHours < 4.5) return "축"
+    if (totalHours >= 2.5 && totalHours < 4.5) return "���"
     // 04:30-06:30 인(寅)시
     if (totalHours >= 4.5 && totalHours < 6.5) return "인"
     // 06:30-08:30 묘(卯)시

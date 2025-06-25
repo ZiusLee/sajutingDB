@@ -7,13 +7,7 @@ const API_BASE_URL = "/api/memories"
 // For example, user_id could come from an auth context, session_id from localStorage
 function getAuthHeaders(userId?: string | null, sessionId?: string | null): HeadersInit {
   const headers: HeadersInit = { "Content-Type": "application/json" }
-  if (userId) {
-    // This is a placeholder. Your actual auth mechanism (e.g., JWT token) should be used.
-    // Or, if your API routes can access server-side session, this might not be needed.
-    // For the provided API routes, they expect 'x-user-id'.
-    headers["x-user-id"] = userId
-  }
-  // session_id is often passed in body or query params for anonymous users
+  // Remove the x-user-id header as it's not being used in the API route
   return headers
 }
 
@@ -44,27 +38,30 @@ export async function getMemories(
   sessionId?: string | null,
   type?: MemoryType,
 ): Promise<MemoryEntry[]> {
-  if (!userId && !sessionId) {
-    // Or return empty array, or let API handle error
-    throw new Error("Either userId or sessionId must be provided to fetch memories.")
-  }
-  const params = new URLSearchParams()
-  if (sessionId && !userId) {
-    // Prioritize userId if both somehow provided
-    params.append("session_id", sessionId)
-  }
-  if (type) {
-    params.append("type", type)
-  }
+  try {
+    const params = new URLSearchParams()
+    if (sessionId && !userId) {
+      params.append("session_id", sessionId)
+    }
+    if (type) {
+      params.append("type", type)
+    }
 
-  const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
-    headers: getAuthHeaders(userId),
-  })
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: "Failed to fetch memories" }))
-    throw new Error(errorData.error || `HTTP error ${response.status}`)
+    const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
+      headers: getAuthHeaders(userId),
+    })
+
+    if (!response.ok) {
+      console.error(`API Error: ${response.status} ${response.statusText}`)
+      const errorData = await response.json().catch(() => ({ error: "Failed to fetch memories" }))
+      throw new Error(errorData.error || `HTTP error ${response.status}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error in getMemories:", error)
+    throw error
   }
-  return response.json()
 }
 
 export async function getMemoryById(id: string, userId?: string | null): Promise<MemoryEntry> {

@@ -56,101 +56,63 @@ export async function POST(request: NextRequest) {
 
     const supabase = createRouteHandlerClient({ cookies })
 
-    // 기존 메시지 수 확인하여 중복 방지
+    // 기존 메시지 조회 (내용과 순서 기반 중복 체크용)
     const { data: existingMessages, error: countError } = await supabase
       .from("messages")
-      .select("id, message_order, role")
+      .select("id, message_order, role, content")
       .eq("session_id", sessionId)
       .order("message_order", { ascending: true })
 
     if (countError) {
       console.error("Error checking existing messages:", countError)
+      return NextResponse.json({ error: "Failed to check existing messages" }, { status: 500 })
     }
 
     const existingCount = existingMessages?.length || 0
-    const highestOrder = existingMessages?.length > 0 ? Math.max(...existingMessages.map((m) => m.message_order)) : -1
+    const maxMessageOrder =
+      existingMessages?.length > 0 ? Math.max(...existingMessages.map((m) => m.message_order)) : -1
 
-    console.log(`[SERVER] Found ${existingCount} existing messages, highest order: ${highestOrder}`)
+    console.log(`[SERVER] Found ${existingCount} existing messages, max message_order: ${maxMessageOrder}`)
     console.log(
       `[SERVER] Existing messages:`,
-      existingMessages?.map((m) => `${m.message_order}: ${m.role}`),
+      existingMessages?.map((m) => `${m.message_order}: ${m.role} - ${m.content.substring(0, 30)}...`),
     )
 
-    // 저장할 메시지 필터링 로직 개선
-    // roomType에 따라 다른 필터링 적용
-    let messagesToSave: any[] = []
+    // 새로운 메시지 필터링 (내용 기반 중복 체크)
+    const newMessages = messages.filter((message, index) => {
+      // 기존 메시지와 내용이 같은지 확인
+      const isDuplicate = existingMessages?.some(
+        (existing) => existing.content === message.content && existing.role === message.role,
+      )
 
-    if (roomType === "sajuping") {
-      // 사주핑: message_order 2 이상만 저장 (초기 메시지 2개 제외)
-      messagesToSave = messages.filter((message, index) => {
-        const messageOrder = index
-        const shouldSave = messageOrder >= 2
-        console.log(`[SERVER] Sajuping - Message ${messageOrder} (${message.role}): shouldSave=${shouldSave}`)
-        return shouldSave
-      })
-    } else if (roomType === "tarot") {
-      // 타로핑: message_order 1 이상만 저장 (초기 메시지 1개 제외)
-      messagesToSave = messages.filter((message, index) => {
-        const messageOrder = index
-        const shouldSave = messageOrder >= 1
-        console.log(`[SERVER] Tarot - Message ${messageOrder} (${message.role}): shouldSave=${shouldSave}`)
-        return shouldSave
-      })
-    } else {
-      // 기타: message_order 1 이상만 저장 (초기 메시지 1개 제외)
-      messagesToSave = messages.filter((message, index) => {
-        const messageOrder = index
-        const shouldSave = messageOrder >= 1
-        console.log(`[SERVER] ${roomType} - Message ${messageOrder} (${message.role}): shouldSave=${shouldSave}`)
-        return shouldSave
-      })
-    }
+      const isNew = !isDuplicate
+      console.log(
+        `[SERVER] Message ${index} (${message.role}): isNew=${isNew}, content="${message.content.substring(0, 50)}..."`,
+      )
 
-    if (messagesToSave.length === 0) {
-      console.log(`[SERVER] No messages to save (all are initial messages)`)
-      return NextResponse.json({ success: true, messageIds: [], savedCount: 0 })
-    }
-
-    // 새로운 메시지만 저장 (이미 저장된 것은 제외)
-    const newMessages = messagesToSave.filter((message) => {
-      const messageOrder = messages.indexOf(message)
-      const isNew = messageOrder > highestOrder
-      console.log(`[SERVER] Message ${messageOrder} (${message.role}): isNew=${isNew}`)
       return isNew
     })
 
     if (newMessages.length === 0) {
-      console.log(`[SERVER] No new messages to save (all already exist)`)
+      console.log(`[SERVER] No new messages to save (all are duplicates)`)
       return NextResponse.json({ success: true, messageIds: [], savedCount: 0 })
     }
 
-    console.log(
-      `[SERVER] Messages to save breakdown:`,
-      messagesToSave.map((m, i) => `${messages.indexOf(m)}: ${m.role}`),
-    )
-    console.log(
-      `[SERVER] New messages breakdown:`,
-      newMessages.map((m) => `${messages.indexOf(m)}: ${m.role}`),
-    )
+    console.log(`[SERVER] Found ${newMessages.length} new messages to save`)
 
-    console.log(
-      `[SERVER] Saving ${newMessages.length} new messages:`,
-      newMessages.map((m) => `${m.role} (${messages.indexOf(m)})`),
-    )
+    // 새 메시지에 message_order 할당 (DB의 최대값 + 1부터 시작)
+    const messagesToInsert = newMessages.map((message, index) => {
+      const newMessageOrder = maxMessageOrder + 1 + index
 
-    // Save messages to database
-    const messagesToInsert = newMessages.map((message) => {
-      const originalIndex = messages.indexOf(message)
-      // 메시지 역할 로깅
       console.log(
-        `[SERVER] Preparing to insert message: order=${originalIndex}, role=${message.role}, content=${message.content.substring(0, 30)}...`,
+        `[SERVER] Preparing to insert message: order=${newMessageOrder}, role=${message.role}, content=${message.content.substring(0, 30)}...`,
       )
 
       return {
         session_id: sessionId,
         role: message.role,
         content: message.content,
-        message_order: originalIndex, // 원래 인덱스 사용
+        message_order: newMessageOrder,
         room_type: roomType,
         model_used: message.model_used || null,
         response_time_ms: message.response_time_ms || null,

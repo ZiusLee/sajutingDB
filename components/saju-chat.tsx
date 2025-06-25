@@ -475,12 +475,22 @@ export default function SajuChat({
     },
     onFinish: async (message) => {
       try {
+        // 어시스턴트 메시지가 완료되면 현재 messages 배열에 새 메시지를 추가
         const updatedMessages = [...messages, message]
 
-        // 항상 DB에 저장 (세션 ID가 있는 경우)
+        console.log("[CHAT] onFinish - 어시스턴트 메시지 완료:", message.id)
+        console.log("[CHAT] onFinish - 전체 메시지 수:", updatedMessages.length)
+        console.log(
+          "[CHAT] onFinish - 메시지 구성:",
+          updatedMessages.map((m, i) => `${i}: ${m.role}`),
+        )
+
+        // 어시스턴트 메시지만 추가 저장 (사용자 메시지는 이미 저장됨)
         if (databaseSessionId) {
-          console.log("[CHAT] 어시스턴트 메시지 DB 저장")
+          console.log("[CHAT] 어시스턴트 메시지 DB 저장 시작")
           await saveMessagesToDatabase(updatedMessages, databaseSessionId)
+        } else {
+          console.warn("[CHAT] 세션 ID가 없어 어시스턴트 메시지 저장 불가")
         }
 
         setShouldGenerateQuestions(true)
@@ -519,6 +529,11 @@ export default function SajuChat({
       try {
         console.log(`[CHAT] DB 저장 시작 - ${messagesToSave.length}개 메시지, 세션: ${sessionId}`)
 
+        // 저장할 메시지들의 상세 정보 로깅
+        messagesToSave.forEach((msg, index) => {
+          console.log(`[CHAT] 메시지 ${index}: ${msg.role} - ${msg.content.substring(0, 50)}...`)
+        })
+
         const response = await fetch("/api/messages", {
           method: "POST",
           headers: {
@@ -540,12 +555,13 @@ export default function SajuChat({
         if (response.ok) {
           const data = await response.json()
           console.log(`[CHAT] DB 저장 성공 - ${data.savedCount || 0}개 메시지`)
+          console.log(`[CHAT] 반환된 메시지 ID들:`, data.messageIds)
 
           if (data.messageIds && data.messageIds.length > 0) {
             setTimeout(() => {
               const newMessageIds: Record<string, string> = {}
-              const savableMessages = messagesToSave.filter((_, index) => index >= 2)
-              savableMessages.forEach((msg, index) => {
+              // 모든 메시지에 대해 ID 매핑 (필터링 제거)
+              messagesToSave.forEach((msg, index) => {
                 if (data.messageIds[index]) {
                   newMessageIds[msg.id] = data.messageIds[index]
                 }
@@ -586,7 +602,7 @@ export default function SajuChat({
     [databaseSessionId, messages, saveMessagesToDatabase],
   )
 
-  const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const customHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!input.trim()) {
@@ -608,8 +624,26 @@ export default function SajuChat({
     setStreamingError(null)
     setRetryCount(0)
 
-    // 사용자 메시지 저장
-    saveUserMessage(input)
+    const userMessage = input.trim()
+    console.log("[CHAT] 사용자 메시지 전송:", userMessage)
+
+    // 사용자 메시지를 즉시 저장 (AI 응답 전에)
+    if (databaseSessionId) {
+      try {
+        const userMessageObj = {
+          id: `user-${Date.now()}`,
+          role: "user" as const,
+          content: userMessage,
+        }
+
+        // 현재 messages에 user 메시지 추가하여 저장
+        const messagesWithUser = [...messages, userMessageObj]
+        console.log("[CHAT] 사용자 메시지 즉시 저장 시작")
+        await saveMessagesToDatabase(messagesWithUser, databaseSessionId)
+      } catch (error) {
+        console.error("[CHAT] 사용자 메시지 저장 오류:", error)
+      }
+    }
 
     // AI 채팅 제출
     aiHandleSubmit(e)
