@@ -156,7 +156,7 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
                     )}
                   </div>
                   <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>
-                    {startYear}-{endYear}
+                    {parseDaeunPeriod(period).startYear}-{parseDaeunPeriod(period).endYear}
                   </div>
                 </div>
               </div>

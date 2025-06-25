@@ -272,18 +272,31 @@ function getYearPillar(
   solarYear: number,
   solarMonth: number,
   solarDay: number,
+  timezoneOffset = 9,
 ): { stem: string; branch: string } {
   let yearToUse = solarYear
 
+  // UTC 기준으로 날짜 생성 후 시간대 오프셋 적용
+  const utcDate = new Date(Date.UTC(solarYear, solarMonth - 1, solarDay, 12, 0, 0)) // 정오 기준
+  const localDate = new Date(utcDate.getTime() + timezoneOffset * 60 * 60 * 1000)
+
+  const adjustedYear = localDate.getUTCFullYear()
+  const adjustedMonth = localDate.getUTCMonth() + 1
+  const adjustedDay = localDate.getUTCDate()
+
   // 현재 날짜가 입춘 이전인지 확인 (2월 4일 이전)
-  const isBeforeLichun = solarMonth < 2 || (solarMonth === 2 && solarDay < 4)
+  const isBeforeLichun = adjustedMonth < 2 || (adjustedMonth === 2 && adjustedDay < 4)
 
   // 입춘 이전이면 이전 연도 사용
   if (isBeforeLichun) {
-    yearToUse = solarYear - 1
+    yearToUse = adjustedYear - 1
+  } else {
+    yearToUse = adjustedYear
   }
 
-  console.log(`Year calculation: ${solarYear}-${solarMonth}-${solarDay}, using year ${yearToUse}`)
+  console.log(
+    `Year calculation: ${solarYear}-${solarMonth}-${solarDay} (UTC${timezoneOffset >= 0 ? "+" : ""}${timezoneOffset}) -> adjusted: ${adjustedYear}-${adjustedMonth}-${adjustedDay}, using year ${yearToUse}`,
+  )
 
   // 갑자년은 서기 4년에 해당 (4 = 갑자, 5 = 을축, ...)
   const stemIndex = (yearToUse + 6) % 10 // 보정: +6
@@ -538,17 +551,27 @@ function generateInterpretation(
 }
 
 // 일간지 계산 (Day Pillar) - 양력 기준
-function getDayPillar(solarYear: number, solarMonth: number, solarDay: number): { stem: string; branch: string } {
-  // 1996년 1월 6일 임인일 기준으로 계산
-  const BASE_DATE = new Date(1996, 0, 6) // 1996년 1월 6일
+function getDayPillar(
+  solarYear: number,
+  solarMonth: number,
+  solarDay: number,
+  timezoneOffset = 9,
+): { stem: string; branch: string } {
+  // 1996년 1월 6일 임인일 기준으로 계산 (UTC 기준)
+  const BASE_DATE = new Date(Date.UTC(1996, 0, 6, 12, 0, 0)) // UTC 정오 기준
   const BASE_STEM_INDEX = 8 // 임(壬)
   const BASE_BRANCH_INDEX = 2 // 인(寅)
 
-  // 기준일로부터의 일수 차이 계산
-  const targetDate = new Date(solarYear, solarMonth - 1, solarDay)
+  // UTC 기준으로 목표 날짜 생성 후 시간대 오프셋 적용
+  const targetDateUTC = new Date(Date.UTC(solarYear, solarMonth - 1, solarDay, 12, 0, 0))
+  const targetDate = new Date(targetDateUTC.getTime() + timezoneOffset * 60 * 60 * 1000)
 
-  // 밀리초 단위 차이를 일 단위로 변환
+  // 밀리초 단위 차이를 일 단위로 변환 (UTC 기준으로 계산)
   const dayDiff = Math.floor((targetDate.getTime() - BASE_DATE.getTime()) / (1000 * 60 * 60 * 24))
+
+  console.log(
+    `Day pillar calculation: ${solarYear}-${solarMonth}-${solarDay} (UTC${timezoneOffset >= 0 ? "+" : ""}${timezoneOffset}), dayDiff: ${dayDiff}`,
+  )
 
   // 천간 및 지지 계산 (60일 주기로 순환)
   const stemIndex = (BASE_STEM_INDEX + dayDiff) % 10
@@ -568,14 +591,21 @@ function getDayPillar(solarYear: number, solarMonth: number, solarDay: number): 
 // [절기명, 월지, 시작 월, 시작일, 시작 시간(24시간제)]
 
 import { EXACT_SOLAR_TERMS } from "./solar-terms"
+import { getCityById } from "@/lib/city-timezone-data"
 
 // Simplify the getMonthBranchFromSolarTerms function to make it more efficient and accurate
 // Replace the current implementation with this improved version:
 
-function getMonthBranchFromSolarTerms(year: number, month: number, day: number, hour = 0): string {
+function getMonthBranchFromSolarTerms(year: number, month: number, day: number, hour = 0, timezoneOffset = 9): string {
   try {
-    const currentDate = new Date(year, month - 1, day, hour)
-    console.log(`=== Calculating month branch for ${year}-${month}-${day} ${hour}h ===`)
+    // UTC 기준으로 날짜 생성 후 시간대 오프셋 적용
+    const utcDate = new Date(Date.UTC(year, month - 1, day, hour, 0, 0))
+    const currentDate = new Date(utcDate.getTime() + timezoneOffset * 60 * 60 * 1000)
+
+    console.log(
+      `=== Calculating month branch for ${year}-${month}-${day} ${hour}h (UTC${timezoneOffset >= 0 ? "+" : ""}${timezoneOffset}) ===`,
+    )
+    console.log(`Adjusted date: ${currentDate.toISOString()}`)
 
     // EXACT_SOLAR_TERMS 데이터가 제대로 로드되었는지 확인
     console.log(`Total solar terms available: ${EXACT_SOLAR_TERMS.length}`)
@@ -661,16 +691,19 @@ function getMonthPillar(
   hour = 0,
   apiMonthStem?: string,
   apiMonthBranch?: string,
+  timezoneOffset = 9,
 ): { stem: string; branch: string } {
-  console.log(`=== getMonthPillar called with: ${solarYear}-${solarMonth}-${solarDay}, yearStem: ${yearStem} ===`)
+  console.log(
+    `=== getMonthPillar called with: ${solarYear}-${solarMonth}-${solarDay}, yearStem: ${yearStem}, timezoneOffset: UTC${timezoneOffset >= 0 ? "+" : ""}${timezoneOffset} ===`,
+  )
 
   // API 제공 값을 무시하고 항상 우리 자체 절기 계산을 사용
   // API 데이터가 부정확할 수 있으므로 신뢰할 수 있는 절기 계산을 우선 사용
 
   try {
-    // Get the month branch based on solar terms
-    console.log(`Calling getMonthBranchFromSolarTerms...`)
-    const monthBranch = getMonthBranchFromSolarTerms(solarYear, solarMonth, solarDay, hour)
+    // Get the month branch based on solar terms with timezone offset
+    console.log(`Calling getMonthBranchFromSolarTerms with timezone offset...`)
+    const monthBranch = getMonthBranchFromSolarTerms(solarYear, solarMonth, solarDay, hour, timezoneOffset)
     console.log(`Month branch from solar terms: ${monthBranch}`)
 
     // Calculate the month stem based on year stem and month branch
@@ -746,21 +779,33 @@ export function calculateSaju(
   apiMonthStem?: string,
   apiMonthBranch?: string,
   timeStandard: TimeStandard = "동경135도",
+  birthCityId?: string,
 ): any {
   const numLunarYear = typeof lunarYear === "string" ? Number.parseInt(lunarYear, 10) : lunarYear
 
   console.log(
-    `Calculate Saju for Lunar: ${numLunarYear}, Solar: ${solarYear}-${solarMonth}-${solarDay}, Time: ${hour}:${minute}, Gender: ${gender}, Name: ${name}, TimeUnknown: ${timeUnknown}, IsLeapMonth: ${isLeapMonth}, TimeStandard: ${timeStandard}`,
+    `Calculate Saju for Lunar: ${numLunarYear}, Solar: ${solarYear}-${solarMonth}-${solarDay}, Time: ${hour}:${minute}, Gender: ${gender}, Name: ${name}, TimeUnknown: ${timeUnknown}, IsLeapMonth: ${isLeapMonth}, TimeStandard: ${timeStandard}, BirthCityId: ${birthCityId}`,
   )
 
-  // 연간지 계산 (Year Pillar)
-  const yearPillar = getYearPillar(numLunarYear, solarYear, solarMonth, solarDay)
+  // 태어난 도시의 시간대 오프셋 가져오기
+  let timezoneOffset = 9 // 기본값: 한국 표준시 (UTC+9)
+  if (birthCityId) {
+    const cityData = getCityById(birthCityId)
+    if (cityData) {
+      timezoneOffset = cityData.utcOffset
+    }
+  }
+
+  console.log(`Using timezone offset: UTC${timezoneOffset >= 0 ? "+" : ""}${timezoneOffset}`)
+
+  // 연간지 계산 (Year Pillar) - 시간대 오프셋 적용
+  const yearPillar = getYearPillar(numLunarYear, solarYear, solarMonth, solarDay, timezoneOffset)
   const yearStem = yearPillar.stem
   const yearBranch = yearPillar.branch
 
   console.log(`Year Pillar calculated: ${yearStem}${yearBranch}`)
 
-  // 월간지 계산 (Month Pillar)
+  // 월간지 계산 (Month Pillar) - 시간대 오프셋 적용
   const monthPillar = getMonthPillar(
     solarYear,
     solarMonth,
@@ -770,14 +815,15 @@ export function calculateSaju(
     hour,
     apiMonthStem,
     apiMonthBranch,
+    timezoneOffset,
   )
   const monthStem = monthPillar.stem
   const monthBranch = monthPillar.branch
 
   console.log(`Month Pillar calculated: ${monthStem}${monthBranch}`)
 
-  // 일간지 계산 (Day Pillar)
-  const dayPillar = getDayPillar(solarYear, solarMonth, solarDay)
+  // 일간지 계산 (Day Pillar) - 시간대 오프셋 적용
+  const dayPillar = getDayPillar(solarYear, solarMonth, solarDay, timezoneOffset)
   const dayStem = dayPillar.stem
   const dayBranch = dayPillar.branch
 
