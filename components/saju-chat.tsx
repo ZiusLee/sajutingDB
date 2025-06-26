@@ -251,10 +251,12 @@ export default function SajuChat({
   const [retryCount, setRetryCount] = useState(0)
   const [initialMessages, setInitialMessages] = useState<any[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const isAutoScrolling = useRef(false)
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
     initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
@@ -496,27 +498,37 @@ export default function SajuChat({
         setShouldGenerateQuestions(true)
         setStreamingError(null)
         setRetryCount(0)
+
+        setIsSubmitting(false)
       } catch (error) {
         console.error("onFinish 핸들러 오류:", error)
+        setIsSubmitting(false)
       }
     },
     onError: (error) => {
       console.error("채팅 오류:", error)
       setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
       setShouldGenerateQuestions(true)
+      setIsSubmitting(false)
     },
     onResponse: (response) => {
-      if (chatContainerRef.current) {
-        setTimeout(() => {
-          chatContainerRef.current?.scrollTo({
-            top: chatContainerRef.current.scrollHeight,
-            behavior: "smooth",
-          })
-        }, 100)
-      }
+      // 스크롤 로직 제거 - 스트리밍 중 흔들림 방지
       setStreamingError(null)
     },
   })
+
+  // 메시지가 변경될 때만 스크롤 (스트리밍 완료 후)
+  useEffect(() => {
+    if (!isLoading && chatContainerRef.current) {
+      const scrollContainer = chatContainerRef.current
+      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
+
+      if (isNearBottom) {
+        // 부드러운 애니메이션 없이 즉시 스크롤
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  }, [messages, isLoading])
 
   // 메시지를 데이터베이스에 저장하는 함수
   const saveMessagesToDatabase = useCallback(
@@ -605,48 +617,56 @@ export default function SajuChat({
   const customHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    if (!input.trim()) {
+    if (!input.trim() || isSubmitting || isLoading) {
       return
     }
 
-    const newQuestionCount = questionCount + 1
-    setQuestionCount(newQuestionCount)
+    // 중복 전송 방지
+    setIsSubmitting(true)
 
-    const shouldShowLoginPrompt = newQuestionCount >= 5 && !actualIsLoggedIn && !hasShownLoginPrompt
+    try {
+      const newQuestionCount = questionCount + 1
+      setQuestionCount(newQuestionCount)
 
-    if (shouldShowLoginPrompt) {
-      setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-      setShowLoginPrompt(true)
-      setHasShownLoginPrompt(true)
-    }
+      const shouldShowLoginPrompt = newQuestionCount >= 5 && !actualIsLoggedIn && !hasShownLoginPrompt
 
-    setShouldGenerateQuestions(false)
-    setStreamingError(null)
-    setRetryCount(0)
-
-    const userMessage = input.trim()
-    console.log("[CHAT] 사용자 메시지 전송:", userMessage)
-
-    // 사용자 메시지를 즉시 저장 (AI 응답 전에)
-    if (databaseSessionId) {
-      try {
-        const userMessageObj = {
-          id: `user-${Date.now()}`,
-          role: "user" as const,
-          content: userMessage,
-        }
-
-        // 현재 messages에 user 메시지 추가하여 저장
-        const messagesWithUser = [...messages, userMessageObj]
-        console.log("[CHAT] 사용자 메시지 즉시 저장 시작")
-        await saveMessagesToDatabase(messagesWithUser, databaseSessionId)
-      } catch (error) {
-        console.error("[CHAT] 사용자 메시지 저장 오류:", error)
+      if (shouldShowLoginPrompt) {
+        setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+        setShowLoginPrompt(true)
+        setHasShownLoginPrompt(true)
       }
-    }
 
-    // AI 채팅 제출
-    aiHandleSubmit(e)
+      setShouldGenerateQuestions(false)
+      setStreamingError(null)
+      setRetryCount(0)
+
+      const userMessage = input.trim()
+      console.log("[CHAT] 사용자 메시지 전송:", userMessage)
+
+      // 사용자 메시지를 즉시 저장 (AI 응답 전에)
+      if (databaseSessionId) {
+        try {
+          const userMessageObj = {
+            id: `user-${Date.now()}`,
+            role: "user" as const,
+            content: userMessage,
+          }
+
+          // 현재 messages에 user 메시지 추가하여 저장
+          const messagesWithUser = [...messages, userMessageObj]
+          console.log("[CHAT] 사용자 메시지 즉시 저장 시작")
+          await saveMessagesToDatabase(messagesWithUser, databaseSessionId)
+        } catch (error) {
+          console.error("[CHAT] 사용자 메시지 저장 오류:", error)
+        }
+      }
+
+      // AI 채팅 제출
+      aiHandleSubmit(e)
+    } catch (error) {
+      console.error("[CHAT] 메시지 전송 오류:", error)
+      setIsSubmitting(false)
+    }
   }
 
   const handleBackWithSave = () => {
@@ -705,15 +725,22 @@ export default function SajuChat({
 
   const scrollToBottomSmooth = useCallback(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      })
+      const scrollContainer = chatContainerRef.current
+      // 스트리밍 중이 아닐 때만 부드러운 스크롤 사용
+      if (!isLoading) {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: "smooth",
+        })
+      } else {
+        // 스트리밍 중에는 즉시 스크롤
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
     }
-  }, [])
+  }, [isLoading])
 
   const handleScroll = useCallback(() => {
-    if (chatContainerRef.current) {
+    if (chatContainerRef.current && !isAutoScrolling.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
       setShowScrollToBottom(!isNearBottom)
@@ -1184,7 +1211,7 @@ ${selectedPeopleInfo}
                   onChange={handleInputChange}
                   placeholder="Ask anything"
                   className="flex-1 bg-transparent border-none px-4 py-3 text-white placeholder-white/50 focus:outline-none"
-                  disabled={isLoading}
+                  disabled={isLoading || isSubmitting}
                 />
 
                 <Button type="button" variant="ghost" size="sm" className="text-white/60 hover:text-white p-2">
@@ -1193,7 +1220,7 @@ ${selectedPeopleInfo}
 
                 <Button
                   type="submit"
-                  disabled={isLoading || !input.trim()}
+                  disabled={isLoading || !input.trim() || isSubmitting}
                   className="mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-2"
                 >
                   <Send className="h-4 w-4" />
