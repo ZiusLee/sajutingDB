@@ -6,7 +6,7 @@ let supabaseInstance: SupabaseClient | null = null
 
 export function getSupabase() {
   if (!supabaseInstance) {
-    // 세션 지속성을 'local'로 설정하여 브라우저를 닫아도 세션이 유지되도록 함
+    // 세션 지속성을 'local'로 설정하되 persistSession을 false로 설정하여 중복 세션 방지
     supabaseInstance = createClientComponentClient({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://tqrwktpmyylxyhgsrwlo.supabase.co",
       supabaseKey:
@@ -14,7 +14,7 @@ export function getSupabase() {
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxcndrdHBteXlseHloZ3Nyd2xvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTEzNzA1NzYsImV4cCI6MjAyNjk0NjU3Nn0.Yd_6UO8X_XCZGjopPWbNxIEaW_yXONTkGPJlG_LBHV0",
       options: {
         auth: {
-          persistSession: true,
+          persistSession: false, // 중복 세션 방지
           storageKey: "sajuping-auth",
           autoRefreshToken: true,
           detectSessionInUrl: true,
@@ -43,13 +43,11 @@ export async function getFileUrl(bucket: string, path: string): Promise<string> 
   // Check cache first
   const cacheKey = `${bucket}/${path}`
   if (fileUrlCache[cacheKey]) {
-    console.log("Using cached URL for:", cacheKey)
     return fileUrlCache[cacheKey]
   }
 
   const client = getSupabase()
   try {
-    console.log(`Fetching URL for ${bucket}/${path} from Supabase`)
     const { data, error } = await client.storage.from(bucket).getPublicUrl(path)
 
     if (error) {
