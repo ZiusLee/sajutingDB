@@ -216,6 +216,45 @@ const generateSajupingInitialMessages = (name: string, saju: any, birthInfo?: Bi
   return [firstMessage, secondMessage]
 }
 
+// 대운 데이터를 변환하는 함수 - 실제 데이터 구조에 맞게 수정
+const convertDaeunData = (daeunData: any) => {
+  if (!daeunData) {
+    console.log("No daeun data provided")
+    return []
+  }
+
+  // daeunData가 pillars 배열을 가지고 있는 경우
+  if (daeunData.pillars && Array.isArray(daeunData.pillars)) {
+    return daeunData.pillars.map((pillar: any, index: number) => ({
+      age: pillar.startAge || index * 10,
+      startYear: pillar.startYear || 0,
+      endYear: pillar.endAge ? pillar.startYear + (pillar.endAge - pillar.startAge) : pillar.startYear + 9,
+      stem: pillar.stemKorean || pillar.stem || "",
+      branch: pillar.branchKorean || pillar.branch || "",
+      stemHanja: pillar.stemHanja || pillar.stem || "",
+      branchHanja: pillar.branchHanja || pillar.branch || "",
+      description: pillar.description || "",
+    }))
+  }
+
+  // daeunData가 직접 배열인 경우
+  if (Array.isArray(daeunData)) {
+    return daeunData.map((item: any, index: number) => ({
+      age: item.age || item.startAge || index * 10,
+      startYear: item.startYear || item.year || 2024 + index * 10,
+      endYear: item.endYear || item.startYear + 9 || 2024 + index * 10 + 9,
+      stem: item.stemKorean || item.stem || "",
+      branch: item.branchKorean || item.branch || "",
+      stemHanja: item.stemHanja || item.stem || "",
+      branchHanja: item.branchHanja || item.branch || "",
+      description: item.description || "",
+    }))
+  }
+
+  console.log("Unexpected daeun data structure:", daeunData)
+  return []
+}
+
 export default function SajuChat({
   saju,
   name,
@@ -850,241 +889,355 @@ ${selectedPeopleInfo}
   }
 
   return (
-    <div className="flex h-screen bg-gray-900 text-white">
-      {/* 메인 채팅 영역 */}
-      <div className="flex-1 flex flex-col">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={handleBackWithSave} className="text-gray-300 hover:text-white">
-              <ArrowLeft className="h-4 w-4" />
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden h-screen supports-[height:100dvh]:h-[100dvh]">
+      {/* 헤더 */}
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 bg-white/10 backdrop-blur-md border-b border-white/20 safe-area-top">
+        <div className="flex items-center min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackWithSave}
+            className="mr-1 sm:mr-2 text-white/80 hover:text-white hover:bg-white/20 p-1.5 sm:p-2 rounded-lg flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+          </Button>
+        </div>
+
+        <div className="flex items-center min-w-0 flex-1 justify-center">
+          <div className="relative" ref={dropdownRef}>
+            <Button
+              variant="ghost"
+              className="flex items-center space-x-1 sm:space-x-2 text-white hover:text-white hover:bg-white/20 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg min-w-0"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <span className="text-base sm:text-lg flex-shrink-0">{currentCharacter.emoji}</span>
+              <span className="font-medium text-sm sm:text-base truncate">{currentCharacter.name}</span>
+              <ChevronDown
+                className={`h-3 w-3 sm:h-4 sm:w-4 transition-transform flex-shrink-0 ${isDropdownOpen ? "rotate-180" : ""}`}
+              />
             </Button>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{currentCharacter.emoji}</span>
-              <div>
-                <h1 className="font-semibold">{currentCharacter.name}</h1>
-                <p className="text-xs text-gray-400">{currentCharacter.description}</p>
+
+            {isDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-[99998]" onClick={() => setIsDropdownOpen(false)} />
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-56 sm:w-64 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-xl z-[99999]">
+                  <div className="py-2">
+                    {pingCharacters.map((character) => (
+                      <button
+                        key={character.id}
+                        onClick={() => {
+                          router.push(
+                            `/saju-chat/${character.roomType}?name=${name}&gender=${gender}&solarYear=${birthInfo?.solarYear}&solarMonth=${birthInfo?.solarMonth}&solarDay=${birthInfo?.solarDay}&solarHour=${birthInfo?.solarHour}&solarMinute=${birthInfo?.solarMinute}&timeUnknown=${birthInfo?.timeUnknown}`,
+                          )
+                          setIsDropdownOpen(false)
+                        }}
+                        className={`w-full flex items-center space-x-3 p-2 sm:p-3 text-left hover:bg-white/20 transition-colors rounded-lg mx-2 ${
+                          character.roomType === roomType ? "bg-white/20" : ""
+                        }`}
+                      >
+                        <span className="text-base sm:text-lg flex-shrink-0">{character.emoji}</span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-white text-sm sm:text-base">{character.name}</p>
+                          <p className="text-xs text-white/70 truncate">{character.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+          {actualIsLoggedIn ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/mypage")}
+              className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 sm:p-2 rounded-lg"
+              title="마이페이지"
+            >
+              <User className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/login")}
+              className="text-white border-white/30 hover:bg-white/20 hover:text-white hover:border-white/50 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm"
+            >
+              로그인
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* 메인 채팅 영역 */}
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto overscroll-behavior-y-contain"
+        onScroll={handleScroll}
+      >
+        <div className="pb-32 pt-4 sm:pt-6">
+          {/* 사주 다이어그램 */}
+          <div className="px-3 sm:px-4 mb-4 sm:mb-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
+                <SajuDiagram
+                  saju={saju}
+                  timeUnknown={birthInfo?.timeUnknown}
+                  size="sm"
+                  name={name}
+                  gender={gender}
+                  solarYear={birthInfo?.solarYear?.toString()}
+                  solarMonth={birthInfo?.solarMonth?.toString()}
+                  solarDay={birthInfo?.solarDay?.toString()}
+                  hour={birthInfo?.solarHour?.toString()}
+                  minute={birthInfo?.solarMinute?.toString()}
+                  lunarYear={birthInfo?.lunarYear?.toString()}
+                  lunarMonth={birthInfo?.lunarMonth?.toString()}
+                  lunarDay={birthInfo?.lunarDay?.toString()}
+                  location="서울특별시"
+                />
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* 도구 버튼 */}
-            <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-300 hover:text-white relative"
-                  onClick={handleToolsNotification}
-                >
-                  <Settings className="h-4 w-4" />
-                  {!hasSeenToolsNotification && <Badge className="absolute -top-1 -right-1 h-2 w-2 p-0 bg-red-500" />}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80 bg-gray-800 border-gray-700">
-                <div className="py-4">
-                  <h3 className="text-lg font-semibold mb-4 text-white">도구</h3>
-                  <div className="space-y-3">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left border-gray-600 hover:bg-gray-700 bg-transparent"
-                      onClick={() => {
-                        setShowCompatibilityTool(true)
-                        setShowToolsDrawer(false)
-                      }}
-                    >
-                      <span className="mr-2">💕</span>
-                      궁합 분석 도구
-                    </Button>
-                    <div className="text-sm text-gray-400 px-3">여러 사람과의 궁합을 한 번에 분석할 수 있습니다.</div>
-                  </div>
+          {/* 대운 다이어그램 */}
+          {saju.daeun && (
+            <div className="px-3 sm:px-4 mb-4 sm:mb-6">
+              <div className="max-w-3xl mx-auto">
+                <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
+                  <DaeunDiagram
+                    daeun={convertDaeunData(saju.daeun)}
+                    birthInfo={birthInfo}
+                    name={name}
+                    gender={gender}
+                  />
                 </div>
-              </SheetContent>
-            </Sheet>
-
-            {/* 사주 정보 드롭다운 */}
-            <div className="relative" ref={dropdownRef}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="text-gray-300 hover:text-white"
-              >
-                <User className="h-4 w-4 mr-1" />
-                {name}
-                <ChevronDown className="h-3 w-3 ml-1" />
-              </Button>
-
-              {isDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                  <div className="p-4">
-                    <h3 className="font-semibold mb-3 text-white">사주 정보</h3>
-                    <SajuDiagram saju={saju} />
-                    <div className="mt-4">
-                      <DaeunDiagram saju={saju} />
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* 채팅 메시지 영역 */}
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* 메시지들 */}
           {messages.map((message, index) => (
             <div
-              key={message.id || index}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              key={message.id}
+              className={`px-3 sm:px-4 py-3 sm:py-4 ${message.role === "assistant" ? "bg-white/5" : ""}`}
             >
-              <div
-                className={`max-w-[80%] rounded-lg p-3 ${
-                  message.role === "user"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-700 text-gray-100 border border-gray-600"
-                }`}
-              >
-                {message.role === "assistant" ? (
-                  <div className="prose prose-invert max-w-none">
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                        li: ({ children }) => <li className="text-sm">{children}</li>,
-                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-                        em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
-                        h1: ({ children }) => <h1 className="text-xl font-bold mb-2 text-white">{children}</h1>,
-                        h2: ({ children }) => <h2 className="text-lg font-semibold mb-2 text-white">{children}</h2>,
-                        h3: ({ children }) => <h3 className="text-md font-medium mb-1 text-white">{children}</h3>,
-                        blockquote: ({ children }) => (
-                          <blockquote className="border-l-4 border-gray-500 pl-4 italic text-gray-300 my-2">
-                            {children}
-                          </blockquote>
-                        ),
-                        code: ({ children }) => (
-                          <code className="bg-gray-800 px-1 py-0.5 rounded text-sm font-mono">{children}</code>
-                        ),
-                        pre: ({ children }) => (
-                          <pre className="bg-gray-800 p-3 rounded-lg overflow-x-auto text-sm font-mono my-2">
-                            {children}
-                          </pre>
-                        ),
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                )}
+              <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
+                <div className="flex-shrink-0">
+                  {message.role === "assistant" ? (
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
+                      {currentCharacter.emoji}
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
+                      나
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 prose prose-invert max-w-none min-w-0">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => (
+                        <p className="text-white/90 leading-relaxed mb-2 sm:mb-3 last:mb-0 text-sm sm:text-base">
+                          {children}
+                        </p>
+                      ),
+                      strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-white/80">{children}</em>,
+                      ul: ({ children }) => (
+                        <ul className="list-disc list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
+                          {children}
+                        </ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
+                          {children}
+                        </ol>
+                      ),
+                      li: ({ children }) => <li className="text-white/90 text-sm sm:text-base">{children}</li>,
+                      h1: ({ children }) => (
+                        <h1 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-white">{children}</h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2 text-white">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-sm sm:text-base font-semibold mb-1 sm:mb-2 text-white">{children}</h3>
+                      ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
           ))}
 
-          {/* 로딩 인디케이터 */}
+          {/* 로딩 상태 */}
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
-                <div className="flex items-center space-x-2">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></div>
+            <div className="px-3 sm:px-4 py-3 sm:py-4 bg-white/5">
+              <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
+                    {currentCharacter.emoji}
                   </div>
-                  <span className="text-sm text-gray-400">답변 생성 중...</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="flex space-x-1">
+                    <div
+                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 에러 메시지 */}
+          {/* 에러 상태 */}
           {streamingError && (
-            <div className="flex justify-center">
-              <div className="bg-red-900/50 border border-red-700 rounded-lg p-3 max-w-md">
-                <p className="text-red-200 text-sm mb-2">{streamingError}</p>
-                <Button
-                  onClick={handleRetry}
-                  disabled={isRetrying}
-                  size="sm"
-                  variant="outline"
-                  className="border-red-600 text-red-200 hover:bg-red-800 bg-transparent"
-                >
-                  {isRetrying ? "재시도 중..." : "다시 시도"}
-                </Button>
+            <div className="px-3 sm:px-4 py-3 sm:py-4">
+              <div className="max-w-3xl mx-auto">
+                <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 sm:p-4">
+                  <p className="text-red-200 text-xs sm:text-sm mb-2 sm:mb-3">{streamingError}</p>
+                  <Button
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm"
+                  >
+                    {isRetrying ? "재시도 중..." : "다시 시도"}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </div>
+      </div>
 
+      {/* 하단 입력 영역 */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/95 to-transparent backdrop-blur-md safe-area-bottom">
         {/* 추천 질문 */}
         {suggestedQuestions.length > 0 && !isLoading && (
-          <div className="px-4 py-2 border-t border-gray-700">
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.slice(0, 3).map((question, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSuggestedQuestionClick(question)}
-                  className="text-xs border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-                  disabled={isLoading}
-                >
-                  {question}
-                </Button>
-              ))}
+          <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-white/10 max-h-[50px] sm:max-h-[60px] flex items-center">
+            <div className="max-w-3xl mx-auto w-full">
+              <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
+                {suggestedQuestions.slice(0, 6).map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSuggestedQuestionClick(question)}
+                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-2 sm:px-3 py-1 whitespace-nowrap flex-shrink-0 h-7 sm:h-8"
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
-        {/* 입력 영역 */}
-        <div className="p-4 border-t border-gray-700">
-          <form onSubmit={customHandleSubmit} className="flex gap-2">
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={handleInputChange}
-              placeholder={`${currentCharacter.name}에게 질문해보세요...`}
-              className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isLoading || isSubmitting}
-            />
-            <Button
-              type="submit"
-              disabled={!input.trim() || isLoading || isSubmitting}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
+        {/* 입력창 */}
+        <div className="px-3 sm:px-4 py-3 sm:py-4 pb-safe">
+          <div className="max-w-3xl mx-auto">
+            <form onSubmit={customHandleSubmit} className="relative">
+              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/20 focus-within:border-white/40">
+                <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
+                  <SheetTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ml-2 sm:ml-3 text-white/60 hover:text-white p-1.5 sm:p-2 relative flex-shrink-0"
+                      onClick={() => {
+                        setShowToolsDrawer(true)
+                        setHasSeenToolsNotification(true)
+                      }}
+                    >
+                      <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      {!hasSeenToolsNotification && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-0.5 -right-0.5 h-3 w-6 sm:h-4 sm:w-8 text-xs px-1 bg-red-500 text-white animate-pulse"
+                        >
+                          new
+                        </Badge>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="bg-slate-900/90 border-white/20 backdrop-blur-md">
+                    <div className="py-4">
+                      <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Tools</h3>
+                      <div className="space-y-3">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-white hover:bg-white/20 p-3 sm:p-4 rounded-lg relative"
+                          onClick={() => {
+                            setShowCompatibilityTool(true)
+                            setShowToolsDrawer(false)
+                          }}
+                        >
+                          <span className="mr-2 sm:mr-3">💕</span>
+                          궁합 보기
+                          {!hasSeenToolsNotification && (
+                            <Badge
+                              variant="destructive"
+                              className="ml-auto h-4 w-8 sm:h-5 sm:w-10 text-xs bg-red-500 text-white animate-pulse"
+                            >
+                              new
+                            </Badge>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
 
-          {/* 질문 카운터 (비로그인 사용자용) */}
-          {!actualIsLoggedIn && (
-            <div className="mt-2 text-center">
-              <p className="text-xs text-gray-400">
-                질문 {questionCount}/5 {questionCount >= 5 && "(로그인하면 무제한 질문 가능)"}
-              </p>
-            </div>
-          )}
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Ask anything"
+                  className="flex-1 bg-transparent border-none px-3 sm:px-4 py-2.5 sm:py-3 text-white placeholder-white/50 focus:outline-none text-sm sm:text-base min-w-0"
+                  disabled={isLoading || isSubmitting}
+                />
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !input.trim() || isSubmitting}
+                  className="mr-2 sm:mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-1.5 sm:p-2 flex-shrink-0"
+                >
+                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
-
-        {/* 스크롤 투 바텀 버튼 */}
-        {showScrollToBottom && (
-          <Button
-            onClick={scrollToBottomSmooth}
-            className="fixed bottom-20 right-6 rounded-full w-10 h-10 bg-gray-700 hover:bg-gray-600 border border-gray-600"
-            size="sm"
-          >
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-        )}
       </div>
+
+      {/* 스크롤 하단 버튼 */}
+      {showScrollToBottom && (
+        <Button
+          onClick={scrollToBottomSmooth}
+          className="fixed bottom-20 sm:bottom-24 right-3 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/20 hover:bg-white/30 text-white z-10"
+          size="sm"
+        >
+          <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+        </Button>
+      )}
 
       {/* 궁합 분석 도구 모달 */}
       {showCompatibilityTool && (

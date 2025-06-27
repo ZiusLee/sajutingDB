@@ -156,3 +156,60 @@
 .markdown-content th {
   @apply bg-gray-100 dark:bg-gray-800;
 }
+
+/* 모바일 최적화 */
+@supports (height: 100dvh) {
+  .supports-\[height\:100dvh\]\:h-\[100dvh\] {
+    height: 100dvh;
+  }
+}
+
+/* Safe area 지원 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* 모바일 스크롤 최적화 */
+.overscroll-behavior-y-contain {
+  overscroll-behavior-y: contain;
+}
+
+/* 스크롤바 숨김 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 모바일 터치 최적화 */
+@media (max-width: 640px) {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* 모바일에서 입력 필드 줌 방지 */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* 키보드가 올라올 때 레이아웃 조정 */
+@media screen and (max-height: 500px) {
+  .mobile-keyboard-adjust {
+    padding-bottom: 0;
+  }
+}
