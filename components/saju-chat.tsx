@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { useChat } from "@/contexts/chat-context"
@@ -269,12 +269,43 @@ export default function SajuChat({
 
   const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
 
+  // Memoize compressed saju to prevent recreation on every render
+  const compressedSaju = useMemo(() => {
+    return compressSaju(
+      saju,
+      birthInfo?.solarYear?.toString(),
+      birthInfo?.solarMonth?.toString(),
+      birthInfo?.solarDay?.toString(),
+      birthInfo?.solarHour?.toString(),
+      birthInfo?.solarMinute?.toString(),
+      birthInfo?.timeUnknown,
+    )
+  }, [saju, birthInfo])
+
+  // Memoize memory context function to prevent recreation
   const getMemoryContext = useCallback(() => {
     if (!userId) return ""
     return memoryService.generateContextSummary(userId)
   }, [userId])
 
-  // 현재 세션 ID 가져오기 (로그인/비로그인 구분)
+  // Memoize the body object for useAIChat to prevent infinite re-renders
+  const aiChatBody = useMemo(
+    () => ({
+      compressedSaju,
+      name,
+      gender,
+      initialInterpretation,
+      roomType,
+      userId,
+      currentYear: 2025,
+      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+      birthInfo,
+      memoryContext: getMemoryContext(),
+    }),
+    [compressedSaju, name, gender, initialInterpretation, roomType, userId, birthInfo, getMemoryContext],
+  )
+
+  // 현재 세션 ID 가져오기 (로그인/비로그인 구분) - 의존성 최소화
   const getCurrentSessionId = useCallback(async (): Promise<string | null> => {
     try {
       // 1. mypage에서 온 경우 - current_saju에서 세션 ID 확인
@@ -336,9 +367,9 @@ export default function SajuChat({
       console.error("[CHAT] 세션 ID 조회 오류:", error)
       return null
     }
-  }, [actualIsLoggedIn, userId, name, supabase])
+  }, [actualIsLoggedIn, userId, name]) // supabase 제거 - 안정적인 의존성만 유지
 
-  // DB에서 채팅 히스토리 로드
+  // DB에서 채팅 히스토리 로드 - 의존성 최소화
   const loadChatHistory = useCallback(async () => {
     try {
       setIsLoadingMessages(true)
@@ -437,10 +468,10 @@ export default function SajuChat({
     }
   }, [getCurrentSessionId, roomType, name, saju, birthInfo])
 
-  // 컴포넌트 마운트 시 채팅 히스토리 로드
+  // 컴포넌트 마운트 시 채팅 히스토리 로드 - 한 번만 실행
   useEffect(() => {
     loadChatHistory()
-  }, [loadChatHistory])
+  }, []) // 빈 의존성 배열로 한 번만 실행
 
   const {
     messages,
@@ -455,26 +486,7 @@ export default function SajuChat({
   } = useAIChat({
     api: "/api/saju-chat",
     initialMessages,
-    body: {
-      compressedSaju: compressSaju(
-        saju,
-        birthInfo?.solarYear?.toString(),
-        birthInfo?.solarMonth?.toString(),
-        birthInfo?.solarDay?.toString(),
-        birthInfo?.solarHour?.toString(),
-        birthInfo?.solarMinute?.toString(),
-        birthInfo?.timeUnknown,
-      ),
-      name,
-      gender,
-      initialInterpretation,
-      roomType,
-      userId,
-      currentYear: 2025,
-      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-      birthInfo,
-      memoryContext: getMemoryContext(),
-    },
+    body: aiChatBody, // 메모화된 객체 사용
     onFinish: async (message) => {
       try {
         // 어시스턴트 메시지가 완료되면 현재 messages 배열에 새 메시지를 추가
