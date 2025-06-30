@@ -1,4 +1,5 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 
 /**
  * Get all saju profiles for the current authenticated user
@@ -82,50 +83,119 @@ export async function getUserSajuProfiles() {
       return { profiles: [], authUserId }
     }
 
-    // Map the data to our profile format
-    const profiles = sessions.map((session) => {
-      // Get the first birth_info and saju_info records if they exist
-      const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
-      const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
-      const sajuJsonb = session.saju || {}
+    // Map the data to our profile format with daeun calculation check
+    const profiles = await Promise.all(
+      sessions.map(async (session) => {
+        // Get the first birth_info and saju_info records if they exist
+        const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
+        const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
+        const sajuJsonb = session.saju || {}
 
-      return {
-        id: session.id,
-        name: session.name || "무명",
-        gender: session.gender || "unknown",
-        birthYear: birthInfo?.solar_year?.toString() || "N/A",
-        birthMonth: birthInfo?.solar_month?.toString().padStart(2, "0") || "N/A",
-        birthDay: birthInfo?.solar_day?.toString().padStart(2, "0") || "N/A",
-        birthHour: birthInfo?.solar_hour?.toString().padStart(2, "0") || "N/A",
-        birthMinute: birthInfo?.solar_minute?.toString().padStart(2, "0") || "N/A",
-        lunarYear: birthInfo?.lunar_year?.toString() || "N/A",
-        lunarMonth: birthInfo?.lunar_month?.toString().padStart(2, "0") || "N/A",
-        lunarDay: birthInfo?.lunar_day?.toString() || "N/A",
-        timeUnknown: birthInfo?.time_unknown || false,
-        createdAt: session.created_at || new Date().toISOString(),
-        birthInfoId: birthInfo?.id || null,
-        isDefault: session.is_default || false,
-        saju: {
-          yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem || "N/A",
-          yearBranch: sajuInfo?.year_branch || sajuJsonb.yearBranch || "N/A",
-          monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem || "N/A",
-          monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch || "N/A",
-          dayStem: sajuInfo?.day_stem || sajuJsonb.dayStem || "N/A",
-          dayBranch: sajuInfo?.day_branch || sajuJsonb.dayBranch || "N/A",
-          hourStem: sajuInfo?.hour_stem || sajuJsonb.hourStem || "N/A",
-          hourBranch: sajuInfo?.hour_branch || sajuJsonb.hourBranch || "N/A",
-          // 십성 정보는 saju JSONB에서 가져옴
-          yearStemSibseong: sajuJsonb.yearStemSibseong || "",
-          monthStemSibseong: sajuJsonb.monthStemSibseong || "",
-          dayStemSibseong: sajuJsonb.dayStemSibseong || "",
-          hourStemSibseong: sajuJsonb.hourStemSibseong || "",
-          yearBranchSibseong: sajuJsonb.yearBranchSibseong || "",
-          monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
-          dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
-          hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-        },
-      }
-    })
+        // 대운 데이터 확인 및 계산
+        let daeunData = sajuJsonb.daeun
+        let shouldUpdateDB = false
+
+        // 대운이 없거나 잘못된 데이터인 경우 계산
+        if (
+          !daeunData ||
+          !daeunData.pillars ||
+          (daeunData.pillars &&
+            daeunData.pillars.length > 0 &&
+            daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
+        ) {
+          console.log(`Session ${session.id}: 대운 데이터가 없거나 잘못됨, 새로 계산합니다.`)
+
+          // 대운 계산에 필요한 데이터가 있는지 확인
+          if (
+            (sajuInfo?.year_stem || sajuJsonb.yearStem) &&
+            (sajuInfo?.month_stem || sajuJsonb.monthStem) &&
+            (sajuInfo?.month_branch || sajuJsonb.monthBranch) &&
+            birthInfo?.solar_year &&
+            birthInfo?.solar_month &&
+            birthInfo?.solar_day
+          ) {
+            try {
+              daeunData = calculateDaeunInfo(
+                {
+                  yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem,
+                  monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem,
+                  monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch,
+                },
+                birthInfo.solar_year,
+                birthInfo.solar_month,
+                birthInfo.solar_day,
+                session.gender || "female",
+                birthInfo.time_unknown ? undefined : birthInfo.solar_hour,
+                birthInfo.time_unknown ? undefined : birthInfo.solar_minute,
+                birthInfo.time_unknown || false,
+              )
+
+              console.log(`Session ${session.id}: 새로 계산된 대운:`, daeunData)
+              shouldUpdateDB = true
+            } catch (error) {
+              console.error(`Error calculating daeun for session ${session.id}:`, error)
+            }
+          }
+        }
+
+        // DB 업데이트를 비동기로 처리 (프로필 반환을 블록하지 않음)
+        if (shouldUpdateDB && daeunData) {
+          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
+
+          // 비동기로 DB 업데이트 (await 하지 않음)
+          supabase
+            .from("saju_sessions")
+            .update({ saju: updatedSajuJsonb })
+            .eq("id", session.id)
+            .then(({ error }) => {
+              if (error) {
+                console.error(`Error updating daeun for session ${session.id}:`, error)
+              } else {
+                console.log(`Successfully updated daeun for session ${session.id}`)
+              }
+            })
+        }
+
+        return {
+          id: session.id,
+          name: session.name || "무명",
+          gender: session.gender || "unknown",
+          birthYear: birthInfo?.solar_year?.toString() || "N/A",
+          birthMonth: birthInfo?.solar_month?.toString().padStart(2, "0") || "N/A",
+          birthDay: birthInfo?.solar_day?.toString().padStart(2, "0") || "N/A",
+          birthHour: birthInfo?.solar_hour?.toString().padStart(2, "0") || "N/A",
+          birthMinute: birthInfo?.solar_minute?.toString().padStart(2, "0") || "N/A",
+          lunarYear: birthInfo?.lunar_year?.toString() || "N/A",
+          lunarMonth: birthInfo?.lunar_month?.toString().padStart(2, "0") || "N/A",
+          lunarDay: birthInfo?.lunar_day?.toString() || "N/A",
+          timeUnknown: birthInfo?.time_unknown || false,
+          createdAt: session.created_at || new Date().toISOString(),
+          birthInfoId: birthInfo?.id || null,
+          isDefault: session.is_default || false,
+          saju: {
+            yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem || "N/A",
+            yearBranch: sajuInfo?.year_branch || sajuJsonb.yearBranch || "N/A",
+            monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem || "N/A",
+            monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch || "N/A",
+            dayStem: sajuInfo?.day_stem || sajuJsonb.dayStem || "N/A",
+            dayBranch: sajuInfo?.day_branch || sajuJsonb.dayBranch || "N/A",
+            hourStem: sajuInfo?.hour_stem || sajuJsonb.hourStem || "N/A",
+            hourBranch: sajuInfo?.hour_branch || sajuJsonb.hourBranch || "N/A",
+            // 십성 정보는 saju JSONB에서 가져옴
+            yearStemSibseong: sajuJsonb.yearStemSibseong || "",
+            monthStemSibseong: sajuJsonb.monthStemSibseong || "",
+            dayStemSibseong: sajuJsonb.dayStemSibseong || "",
+            hourStemSibseong: sajuJsonb.hourStemSibseong || "",
+            yearBranchSibseong: sajuJsonb.yearBranchSibseong || "",
+            monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
+            dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
+            hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
+            // 대운 데이터 추가
+            daeun: daeunData,
+          },
+        }
+      }),
+    )
 
     console.log(`Returning ${profiles.length} profiles`)
     return { profiles, authUserId }
@@ -587,7 +657,7 @@ export async function getDefaultSajuSession(authUserId: string): Promise<any | n
 }
 
 /**
- * Get a saju profile by session ID
+ * Get a saju profile by session ID with daeun calculation
  */
 export async function getSajuProfileBySessionId(sessionId: string): Promise<any | null> {
   try {
@@ -648,6 +718,66 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     console.log("JSONB saju data from database:", sajuJsonb)
 
+    // 대운 데이터 확인 및 계산
+    let daeunData = sajuJsonb.daeun
+
+    // 대운이 없거나 잘못된 데이터인 경우 계산
+    if (
+      !daeunData ||
+      !daeunData.pillars ||
+      (daeunData.pillars &&
+        daeunData.pillars.length > 0 &&
+        daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
+    ) {
+      console.log(`Session ${sessionId}: 대운 데이터가 없거나 잘못됨, 새로 계산합니다.`)
+
+      // 대운 계산에 필요한 데이터가 있는지 확인
+      if (
+        (sajuInfo?.year_stem || sajuJsonb.yearStem) &&
+        (sajuInfo?.month_stem || sajuJsonb.monthStem) &&
+        (sajuInfo?.month_branch || sajuJsonb.monthBranch) &&
+        birthInfo?.solar_year &&
+        birthInfo?.solar_month &&
+        birthInfo?.solar_day
+      ) {
+        try {
+          daeunData = calculateDaeunInfo(
+            {
+              yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem,
+              monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem,
+              monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch,
+            },
+            birthInfo.solar_year,
+            birthInfo.solar_month,
+            birthInfo.solar_day,
+            data.gender || "female",
+            birthInfo.time_unknown ? undefined : birthInfo.solar_hour,
+            birthInfo.time_unknown ? undefined : birthInfo.solar_minute,
+            birthInfo.time_unknown || false,
+          )
+
+          console.log(`Session ${sessionId}: 새로 계산된 대운:`, daeunData)
+
+          // 계산된 대운을 DB에 비동기 업데이트 (반환을 블록하지 않음)
+          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
+
+          supabase
+            .from("saju_sessions")
+            .update({ saju: updatedSajuJsonb })
+            .eq("id", sessionId)
+            .then(({ error }) => {
+              if (error) {
+                console.error(`Error updating daeun for session ${sessionId}:`, error)
+              } else {
+                console.log(`Successfully updated daeun for session ${sessionId}`)
+              }
+            })
+        } catch (error) {
+          console.error(`Error calculating daeun for session ${sessionId}:`, error)
+        }
+      }
+    }
+
     return {
       id: data.id,
       name: data.name || "Unknown",
@@ -691,6 +821,8 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
         hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
         elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+        // 대운 데이터 추가
+        daeun: daeunData,
       },
     }
   } catch (error) {

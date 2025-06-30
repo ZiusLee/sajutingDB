@@ -283,8 +283,6 @@ function getYearPillar(
     yearToUse = solarYear - 1
   }
 
-  console.log(`Year calculation: ${solarYear}-${solarMonth}-${solarDay}, using year ${yearToUse}`)
-
   // 갑자년은 서기 4년에 해당 (4 = 갑자, 5 = 을축, ...)
   const stemIndex = (yearToUse + 6) % 10 // 보정: +6
   const branchIndex = (yearToUse + 8) % 12 // 보정: +8
@@ -385,7 +383,6 @@ function getHourBranch(hour: number, minute: number, timeStandard: TimeStandard 
   }
 
   // 기본값 (동경 135도 표준시 기준)
-  console.warn(`시간 범위를 벗어났습니다: ${hour}:${minute}, 기본값 '자'를 반환합니다.`)
   return "자"
 }
 
@@ -538,25 +535,52 @@ function generateInterpretation(
 }
 
 // 일간지 계산 (Day Pillar) - 양력 기준
+// function getDayPillar(solarYear: number, solarMonth: number, solarDay: number): { stem: string; branch: string } {
+//   // 1996년 1월 6일 임인일 기준으로 계산
+//   const BASE_DATE = new Date(1996, 0, 6) // 1996년 1월 6일
+//   const BASE_STEM_INDEX = 8 // 임(壬)
+//   const BASE_BRANCH_INDEX = 2 // 인(寅)
+
+//   // 기준일로부터의 일수 차이 계산
+//   const targetDate = new Date(solarYear, solarMonth - 1, solarDay)
+
+//   // 밀리초 단위 차이를 일 단위로 변환
+//   const dayDiff = Math.floor((targetDate.getTime() - BASE_DATE.getTime()) / (1000 * 60 * 60 * 24))
+
+//   // 천간 및 지지 계산 (60일 주기로 순환)
+//   const stemIndex = (BASE_STEM_INDEX + dayDiff) % 10
+//   const branchIndex = (BASE_BRANCH_INDEX + dayDiff) % 12
+
+//   return {
+//     stem: HEAVENLY_STEMS[stemIndex >= 0 ? stemIndex : stemIndex + 10],
+//     branch: EARTHLY_BRANCHES[branchIndex >= 0 ? branchIndex : branchIndex + 12],
+//   }
+// }
+
+// 일간지 계산 (Day Pillar) - 시간대 독립적 계산
 function getDayPillar(solarYear: number, solarMonth: number, solarDay: number): { stem: string; branch: string } {
   // 1996년 1월 6일 임인일 기준으로 계산
-  const BASE_DATE = new Date(1996, 0, 6) // 1996년 1월 6일
+  const BASE_DATE = new Date(Date.UTC(1996, 0, 6)) // UTC 기준으로 1996년 1월 6일
   const BASE_STEM_INDEX = 8 // 임(壬)
   const BASE_BRANCH_INDEX = 2 // 인(寅)
 
-  // 기준일로부터의 일수 차이 계산
-  const targetDate = new Date(solarYear, solarMonth - 1, solarDay)
+  // 기준일로부터의 일수 차이 계산 (UTC 기준)
+  const targetDate = new Date(Date.UTC(solarYear, solarMonth - 1, solarDay))
 
   // 밀리초 단위 차이를 일 단위로 변환
   const dayDiff = Math.floor((targetDate.getTime() - BASE_DATE.getTime()) / (1000 * 60 * 60 * 24))
 
   // 천간 및 지지 계산 (60일 주기로 순환)
-  const stemIndex = (BASE_STEM_INDEX + dayDiff) % 10
-  const branchIndex = (BASE_BRANCH_INDEX + dayDiff) % 12
+  let stemIndex = (BASE_STEM_INDEX + dayDiff) % 10
+  let branchIndex = (BASE_BRANCH_INDEX + dayDiff) % 12
+
+  // 음수 처리
+  if (stemIndex < 0) stemIndex += 10
+  if (branchIndex < 0) branchIndex += 12
 
   return {
-    stem: HEAVENLY_STEMS[stemIndex >= 0 ? stemIndex : stemIndex + 10],
-    branch: EARTHLY_BRANCHES[branchIndex >= 0 ? branchIndex : branchIndex + 12],
+    stem: HEAVENLY_STEMS[stemIndex],
+    branch: EARTHLY_BRANCHES[branchIndex],
   }
 }
 
@@ -569,16 +593,53 @@ function getDayPillar(solarYear: number, solarMonth: number, solarDay: number): 
 
 import { EXACT_SOLAR_TERMS } from "./solar-terms"
 
+// 율리우스 일자 계산 함수
+// export function getSolarToJulianDay(year: number, month: number, day: number): number {
+//   let Y = year
+//   let M = month
+//   if (month <= 2) {
+//     Y -= 1
+//     M += 12
+//   }
+//   const A = Math.floor(Y / 100)
+//   const B = Math.floor(A / 4)
+//   const C = 2 - A + B
+//   const E = Math.floor(365.25 * (Y + 4716))
+//   const F = Math.floor(30.6001 * (M + 1))
+//   const JD = E + F + day + C - 1524.5
+//   return JD
+// }
+
+// 율리우스 일자 계산 함수 - 시간대 독립적 개선 버전
+export function getSolarToJulianDay(year: number, month: number, day: number): number {
+  // 그레고리력 개정 이전/이후 구분 (1582년 10월 15일)
+  const isGregorian = year > 1582 || (year === 1582 && month > 10) || (year === 1582 && month === 10 && day >= 15)
+
+  const a = Math.floor((14 - month) / 12)
+  const y = year + 4800 - a
+  const m = month + 12 * a - 3
+
+  let julianDay = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4)
+
+  if (isGregorian) {
+    julianDay = julianDay - Math.floor(y / 100) + Math.floor(y / 400) - 32045
+  } else {
+    julianDay = julianDay - 32083
+  }
+
+  return julianDay
+}
+
 // Simplify the getMonthBranchFromSolarTerms function to make it more efficient and accurate
 // Replace the current implementation with this improved version:
 
+// getMonthBranchFromSolarTerms 함수도 UTC 기준으로 수정
 function getMonthBranchFromSolarTerms(year: number, month: number, day: number, hour = 0): string {
   try {
-    const currentDate = new Date(year, month - 1, day, hour)
-    console.log(`=== Calculating month branch for ${year}-${month}-${day} ${hour}h ===`)
+    // UTC 기준으로 날짜 생성하여 시간대 독립적 계산
+    const currentDate = new Date(Date.UTC(year, month - 1, day, hour))
 
     // EXACT_SOLAR_TERMS 데이터가 제대로 로드되었는지 확인
-    console.log(`Total solar terms available: ${EXACT_SOLAR_TERMS.length}`)
     if (EXACT_SOLAR_TERMS.length === 0) {
       console.error("EXACT_SOLAR_TERMS is empty!")
       return "자"
@@ -604,46 +665,24 @@ function getMonthBranchFromSolarTerms(year: number, month: number, day: number, 
     const currentYearTerms = EXACT_SOLAR_TERMS.filter((term) => term.year === year)
     const prevYearTerms = EXACT_SOLAR_TERMS.filter((term) => term.year === year - 1)
 
-    console.log(`Current year (${year}) terms found: ${currentYearTerms.length}`)
-    console.log(`Previous year (${year - 1}) terms found: ${prevYearTerms.length}`)
-
-    // 1993년 청명 절기 확인
-    const qingming1993 = currentYearTerms.find((term) => term.solarTerm === "청명")
-    if (qingming1993) {
-      console.log(`Found 청명 for ${year}: ${qingming1993.timestamp}`)
-    } else {
-      console.log(`청명 not found for ${year}`)
-    }
-
     // Combine and sort all terms by timestamp in descending order
     const allRelevantTerms = [...currentYearTerms, ...prevYearTerms]
       .filter((term) => solarTermToMonthBranch[term.solarTerm]) // Only include terms that affect month branch
       .map((term) => ({
         ...term,
-        date: new Date(term.timestamp),
+        date: new Date(term.timestamp), // 절기 데이터의 timestamp는 이미 정확한 시간
         monthBranch: solarTermToMonthBranch[term.solarTerm],
       }))
       .sort((a, b) => b.date.getTime() - a.date.getTime()) // Sort in descending order
 
-    console.log(`Total relevant terms: ${allRelevantTerms.length}`)
-    console.log(`Current date: ${currentDate.toISOString()}`)
-
     // Find the most recent solar term that has passed
     for (const term of allRelevantTerms) {
-      console.log(`Checking term: ${term.solarTerm} (${term.timestamp}) -> ${term.monthBranch}`)
-      console.log(`Term date: ${term.date.toISOString()}`)
-      console.log(`Current >= Term: ${currentDate >= term.date}`)
-
       if (currentDate >= term.date) {
-        console.log(
-          `✓ ${year}-${month}-${day} ${hour}h falls after ${term.solarTerm} (${term.timestamp}), so month branch is ${term.monthBranch}`,
-        )
         return term.monthBranch
       }
     }
 
     // If no matching term is found (unlikely but possible for very old dates)
-    console.warn(`Could not determine month branch for ${year}-${month}-${day}, using default 자`)
     return "자"
   } catch (error) {
     console.error(`Error in getMonthBranchFromSolarTerms for ${year}-${month}-${day}:`, error)
@@ -662,23 +701,16 @@ function getMonthPillar(
   apiMonthStem?: string,
   apiMonthBranch?: string,
 ): { stem: string; branch: string } {
-  console.log(`=== getMonthPillar called with: ${solarYear}-${solarMonth}-${solarDay}, yearStem: ${yearStem} ===`)
-
   // API 제공 값을 무시하고 항상 우리 자체 절기 계산을 사용
   // API 데이터가 부정확할 수 있으므로 신뢰할 수 있는 절기 계산을 우선 사용
 
   try {
     // Get the month branch based on solar terms
-    console.log(`Calling getMonthBranchFromSolarTerms...`)
     const monthBranch = getMonthBranchFromSolarTerms(solarYear, solarMonth, solarDay, hour)
-    console.log(`Month branch from solar terms: ${monthBranch}`)
 
     // Calculate the month stem based on year stem and month branch
-    console.log(`Calling getMonthStem with yearStem: ${yearStem}, monthBranch: ${monthBranch}`)
     const monthStem = getMonthStem(yearStem, monthBranch)
-    console.log(`Month stem calculated: ${monthStem}`)
 
-    console.log(`Final month pillar: ${monthStem}${monthBranch}`)
     return { stem: monthStem, branch: monthBranch }
   } catch (error) {
     console.error(`Error calculating month pillar for ${solarYear}-${solarMonth}-${solarDay}:`, error)
@@ -722,11 +754,6 @@ function getMonthStem(yearStem: string, monthBranch: string): string {
   // Calculate the stem index and return the corresponding stem
   const stemIndex = (firstMonthStemIndex + monthBranchIndex) % 10
 
-  // 디버깅 로그 추가
-  console.log(
-    `Year stem: ${yearStem}, Month branch: ${monthBranch}, First month stem index: ${firstMonthStemIndex}, Month branch index: ${monthBranchIndex}, Calculated stem index: ${stemIndex}, Result: ${HEAVENLY_STEMS[stemIndex]}`,
-  )
-
   return HEAVENLY_STEMS[stemIndex]
 }
 
@@ -749,16 +776,10 @@ export function calculateSaju(
 ): any {
   const numLunarYear = typeof lunarYear === "string" ? Number.parseInt(lunarYear, 10) : lunarYear
 
-  console.log(
-    `Calculate Saju for Lunar: ${numLunarYear}, Solar: ${solarYear}-${solarMonth}-${solarDay}, Time: ${hour}:${minute}, Gender: ${gender}, Name: ${name}, TimeUnknown: ${timeUnknown}, IsLeapMonth: ${isLeapMonth}, TimeStandard: ${timeStandard}`,
-  )
-
   // 연간지 계산 (Year Pillar)
   const yearPillar = getYearPillar(numLunarYear, solarYear, solarMonth, solarDay)
   const yearStem = yearPillar.stem
   const yearBranch = yearPillar.branch
-
-  console.log(`Year Pillar calculated: ${yearStem}${yearBranch}`)
 
   // 월간지 계산 (Month Pillar)
   const monthPillar = getMonthPillar(
@@ -774,14 +795,10 @@ export function calculateSaju(
   const monthStem = monthPillar.stem
   const monthBranch = monthPillar.branch
 
-  console.log(`Month Pillar calculated: ${monthStem}${monthBranch}`)
-
   // 일간지 계산 (Day Pillar)
   const dayPillar = getDayPillar(solarYear, solarMonth, solarDay)
   const dayStem = dayPillar.stem
   const dayBranch = dayPillar.branch
-
-  console.log(`Day Pillar calculated: ${dayStem}${dayBranch}`)
 
   // 시간 간지 계산
   let hourStem, hourBranch
@@ -794,9 +811,8 @@ export function calculateSaju(
     hourStem = getHourStem(dayStem, hour, minute, timeStandard)
   }
 
-  console.log(
-    `Final pillars - Year: ${yearStem}${yearBranch}, Month: ${monthStem}${monthBranch}, Day: ${dayStem}${dayBranch}, Hour: ${hourStem}${hourBranch}`,
-  )
+  // 간단한 결과 로그만 출력
+  console.log(`사주 계산 완료: ${dayStem}${dayBranch} (${name})`)
 
   // 오행 계산
   const elements = countElements(yearStem, yearBranch, monthStem, monthBranch, dayStem, dayBranch, hourStem, hourBranch)

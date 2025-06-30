@@ -128,7 +128,7 @@ export function LandingPageClient() {
     return "비"
   }
 
-  // 오늘의 운세 데이터 (실제로는 사주 기반으로 계산해야 함)
+  // 오늘의 ��세 데이터 (실제로는 사주 기반으로 계산해야 함)
   const todayFortunes = [
     {
       type: "love",

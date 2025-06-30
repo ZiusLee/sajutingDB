@@ -1,173 +1,248 @@
 "use client"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import type { Saju } from "@/lib/saju"
-import {
-  calculateDaeunInfo,
-  calculateKoreanAge,
-  getCurrentDaeunIndex,
-  getStemColor,
-  getBranchColor,
-  getDaeunDirection,
-} from "@/lib/daeun-calculator"
-import { useEffect, useState } from "react"
 
-interface DaeunDiagramProps {
-  saju: Saju
-  gender?: string
-  solarYear?: string
-  solarMonth?: string
-  solarDay?: string
-  hour?: string
-  minute?: string
-  timeUnknown?: boolean
+import type React from "react"
+import { useState, useMemo } from "react"
+import { Info } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+
+interface DaeunPeriod {
+  age: number
+  startYear: number
+  endYear: number
+  stem: string
+  branch: string
+  stemHanja?: string
+  branchHanja?: string
+  description?: string
 }
 
-export default function DaeunDiagram({
-  saju,
-  gender = "",
-  solarYear = "",
-  solarMonth = "",
-  solarDay = "",
-  hour = "",
-  minute = "",
-  timeUnknown = false,
-}: DaeunDiagramProps) {
-  const [error, setError] = useState<string | null>(null)
-  const [daeunInfo, setDaeunInfo] = useState<any>(null)
-  const [currentDaeunIndex, setCurrentDaeunIndex] = useState(0)
-
-  useEffect(() => {
-    try {
-      // 성별 정규화
-      const normalizedGender =
-        gender === "male" || gender === "남성" || gender === "남자"
-          ? "male"
-          : gender === "female" || gender === "여성" || gender === "여자"
-            ? "female"
-            : "male" // 기본값
-
-      // 출생 정보 변환
-      const birthYear = Number.parseInt(solarYear, 10) || new Date().getFullYear() - 30 // 기본값
-      const birthMonth = Number.parseInt(solarMonth, 10) || 1
-      const birthDay = Number.parseInt(solarDay, 10) || 1
-      const birthHour = timeUnknown ? undefined : Number.parseInt(hour, 10)
-      const birthMinute = timeUnknown ? undefined : Number.parseInt(minute, 10)
-
-      // 대운 방향 결정
-      const direction = getDaeunDirection(saju.yearStem, normalizedGender)
-
-      // 대운 정보 계산
-      const info = calculateDaeunInfo(saju, birthYear, birthMonth, birthDay, normalizedGender, birthHour, birthMinute)
-      setDaeunInfo(info)
-
-      // 현재 나이 계산 (만 나이)
-      const currentAge = calculateKoreanAge(birthYear, birthMonth, birthDay)
-
-      // 현재 대운 인덱스 계산
-      const index = getCurrentDaeunIndex(info.pillars, currentAge)
-      setCurrentDaeunIndex(index)
-    } catch (err) {
-      console.error("Error calculating daeun info:", err)
-      setError("대운 정보를 계산하는 중 오류가 발생했습니다.")
-    }
-  }, [saju, gender, solarYear, solarMonth, solarDay, hour, minute, timeUnknown])
-
-  if (error) {
-    return (
-      <Card className="mt-6">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">대운(大運) 흐름</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-red-500 text-center py-2">{error}</div>
-          <div className="text-xs text-muted-foreground mt-4">
-            <p>※ 대운은 10년 단위로 변화하는 큰 운의 흐름입니다.</p>
-            <p>※ 대운세수는 생일과 절입일의 차이를 기준으로 계산됩니다.</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
+interface DaeunDiagramProps {
+  daeun: DaeunPeriod[]
+  birthInfo?: {
+    solarYear: number
+    solarMonth: number
+    solarDay: number
+    solarHour?: number
+    solarMinute?: number
+    timeUnknown?: boolean
   }
+  name?: string
+  gender?: string
+}
 
-  if (!daeunInfo) {
+const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gender }) => {
+  const [selectedPeriod, setSelectedPeriod] = useState<DaeunPeriod | null>(null)
+  const currentYear = new Date().getFullYear()
+
+  // 안전한 대운 데이터 처리
+  const safeDaeun = useMemo(() => {
+    if (!daeun || !Array.isArray(daeun)) return []
+    return daeun
+  }, [daeun])
+
+  // 대운 데이터 수정 (연도 계산 오류 수정)
+  const correctedDaeun = useMemo(() => {
+    if (!safeDaeun.length || !birthInfo?.solarYear) return safeDaeun
+
+    return safeDaeun.map((period) => {
+      if (!period || typeof period.age !== "number") return period
+
+      return {
+        ...period,
+        startYear: birthInfo.solarYear + period.age,
+        endYear: birthInfo.solarYear + period.age + 9,
+      }
+    })
+  }, [safeDaeun, birthInfo?.solarYear])
+
+  // 현재 대운 찾기 (메모화하여 무한 리렌더링 방지)
+  const currentDaeun = useMemo(() => {
+    if (!correctedDaeun.length || !birthInfo?.solarYear) return null
+
+    const currentAge = currentYear - birthInfo.solarYear
+
+    const current = correctedDaeun.find((period) => {
+      if (!period || typeof period.age !== "number") return false
+      return currentAge >= period.age && currentAge < period.age + 10
+    })
+
+    return current || null
+  }, [correctedDaeun, currentYear, birthInfo?.solarYear])
+
+  // 대운 설명 정보
+  const daeunExplanation = useMemo(() => {
+    const currentDaeunText = currentDaeun
+      ? `${currentDaeun.stem}${currentDaeun.branch} (${currentDaeun.startYear}-${currentDaeun.endYear})`
+      : "해당 없음"
+
+    return `대운(大運)은 10년 단위로 변화하는 인생의 큰 흐름을 나타냅니다.
+
+• **현재 대운**: ${currentDaeunText}
+• **대운의 의미**: 각 10년마다 다른 천간지지가 영향을 미쳐 운세의 흐름이 바뀝니다
+• **활용법**: 대운을 통해 인생의 전환점과 중요한 시기를 파악할 수 있습니다
+
+각 대운 기간을 클릭하면 상세 정보를 확인할 수 있습니다.`
+  }, [currentDaeun])
+
+  if (!correctedDaeun.length) {
     return (
-      <Card className="mt-6">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">대운(大運) 흐름</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-2">대운 정보를 계산 중입니다...</div>
-        </CardContent>
-      </Card>
+      <div className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">대운표 (大運表)</h3>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-white/60 hover:text-white p-1">
+                <Info className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-slate-800 border-slate-700">
+              <DialogHeader>
+                <DialogTitle className="text-white">대운표란?</DialogTitle>
+              </DialogHeader>
+              <div className="text-white/90 whitespace-pre-line text-sm">{daeunExplanation}</div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <div className="text-white/60 text-center py-8">대운 정보를 불러올 수 없습니다.</div>
+      </div>
     )
   }
 
   return (
-    <Card className="mt-6">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex justify-between items-center">
-          <span>대운(大運) 흐름</span>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-normal text-muted-foreground">
-              {daeunInfo.direction === "forward" ? "순행(→)" : "역행(←)"} · 대운세수: {daeunInfo.daeunAge}세
-            </span>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <div className="min-w-max">
-            <div className="grid grid-cols-8 gap-1 text-center mb-2">
-              {daeunInfo.pillars.map((pillar: any, index: number) => (
-                <div
-                  key={index}
-                  className={`p-2 rounded-md ${
-                    index === currentDaeunIndex ? "bg-primary/10 border border-primary/30" : ""
-                  }`}
-                >
-                  <div className="text-lg font-semibold">
-                    <span className={`${getStemColor(pillar.stem)} mr-1`}>{pillar.stemKorean}</span>
-                    <span className={getBranchColor(pillar.branch)}>{pillar.branchKorean}</span>
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-white">대운표 (大運表)</h3>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-white/60 hover:text-white p-1">
+              <Info className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-slate-800 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-white">대운표란?</DialogTitle>
+            </DialogHeader>
+            <div className="text-white/90 whitespace-pre-line text-sm">{daeunExplanation}</div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* 대운 기간들을 가로 스크롤로 표시 */}
+      <div className="overflow-x-auto">
+        <div className="flex gap-2 min-w-max pb-2">
+          {correctedDaeun.slice(0, 8).map((period, index) => {
+            if (!period || !period.stem || !period.branch) return null
+
+            let isCurrent = false
+            let isPast = false
+            let isFuture = false
+
+            if (birthInfo?.solarYear && typeof period.age === "number") {
+              const currentAge = currentYear - birthInfo.solarYear
+              isCurrent = currentAge >= period.age && currentAge < period.age + 10
+              isPast = currentAge >= period.age + 10
+              isFuture = currentAge < period.age
+            }
+
+            return (
+              <div
+                key={`${period.stem}-${period.branch}-${index}`}
+                onClick={() => setSelectedPeriod(period)}
+                className={`
+                  flex-shrink-0 w-24 h-32 border rounded-lg p-2 cursor-pointer transition-all
+                  ${
+                    isCurrent
+                      ? "border-yellow-400 bg-yellow-400/20 shadow-lg"
+                      : isPast
+                        ? "border-gray-500 bg-gray-500/10"
+                        : "border-white/30 bg-white/10 hover:bg-white/20"
+                  }
+                `}
+              >
+                <div className="text-center h-full flex flex-col justify-between">
+                  <div>
+                    <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>{period.age}세</div>
+                    <div className={`text-lg font-bold ${isCurrent ? "text-yellow-100" : "text-white"}`}>
+                      {period.stem}
+                      {period.branch}
+                    </div>
+                    {period.stemHanja && period.branchHanja && (
+                      <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>
+                        {period.stemHanja}
+                        {period.branchHanja}
+                      </div>
+                    )}
+                  </div>
+                  <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>
+                    {period.startYear}-{period.endYear}
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
-            <div className="grid grid-cols-8 gap-1 text-center text-sm">
-              {daeunInfo.pillars.map((pillar: any, index: number) => (
-                <div
-                  key={index}
-                  className={`p-1 ${index === currentDaeunIndex ? "font-medium" : "text-muted-foreground"}`}
-                >
-                  <div>
-                    {pillar.startAge}~{pillar.endAge}세
-                  </div>
-                  <div>{pillar.startYear}년~</div>
-                  {pillar.startMonth && pillar.startDay && !timeUnknown && (
-                    <div className="text-xs mt-1">
-                      ({pillar.startMonth}월 {pillar.startDay}일경)
-                    </div>
+      {/* 현재 대운 강조 표시 */}
+      {currentDaeun && (
+        <div className="mt-4 p-3 bg-yellow-400/20 border border-yellow-400/30 rounded-lg">
+          <div className="text-yellow-200 text-sm font-medium">
+            현재 대운: {currentDaeun.stem}
+            {currentDaeun.branch} ({currentDaeun.startYear}-{currentDaeun.endYear})
+          </div>
+          <div className="text-yellow-100/80 text-xs mt-1">{currentDaeun.age}세부터 시작된 10년 운세 기간</div>
+        </div>
+      )}
+
+      {/* 선택된 대운 상세 정보 모달 */}
+      {selectedPeriod && (
+        <Dialog open={!!selectedPeriod} onOpenChange={() => setSelectedPeriod(null)}>
+          <DialogContent className="bg-slate-800 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-white">
+                {selectedPeriod.stem}
+                {selectedPeriod.branch} 대운 ({selectedPeriod.startYear}-{selectedPeriod.endYear})
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 text-white/90">
+              <div>
+                <div className="text-sm text-white/60">나이</div>
+                <div className="font-medium">
+                  {selectedPeriod.age}세 ~ {selectedPeriod.age + 9}세
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-white/60">기간</div>
+                <div className="font-medium">
+                  {selectedPeriod.startYear}년 ~ {selectedPeriod.endYear}년
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-white/60">천간지지</div>
+                <div className="font-medium">
+                  {selectedPeriod.stem}
+                  {selectedPeriod.branch}
+                  {selectedPeriod.stemHanja && selectedPeriod.branchHanja && (
+                    <span className="ml-2 text-white/60">
+                      ({selectedPeriod.stemHanja}
+                      {selectedPeriod.branchHanja})
+                    </span>
                   )}
                 </div>
-              ))}
+              </div>
+              {selectedPeriod.description && (
+                <div>
+                  <div className="text-sm text-white/60">특징</div>
+                  <div className="text-sm">{selectedPeriod.description}</div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p>※ 대운은 10년 단위로 변화하는 큰 운의 흐름입니다.</p>
-          <p>※ 대운세수는 생일과 절입일의 차이를 기준으로 계산됩니다.</p>
-          <p>※ 모든 나이는 만 나이 기준입니다.</p>
-          {timeUnknown && (
-            <p className="text-yellow-600 dark:text-yellow-400">
-              ※ 출생시간이 불확실하여 대략적인 대운 계산만 가능합니다.
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
   )
 }
+
+export default DaeunDiagram

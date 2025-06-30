@@ -33,22 +33,28 @@ interface MemoryBankProps {
 export default function MemoryBank({ userId, sessionId, isOpen, onClose }: MemoryBankProps) {
   const [memories, setMemories] = useState<MemoryEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // 메모리 로드
   const loadMemories = async () => {
     if (!userId && !sessionId) {
       console.log("Memory Bank: User ID and Session ID are missing.")
       setMemories([])
+      setError(null)
       return
     }
+
     setIsLoading(true)
+    setError(null)
     try {
-      const fetchedMemories = await getMemories(userId, sessionId) // Use new service
-      setMemories(fetchedMemories)
-      console.log(`메모리 뱅크 로드: ${fetchedMemories.length}개 항목`)
+      console.log("Loading memories for:", { userId, sessionId })
+      const fetchedMemories = await getMemories(userId, sessionId)
+      setMemories(fetchedMemories || [])
+      console.log(`메모리 뱅크 로드: ${fetchedMemories?.length || 0}개 항목`)
     } catch (error) {
       console.error("Error loading memories:", error)
       setMemories([])
+      setError("메모리를 불러오는데 실패했습니다.")
     } finally {
       setIsLoading(false)
     }
@@ -64,16 +70,17 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
   // 메모리 삭제
   const handleDeleteMemory = async (memoryId: string) => {
     if (!userId) {
+      // Deletion currently requires userId
       console.warn("User ID is required to delete memory.")
+      // Optionally, show a toast or message to the user
       return
     }
-
-    const success = await deleteMemory(memoryId, userId)
-    if (success) {
+    try {
+      await deleteMemory(memoryId, userId) // Use new service
       setMemories((prev) => prev.filter((memory) => memory.id !== memoryId))
-    } else {
-      console.error("Failed to delete memory")
-      // Optionally show a toast or error message to user
+    } catch (error) {
+      console.error("Error deleting memory:", error)
+      // Optionally, show a toast or message to the user
     }
   }
 
@@ -204,6 +211,14 @@ export default function MemoryBank({ userId, sessionId, isOpen, onClose }: Memor
                   style={{ animationDelay: "300ms" }}
                 ></div>
               </div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <Brain className="h-12 w-12 text-red-600 mx-auto mb-4" />
+              <p className="text-red-400">{error}</p>
+              <Button variant="outline" size="sm" onClick={loadMemories} className="mt-2">
+                다시 시도
+              </Button>
             </div>
           ) : memories.length === 0 ? (
             <div className="text-center py-8">

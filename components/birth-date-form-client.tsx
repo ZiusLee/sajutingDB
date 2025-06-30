@@ -20,6 +20,7 @@ import { updateAuthUserId } from "@/lib/db-service"
 import { CitySearch } from "@/components/city-search"
 import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 
 interface BirthDateFormClientProps {
   onSuccess?: (sessionId: string) => void
@@ -165,8 +166,52 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
       setSaju(sajuResult)
 
-      // Calculate daeun data if available in sajuResult
-      const daeunData = sajuResult.daeun || null
+      // 대운 계산 추가 - 사주 계산 후에 정확한 데이터로 계산
+      console.log("사주 계산 완료, 대운 계산 시작:", {
+        yearStem: sajuResult.yearStem,
+        monthStem: sajuResult.monthStem,
+        monthBranch: sajuResult.monthBranch,
+        gender,
+        birthYear: Number.parseInt(year),
+        birthMonth: Number.parseInt(month),
+        birthDay: Number.parseInt(day),
+        hour: timeUnknown ? undefined : hour,
+        minute: timeUnknown ? undefined : minute,
+        timeUnknown,
+      })
+
+      const daeunData = calculateDaeunInfo(
+        {
+          yearStem: sajuResult.yearStem,
+          monthStem: sajuResult.monthStem,
+          monthBranch: sajuResult.monthBranch,
+        },
+        Number.parseInt(year),
+        Number.parseInt(month),
+        Number.parseInt(day),
+        gender,
+        timeUnknown ? undefined : hour,
+        timeUnknown ? undefined : minute,
+        timeUnknown,
+      )
+
+      console.log("Calculated daeun data:", daeunData)
+
+      // 사주 결과에 대운 데이터 추가
+      sajuResult.daeun = daeunData
+
+      // 대운 계산 추가
+      // const daeunData = calculateDaeunInfo(
+      //   sajuResult,
+      //   Number.parseInt(year),
+      //   Number.parseInt(month),
+      //   Number.parseInt(day),
+      //   gender,
+      //   timeUnknown ? undefined : hour,
+      //   timeUnknown ? undefined : minute,
+      // )
+
+      // console.log("Calculated daeun data:", daeunData)
 
       // Store calculation data in localStorage for later use
       const sajuDataToStore = {
@@ -194,11 +239,11 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         monthStemHanja: sajuResult.monthStemHanja,
         monthBranchHanja: sajuResult.monthBranchHanja,
         dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.dayBranch,
+        dayBranch: sajuResult.dayBranchHanja,
         dayStemHanja: sajuResult.dayStemHanja,
         dayBranchHanja: sajuResult.dayBranchHanja,
         hourStem: sajuResult.hourStem,
-        hourBranch: sajuResult.hourBranch,
+        hourBranch: sajuResult.hourBranchHanja,
         hourStemHanja: sajuResult.hourStemHanja,
         hourBranchHanja: sajuResult.hourBranchHanja,
         dayMaster: sajuResult.dayMaster,
@@ -280,6 +325,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
             returnPath: router.asPath,
             timeStandard: getTimeStandardFromCity(),
             birthCityId,
+            daeun: daeunData, // 대운 데이터 추가
             birthInfo: {
               solarYear: Number.parseInt(year),
               solarMonth: Number.parseInt(month),
@@ -314,6 +360,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
               returnPath: "/",
               timeStandard: getTimeStandardFromCity(),
               birthCityId,
+              daeun: daeunData, // 대운 데이터 추가
               birthInfo: {
                 solarYear: Number.parseInt(year),
                 solarMonth: Number.parseInt(month),

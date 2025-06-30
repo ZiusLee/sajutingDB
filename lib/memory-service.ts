@@ -1,7 +1,10 @@
+import { createMemory, getMemories } from "@/lib/memory-api-service"
+import type { MemoryType } from "@/lib/memory-types"
+
 export interface MemoryEntry {
   id: string
   userId: string
-  type: "relationship" | "career" | "emotion" | "location" | "compatibility" | "personal"
+  type: MemoryType
   label: string
   value: string
   metadata?: {
@@ -40,78 +43,125 @@ class MemoryService {
     return importantKeywords.test(text) || text.length > 100
   }
 
-  // 메모리 저장 - 개선된 버전
+  // 메모리 저장 - 데이터베이스 연동
   async saveMemory(userId: string, entry: Omit<MemoryEntry, "id" | "userId" | "timestamp">): Promise<string> {
-    const memoryId = `memory_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-
-    const newEntry: MemoryEntry = {
-      id: memoryId,
-      userId,
-      timestamp: new Date().toISOString(),
-      ...entry,
-    }
-
-    let userMemory = this.memories.get(userId)
-    if (!userMemory) {
-      userMemory = {
-        userId,
-        entries: [],
-        summaryChunks: [],
-        lastUpdated: new Date().toISOString(),
-      }
-    }
-
-    // 중복 체크 및 업데이트
-    const existingIndex = userMemory.entries.findIndex((e) => e.type === entry.type && e.label === entry.label)
-
-    if (existingIndex >= 0) {
-      userMemory.entries[existingIndex] = newEntry
-    } else {
-      userMemory.entries.push(newEntry)
-    }
-
-    userMemory.lastUpdated = new Date().toISOString()
-    this.memories.set(userId, userMemory)
-
-    // 로컬 스토리지에도 저장 - 개선된 버전
     try {
-      const storageKey = `user_memory_${userId}`
-      localStorage.setItem(storageKey, JSON.stringify(userMemory))
+      // API를 통해 데이터베이스에 저장
+      const savedMemory = await createMemory(
+        entry.type,
+        entry.value, // content로 value 사용
+        [], // tags는 빈 배열로
+        userId,
+      )
 
-      // 전역 메모리 인덱스도 업데이트
-      const globalMemoryIndex = JSON.parse(localStorage.getItem("memory_index") || "[]")
-      if (!globalMemoryIndex.includes(userId)) {
-        globalMemoryIndex.push(userId)
-        localStorage.setItem("memory_index", JSON.stringify(globalMemoryIndex))
+      console.log(`✅ 메모리 저장 완료: ${entry.label} = ${entry.value}`)
+      return savedMemory.id
+    } catch (error) {
+      console.error("❌ 메모리 저장 실패:", error)
+
+      // 실패 시 로컬 스토리지에라도 저장
+      const memoryId = `memory_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      const newEntry: MemoryEntry = {
+        id: memoryId,
+        userId,
+        timestamp: new Date().toISOString(),
+        ...entry,
       }
 
-      console.log(`메모리 저장 완료: ${entry.label} = ${entry.value}`)
-    } catch (error) {
-      console.error("Error saving memory to localStorage:", error)
-    }
+      let userMemory = this.memories.get(userId)
+      if (!userMemory) {
+        userMemory = {
+          userId,
+          entries: [],
+          summaryChunks: [],
+          lastUpdated: new Date().toISOString(),
+        }
+      }
 
-    return memoryId
+      const existingIndex = userMemory.entries.findIndex((e) => e.type === entry.type && e.label === entry.label)
+      if (existingIndex >= 0) {
+        userMemory.entries[existingIndex] = newEntry
+      } else {
+        userMemory.entries.push(newEntry)
+      }
+
+      userMemory.lastUpdated = new Date().toISOString()
+      this.memories.set(userId, userMemory)
+
+      try {
+        const storageKey = `user_memory_${userId}`
+        localStorage.setItem(storageKey, JSON.stringify(userMemory))
+      } catch (storageError) {
+        console.error("로컬 스토리지 저장 실패:", storageError)
+      }
+
+      return memoryId
+    }
   }
 
-  // 메모리 조회 - 개선된 버전
-  getMemory(userId: string): UserMemory | null {
-    let userMemory = this.memories.get(userId)
+  // 메모리 조회 - 데이터베이스 우선
+  async getMemory(userId: string): Promise<UserMemory | null> {
+    try {
+      // API를 통해 데이터베이스에서 조회
+      const memories = await getMemories(userId)
 
+      if (memories && memories.length > 0) {
+        const userMemory: UserMemory = {
+          userId,
+          entries: memories.map((mem) => ({
+            id: mem.id,
+            userId: mem.user_id || userId,
+            type: mem.type,
+            label: this.getMemoryLabel(mem.type, mem.content),
+            value: typeof mem.content === "string" ? mem.content : JSON.stringify(mem.content),
+            timestamp: mem.created_at || mem.timestamp,
+            metadata: mem.metadata,
+          })),
+          summaryChunks: [],
+          lastUpdated: new Date().toISOString(),
+        }
+
+        console.log(`📖 데이터베이스에서 메모리 로드: ${userMemory.entries.length}개 항목`)
+        return userMemory
+      }
+    } catch (error) {
+      console.error("데이터베이스 메모리 조회 실패:", error)
+    }
+
+    // 데이터베이스 실패 시 로컬 스토리지에서 조회
+    let userMemory = this.memories.get(userId)
     if (!userMemory) {
-      // 로컬 스토리지에서 복원 시도
       try {
         const stored = localStorage.getItem(`user_memory_${userId}`)
         if (stored) {
           userMemory = JSON.parse(stored)
           this.memories.set(userId, userMemory!)
-          console.log(`메모리 복원 완료: ${userMemory?.entries.length}개 항목`)
+          console.log(`📖 로컬 스토리지에서 메모리 복원: ${userMemory?.entries.length}개 항목`)
         }
       } catch (error) {
-        console.error("Error loading memory from localStorage:", error)
+        console.error("로컬 스토리지 메모리 로드 실패:", error)
       }
     }
 
     return userMemory || null
+  }
+
+  // 메모리 타입에 따른 라벨 생성
+  private getMemoryLabel(type: MemoryType, content: any): string {
+    switch (type) {
+      case "career":
+        return "직업"
+      case "location":
+        return "거주지"
+      case "emotion":
+        return "감정상태"
+      case "personal":
+        return "개인정보"
+      case "compatibility":
+        return "궁합 대상자"
+      default:
+        return type
+    }
   }
 
   // 모든 사용자 메모리 조회
@@ -126,19 +176,20 @@ class MemoryService {
   }
 
   // 특정 타입의 메모리 조회
-  getMemoriesByType(userId: string, type: MemoryEntry["type"]): MemoryEntry[] {
-    const userMemory = this.getMemory(userId)
+  async getMemoriesByType(userId: string, type: MemoryType): Promise<MemoryEntry[]> {
+    const userMemory = await this.getMemory(userId)
     return userMemory?.entries.filter((entry) => entry.type === type) || []
   }
 
   // 궁합 대상자 조회
-  getCompatibilityTargets(userId: string): MemoryEntry[] {
+  async getCompatibilityTargets(userId: string): Promise<MemoryEntry[]> {
     return this.getMemoriesByType(userId, "compatibility")
   }
 
   // 메모리 삭제
   deleteMemory(userId: string, memoryId: string): boolean {
-    const userMemory = this.getMemory(userId)
+    // 로컬 메모리에서 삭제 (데이터베이스 삭제는 별도 API 호출 필요)
+    const userMemory = this.memories.get(userId)
     if (!userMemory) return false
 
     const index = userMemory.entries.findIndex((entry) => entry.id === memoryId)
@@ -159,7 +210,8 @@ class MemoryService {
 
   // 컨텍스트 요약 생성
   generateContextSummary(userId: string): string {
-    const userMemory = this.getMemory(userId)
+    // 동기 버전으로 변경 (비동기 호출은 별도 처리)
+    const userMemory = this.memories.get(userId)
     if (!userMemory || userMemory.entries.length === 0) {
       return ""
     }
@@ -190,7 +242,7 @@ class MemoryService {
       summaryParts.push(`감정상태: ${emotionInfo.map((e) => e.value).join(", ")}`)
     }
 
-    // 궁합 대상자들 - 더 상세하게
+    // 궁합 대상자들
     const compatibilityTargets = userMemory.entries.filter((e) => e.type === "compatibility")
     if (compatibilityTargets.length > 0) {
       const targets = compatibilityTargets.map((e) => {
@@ -204,106 +256,132 @@ class MemoryService {
       return ""
     }
 
-    return `📖 기억된 정보:
-• ${summaryParts.join("\n• ")}
-
-💡 위 정보를 활용하여 더 개인화된 상담을 제공하세요. 특히 궁합 대상자가 언급되면 저장된 정보를 즉시 활용하세요.`
+    return `📖 기억된 정보:\n• ${summaryParts.join("\n• ")}\n\n💡 위 정보를 활용하여 더 개인화된 상담을 제공하세요.`
   }
 
-  // 자동 메모리 추출
-  async extractAndSaveMemories(userId: string, userMessage: string, assistantResponse: string): Promise<MemoryEntry[]> {
+  // 자동 메모리 추출 - 개선된 버전
+  async extractAndSaveMemories(userId: string, userMessage: string, aiResponse: string): Promise<MemoryEntry[]> {
     const savedMemories: MemoryEntry[] = []
 
-    // 직업 정보 추출
-    const jobPatterns = [
-      /(?:직업|일|회사|업무).*?(?:은|는|이)?\s*([가-힣a-zA-Z\s]+)(?:이에요|예요|입니다|해요|하고)/,
-      /([가-힣a-zA-Z\s]+)(?:로|으로|에서)?\s*(?:일|근무|다녀|회사)/,
-    ]
+    try {
+      // 직업 정보 추출 (더 다양한 패턴)
+      const jobPatterns = [
+        /(?:직업|일|회사|업무|직장).*?(?:은|는|이)?\s*([가-힣a-zA-Z\s]+)(?:이에요|예요|입니다|해요|하고|다녀)/,
+        /([가-힣a-zA-Z\s]+)(?:로|으로|에서)?\s*(?:일|근무|다녀|회사|직장)/,
+        /(?:퇴사|이직|창업).*?([가-힣a-zA-Z\s]+)/,
+      ]
 
-    for (const pattern of jobPatterns) {
-      const match = userMessage.match(pattern)
-      if (match && match[1]) {
-        const job = match[1].trim()
-        if (job.length > 1 && job.length < 20) {
-          const memoryId = await this.saveMemory(userId, {
-            type: "career",
-            label: "직업",
-            value: job,
-          })
-          savedMemories.push({
-            id: memoryId,
-            userId,
-            type: "career",
-            label: "직업",
-            value: job,
-            timestamp: new Date().toISOString(),
-          })
+      for (const pattern of jobPatterns) {
+        const match = userMessage.match(pattern)
+        if (match && match[1]) {
+          const job = match[1].trim()
+          if (job.length > 1 && job.length < 30) {
+            const memoryId = await this.saveMemory(userId, {
+              type: "career",
+              label: "직업",
+              value: job,
+            })
+            console.log(`💼 직업 정보 저장: ${job}`)
+            break
+          }
         }
       }
-    }
 
-    // 거주지 정보 추출
-    const locationPatterns = [
-      /(?:살고|거주|사는|있는).*?(?:곳|지역|동네).*?(?:은|는|이)?\s*([가-힣\s]+)(?:이에요|예요|입니다)/,
-      /([가-힣]+(?:시|구|동|읍|면))(?:에|에서)?\s*(?:살고|거주|있어)/,
-    ]
+      // 거주지 정보 추출
+      const locationPatterns = [
+        /(?:살고|거주|사는|있는|이사).*?(?:곳|지역|동네|구|시|동).*?(?:은|는|이)?\s*([가-힣\s]+)(?:이에요|예요|입니다|에서|에)/,
+        /([가-힣]+(?:시|구|동|읍|면|리))(?:에|에서)?\s*(?:살고|거주|있어|이사)/,
+      ]
 
-    for (const pattern of locationPatterns) {
-      const match = userMessage.match(pattern)
-      if (match && match[1]) {
-        const location = match[1].trim()
-        if (location.length > 1 && location.length < 20) {
-          const memoryId = await this.saveMemory(userId, {
-            type: "location",
-            label: "거주지",
-            value: location,
-          })
-          savedMemories.push({
-            id: memoryId,
-            userId,
-            type: "location",
-            label: "거주지",
-            value: location,
-            timestamp: new Date().toISOString(),
-          })
+      for (const pattern of locationPatterns) {
+        const match = userMessage.match(pattern)
+        if (match && match[1]) {
+          const location = match[1].trim()
+          if (location.length > 1 && location.length < 20) {
+            await this.saveMemory(userId, {
+              type: "location",
+              label: "거주지",
+              value: location,
+            })
+            console.log(`🏠 거주지 정보 저장: ${location}`)
+            break
+          }
         }
       }
-    }
 
-    // 연애 상태 추출
-    const relationshipPatterns = [
-      /(?:연애|썸|사귀|헤어|이별).*?(?:중|상태|이에요|예요|했어|했습니다)/,
-      /(썸|연애|사귀는|헤어진|이별한)\s*(?:상태|중|사람|상대)/,
-    ]
+      // 연애 상태 추출
+      const relationshipPatterns = [
+        { pattern: /(썸|썸타는|썸남|썸녀)/, status: "썸 단계" },
+        { pattern: /(연애|사귀는|애인|남친|여친|커플)/, status: "연애 중" },
+        { pattern: /(헤어|이별|깨진|끝난)/, status: "이별 후" },
+        { pattern: /(결혼|신혼|부부|배우자)/, status: "기혼" },
+        { pattern: /(솔로|혼자|싱글)/, status: "솔로" },
+      ]
 
-    for (const pattern of relationshipPatterns) {
-      const match = userMessage.match(pattern)
-      if (match) {
-        let status = "알 수 없음"
-        if (match[0].includes("썸")) status = "썸 단계"
-        else if (match[0].includes("사귀")) status = "연애 중"
-        else if (match[0].includes("헤어") || match[0].includes("이별")) status = "이별 후"
-
-        const memoryId = await this.saveMemory(userId, {
-          type: "emotion",
-          label: "연애상태",
-          value: status,
-        })
-        savedMemories.push({
-          id: memoryId,
-          userId,
-          type: "emotion",
-          label: "연애상태",
-          value: status,
-          timestamp: new Date().toISOString(),
-        })
+      for (const { pattern, status } of relationshipPatterns) {
+        if (pattern.test(userMessage)) {
+          await this.saveMemory(userId, {
+            type: "emotion",
+            label: "연애상태",
+            value: status,
+          })
+          console.log(`💕 연애상태 저장: ${status}`)
+          break
+        }
       }
+
+      // 목표/계획 추출
+      const goalPatterns = [
+        /(?:목표|꿈|계획|하고싶은|되고싶은).*?(?:은|는|이)?\s*([가-힣a-zA-Z\s]+)(?:이에요|예요|입니다|해요)/,
+        /([가-힣a-zA-Z\s]+)(?:을|를)?\s*(?:목표|꿈|계획|하고싶어|되고싶어)/,
+      ]
+
+      for (const pattern of goalPatterns) {
+        const match = userMessage.match(pattern)
+        if (match && match[1]) {
+          const goal = match[1].trim()
+          if (goal.length > 2 && goal.length < 50) {
+            await this.saveMemory(userId, {
+              type: "personal",
+              label: "목표",
+              value: goal,
+            })
+            console.log(`🎯 목표 정보 저장: ${goal}`)
+            break
+          }
+        }
+      }
+    } catch (error) {
+      console.error("메모리 추출 중 오류:", error)
     }
 
     return savedMemories
   }
 
-  // 궁합 대상자 저장 - 압축된 사주 포함
+  // 감정 상태 저장
+  async saveEmotionalState(userId: string, userMessage: string, aiResponse: string): Promise<void> {
+    const emotionPatterns = [
+      { pattern: /(기분|우울|슬픈|힘든)/, emotion: "우울함" },
+      { pattern: /(행복|좋은|기쁜|즐거운)/, emotion: "긍정적" },
+      { pattern: /(불안|걱정|스트레스)/, emotion: "불안함" },
+      { pattern: /(화나|짜증|분노)/, emotion: "분노" },
+      { pattern: /(외로|혼자|쓸쓸)/, emotion: "외로움" },
+    ]
+
+    for (const { pattern, emotion } of emotionPatterns) {
+      if (pattern.test(userMessage) || pattern.test(aiResponse)) {
+        await this.saveMemory(userId, {
+          type: "emotion",
+          label: "감정상태",
+          value: emotion,
+        })
+        console.log(`😊 감정상태 저장: ${emotion}`)
+        break
+      }
+    }
+  }
+
+  // 궁합 대상자 저장
   async saveCompatibilityTarget(
     userId: string,
     name: string,
@@ -326,14 +404,14 @@ class MemoryService {
     })
   }
 
-  // 이름으로 궁합 대상자 찾기 - 더 유연하게
-  findCompatibilityTargetByName(userId: string, name: string): MemoryEntry | null {
-    const targets = this.getCompatibilityTargets(userId)
+  // 이름으로 궁합 대상자 찾기
+  async findCompatibilityTargetByName(userId: string, name: string): Promise<MemoryEntry | null> {
+    const targets = await this.getCompatibilityTargets(userId)
 
     // 정확한 이름 매칭
     let target = targets.find((target) => target.metadata?.name === name)
 
-    // 부분 매칭 (예: "채원" -> "나채원")
+    // 부분 매칭
     if (!target) {
       target = targets.find(
         (target) => target.metadata?.name?.includes(name) || name.includes(target.metadata?.name || ""),
@@ -343,9 +421,9 @@ class MemoryService {
     return target || null
   }
 
-  // 궁합 대상자 정보를 포맷된 문자열로 반환
-  getCompatibilityTargetInfo(userId: string, name: string): string | null {
-    const target = this.findCompatibilityTargetByName(userId, name)
+  // 궁합 대상자 정보 포맷
+  async getCompatibilityTargetInfo(userId: string, name: string): Promise<string | null> {
+    const target = await this.findCompatibilityTargetByName(userId, name)
     if (!target || !target.metadata) {
       return null
     }
@@ -355,8 +433,8 @@ class MemoryService {
   }
 
   // 압축된 사주 정보 조회
-  getCompatibilityTargetSaju(userId: string, name: string): any | null {
-    const target = this.findCompatibilityTargetByName(userId, name)
+  async getCompatibilityTargetSaju(userId: string, name: string): Promise<any | null> {
+    const target = await this.findCompatibilityTargetByName(userId, name)
     return target?.metadata?.compressedSaju || null
   }
 }
