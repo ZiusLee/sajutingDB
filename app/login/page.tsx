@@ -39,7 +39,7 @@ export default function LoginPage() {
           setError("사용자 정보를 찾을 수 없습니다. 다시 시도해주세요.")
           break
         case "no_code":
-          setError("인증 코드가 없습니다. 다시 시도해주세요.")
+          setError("인증 코드가 없습니다. ��시 시도해주세요.")
           break
         default:
           setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.")

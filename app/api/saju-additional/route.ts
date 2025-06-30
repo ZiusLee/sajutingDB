@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 - 년주: ${yearStem}${yearBranch}
 - 월주: ${monthStem}${monthBranch}
 - 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})
-- 시주: ${hourStem}${hourBranch}
+- 시���: ${hourStem}${hourBranch}
 - 띠: ${yearAnimal}
 - 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
 

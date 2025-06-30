@@ -3011,7 +3011,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 2044, month: 12, solarTerm: '대설', timestamp: '2044-12-06 20:44' },
   { year: 2044, month: 12, solarTerm: '동지', timestamp: '2044-12-21 14:42' },
   { year: 2045, month: 1, solarTerm: '소한', timestamp: '2045-01-05 08:01' },
-  { year: 2045, month: 1, solarTerm: '대한', timestamp: '2045-01-20 01:21' },
+  { year: 2045, month: 1, solarTerm: '��한', timestamp: '2045-01-20 01:21' },
   { year: 2045, month: 2, solarTerm: '입춘', timestamp: '2045-02-03 19:35' },
   { year: 2045, month: 2, solarTerm: '우수', timestamp: '2045-02-18 15:21' },
   { year: 2045, month: 3, solarTerm: '경칩', timestamp: '2045-03-05 13:23' },

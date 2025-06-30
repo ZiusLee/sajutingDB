@@ -6,13 +6,12 @@ import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Send, ChevronDown, User, ArrowLeft, Settings } from "lucide-react"
+import { Send, ChevronDown, User, ArrowLeft, Settings, Users } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
 import CompatibilityTool from "@/components/compatibility-tool"
 import { compressSaju } from "@/lib/saju-compression"
-import { useAuth } from "@/contexts/auth-context"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import DaeunDiagram from "@/components/daeun-diagram"
@@ -253,32 +252,6 @@ const getCurrentAge = (birthInfo?: BirthInfo) => {
   return 25 // 기본값
 }
 
-// 초기 메시지 생성 - 컴포넌트 외부로 이동하여 안정화
-const createInitialMessages = (name: string, roomType: string, birthInfo?: BirthInfo) => {
-  if (roomType === "sajuping") {
-    return [
-      {
-        id: "saju-analysis",
-        role: "assistant" as const,
-        content: getInitialMessageByRoomType(name, "sajuping", birthInfo),
-      },
-      {
-        id: "consultation-start",
-        role: "assistant" as const,
-        content: `오늘은 어떤 것이 궁금하세요? 😊`,
-      },
-    ]
-  } else {
-    return [
-      {
-        id: "welcome",
-        role: "assistant" as const,
-        content: getInitialMessageByRoomType(name, roomType, birthInfo),
-      },
-    ]
-  }
-}
-
 export default function SajuChat({
   saju,
   name,
@@ -290,13 +263,10 @@ export default function SajuChat({
   sessionKey,
   birthInfo,
 }: SajuChatProps) {
-  const { user, isAuthenticated } = useAuth()
-  const userId = user?.id || null
-  const actualIsLoggedIn = isAuthenticated || isLoggedIn
-
-  // 초기화 상태 - 단순화
+  // 기본 상태들
+  const [authUser, setAuthUser] = useState<any>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isReady, setIsReady] = useState(false)
-  const [dbMessages, setDbMessages] = useState<any[]>([])
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
 
   // UI 상태들
@@ -315,30 +285,54 @@ export default function SajuChat({
   const [retryCount, setRetryCount] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Refs
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isAutoScrolling = useRef(false)
   const lastMessageLength = useRef(0)
+  const initRef = useRef(false)
 
   const router = useRouter()
   const supabase = createClientComponentClient()
 
-  const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
-  const suggestedQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
+  // 안정화된 값들
+  const currentCharacter = useMemo(() => {
+    return pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
+  }, [roomType])
 
-  // 안정화된 초기 메시지 - 한 번만 생성
-  const stableInitialMessages = useMemo(() => {
-    return createInitialMessages(name, roomType, birthInfo)
-  }, [name, roomType, birthInfo])
+  const suggestedQuestions = useMemo(() => {
+    return initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
+  }, [roomType])
 
-  // 최종 메시지 배열 - DB 메시지가 있으면 사용, 없으면 초기 메시지 사용
-  const finalInitialMessages = useMemo(() => {
-    if (dbMessages.length > 0) {
-      return dbMessages
+  const userId = authUser?.id || null
+  const actualIsLoggedIn = isAuthenticated || isLoggedIn
+
+  // 초기 메시지 생성 - 안정화
+  const initialMessages = useMemo(() => {
+    if (roomType === "sajuping") {
+      return [
+        {
+          id: "saju-analysis",
+          role: "assistant" as const,
+          content: getInitialMessageByRoomType(name, "sajuping", birthInfo),
+        },
+        {
+          id: "consultation-start",
+          role: "assistant" as const,
+          content: `오늘은 어떤 것이 궁금하세요? 😊`,
+        },
+      ]
+    } else {
+      return [
+        {
+          id: "welcome",
+          role: "assistant" as const,
+          content: getInitialMessageByRoomType(name, roomType, birthInfo),
+        },
+      ]
     }
-    return stableInitialMessages
-  }, [dbMessages, stableInitialMessages])
+  }, [name, roomType, birthInfo])
 
   // 대운 계산을 메모화하여 무한 루프 방지 - 안전한 처리
   const calculatedDaeun = useMemo(() => {
@@ -435,9 +429,50 @@ export default function SajuChat({
     [compressedSaju, name, gender, initialInterpretation, roomType, userId, birthInfo],
   )
 
+  // 인증 상태 확인 - 한 번만 실행
+  useEffect(() => {
+    let mounted = true
+
+    const checkAuth = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (mounted) {
+          setAuthUser(user)
+          setIsAuthenticated(!!user)
+        }
+      } catch (error) {
+        console.error("Auth check error:", error)
+        if (mounted) {
+          setAuthUser(null)
+          setIsAuthenticated(false)
+        }
+      }
+    }
+
+    checkAuth()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (mounted) {
+        setAuthUser(session?.user || null)
+        setIsAuthenticated(!!session?.user)
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [supabase])
+
   // 초기화 로직 - 한 번만 실행
   useEffect(() => {
-    let isMounted = true
+    if (initRef.current || !isAuthenticated === undefined) return
+    initRef.current = true
 
     const initializeChat = async () => {
       try {
@@ -446,77 +481,57 @@ export default function SajuChat({
 
         const currentSajuData = localStorage.getItem("current_saju")
         if (currentSajuData) {
-          const sajuData = JSON.parse(currentSajuData)
-          sessionId = sajuData.sessionId
+          try {
+            const sajuData = JSON.parse(currentSajuData)
+            sessionId = sajuData.sessionId
+          } catch (e) {
+            console.error("Failed to parse current_saju:", e)
+          }
         }
 
         if (!sessionId && actualIsLoggedIn && userId) {
-          const { data: sessions, error } = await supabase
-            .from("saju_sessions")
-            .select("id, name, created_at")
-            .eq("auth_user_id", userId)
-            .eq("name", name)
-            .order("created_at", { ascending: false })
-            .limit(1)
+          try {
+            const { data: sessions, error } = await supabase
+              .from("saju_sessions")
+              .select("id, name, created_at")
+              .eq("auth_user_id", userId)
+              .eq("name", name)
+              .order("created_at", { ascending: false })
+              .limit(1)
 
-          if (!error && sessions && sessions.length > 0) {
-            sessionId = sessions[0].id
+            if (!error && sessions && sessions.length > 0) {
+              sessionId = sessions[0].id
+            }
+          } catch (e) {
+            console.error("Failed to fetch sessions:", e)
           }
         }
 
         if (!sessionId) {
-          const storedSajuData = localStorage.getItem("tempSajuData")
-          if (storedSajuData) {
-            const sajuData = JSON.parse(storedSajuData)
-            sessionId = sajuData.sessionId
-          } else {
-            sessionId = localStorage.getItem("user_id")
-          }
-        }
-
-        if (isMounted) {
-          setDatabaseSessionId(sessionId)
-        }
-
-        // DB에서 메시지 로드 시도
-        if (sessionId) {
           try {
-            const response = await fetch(`/api/messages?sessionId=${sessionId}`)
-            if (response.ok) {
-              const data = await response.json()
-              const messages = data.messages || []
-
-              if (isMounted && messages.length > 0) {
-                const formattedMessages = messages.map((msg: any) => ({
-                  id: msg.id,
-                  role: msg.role,
-                  content: msg.content,
-                }))
-                setDbMessages(formattedMessages)
-              }
+            const storedSajuData = localStorage.getItem("tempSajuData")
+            if (storedSajuData) {
+              const sajuData = JSON.parse(storedSajuData)
+              sessionId = sajuData.sessionId
+            } else {
+              sessionId = localStorage.getItem("user_id")
             }
-          } catch (error) {
-            console.error("메시지 로드 오류:", error)
+          } catch (e) {
+            console.error("Failed to get fallback session ID:", e)
           }
         }
 
-        if (isMounted) {
-          setIsReady(true)
-        }
+        setDatabaseSessionId(sessionId)
+        setIsReady(true)
       } catch (error) {
         console.error("초기화 오류:", error)
-        if (isMounted) {
-          setIsReady(true)
-        }
+        setIsReady(true)
       }
     }
 
-    initializeChat()
-
-    return () => {
-      isMounted = false
-    }
-  }, [actualIsLoggedIn, userId, name, supabase])
+    const timer = setTimeout(initializeChat, 100)
+    return () => clearTimeout(timer)
+  }, [actualIsLoggedIn, userId, name, supabase, isAuthenticated])
 
   // useAIChat - isReady가 true일 때만 초기화
   const {
@@ -531,7 +546,7 @@ export default function SajuChat({
     append,
   } = useAIChat({
     api: "/api/saju-chat",
-    initialMessages: isReady ? finalInitialMessages : [],
+    initialMessages: isReady ? initialMessages : [],
     body: aiChatBody,
     onFinish: async (message) => {
       try {
@@ -614,52 +629,65 @@ export default function SajuChat({
     [roomType, name, gender, saju, birthInfo],
   )
 
-  const customHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const customHandleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault()
 
-    if (!input.trim() || isSubmitting || isLoading) {
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      const newQuestionCount = questionCount + 1
-      setQuestionCount(newQuestionCount)
-
-      const shouldShowLoginPrompt = newQuestionCount >= 5 && !actualIsLoggedIn && !hasShownLoginPrompt
-
-      if (shouldShowLoginPrompt) {
-        setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-        setShowLoginPrompt(true)
-        setHasShownLoginPrompt(true)
+      if (!input.trim() || isSubmitting || isLoading) {
+        return
       }
 
-      setStreamingError(null)
-      setRetryCount(0)
+      setIsSubmitting(true)
 
-      const userMessage = input.trim()
+      try {
+        const newQuestionCount = questionCount + 1
+        setQuestionCount(newQuestionCount)
 
-      // 사용자 메시지를 즉시 저장
-      if (databaseSessionId) {
-        try {
-          const userMessageObj = {
-            id: `user-${Date.now()}`,
-            role: "user" as const,
-            content: userMessage,
-          }
-          await saveMessagesToDatabase([userMessageObj], databaseSessionId)
-        } catch (error) {
-          console.error("사용자 메시지 저장 오류:", error)
+        const shouldShowLoginPrompt = newQuestionCount >= 5 && !actualIsLoggedIn && !hasShownLoginPrompt
+
+        if (shouldShowLoginPrompt) {
+          setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+          setShowLoginPrompt(true)
+          setHasShownLoginPrompt(true)
         }
-      }
 
-      aiHandleSubmit(e)
-    } catch (error) {
-      console.error("메시지 전송 오류:", error)
-      setIsSubmitting(false)
-    }
-  }
+        setStreamingError(null)
+        setRetryCount(0)
+
+        const userMessage = input.trim()
+
+        // 사용자 메시지를 즉시 저장
+        if (databaseSessionId) {
+          try {
+            const userMessageObj = {
+              id: `user-${Date.now()}`,
+              role: "user" as const,
+              content: userMessage,
+            }
+            await saveMessagesToDatabase([userMessageObj], databaseSessionId)
+          } catch (error) {
+            console.error("사용자 메시지 저장 오류:", error)
+          }
+        }
+
+        aiHandleSubmit(e)
+      } catch (error) {
+        console.error("메시지 전송 오류:", error)
+        setIsSubmitting(false)
+      }
+    },
+    [
+      input,
+      isSubmitting,
+      isLoading,
+      questionCount,
+      actualIsLoggedIn,
+      hasShownLoginPrompt,
+      databaseSessionId,
+      saveMessagesToDatabase,
+      aiHandleSubmit,
+    ],
+  )
 
   const handleBackWithSave = useCallback(() => {
     try {
@@ -813,10 +841,47 @@ ${mainPersonInfo}
 ${selectedPeopleInfo}
 
 위 사주 정보를 바탕으로 다음 관점에서 궁합을 분석해주세요:
-1. 일간(日干) 상생상극 관계
-2. 오행 균형과 보완 관계  
-3. 십성 조화도
-4. 전체적인 궁합 점수와 조언
+🧭 해석 구성 순서
+
+1. 기본 궁합 구조 분석
+
+-일주 궁합 (일간/일지 상호작용, 일간합·일지합·충·형 등)
+
+-오행 상생·상극 구조 파악
+
+-양쪽 명조의 균형 및 보완 여부
+
+2. 성향과 기질의 조화 여부
+
+-각자의 성격, 감정 표현 방식, 관계 주도력
+
+-대인관계 스타일(주도형/의존형/조율형 등)의 상호 보완 가능성
+
+-일간 십성 비교를 통한 감정 흐름 분석
+
+3. 생활 궁합 (현실적 궁합)
+
+-금전, 직업, 생활리듬 등 실생활 속 궁합 체크
+
+-함께 지낼 때 충돌 요인/의사소통 패턴
+
+-가치관/생활 습관의 일치 여부
+
+4. 인연의 지속성과 흐름
+
+-궁합 구조가 일시적인 인연인지, 장기적인 흐름을 가지는지
+
+-대운·세운에 따라 만남/이별 시기 흐름
+
+-시기적 맞물림 또는 타이밍 불일치 여부
+
+5. 궁합 총평 및 조언
+
+-긍정적인 시너지 포인트
+
+-주의가 필요한 갈등 구조 및 현실 팁
+
+-관계 지속을 위한 심리적/생활적 조언
 
 각 사람과의 궁합을 개별적으로 분석하고, 종합적인 조언도 부탁드립니다.`
 
@@ -1263,10 +1328,13 @@ ${selectedPeopleInfo}
       {/* 궁합 분석 도구 모달 */}
       {showCompatibilityTool && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-700">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-white">궁합 분석 도구</h2>
+                <h2 className="text-xl font-semibold text-white flex items-center space-x-2">
+                  <Users className="h-5 w-5 text-purple-400" />
+                  <span>궁합 보기</span>
+                </h2>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1285,6 +1353,13 @@ ${selectedPeopleInfo}
                 }}
                 onAnalyze={handleCompatibilityAnalysis}
                 onClose={() => setShowCompatibilityTool(false)}
+                currentSaju={saju}
+                currentName={name}
+                currentGender={gender}
+                currentBirthInfo={birthInfo}
+                isLoggedIn={actualIsLoggedIn}
+                userId={userId}
+                onCompatibilityAnalysis={handleCompatibilityAnalysis}
               />
             </div>
           </div>
