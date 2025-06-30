@@ -77,14 +77,14 @@ function getModelForRoomType(roomType) {
   try {
     switch (roomType) {
       case "sajuping":
-        return "gpt-4o"
+        return "gpt-4.1"
       case "tarot":
-        return "gpt-4o"
+        return "gpt-4.1"
       default:
-        return "gpt-4o"
+        return "gpt-4.1"
     }
   } catch (error) {
-    return "gpt-4o"
+    return "gpt-4.1"
   }
 }
 
@@ -363,7 +363,7 @@ ${sajuInfo}${compatibilityInfo}
       const result = streamText({
         model: model,
         messages: apiMessages,
-        maxTokens: 2000,
+        maxTokens: 4000,
       })
 
       return result.toDataStreamResponse()
