@@ -7,7 +7,7 @@ import { useRouter } from "@/next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Send, ChevronDown, User, ArrowLeft, Settings, Users } from "lucide-react"
-import { useChat as useAIChat } from "ai/react"
+import { useChat as useAIChat, type Message } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
 import CompatibilityTool from "@/components/compatibility-tool"
@@ -184,11 +184,28 @@ ${currentYear}년 을사년, 푸른 뱀의 해에 타로카드가 ${userName}님
   }
 }
 
+// 현재 나이 계산 헬퍼 함수
+const getCurrentAge = (birthInfo?: BirthInfo) => {
+  if (birthInfo?.solarYear && birthInfo?.solarMonth && birthInfo?.solarDay) {
+    const birthDate = new Date(birthInfo.solarYear, birthInfo.solarMonth - 1, birthInfo.solarDay)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
+  return 25 // 기본값
+}
+
 // 대운 데이터를 변환하는 함수 - 안전한 처리
-const convertDaeunData = (daeunData: any) => {
+const convertDaeunData = (daeunData: any, birthInfo?: BirthInfo) => {
   if (!daeunData) {
     return []
   }
+
+  const currentAge = getCurrentAge(birthInfo)
 
   // pillars 배열이 있는 경우
   if (daeunData.pillars && Array.isArray(daeunData.pillars)) {
@@ -199,16 +216,18 @@ const convertDaeunData = (daeunData: any) => {
         return {
           age: pillar.startAge || index * 10,
           startYear: pillar.startAge
-            ? new Date().getFullYear() - getCurrentAge() + pillar.startAge
+            ? new Date().getFullYear() - currentAge + pillar.startAge
             : new Date().getFullYear() + index * 10,
           endYear: pillar.endAge
-            ? new Date().getFullYear() - getCurrentAge() + pillar.endAge
+            ? new Date().getFullYear() - currentAge + pillar.endAge
             : new Date().getFullYear() + index * 10 + 9,
           stem: pillar.stem || "",
           branch: pillar.branch || "",
           stemHanja: pillar.stemHanja || pillar.stem || "",
           branchHanja: pillar.branchHanja || pillar.branch || "",
-          description: `${pillar.stem || ""}${pillar.branch || ""} 대운 (${pillar.startAge || index * 10}-${pillar.endAge || index * 10 + 9}세)`,
+          description: `${pillar.stem || ""}${pillar.branch || ""} 대운 (${pillar.startAge || index * 10}-${
+            pillar.endAge || index * 10 + 9
+          }세)`,
         }
       })
       .filter(Boolean)
@@ -237,21 +256,6 @@ const convertDaeunData = (daeunData: any) => {
   return []
 }
 
-// 현재 나이 계산 헬퍼 함수
-const getCurrentAge = (birthInfo?: BirthInfo) => {
-  if (birthInfo?.solarYear && birthInfo?.solarMonth && birthInfo?.solarDay) {
-    const birthDate = new Date(birthInfo.solarYear, birthInfo.solarMonth - 1, birthInfo.solarDay)
-    const today = new Date()
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    return age
-  }
-  return 25 // 기본값
-}
-
 export default function SajuChat({
   saju,
   name,
@@ -268,6 +272,7 @@ export default function SajuChat({
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
+  const [isHistoryLoaded, setIsHistoryLoaded] = useState(false)
 
   // UI 상태들
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
@@ -311,36 +316,37 @@ export default function SajuChat({
     }
   }, [roomType, authUser?.id, isAuthenticated, isLoggedIn])
 
-  // 초기 메시지 생성 - 완전히 안정화
-  const initialMessages = useMemo(() => {
-    const messages = []
+  // 초기 메시지 생성 - 안정화된 원시값 의존성 사용
+  const initialMessages = useMemo((): Message[] => {
+    const messages: Message[] = []
+    const initialMessageContent = getInitialMessageByRoomType(name, roomType, birthInfo)
 
     if (roomType === "sajuping") {
       messages.push({
         id: "saju-analysis",
-        role: "assistant" as const,
-        content: getInitialMessageByRoomType(name, "sajuping", birthInfo),
+        role: "assistant",
+        content: initialMessageContent,
       })
       messages.push({
         id: "consultation-start",
-        role: "assistant" as const,
+        role: "assistant",
         content: `오늘은 어떤 것이 궁금하세요? 😊`,
       })
     } else {
       messages.push({
         id: "welcome",
-        role: "assistant" as const,
-        content: getInitialMessageByRoomType(name, roomType, birthInfo),
+        role: "assistant",
+        content: initialMessageContent,
       })
     }
 
     return messages
-  }, [name, roomType, birthInfo])
+  }, [name, roomType, birthInfo?.solarYear, birthInfo?.solarMonth, birthInfo?.solarDay, birthInfo?.timeUnknown])
 
-  // 대운 계산을 메모화하여 무한 루프 방지 - 완전히 안정화
+  // 대운 계산을 메모화하여 무한 루프 방지
+  const stringifiedDaeun = JSON.stringify(saju?.daeun)
   const calculatedDaeun = useMemo(() => {
     try {
-      // 이미 올바른 대운이 있는 경우 그대로 사용
       if (
         saju?.daeun &&
         saju.daeun.pillars &&
@@ -351,7 +357,6 @@ export default function SajuChat({
         return saju.daeun
       }
 
-      // 대운 계산에 필요한 데이터가 있는지 확인
       if (
         saju?.yearStem &&
         saju?.monthStem &&
@@ -361,7 +366,7 @@ export default function SajuChat({
         birthInfo?.solarDay &&
         gender
       ) {
-        const daeunData = calculateDaeunInfo(
+        return calculateDaeunInfo(
           {
             yearStem: saju.yearStem,
             monthStem: saju.monthStem,
@@ -375,30 +380,25 @@ export default function SajuChat({
           birthInfo.timeUnknown ? undefined : birthInfo.solarMinute,
           birthInfo.timeUnknown || false,
         )
-
-        return daeunData
       }
-
       return null
     } catch (error) {
       console.error("대운 계산 중 오류:", error)
       return null
     }
   }, [
-    JSON.stringify(saju?.daeun), // JSON.stringify로 깊은 비교
+    stringifiedDaeun,
     saju?.yearStem,
     saju?.monthStem,
     saju?.monthBranch,
     birthInfo?.solarYear,
     birthInfo?.solarMonth,
     birthInfo?.solarDay,
-    birthInfo?.solarHour,
-    birthInfo?.solarMinute,
-    birthInfo?.timeUnknown,
     gender,
+    birthInfo?.timeUnknown,
   ])
 
-  // Memoize compressed saju - 완전히 안정화
+  // Memoize compressed saju
   const compressedSaju = useMemo(() => {
     try {
       return compressSaju(
@@ -415,7 +415,7 @@ export default function SajuChat({
       return ""
     }
   }, [
-    JSON.stringify(saju), // JSON.stringify로 깊은 비교
+    JSON.stringify(saju), // saju 객체의 깊은 변화를 감지하기 위해 stringify 사용
     birthInfo?.solarYear,
     birthInfo?.solarMonth,
     birthInfo?.solarDay,
@@ -424,7 +424,7 @@ export default function SajuChat({
     birthInfo?.timeUnknown,
   ])
 
-  // Memoize the body object for useAIChat - 완전히 안정화
+  // Memoize the body object for useAIChat
   const aiChatBody = useMemo(
     () => ({
       compressedSaju,
@@ -435,12 +435,104 @@ export default function SajuChat({
       userId: stableValues.userId,
       currentYear: 2025,
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-      birthInfo: birthInfo ? { ...birthInfo } : undefined, // 얕은 복사로 안정화
+      birthInfo: birthInfo ? { ...birthInfo } : undefined,
     }),
-    [compressedSaju, name, gender, initialInterpretation, roomType, stableValues.userId, birthInfo],
+    [compressedSaju, name, gender, initialInterpretation, roomType, stableValues.userId, JSON.stringify(birthInfo)],
   )
 
-  // 인증 상태 확인 - 한 번만 실행하고 안정화
+  // 메시지를 데이터베이스에 저장하는 함수
+  const saveMessagesToDatabase = useCallback(
+    async (messagesToSave: any[], sessionId: string) => {
+      if (!sessionId || !messagesToSave || messagesToSave.length === 0) {
+        return
+      }
+
+      try {
+        const response = await fetch("/api/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId,
+            messages: messagesToSave,
+            roomType,
+            sajuData: {
+              name,
+              gender,
+              saju,
+              birthInfo,
+            },
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.messageIds && data.messageIds.length > 0) {
+            const newMessageIds: Record<string, string> = {}
+            messagesToSave.forEach((msg, index) => {
+              if (data.messageIds[index]) {
+                newMessageIds[msg.id] = data.messageIds[index]
+              }
+            })
+            setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
+          }
+        }
+      } catch (error) {
+        console.error("DB 저장 오류:", error)
+      }
+    },
+    [roomType, name, gender, saju, birthInfo],
+  )
+
+  const onFinishHandler = useCallback(
+    async (message: any) => {
+      try {
+        if (databaseSessionId) {
+          await saveMessagesToDatabase([message], databaseSessionId)
+        }
+        setStreamingError(null)
+        setRetryCount(0)
+        setIsSubmitting(false)
+      } catch (error) {
+        console.error("onFinish 핸들러 오류:", error)
+        setIsSubmitting(false)
+      }
+    },
+    [databaseSessionId, saveMessagesToDatabase],
+  )
+
+  const onErrorHandler = useCallback((error: Error) => {
+    console.error("채팅 오류:", error)
+    setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
+    setIsSubmitting(false)
+  }, [])
+
+  const onResponseHandler = useCallback((response: Response) => {
+    setStreamingError(null)
+  }, [])
+
+  const {
+    messages,
+    setMessages,
+    input,
+    handleInputChange,
+    handleSubmit: aiHandleSubmit,
+    isLoading,
+    setInput,
+    error,
+    reload,
+    append,
+  } = useAIChat({
+    api: "/api/saju-chat",
+    initialMessages: [],
+    body: aiChatBody,
+    onFinish: onFinishHandler,
+    onError: onErrorHandler,
+    onResponse: onResponseHandler,
+  })
+
+  // 인증 상태 확인
   useEffect(() => {
     if (initRef.current) return
     initRef.current = true
@@ -484,16 +576,15 @@ export default function SajuChat({
       mounted = false
       subscription.unsubscribe()
     }
-  }, []) // 빈 의존성 배열
+  }, [])
 
-  // 세션 ID 초기화 - 인증 상태가 확정된 후 한 번만 실행
+  // 세션 ID 초기화
   useEffect(() => {
     if (!isInitialized) return
 
     const initializeSession = async () => {
       try {
         let sessionId = null
-
         const currentSajuData = localStorage.getItem("current_saju")
         if (currentSajuData) {
           try {
@@ -545,99 +636,46 @@ export default function SajuChat({
     initializeSession()
   }, [isInitialized, stableValues.actualIsLoggedIn, stableValues.userId, name])
 
-  // 메시지를 데이터베이스에 저장하는 함수 - 안정화
-  const saveMessagesToDatabase = useCallback(
-    async (messagesToSave: any[], sessionId: string) => {
-      if (!sessionId || !messagesToSave || messagesToSave.length === 0) {
-        return
-      }
+  // 메시지 기록 로드
+  useEffect(() => {
+    if (isHistoryLoaded || !isInitialized) {
+      return
+    }
 
-      try {
-        const response = await fetch("/api/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            sessionId,
-            messages: messagesToSave,
-            roomType,
-            sajuData: {
-              name,
-              gender,
-              saju,
-              birthInfo,
-            },
-          }),
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.messageIds && data.messageIds.length > 0) {
-            const newMessageIds: Record<string, string> = {}
-            messagesToSave.forEach((msg, index) => {
-              if (data.messageIds[index]) {
-                newMessageIds[msg.id] = data.messageIds[index]
-              }
-            })
-            setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
+    const loadMessages = async () => {
+      if (databaseSessionId) {
+        try {
+          const response = await fetch(`/api/messages?sessionId=${databaseSessionId}`)
+          if (!response.ok) {
+            throw new Error("Failed to fetch message history")
           }
+          const data = await response.json()
+          const pastMessages = data.messages || []
+
+          if (pastMessages.length > 0) {
+            const formattedHistory = pastMessages.map((msg: any) => ({
+              id: String(msg.id),
+              role: msg.role,
+              content: msg.content,
+            }))
+            setMessages(formattedHistory)
+          } else {
+            setMessages(initialMessages)
+          }
+        } catch (error) {
+          console.error("Error loading message history:", error)
+          setMessages(initialMessages)
         }
-      } catch (error) {
-        console.error("DB 저장 오류:", error)
+      } else {
+        setMessages(initialMessages)
       }
-    },
-    [roomType, name, gender, JSON.stringify(saju), JSON.stringify(birthInfo)], // JSON.stringify로 안정화
-  )
+      setIsHistoryLoaded(true)
+    }
 
-  const onFinishHandler = useCallback(
-    async (message: any) => {
-      try {
-        if (databaseSessionId) {
-          await saveMessagesToDatabase([message], databaseSessionId)
-        }
-        setStreamingError(null)
-        setRetryCount(0)
-        setIsSubmitting(false)
-      } catch (error) {
-        console.error("onFinish 핸들러 오류:", error)
-        setIsSubmitting(false)
-      }
-    },
-    [databaseSessionId, saveMessagesToDatabase],
-  )
+    loadMessages()
+  }, [isInitialized, databaseSessionId, isHistoryLoaded, setMessages, initialMessages])
 
-  const onErrorHandler = useCallback((error: Error) => {
-    console.error("채팅 오류:", error)
-    setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
-    setIsSubmitting(false)
-  }, [])
-
-  const onResponseHandler = useCallback((response: Response) => {
-    setStreamingError(null)
-  }, [])
-
-  // useAIChat - 초기화가 완료된 후에만 실행
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit: aiHandleSubmit,
-    isLoading,
-    setInput,
-    error,
-    reload,
-    append,
-  } = useAIChat({
-    api: "/api/saju-chat",
-    initialMessages: isInitialized ? initialMessages : [],
-    body: aiChatBody,
-    onFinish: onFinishHandler,
-    onError: onErrorHandler,
-    onResponse: onResponseHandler,
-  })
-
-  // 메시지가 변경될 때만 스크롤 - 최적화된 버전
+  // 메시지가 변경될 때만 스크롤
   useEffect(() => {
     const scrollContainer = chatContainerRef.current
     if (scrollContainer && messages.length > lastMessageLength.current) {
@@ -677,7 +715,6 @@ export default function SajuChat({
 
         const userMessage = input.trim()
 
-        // 사용자 메시지를 즉시 저장
         if (databaseSessionId) {
           try {
             const userMessageObj = {
@@ -718,7 +755,7 @@ export default function SajuChat({
           saju,
           name,
           gender,
-          interpretation: initialInterpretation,
+          initialInterpretation,
           birthInfo,
         }),
       )
@@ -850,7 +887,7 @@ export default function SajuChat({
 - 사주팔자: ${personSaju.yearStem}${personSaju.yearBranch}년 ${personSaju.monthStem}${personSaju.monthBranch}월 ${personSaju.dayStem}${personSaju.dayBranch}일 ${personSaju.hourStem}${personSaju.hourBranch}시
 - 일간(日干): ${personSaju.dayMaster}
 - 띠: ${personSaju.yearAnimal || "정보없음"}
-- 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${personSaju.monthStemSibseong}) 월지(${personSaju.monthBranchSibseong}) 일간(${personSaju.dayStemSibseong}) 일지(${personSaju.dayBranchSibseong}) 시간(${personSaju.hourStemSibseong}) 시지(${personSaju.hourBranchSibseong})
+- 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${mainPersonSaju.monthStemSibseong}) 월지(${mainPersonSaju.monthBranchSibseong}) 일간(${mainPersonSaju.dayStemSibseong}) 일지(${mainPersonSaju.dayBranchSibseong}) 시간(${mainPersonSaju.hourStemSibseong}) 시지(${mainPersonSaju.hourBranchSibseong})
 - 오행분포: 목${personSaju.elements.wood} 화${personSaju.elements.fire} 토${personSaju.elements.earth} 금${personSaju.elements.metal} 수${personSaju.elements.water}
 `
           })
@@ -967,7 +1004,7 @@ ${selectedPeopleInfo}
   useForceDarkTheme()
 
   // 로딩 상태
-  if (!isInitialized) {
+  if (!isInitialized || !isHistoryLoaded) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
         <div className="flex-1 flex items-center justify-center">
@@ -1096,13 +1133,13 @@ ${selectedPeopleInfo}
             </div>
           </div>
 
-          {/* 대운 다이어그램 - 안전한 처리 */}
+          {/* 대운 다이어그램 */}
           {calculatedDaeun && (
             <div className="px-3 sm:px-4 mb-4 sm:mb-6">
               <div className="max-w-3xl mx-auto">
                 <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
                   <DaeunDiagram
-                    daeun={convertDaeunData(calculatedDaeun)}
+                    daeun={convertDaeunData(calculatedDaeun, birthInfo)}
                     birthInfo={birthInfo}
                     name={name}
                     gender={gender}
@@ -1167,7 +1204,7 @@ ${selectedPeopleInfo}
                       {message.content}
                     </ReactMarkdown>
 
-                    {/* 메시지 피드백 버튼들 - assistant 메시지에만 표시 */}
+                    {/* 메시지 피드백 버튼들 */}
                     {message.role === "assistant" && (
                       <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <MessageFeedbackButtons
@@ -1369,8 +1406,8 @@ ${selectedPeopleInfo}
                 currentUserSaju={{
                   name,
                   gender,
-                  saju,
-                  birthInfo,
+                  saju: saju,
+                  birthInfo: birthInfo,
                 }}
                 onAnalyze={handleCompatibilityAnalysis}
                 onClose={() => setShowCompatibilityTool(false)}
