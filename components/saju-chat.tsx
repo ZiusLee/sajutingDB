@@ -6,12 +6,13 @@ import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Send, ChevronDown, User, ArrowLeft, Settings, Users } from "lucide-react"
-import { useChat as useAIChat, type Message } from "ai/react"
+import { Send, ChevronDown, User, ArrowLeft, Settings } from "lucide-react"
+import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
 import CompatibilityTool from "@/components/compatibility-tool"
 import { compressSaju } from "@/lib/saju-compression"
+import { useAuth } from "@/contexts/auth-context"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import DaeunDiagram from "@/components/daeun-diagram"
@@ -184,28 +185,11 @@ ${currentYear}년 을사년, 푸른 뱀의 해에 타로카드가 ${userName}님
   }
 }
 
-// 현재 나이 계산 헬퍼 함수
-const getCurrentAge = (birthInfo?: BirthInfo) => {
-  if (birthInfo?.solarYear && birthInfo?.solarMonth && birthInfo?.solarDay) {
-    const birthDate = new Date(birthInfo.solarYear, birthInfo.solarMonth - 1, birthInfo.solarDay)
-    const today = new Date()
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    return age
-  }
-  return 25 // 기본값
-}
-
 // 대운 데이터를 변환하는 함수 - 안전한 처리
-const convertDaeunData = (daeunData: any, birthInfo?: BirthInfo) => {
+const convertDaeunData = (daeunData: any) => {
   if (!daeunData) {
     return []
   }
-
-  const currentAge = getCurrentAge(birthInfo)
 
   // pillars 배열이 있는 경우
   if (daeunData.pillars && Array.isArray(daeunData.pillars)) {
@@ -216,18 +200,16 @@ const convertDaeunData = (daeunData: any, birthInfo?: BirthInfo) => {
         return {
           age: pillar.startAge || index * 10,
           startYear: pillar.startAge
-            ? new Date().getFullYear() - currentAge + pillar.startAge
+            ? new Date().getFullYear() - getCurrentAge() + pillar.startAge
             : new Date().getFullYear() + index * 10,
           endYear: pillar.endAge
-            ? new Date().getFullYear() - currentAge + pillar.endAge
+            ? new Date().getFullYear() - getCurrentAge() + pillar.endAge
             : new Date().getFullYear() + index * 10 + 9,
           stem: pillar.stem || "",
           branch: pillar.branch || "",
           stemHanja: pillar.stemHanja || pillar.stem || "",
           branchHanja: pillar.branchHanja || pillar.branch || "",
-          description: `${pillar.stem || ""}${pillar.branch || ""} 대운 (${pillar.startAge || index * 10}-${
-            pillar.endAge || index * 10 + 9
-          }세)`,
+          description: `${pillar.stem || ""}${pillar.branch || ""} 대운 (${pillar.startAge || index * 10}-${pillar.endAge || index * 10 + 9}세)`,
         }
       })
       .filter(Boolean)
@@ -256,6 +238,47 @@ const convertDaeunData = (daeunData: any, birthInfo?: BirthInfo) => {
   return []
 }
 
+// 현재 나이 계산 헬퍼 함수
+const getCurrentAge = (birthInfo?: BirthInfo) => {
+  if (birthInfo?.solarYear && birthInfo?.solarMonth && birthInfo?.solarDay) {
+    const birthDate = new Date(birthInfo.solarYear, birthInfo.solarMonth - 1, birthInfo.solarDay)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
+  return 25 // 기본값
+}
+
+// 초기 메시지 생성 - 컴포넌트 외부로 이동하여 안정화
+const createInitialMessages = (name: string, roomType: string, birthInfo?: BirthInfo) => {
+  if (roomType === "sajuping") {
+    return [
+      {
+        id: "saju-analysis",
+        role: "assistant" as const,
+        content: getInitialMessageByRoomType(name, "sajuping", birthInfo),
+      },
+      {
+        id: "consultation-start",
+        role: "assistant" as const,
+        content: `오늘은 어떤 것이 궁금하세요? 😊`,
+      },
+    ]
+  } else {
+    return [
+      {
+        id: "welcome",
+        role: "assistant" as const,
+        content: getInitialMessageByRoomType(name, roomType, birthInfo),
+      },
+    ]
+  }
+}
+
 export default function SajuChat({
   saju,
   name,
@@ -267,12 +290,14 @@ export default function SajuChat({
   sessionKey,
   birthInfo,
 }: SajuChatProps) {
-  // 기본 상태들
-  const [authUser, setAuthUser] = useState<any>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const { user, isAuthenticated } = useAuth()
+  const userId = user?.id || null
+  const actualIsLoggedIn = isAuthenticated || isLoggedIn
+
+  // 초기화 상태 - 단순화
+  const [isReady, setIsReady] = useState(false)
+  const [dbMessages, setDbMessages] = useState<any[]>([])
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
-  const [isHistoryLoaded, setIsHistoryLoaded] = useState(false)
 
   // UI 상태들
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
@@ -290,63 +315,35 @@ export default function SajuChat({
   const [retryCount, setRetryCount] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Refs
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isAutoScrolling = useRef(false)
   const lastMessageLength = useRef(0)
-  const initRef = useRef(false)
-  const supabaseRef = useRef(createClientComponentClient())
 
   const router = useRouter()
+  const supabase = createClientComponentClient()
 
-  // 안정화된 값들 - 한 번만 계산
-  const stableValues = useMemo(() => {
-    const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
-    const suggestedQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
-    const userId = authUser?.id || null
-    const actualIsLoggedIn = isAuthenticated || isLoggedIn
+  const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
+  const suggestedQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
 
-    return {
-      currentCharacter,
-      suggestedQuestions,
-      userId,
-      actualIsLoggedIn,
+  // 안정화된 초기 메시지 - 한 번만 생성
+  const stableInitialMessages = useMemo(() => {
+    return createInitialMessages(name, roomType, birthInfo)
+  }, [name, roomType, birthInfo])
+
+  // 최종 메시지 배열 - DB 메시지가 있으면 사용, 없으면 초기 메시지 사용
+  const finalInitialMessages = useMemo(() => {
+    if (dbMessages.length > 0) {
+      return dbMessages
     }
-  }, [roomType, authUser?.id, isAuthenticated, isLoggedIn])
+    return stableInitialMessages
+  }, [dbMessages, stableInitialMessages])
 
-  // 초기 메시지 생성 - 안정화된 원시값 의존성 사용
-  const initialMessages = useMemo((): Message[] => {
-    const messages: Message[] = []
-    const initialMessageContent = getInitialMessageByRoomType(name, roomType, birthInfo)
-
-    if (roomType === "sajuping") {
-      messages.push({
-        id: "saju-analysis",
-        role: "assistant",
-        content: initialMessageContent,
-      })
-      messages.push({
-        id: "consultation-start",
-        role: "assistant",
-        content: `오늘은 어떤 것이 궁금하세요? 😊`,
-      })
-    } else {
-      messages.push({
-        id: "welcome",
-        role: "assistant",
-        content: initialMessageContent,
-      })
-    }
-
-    return messages
-  }, [name, roomType, birthInfo?.solarYear, birthInfo?.solarMonth, birthInfo?.solarDay, birthInfo?.timeUnknown])
-
-  // 대운 계산을 메모화하여 무한 루프 방지
-  const stringifiedDaeun = JSON.stringify(saju?.daeun)
+  // 대운 계산을 메모화하여 무한 루프 방지 - 안전한 처리
   const calculatedDaeun = useMemo(() => {
     try {
+      // 이미 올바른 대운이 있는 경우 그대로 사용
       if (
         saju?.daeun &&
         saju.daeun.pillars &&
@@ -357,6 +354,7 @@ export default function SajuChat({
         return saju.daeun
       }
 
+      // 대운 계산에 필요한 데이터가 있는지 확인
       if (
         saju?.yearStem &&
         saju?.monthStem &&
@@ -366,7 +364,7 @@ export default function SajuChat({
         birthInfo?.solarDay &&
         gender
       ) {
-        return calculateDaeunInfo(
+        const daeunData = calculateDaeunInfo(
           {
             yearStem: saju.yearStem,
             monthStem: saju.monthStem,
@@ -380,25 +378,30 @@ export default function SajuChat({
           birthInfo.timeUnknown ? undefined : birthInfo.solarMinute,
           birthInfo.timeUnknown || false,
         )
+
+        return daeunData
       }
+
       return null
     } catch (error) {
       console.error("대운 계산 중 오류:", error)
       return null
     }
   }, [
-    stringifiedDaeun,
     saju?.yearStem,
     saju?.monthStem,
     saju?.monthBranch,
+    saju?.daeun,
     birthInfo?.solarYear,
     birthInfo?.solarMonth,
     birthInfo?.solarDay,
-    gender,
+    birthInfo?.solarHour,
+    birthInfo?.solarMinute,
     birthInfo?.timeUnknown,
+    gender,
   ])
 
-  // Memoize compressed saju
+  // Memoize compressed saju to prevent recreation on every render
   const compressedSaju = useMemo(() => {
     try {
       return compressSaju(
@@ -414,17 +417,9 @@ export default function SajuChat({
       console.error("사주 압축 중 오류:", error)
       return ""
     }
-  }, [
-    JSON.stringify(saju), // saju 객체의 깊은 변화를 감지하기 위해 stringify 사용
-    birthInfo?.solarYear,
-    birthInfo?.solarMonth,
-    birthInfo?.solarDay,
-    birthInfo?.solarHour,
-    birthInfo?.solarMinute,
-    birthInfo?.timeUnknown,
-  ])
+  }, [saju, birthInfo])
 
-  // Memoize the body object for useAIChat
+  // Memoize the body object for useAIChat to prevent infinite re-renders - 안정화
   const aiChatBody = useMemo(
     () => ({
       compressedSaju,
@@ -432,13 +427,147 @@ export default function SajuChat({
       gender,
       initialInterpretation,
       roomType,
-      userId: stableValues.userId,
+      userId,
       currentYear: 2025,
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-      birthInfo: birthInfo ? { ...birthInfo } : undefined,
+      birthInfo,
     }),
-    [compressedSaju, name, gender, initialInterpretation, roomType, stableValues.userId, JSON.stringify(birthInfo)],
+    [compressedSaju, name, gender, initialInterpretation, roomType, userId, birthInfo],
   )
+
+  // 초기화 로직 - 한 번만 실행
+  useEffect(() => {
+    let isMounted = true
+
+    const initializeChat = async () => {
+      try {
+        // 세션 ID 가져오기
+        let sessionId = null
+
+        const currentSajuData = localStorage.getItem("current_saju")
+        if (currentSajuData) {
+          const sajuData = JSON.parse(currentSajuData)
+          sessionId = sajuData.sessionId
+        }
+
+        if (!sessionId && actualIsLoggedIn && userId) {
+          const { data: sessions, error } = await supabase
+            .from("saju_sessions")
+            .select("id, name, created_at")
+            .eq("auth_user_id", userId)
+            .eq("name", name)
+            .order("created_at", { ascending: false })
+            .limit(1)
+
+          if (!error && sessions && sessions.length > 0) {
+            sessionId = sessions[0].id
+          }
+        }
+
+        if (!sessionId) {
+          const storedSajuData = localStorage.getItem("tempSajuData")
+          if (storedSajuData) {
+            const sajuData = JSON.parse(storedSajuData)
+            sessionId = sajuData.sessionId
+          } else {
+            sessionId = localStorage.getItem("user_id")
+          }
+        }
+
+        if (isMounted) {
+          setDatabaseSessionId(sessionId)
+        }
+
+        // DB에서 메시지 로드 시도
+        if (sessionId) {
+          try {
+            const response = await fetch(`/api/messages?sessionId=${sessionId}`)
+            if (response.ok) {
+              const data = await response.json()
+              const messages = data.messages || []
+
+              if (isMounted && messages.length > 0) {
+                const formattedMessages = messages.map((msg: any) => ({
+                  id: msg.id,
+                  role: msg.role,
+                  content: msg.content,
+                }))
+                setDbMessages(formattedMessages)
+              }
+            }
+          } catch (error) {
+            console.error("메시지 로드 오류:", error)
+          }
+        }
+
+        if (isMounted) {
+          setIsReady(true)
+        }
+      } catch (error) {
+        console.error("초기화 오류:", error)
+        if (isMounted) {
+          setIsReady(true)
+        }
+      }
+    }
+
+    initializeChat()
+
+    return () => {
+      isMounted = false
+    }
+  }, [actualIsLoggedIn, userId, name, supabase])
+
+  // useAIChat - isReady가 true일 때만 초기화
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit: aiHandleSubmit,
+    isLoading,
+    setInput,
+    error,
+    reload,
+    append,
+  } = useAIChat({
+    api: "/api/saju-chat",
+    initialMessages: isReady ? finalInitialMessages : [],
+    body: aiChatBody,
+    onFinish: async (message) => {
+      try {
+        if (databaseSessionId) {
+          await saveMessagesToDatabase([message], databaseSessionId)
+        }
+        setStreamingError(null)
+        setRetryCount(0)
+        setIsSubmitting(false)
+      } catch (error) {
+        console.error("onFinish 핸들러 오류:", error)
+        setIsSubmitting(false)
+      }
+    },
+    onError: (error) => {
+      console.error("채팅 오류:", error)
+      setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
+      setIsSubmitting(false)
+    },
+    onResponse: (response) => {
+      setStreamingError(null)
+    },
+  })
+
+  // 메시지가 변경될 때만 스크롤 - 최적화된 버전
+  useEffect(() => {
+    const scrollContainer = chatContainerRef.current
+    if (scrollContainer && messages.length > lastMessageLength.current) {
+      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
+      lastMessageLength.current = messages.length
+
+      if (isNearBottom) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  }, [messages.length])
 
   // 메시지를 데이터베이스에 저장하는 함수
   const saveMessagesToDatabase = useCallback(
@@ -485,267 +614,52 @@ export default function SajuChat({
     [roomType, name, gender, saju, birthInfo],
   )
 
-  const onFinishHandler = useCallback(
-    async (message: any) => {
-      try {
-        if (databaseSessionId) {
-          await saveMessagesToDatabase([message], databaseSessionId)
-        }
-        setStreamingError(null)
-        setRetryCount(0)
-        setIsSubmitting(false)
-      } catch (error) {
-        console.error("onFinish 핸들러 오류:", error)
-        setIsSubmitting(false)
-      }
-    },
-    [databaseSessionId, saveMessagesToDatabase],
-  )
+  const customHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
 
-  const onErrorHandler = useCallback((error: Error) => {
-    console.error("채팅 오류:", error)
-    setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
-    setIsSubmitting(false)
-  }, [])
-
-  const onResponseHandler = useCallback((response: Response) => {
-    setStreamingError(null)
-  }, [])
-
-  const {
-    messages,
-    setMessages,
-    input,
-    handleInputChange,
-    handleSubmit: aiHandleSubmit,
-    isLoading,
-    setInput,
-    error,
-    reload,
-    append,
-  } = useAIChat({
-    api: "/api/saju-chat",
-    initialMessages: [],
-    body: aiChatBody,
-    onFinish: onFinishHandler,
-    onError: onErrorHandler,
-    onResponse: onResponseHandler,
-  })
-
-  // 인증 상태 확인
-  useEffect(() => {
-    if (initRef.current) return
-    initRef.current = true
-
-    let mounted = true
-    const supabase = supabaseRef.current
-
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (mounted) {
-          setAuthUser(user)
-          setIsAuthenticated(!!user)
-          setIsInitialized(true)
-        }
-      } catch (error) {
-        console.error("Auth check error:", error)
-        if (mounted) {
-          setAuthUser(null)
-          setIsAuthenticated(false)
-          setIsInitialized(true)
-        }
-      }
-    }
-
-    checkAuth()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (mounted) {
-        setAuthUser(session?.user || null)
-        setIsAuthenticated(!!session?.user)
-      }
-    })
-
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  // 세션 ID 초기화
-  useEffect(() => {
-    if (!isInitialized) return
-
-    const initializeSession = async () => {
-      try {
-        let sessionId = null
-        const currentSajuData = localStorage.getItem("current_saju")
-        if (currentSajuData) {
-          try {
-            const sajuData = JSON.parse(currentSajuData)
-            sessionId = sajuData.sessionId
-          } catch (e) {
-            console.error("Failed to parse current_saju:", e)
-          }
-        }
-
-        if (!sessionId && stableValues.actualIsLoggedIn && stableValues.userId) {
-          try {
-            const { data: sessions, error } = await supabaseRef.current
-              .from("saju_sessions")
-              .select("id, name, created_at")
-              .eq("auth_user_id", stableValues.userId)
-              .eq("name", name)
-              .order("created_at", { ascending: false })
-              .limit(1)
-
-            if (!error && sessions && sessions.length > 0) {
-              sessionId = sessions[0].id
-            }
-          } catch (e) {
-            console.error("Failed to fetch sessions:", e)
-          }
-        }
-
-        if (!sessionId) {
-          try {
-            const storedSajuData = localStorage.getItem("tempSajuData")
-            if (storedSajuData) {
-              const sajuData = JSON.parse(storedSajuData)
-              sessionId = sajuData.sessionId
-            } else {
-              sessionId = localStorage.getItem("user_id")
-            }
-          } catch (e) {
-            console.error("Failed to get fallback session ID:", e)
-          }
-        }
-
-        setDatabaseSessionId(sessionId)
-      } catch (error) {
-        console.error("세션 초기화 오류:", error)
-      }
-    }
-
-    initializeSession()
-  }, [isInitialized, stableValues.actualIsLoggedIn, stableValues.userId, name])
-
-  // 메시지 기록 로드
-  useEffect(() => {
-    if (isHistoryLoaded || !isInitialized) {
+    if (!input.trim() || isSubmitting || isLoading) {
       return
     }
 
-    const loadMessages = async () => {
+    setIsSubmitting(true)
+
+    try {
+      const newQuestionCount = questionCount + 1
+      setQuestionCount(newQuestionCount)
+
+      const shouldShowLoginPrompt = newQuestionCount >= 5 && !actualIsLoggedIn && !hasShownLoginPrompt
+
+      if (shouldShowLoginPrompt) {
+        setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+        setShowLoginPrompt(true)
+        setHasShownLoginPrompt(true)
+      }
+
+      setStreamingError(null)
+      setRetryCount(0)
+
+      const userMessage = input.trim()
+
+      // 사용자 메시지를 즉시 저장
       if (databaseSessionId) {
         try {
-          const response = await fetch(`/api/messages?sessionId=${databaseSessionId}`)
-          if (!response.ok) {
-            throw new Error("Failed to fetch message history")
+          const userMessageObj = {
+            id: `user-${Date.now()}`,
+            role: "user" as const,
+            content: userMessage,
           }
-          const data = await response.json()
-          const pastMessages = data.messages || []
-
-          if (pastMessages.length > 0) {
-            const formattedHistory = pastMessages.map((msg: any) => ({
-              id: String(msg.id),
-              role: msg.role,
-              content: msg.content,
-            }))
-            setMessages(formattedHistory)
-          } else {
-            setMessages(initialMessages)
-          }
+          await saveMessagesToDatabase([userMessageObj], databaseSessionId)
         } catch (error) {
-          console.error("Error loading message history:", error)
-          setMessages(initialMessages)
+          console.error("사용자 메시지 저장 오류:", error)
         }
-      } else {
-        setMessages(initialMessages)
       }
-      setIsHistoryLoaded(true)
+
+      aiHandleSubmit(e)
+    } catch (error) {
+      console.error("메시지 전송 오류:", error)
+      setIsSubmitting(false)
     }
-
-    loadMessages()
-  }, [isInitialized, databaseSessionId, isHistoryLoaded, setMessages, initialMessages])
-
-  // 메시지가 변경될 때만 스크롤
-  useEffect(() => {
-    const scrollContainer = chatContainerRef.current
-    if (scrollContainer && messages.length > lastMessageLength.current) {
-      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
-      lastMessageLength.current = messages.length
-
-      if (isNearBottom) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
-  }, [messages.length])
-
-  const customHandleSubmit = useCallback(
-    async (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault()
-
-      if (!input.trim() || isSubmitting || isLoading) {
-        return
-      }
-
-      setIsSubmitting(true)
-
-      try {
-        const newQuestionCount = questionCount + 1
-        setQuestionCount(newQuestionCount)
-
-        const shouldShowLoginPrompt = newQuestionCount >= 5 && !stableValues.actualIsLoggedIn && !hasShownLoginPrompt
-
-        if (shouldShowLoginPrompt) {
-          setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-          setShowLoginPrompt(true)
-          setHasShownLoginPrompt(true)
-        }
-
-        setStreamingError(null)
-        setRetryCount(0)
-
-        const userMessage = input.trim()
-
-        if (databaseSessionId) {
-          try {
-            const userMessageObj = {
-              id: `user-${Date.now()}`,
-              role: "user" as const,
-              content: userMessage,
-            }
-            await saveMessagesToDatabase([userMessageObj], databaseSessionId)
-          } catch (error) {
-            console.error("사용자 메시지 저장 오류:", error)
-          }
-        }
-
-        aiHandleSubmit(e)
-      } catch (error) {
-        console.error("메시지 전송 오류:", error)
-        setIsSubmitting(false)
-      }
-    },
-    [
-      input,
-      isSubmitting,
-      isLoading,
-      questionCount,
-      stableValues.actualIsLoggedIn,
-      hasShownLoginPrompt,
-      databaseSessionId,
-      saveMessagesToDatabase,
-      aiHandleSubmit,
-    ],
-  )
+  }
 
   const handleBackWithSave = useCallback(() => {
     try {
@@ -755,7 +669,7 @@ export default function SajuChat({
           saju,
           name,
           gender,
-          initialInterpretation,
+          interpretation: initialInterpretation,
           birthInfo,
         }),
       )
@@ -887,7 +801,7 @@ export default function SajuChat({
 - 사주팔자: ${personSaju.yearStem}${personSaju.yearBranch}년 ${personSaju.monthStem}${personSaju.monthBranch}월 ${personSaju.dayStem}${personSaju.dayBranch}일 ${personSaju.hourStem}${personSaju.hourBranch}시
 - 일간(日干): ${personSaju.dayMaster}
 - 띠: ${personSaju.yearAnimal || "정보없음"}
-- 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${mainPersonSaju.monthStemSibseong}) 월지(${mainPersonSaju.monthBranchSibseong}) 일간(${mainPersonSaju.dayStemSibseong}) 일지(${mainPersonSaju.dayBranchSibseong}) 시간(${mainPersonSaju.hourStemSibseong}) 시지(${mainPersonSaju.hourBranchSibseong})
+- 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${personSaju.monthStemSibseong}) 월지(${personSaju.monthBranchSibseong}) 일간(${personSaju.dayStemSibseong}) 일지(${personSaju.dayBranchSibseong}) 시간(${personSaju.hourStemSibseong}) 시지(${personSaju.hourBranchSibseong})
 - 오행분포: 목${personSaju.elements.wood} 화${personSaju.elements.fire} 토${personSaju.elements.earth} 금${personSaju.elements.metal} 수${personSaju.elements.water}
 `
           })
@@ -899,47 +813,46 @@ ${mainPersonInfo}
 ${selectedPeopleInfo}
 
 위 사주 정보를 바탕으로 다음 관점에서 궁합을 분석해주세요:
-🧭 해석 구성 순서
 
 1. 기본 궁합 구조 분석
 
--일주 궁합 (일간/일지 상호작용, 일간합·일지합·충·형 등)
+일주 궁합 (일간/일지 상호작용, 일간합·일지합·충·형 등)
 
--오행 상생·상극 구조 파악
+오행 상생·상극 구조 파악
 
--양쪽 명조의 균형 및 보완 여부
+양쪽 명조의 균형 및 보완 여부
 
 2. 성향과 기질의 조화 여부
 
--각자의 성격, 감정 표현 방식, 관계 주도력
+각자의 성격, 감정 표현 방식, 관계 주도력
 
--대인관계 스타일(주도형/의존형/조율형 등)의 상호 보완 가능성
+대인관계 스타일(주도형/의존형/조율형 등)의 상호 보완 가능성
 
--일간 십성 비교를 통한 감정 흐름 분석
+일간 십성 비교를 통한 감정 흐름 분석
 
 3. 생활 궁합 (현실적 궁합)
 
--금전, 직업, 생활리듬 등 실생활 속 궁합 체크
+금전, 직업, 생활리듬 등 실생활 속 궁합 체크
 
--함께 지낼 때 충돌 요인/의사소통 패턴
+함께 지낼 때 충돌 요인/의사소통 패턴
 
--가치관/생활 습관의 일치 여부
+가치관/생활 습관의 일치 여부
 
 4. 인연의 지속성과 흐름
 
--궁합 구조가 일시적인 인연인지, 장기적인 흐름을 가지는지
+궁합 구조가 일시적인 인연인지, 장기적인 흐름을 가지는지
 
--대운·세운에 따라 만남/이별 시기 흐름
+대운·세운에 따라 만남/이별 시기 흐름
 
--시기적 맞물림 또는 타이밍 불일치 여부
+시기적 맞물림 또는 타이밍 불일치 여부
 
 5. 궁합 총평 및 조언
 
--긍정적인 시너지 포인트
+긍정적인 시너지 포인트
 
--주의가 필요한 갈등 구조 및 현실 팁
+주의가 필요한 갈등 구조 및 현실 팁
 
--관계 지속을 위한 심리적/생활적 조언
+관계 지속을 위한 심리적/생활적 조언
 
 각 사람과의 궁합을 개별적으로 분석하고, 종합적인 조언도 부탁드립니다.`
 
@@ -1004,7 +917,7 @@ ${selectedPeopleInfo}
   useForceDarkTheme()
 
   // 로딩 상태
-  if (!isInitialized || !isHistoryLoaded) {
+  if (!isReady) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
         <div className="flex-1 flex items-center justify-center">
@@ -1039,8 +952,8 @@ ${selectedPeopleInfo}
               className="flex items-center space-x-1 sm:space-x-2 text-white hover:text-white hover:bg-white/20 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg min-w-0"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
-              <span className="text-base sm:text-lg flex-shrink-0">{stableValues.currentCharacter.emoji}</span>
-              <span className="font-medium text-sm sm:text-base truncate">{stableValues.currentCharacter.name}</span>
+              <span className="text-base sm:text-lg flex-shrink-0">{currentCharacter.emoji}</span>
+              <span className="font-medium text-sm sm:text-base truncate">{currentCharacter.name}</span>
               <ChevronDown
                 className={`h-3 w-3 sm:h-4 sm:w-4 transition-transform flex-shrink-0 ${isDropdownOpen ? "rotate-180" : ""}`}
               />
@@ -1079,7 +992,7 @@ ${selectedPeopleInfo}
         </div>
 
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-          {stableValues.actualIsLoggedIn ? (
+          {actualIsLoggedIn ? (
             <Button
               variant="ghost"
               size="sm"
@@ -1133,13 +1046,13 @@ ${selectedPeopleInfo}
             </div>
           </div>
 
-          {/* 대운 다이어그램 */}
+          {/* 대운 다이어그램 - 안전한 처리 */}
           {calculatedDaeun && (
             <div className="px-3 sm:px-4 mb-4 sm:mb-6">
               <div className="max-w-3xl mx-auto">
                 <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
                   <DaeunDiagram
-                    daeun={convertDaeunData(calculatedDaeun, birthInfo)}
+                    daeun={convertDaeunData(calculatedDaeun)}
                     birthInfo={birthInfo}
                     name={name}
                     gender={gender}
@@ -1161,7 +1074,7 @@ ${selectedPeopleInfo}
                   <div className="flex-shrink-0">
                     {message.role === "assistant" ? (
                       <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                        {stableValues.currentCharacter.emoji}
+                        {currentCharacter.emoji}
                       </div>
                     ) : (
                       <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
@@ -1204,7 +1117,7 @@ ${selectedPeopleInfo}
                       {message.content}
                     </ReactMarkdown>
 
-                    {/* 메시지 피드백 버튼들 */}
+                    {/* 메시지 피드백 버튼들 - assistant 메시지에만 표시 */}
                     {message.role === "assistant" && (
                       <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <MessageFeedbackButtons
@@ -1227,7 +1140,7 @@ ${selectedPeopleInfo}
               <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
                 <div className="flex-shrink-0">
                   <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                    {stableValues.currentCharacter.emoji}
+                    {currentCharacter.emoji}
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -1274,11 +1187,11 @@ ${selectedPeopleInfo}
       {/* 하단 입력 영역 */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/95 to-transparent backdrop-blur-md safe-area-bottom">
         {/* 추천 질문 */}
-        {stableValues.suggestedQuestions.length > 0 && !isLoading && (
+        {suggestedQuestions.length > 0 && !isLoading && (
           <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-white/10 max-h-[50px] sm:max-h-[60px] flex items-center">
             <div className="max-w-3xl mx-auto w-full">
               <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
-                {stableValues.suggestedQuestions.slice(0, 6).map((question, index) => (
+                {suggestedQuestions.slice(0, 6).map((question, index) => (
                   <Button
                     key={index}
                     variant="outline"
@@ -1386,13 +1299,10 @@ ${selectedPeopleInfo}
       {/* 궁합 분석 도구 모달 */}
       {showCompatibilityTool && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+          <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-white flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-purple-400" />
-                  <span>궁합 보기</span>
-                </h2>
+                <h2 className="text-xl font-semibold text-white">궁합 분석 도구</h2>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1406,18 +1316,11 @@ ${selectedPeopleInfo}
                 currentUserSaju={{
                   name,
                   gender,
-                  saju: saju,
-                  birthInfo: birthInfo,
+                  saju,
+                  birthInfo,
                 }}
                 onAnalyze={handleCompatibilityAnalysis}
                 onClose={() => setShowCompatibilityTool(false)}
-                currentSaju={saju}
-                currentName={name}
-                currentGender={gender}
-                currentBirthInfo={birthInfo}
-                isLoggedIn={stableValues.actualIsLoggedIn}
-                userId={stableValues.userId}
-                onCompatibilityAnalysis={handleCompatibilityAnalysis}
               />
             </div>
           </div>

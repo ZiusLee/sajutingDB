@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -37,8 +37,8 @@ interface SajuPerson {
   birthDay: string
   birthHour: string
   birthMinute: string
-  saju: any
-  sajuSummary?: string
+  saju: any // 완전한 사주 정보
+  sajuSummary?: string // 사주 요약 정보
   createdAt: string
 }
 
@@ -80,7 +80,6 @@ export default function CompatibilityTool({
   const [showMainPersonSelector, setShowMainPersonSelector] = useState(false)
   const [availableMainPeople, setAvailableMainPeople] = useState<SajuPerson[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [initialized, setInitialized] = useState(false)
 
   // 새 사람 추가 폼 상태
   const [newPersonForm, setNewPersonForm] = useState({
@@ -94,8 +93,8 @@ export default function CompatibilityTool({
     timeUnknown: false,
   })
 
-  // 현재 사주를 SajuPerson 형태로 변환 - 메모화
-  const getCurrentSajuPerson = useCallback((): SajuPerson => {
+  // 현재 사주를 SajuPerson 형태로 변환
+  const getCurrentSajuPerson = (): SajuPerson => {
     const saju = currentUserSaju?.saju || currentSaju
     const name = currentUserSaju?.name || currentName || "나"
     const gender = currentUserSaju?.gender || currentGender || "unknown"
@@ -118,10 +117,10 @@ export default function CompatibilityTool({
       sajuSummary: sajuSummary,
       createdAt: new Date().toISOString(),
     }
-  }, [currentUserSaju, currentSaju, currentName, currentGender, currentBirthInfo])
+  }
 
-  // 로컬 스토리지에서 최근 사람들 불러오기 - 메모화
-  const loadRecentPeople = useCallback(() => {
+  // 로컬 스토리지에서 최근 사람들 불러오기
+  const loadRecentPeople = () => {
     try {
       const stored = localStorage.getItem("compatibility_recent_people")
       if (stored) {
@@ -131,10 +130,10 @@ export default function CompatibilityTool({
     } catch (error) {
       console.error("Error loading recent people:", error)
     }
-  }, [])
+  }
 
-  // 로그인된 사용자의 사주 프로필들 불러오기 - 메모화
-  const loadUserProfiles = useCallback(async () => {
+  // 로그인된 사용자의 사주 프로필들 불러오기
+  const loadUserProfiles = async () => {
     if (!isLoggedIn || !userId) return
 
     try {
@@ -153,43 +152,38 @@ export default function CompatibilityTool({
       }))
 
       setAvailableMainPeople(sajuPeople)
+
+      // 현재 채팅 중인 사주가 이미 mainPerson으로 설정되어 있으므로
+      // 여기서는 추가 설정하지 않음
     } catch (error) {
       console.error("Error loading user profiles:", error)
     }
+  }
+
+  // 컴포넌트 초기화
+  useEffect(() => {
+    loadRecentPeople()
+
+    // 현재 채팅 중인 사주를 우선적으로 대표사주로 설정
+    const currentSajuPerson = getCurrentSajuPerson()
+    setMainPerson(currentSajuPerson)
+
+    if (isLoggedIn) {
+      loadUserProfiles()
+    }
   }, [isLoggedIn, userId])
 
-  // 컴포넌트 초기화 - 한 번만 실행
-  useEffect(() => {
-    if (initialized) return
-
-    const initializeComponent = async () => {
-      loadRecentPeople()
-
-      // 현재 채팅 중인 사주를 우선적으로 대표사주로 설정
-      const currentSajuPerson = getCurrentSajuPerson()
-      setMainPerson(currentSajuPerson)
-
-      if (isLoggedIn) {
-        await loadUserProfiles()
-      }
-
-      setInitialized(true)
-    }
-
-    initializeComponent()
-  }, [initialized, loadRecentPeople, getCurrentSajuPerson, isLoggedIn, loadUserProfiles])
-
   // 로컬 스토리지에 최근 사람들 저장
-  const saveRecentPeople = useCallback((people: SajuPerson[]) => {
+  const saveRecentPeople = (people: SajuPerson[]) => {
     try {
       localStorage.setItem("compatibility_recent_people", JSON.stringify(people))
     } catch (error) {
       console.error("Error saving recent people:", error)
     }
-  }, [])
+  }
 
   // 새 사람 추가
-  const handleAddPerson = useCallback(async () => {
+  const handleAddPerson = async () => {
     if (!newPersonForm.name || !newPersonForm.birthYear || !newPersonForm.birthMonth || !newPersonForm.birthDay) {
       alert("필수 정보를 모두 입력해주세요.")
       return
@@ -260,11 +254,9 @@ export default function CompatibilityTool({
       }
 
       // 최근 사람들 목록에 추가 (최대 10명)
-      setRecentPeople((prev) => {
-        const updatedRecentPeople = [newPerson, ...prev.filter((p) => p.id !== newPerson.id)].slice(0, 10)
-        saveRecentPeople(updatedRecentPeople)
-        return updatedRecentPeople
-      })
+      const updatedRecentPeople = [newPerson, ...recentPeople.filter((p) => p.id !== newPerson.id)].slice(0, 10)
+      setRecentPeople(updatedRecentPeople)
+      saveRecentPeople(updatedRecentPeople)
 
       // 폼 초기화
       setNewPersonForm({
@@ -284,10 +276,10 @@ export default function CompatibilityTool({
     } finally {
       setIsLoading(false)
     }
-  }, [newPersonForm, saveRecentPeople])
+  }
 
   // 사람 선택/해제
-  const togglePersonSelection = useCallback((person: SajuPerson) => {
+  const togglePersonSelection = (person: SajuPerson) => {
     setSelectedPeople((prev) => {
       const isSelected = prev.some((p) => p.id === person.id)
       if (isSelected) {
@@ -299,10 +291,10 @@ export default function CompatibilityTool({
         return prev
       }
     })
-  }, [])
+  }
 
-  // 궁합 분석 실행
-  const handleAnalyze = useCallback(() => {
+  // 궁합 분석 실행 - 개선된 버전
+  const handleAnalyze = () => {
     console.log("handleAnalyze called")
     console.log("mainPerson:", mainPerson)
     console.log("selectedPeople:", selectedPeople)
@@ -429,18 +421,15 @@ export default function CompatibilityTool({
       console.error("Error in handleAnalyze:", error)
       alert("궁합 분석 중 오류가 발생했습니다: " + error.message)
     }
-  }, [mainPerson, selectedPeople, onAnalyze, onCompatibilityAnalysis, onClose])
+  }
 
   // 대표 사주 변경
-  const handleMainPersonChange = useCallback((person: SajuPerson) => {
+  const handleMainPersonChange = (person: SajuPerson) => {
     setMainPerson(person)
     setShowMainPersonSelector(false)
-  }, [])
+  }
 
-  // 표시할 최근 사람들 - 메모화
-  const displayedRecentPeople = useMemo(() => {
-    return showAllPeople ? recentPeople : recentPeople.slice(0, 3)
-  }, [showAllPeople, recentPeople])
+  const displayedRecentPeople = showAllPeople ? recentPeople : recentPeople.slice(0, 3)
 
   return (
     <div className="space-y-6">

@@ -389,7 +389,7 @@ export default function CompatibleMatches({
             age: 35,
             birthYear: "1989년생",
             saju: "기사-경오-신미-임신",
-            compatibility: "서로의 ��성을 존중��며 오랜 시간 함께할 수 있는 ���정적인 관계",
+            compatibility: "서로의 ��성을 존중��며 오랜 시간 함께할 수 있는 안정적인 관계",
             compatibilityScore: 89,
             imageUrl: "/placeholder.svg?height=150&width=150",
           },

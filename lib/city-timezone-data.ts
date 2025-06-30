@@ -571,7 +571,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   {
     id: "lagos",
     city: "라고스",
-    country: "나이지리���",
+    country: "나이지리아",
     timezone: "Africa/Lagos",
     utcOffset: 1,
     timeStandard: "서머타임",
