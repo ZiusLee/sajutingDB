@@ -102,7 +102,7 @@ async function processMessagesForContext(messages, compressedSaju, name, roomTyp
   const recentMessages = messages.slice(-8)
   const middleMessages = messages.slice(2, -8)
 
-  // 🚀 성능 최적화: 간단한 요약만 생성
+  // 🚀 성능 최적화: 간단한 요약만 생성 (무한 루프 방지)
   if (middleMessages.length > 0) {
     try {
       const summaryText = await createSimpleSummary(middleMessages, roomType)
@@ -115,14 +115,23 @@ async function processMessagesForContext(messages, compressedSaju, name, roomTyp
         ...recentMessages,
       ]
     } catch (error) {
-      return [...initialMessages, ...recentMessages]
+      console.error("요약 생성 실패:", error)
+      // 요약 실패 시 기본 메시지로 대체
+      return [
+        ...initialMessages,
+        {
+          role: "system",
+          content: `📚 이전 대화 요약: 이전에 ${roomType} 상담이 있었습니다.`,
+        },
+        ...recentMessages,
+      ]
     }
   }
 
   return [...initialMessages, ...recentMessages]
 }
 
-// 🚀 로그 최적화: 빠르고 간단한 요약 함수
+// 🚀 수정된 요약 함수 - 무한 루프 방지
 async function createSimpleSummary(messages, roomType) {
   try {
     const recentContent = messages
@@ -132,19 +141,42 @@ async function createSimpleSummary(messages, roomType) {
 
     const summaryPrompt = `다음 ${roomType} 상담을 30자 이내로 요약: ${recentContent}`
 
-    const summary = await streamText({
-      model: openai("gpt-4o-mini"),
-      prompt: summaryPrompt,
-      maxTokens: 50,
+    // 🔧 무한 루프 방지: 타임아웃 설정
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Summary timeout")), 10000) // 10초 타임아웃
     })
 
-    let summaryText = ""
-    for await (const chunk of summary.textStream) {
-      summaryText += chunk
+    const summaryPromise = async () => {
+      const summary = await streamText({
+        model: openai("gpt-4o-mini"),
+        prompt: summaryPrompt,
+        maxTokens: 50,
+      })
+
+      let summaryText = ""
+      let chunkCount = 0
+      const MAX_CHUNKS = 20 // 최대 청크 수 제한
+
+      // 🔧 무한 루프 방지: 청크 수 제한과 타임아웃
+      for await (const chunk of summary.textStream) {
+        summaryText += chunk
+        chunkCount++
+        
+        // 최대 청크 수 또는 길이 제한에 도달하면 종료
+        if (chunkCount >= MAX_CHUNKS || summaryText.length > 100) {
+          break
+        }
+      }
+
+      return summaryText.trim() || "이전 대화 내용"
     }
 
-    return summaryText.trim() || "이전 대화 내용"
+    // 타임아웃과 함께 요약 실행
+    const result = await Promise.race([summaryPromise(), timeoutPromise])
+    return result
+
   } catch (error) {
+    console.error("요약 생성 오류:", error)
     return "이전 대화 내용"
   }
 }
@@ -368,7 +400,6 @@ ${sajuInfo}${compatibilityInfo}
         topP: 1.0,
       })
       
-
       return result.toDataStreamResponse()
     } catch (streamError) {
       if (shouldLog("ERROR")) {

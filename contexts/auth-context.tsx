@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useRef, useMemo, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import { getSupabase } from "@/lib/supabase-client"
@@ -19,8 +19,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  // Use our singleton Supabase instance
-  const supabase = getSupabase()
+  
+  // Supabase 인스턴스를 ref로 안정화
+  const supabaseRef = useRef(getSupabase())
+  const supabase = supabaseRef.current
+  
+  // 초기화 완료 여부를 추적
+  const [isInitialized, setIsInitialized] = useState(false)
+  const initRef = useRef(false)
+  
+  // 리다이렉션을 한 번만 실행하도록 추적
+  const redirectedRef = useRef(false)
 
   // Function to refresh user data
   const refreshUser = async () => {
@@ -47,17 +56,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (userData?.user) {
           console.log("User authenticated:", userData.user.id)
-          setUser(userData.user)
-
-          // 로그인 상태를 localStorage에 저장
-          localStorage.setItem("user_authenticated", "true")
-          localStorage.setItem("user_id", userData.user.id)
-          if (userData.user.user_metadata?.name) {
-            localStorage.setItem("user_name", userData.user.user_metadata.name)
-          }
-          if (userData.user.email) {
-            localStorage.setItem("user_email", userData.user.email)
-          }
+          
+          // 이전 사용자와 동일한지 확인 후에만 업데이트
+          setUser(prevUser => {
+            if (prevUser?.id !== userData.user.id) {
+              // 새로운 사용자인 경우에만 localStorage 업데이트
+              localStorage.setItem("user_authenticated", "true")
+              localStorage.setItem("user_id", userData.user.id)
+              if (userData.user.user_metadata?.name) {
+                localStorage.setItem("user_name", userData.user.user_metadata.name)
+              }
+              if (userData.user.email) {
+                localStorage.setItem("user_email", userData.user.email)
+              }
+              return userData.user
+            }
+            return prevUser
+          })
 
           return userData.user
         } else {
@@ -78,71 +93,118 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // 초기 로그인 상태 확인
+  // 안전한 리다이렉션 함수
+  const safeRedirect = (path: string) => {
+    if (redirectedRef.current) return
+    
+    const currentPath = window.location.pathname
+    if (currentPath === path) return
+    
+    const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list"]
+    const shouldRedirect = !excludedPaths.some((p) => currentPath.startsWith(p))
+    const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
+    
+    if (shouldRedirect && !fromMyPage) {
+      redirectedRef.current = true
+      setTimeout(() => {
+        redirectedRef.current = false
+      }, 1000) // 1초 후 리다이렉션 가능하도록 리셋
+      
+      router.push(path)
+    }
+  }
+
+  // 초기 로그인 상태 확인 - 한 번만 실행
   useEffect(() => {
+    if (initRef.current) return
+    initRef.current = true
+    
+    let mounted = true
+    
     const checkAuth = async () => {
-      await refreshUser()
+      try {
+        await refreshUser()
+        if (mounted) {
+          setIsInitialized(true)
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error)
+        if (mounted) {
+          setIsLoading(false)
+          setIsInitialized(true)
+        }
+      }
     }
 
     checkAuth()
 
-    // 인증 상태 변경 이벤트 리스너
+    // 인증 상태 변경 이벤트 리스너 - 한 번만 설정
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+      
       console.log("Auth state changed:", event, session?.user?.id)
+      
       if (session?.user) {
-        setUser(session.user)
-
-        // 로그인 상태를 localStorage에 저장
-        localStorage.setItem("user_authenticated", "true")
-        localStorage.setItem("user_id", session.user.id)
-        if (session.user.user_metadata?.name) {
-          localStorage.setItem("user_name", session.user.user_metadata.name)
-        }
-        if (session.user.email) {
-          localStorage.setItem("user_email", session.user.email)
-        }
-
-        // 로그인 상태가 변경되었고 사용자가 있는 경우 마이페이지로 리다이렉션
-        // 단, 이미 /mypage 경로에 있는 경우는 제외
-        const currentPath = window.location.pathname
-        const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list"]
-        const shouldRedirect = !excludedPaths.some((path) => currentPath.startsWith(path))
-
-        // from_mypage 플래그가 있으면 리디렉션하지 않음
-        const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
-
-        if (shouldRedirect && !fromMyPage) {
-          router.push("/mypage")
-        }
+        setUser(prevUser => {
+          // 동일한 사용자인 경우 상태 업데이트 방지
+          if (prevUser?.id === session.user.id) {
+            return prevUser
+          }
+          
+          // 새로운 사용자인 경우에만 localStorage 업데이트
+          localStorage.setItem("user_authenticated", "true")
+          localStorage.setItem("user_id", session.user.id)
+          if (session.user.user_metadata?.name) {
+            localStorage.setItem("user_name", session.user.user_metadata.name)
+          }
+          if (session.user.email) {
+            localStorage.setItem("user_email", session.user.email)
+          }
+          
+          // 로그인 성공 시 리다이렉션 (비동기로 처리)
+          setTimeout(() => {
+            safeRedirect("/mypage")
+          }, 100)
+          
+          return session.user
+        })
       } else {
-        setUser(null)
-
-        // 로그아웃 시 localStorage에서 사용자 정보 제거
-        localStorage.removeItem("user_authenticated")
-        localStorage.removeItem("user_id")
-        localStorage.removeItem("user_name")
-        localStorage.removeItem("user_email")
+        setUser(prevUser => {
+          if (prevUser === null) return prevUser // 이미 null인 경우 업데이트 방지
+          
+          // 로그아웃 시에만 localStorage 클리어
+          localStorage.removeItem("user_authenticated")
+          localStorage.removeItem("user_id")
+          localStorage.removeItem("user_name")
+          localStorage.removeItem("user_email")
+          
+          return null
+        })
       }
+      
       setIsLoading(false)
     })
 
     // 클린업 함수
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase.auth])
+  }, []) // 빈 의존성 배열로 변경
 
   // 로그아웃 함수
   const logout = async () => {
+    if (isLoading) return // 이미 로딩 중이면 중복 실행 방지
+    
     setIsLoading(true)
     try {
       console.log("Logging out...")
       const { error } = await supabase.auth.signOut()
       if (error) {
         console.error("로그아웃 오류:", error)
-        throw error // 로그아웃 실패 시 오류 발생
+        throw error
       }
 
       // Clear localStorage
@@ -160,16 +222,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
+  // Context 값을 메모화하여 불필요한 re-render 방지
+  const contextValue = useMemo(() => ({
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    logout,
+    refreshUser,
+  }), [user, isLoading]) // logout과 refreshUser는 함수이므로 의존성에서 제외
+
+  // 초기화가 완료될 때까지 로딩 상태 유지
+  if (!isInitialized) {
+    return (
+      <AuthContext.Provider value={{
+        user: null,
+        isAuthenticated: false,
+        isLoading: true,
         logout,
         refreshUser,
-      }}
-    >
+      }}>
+        {children}
+      </AuthContext.Provider>
+    )
+  }
+
+  return (
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )
