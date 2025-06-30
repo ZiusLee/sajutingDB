@@ -186,7 +186,7 @@ ${currentYear}년 을사년, 푸른 뱀의 해에 타로카드가 ${userName}님
   }
 }
 
-// 대운 데이터를 변환하는 함수 - 실제 데이터 구조에 맞게 수정
+// 대운 데이터를 변환하는 함수 - 안전한 처리
 const convertDaeunData = (daeunData: any) => {
   if (!daeunData) {
     return []
@@ -194,37 +194,46 @@ const convertDaeunData = (daeunData: any) => {
 
   // pillars 배열이 있는 경우
   if (daeunData.pillars && Array.isArray(daeunData.pillars)) {
-    return daeunData.pillars.map((pillar: any, index: number) => {
-      const converted = {
-        age: pillar.startAge || index * 10,
-        startYear: pillar.startAge
-          ? new Date().getFullYear() - getCurrentAge() + pillar.startAge
-          : new Date().getFullYear() + index * 10,
-        endYear: pillar.endAge
-          ? new Date().getFullYear() - getCurrentAge() + pillar.endAge
-          : new Date().getFullYear() + index * 10 + 9,
-        stem: pillar.stem || "",
-        branch: pillar.branch || "",
-        stemHanja: pillar.stemHanja || pillar.stem || "",
-        branchHanja: pillar.branchHanja || pillar.branch || "",
-        description: `${pillar.stem || ""}${pillar.branch || ""} 대운 (${pillar.startAge || index * 10}-${pillar.endAge || index * 10 + 9}세)`,
-      }
-      return converted
-    })
+    return daeunData.pillars
+      .map((pillar: any, index: number) => {
+        if (!pillar) return null
+
+        return {
+          age: pillar.startAge || index * 10,
+          startYear: pillar.startAge
+            ? new Date().getFullYear() - getCurrentAge() + pillar.startAge
+            : new Date().getFullYear() + index * 10,
+          endYear: pillar.endAge
+            ? new Date().getFullYear() - getCurrentAge() + pillar.endAge
+            : new Date().getFullYear() + index * 10 + 9,
+          stem: pillar.stem || "",
+          branch: pillar.branch || "",
+          stemHanja: pillar.stemHanja || pillar.stem || "",
+          branchHanja: pillar.branchHanja || pillar.branch || "",
+          description: `${pillar.stem || ""}${pillar.branch || ""} 대운 (${pillar.startAge || index * 10}-${pillar.endAge || index * 10 + 9}세)`,
+        }
+      })
+      .filter(Boolean)
   }
 
   // 직접 배열인 경우 (fallback)
   if (Array.isArray(daeunData)) {
-    return daeunData.map((item: any, index: number) => ({
-      age: item.age || index * 10,
-      startYear: item.startYear || new Date().getFullYear() + index * 10,
-      endYear: item.endYear || new Date().getFullYear() + index * 10 + 9,
-      stem: item.stem || "",
-      branch: item.branch || "",
-      stemHanja: item.stemHanja || item.stem || "",
-      branchHanja: item.branchHanja || item.branch || "",
-      description: item.description || `${item.stem || ""}${item.branch || ""} 대운`,
-    }))
+    return daeunData
+      .map((item: any, index: number) => {
+        if (!item) return null
+
+        return {
+          age: item.age || index * 10,
+          startYear: item.startYear || new Date().getFullYear() + index * 10,
+          endYear: item.endYear || new Date().getFullYear() + index * 10 + 9,
+          stem: item.stem || "",
+          branch: item.branch || "",
+          stemHanja: item.stemHanja || item.stem || "",
+          branchHanja: item.branchHanja || item.branch || "",
+          description: item.description || `${item.stem || ""}${item.branch || ""} 대운`,
+        }
+      })
+      .filter(Boolean)
   }
 
   return []
@@ -300,29 +309,30 @@ export default function SajuChat({
 
   const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
 
-  // 대운 계산을 메모화하여 무한 루프 방지
+  // 대운 계산을 메모화하여 무한 루프 방지 - 안전한 처리
   const calculatedDaeun = useMemo(() => {
-    // 이미 올바른 대운이 있는 경우 그대로 사용
-    if (
-      saju.daeun &&
-      saju.daeun.pillars &&
-      Array.isArray(saju.daeun.pillars) &&
-      saju.daeun.pillars.length > 0 &&
-      !saju.daeun.pillars.every((p: any) => p.stem === "갑" && p.branch === "자")
-    ) {
-      return saju.daeun
-    }
+    try {
+      // 이미 올바른 대운이 있는 경우 그대로 사용
+      if (
+        saju?.daeun &&
+        saju.daeun.pillars &&
+        Array.isArray(saju.daeun.pillars) &&
+        saju.daeun.pillars.length > 0 &&
+        !saju.daeun.pillars.every((p: any) => p?.stem === "갑" && p?.branch === "자")
+      ) {
+        return saju.daeun
+      }
 
-    // 대운 계산에 필요한 데이터가 있는지 확인
-    if (
-      saju.yearStem &&
-      saju.monthStem &&
-      saju.monthBranch &&
-      birthInfo?.solarYear &&
-      birthInfo?.solarMonth &&
-      birthInfo?.solarDay
-    ) {
-      try {
+      // 대운 계산에 필요한 데이터가 있는지 확인
+      if (
+        saju?.yearStem &&
+        saju?.monthStem &&
+        saju?.monthBranch &&
+        birthInfo?.solarYear &&
+        birthInfo?.solarMonth &&
+        birthInfo?.solarDay &&
+        gender
+      ) {
         const daeunData = calculateDaeunInfo(
           {
             yearStem: saju.yearStem,
@@ -339,18 +349,18 @@ export default function SajuChat({
         )
 
         return daeunData
-      } catch (error) {
-        console.error("대운 계산 중 오류:", error)
-        return null
       }
-    }
 
-    return null
+      return null
+    } catch (error) {
+      console.error("대운 계산 중 오류:", error)
+      return null
+    }
   }, [
-    saju.yearStem,
-    saju.monthStem,
-    saju.monthBranch,
-    saju.daeun,
+    saju?.yearStem,
+    saju?.monthStem,
+    saju?.monthBranch,
+    saju?.daeun,
     birthInfo?.solarYear,
     birthInfo?.solarMonth,
     birthInfo?.solarDay,
@@ -362,15 +372,20 @@ export default function SajuChat({
 
   // Memoize compressed saju to prevent recreation on every render
   const compressedSaju = useMemo(() => {
-    return compressSaju(
-      saju,
-      birthInfo?.solarYear?.toString(),
-      birthInfo?.solarMonth?.toString(),
-      birthInfo?.solarDay?.toString(),
-      birthInfo?.solarHour?.toString(),
-      birthInfo?.solarMinute?.toString(),
-      birthInfo?.timeUnknown,
-    )
+    try {
+      return compressSaju(
+        saju,
+        birthInfo?.solarYear?.toString(),
+        birthInfo?.solarMonth?.toString(),
+        birthInfo?.solarDay?.toString(),
+        birthInfo?.solarHour?.toString(),
+        birthInfo?.solarMinute?.toString(),
+        birthInfo?.timeUnknown,
+      )
+    } catch (error) {
+      console.error("사주 압축 중 오류:", error)
+      return ""
+    }
   }, [saju, birthInfo])
 
   // Memoize the body object for useAIChat to prevent infinite re-renders - 안정화
@@ -556,7 +571,7 @@ export default function SajuChat({
 
         // 어시스턴트 메시지만 추가 저장 (사용자 메시지는 이미 저장됨)
         if (databaseSessionId) {
-          await saveMessagesToDatabase(updatedMessages, databaseSessionId)
+          await saveMessagesToDatabase([message], databaseSessionId)
         }
 
         setShouldGenerateQuestions(true)
@@ -593,14 +608,17 @@ export default function SajuChat({
     }
   }, [messages.length, isLoading])
 
-  // 메시지를 데이터베이스에 저장하는 함수 - 안정화된 버전
+  // 메시지를 데이터베이스에 저장하는 함수 - 개선된 버전
   const saveMessagesToDatabase = useCallback(
     async (messagesToSave: any[], sessionId: string) => {
-      if (!sessionId) {
+      if (!sessionId || !messagesToSave || messagesToSave.length === 0) {
+        console.log("세션 ID 또는 메시지가 없어 저장을 건너뜁니다.")
         return
       }
 
       try {
+        console.log("메시지 저장 시도:", { sessionId, messageCount: messagesToSave.length })
+
         const response = await fetch("/api/messages", {
           method: "POST",
           headers: {
@@ -619,27 +637,29 @@ export default function SajuChat({
           }),
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          console.log(`DB 저장 완료: ${data.savedCount || 0}개 메시지`)
-
-          if (data.messageIds && data.messageIds.length > 0) {
-            setTimeout(() => {
-              const newMessageIds: Record<string, string> = {}
-              messagesToSave.forEach((msg, index) => {
-                if (data.messageIds[index]) {
-                  newMessageIds[msg.id] = data.messageIds[index]
-                }
-              })
-              setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
-            }, 0)
-          }
-        } else {
+        if (!response.ok) {
           const errorText = await response.text()
-          console.error("DB 저장 실패:", errorText)
+          console.error("DB 저장 실패:", response.status, errorText)
+          throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
+
+        const data = await response.json()
+        console.log("메시지 저장 성공:", data)
+
+        if (data.messageIds && data.messageIds.length > 0) {
+          setTimeout(() => {
+            const newMessageIds: Record<string, string> = {}
+            messagesToSave.forEach((msg, index) => {
+              if (data.messageIds[index]) {
+                newMessageIds[msg.id] = data.messageIds[index]
+              }
+            })
+            setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
+          }, 0)
         }
       } catch (error) {
         console.error("DB 저장 오류:", error)
+        // 에러가 발생해도 채팅은 계속 진행되도록 함
       }
     },
     [roomType, name, gender, saju, birthInfo],
@@ -673,7 +693,7 @@ export default function SajuChat({
 
       const userMessage = input.trim()
 
-      // 사용자 메시지를 즉시 저장 (AI 응답 전에)
+      // 사용자 메시지를 즉시 저장 (AI 응답 전에) - 세션 ID가 있을 때만
       if (databaseSessionId) {
         try {
           const userMessageObj = {
@@ -682,11 +702,11 @@ export default function SajuChat({
             content: userMessage,
           }
 
-          // 현재 messages에 user 메시지 추가하여 저장
-          const messagesWithUser = [...messages, userMessageObj]
-          await saveMessagesToDatabase(messagesWithUser, databaseSessionId)
+          // 사용자 메시지만 저장
+          await saveMessagesToDatabase([userMessageObj], databaseSessionId)
         } catch (error) {
           console.error("사용자 메시지 저장 오류:", error)
+          // 저장 실패해도 채팅은 계속 진행
         }
       }
 
@@ -1046,7 +1066,7 @@ ${selectedPeopleInfo}
             </div>
           </div>
 
-          {/* 대운 다이어그램 - 메모화된 대운 사용 */}
+          {/* 대운 다이어그램 - 안전한 처리 */}
           {calculatedDaeun && (
             <div className="px-3 sm:px-4 mb-4 sm:mb-6">
               <div className="max-w-3xl mx-auto">

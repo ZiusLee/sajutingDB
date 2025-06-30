@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Info } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -35,26 +35,57 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
   const [selectedPeriod, setSelectedPeriod] = useState<DaeunPeriod | null>(null)
   const currentYear = new Date().getFullYear()
 
-  // 현재 대운 찾기
-  const getCurrentDaeun = () => {
-    if (!Array.isArray(daeun)) return null
-    return daeun.find((period) => currentYear >= period.startYear && currentYear <= period.endYear)
-  }
+  // 안전한 대운 데이터 처리
+  const safeDaeun = useMemo(() => {
+    if (!daeun || !Array.isArray(daeun)) return []
+    return daeun
+  }, [daeun])
 
-  const currentDaeun = getCurrentDaeun()
+  // 대운 데이터 수정 (연도 계산 오류 수정)
+  const correctedDaeun = useMemo(() => {
+    if (!safeDaeun.length || !birthInfo?.solarYear) return safeDaeun
+
+    return safeDaeun.map((period) => {
+      if (!period || typeof period.age !== "number") return period
+
+      return {
+        ...period,
+        startYear: birthInfo.solarYear + period.age,
+        endYear: birthInfo.solarYear + period.age + 9,
+      }
+    })
+  }, [safeDaeun, birthInfo?.solarYear])
+
+  // 현재 대운 찾기 (메모화하여 무한 리렌더링 방지)
+  const currentDaeun = useMemo(() => {
+    if (!correctedDaeun.length || !birthInfo?.solarYear) return null
+
+    const currentAge = currentYear - birthInfo.solarYear
+
+    const current = correctedDaeun.find((period) => {
+      if (!period || typeof period.age !== "number") return false
+      return currentAge >= period.age && currentAge < period.age + 10
+    })
+
+    return current || null
+  }, [correctedDaeun, currentYear, birthInfo?.solarYear])
 
   // 대운 설명 정보
-  const daeunExplanation = `
-대운(大運)은 10년 단위로 변화하는 인생의 큰 흐름을 나타냅니다.
+  const daeunExplanation = useMemo(() => {
+    const currentDaeunText = currentDaeun
+      ? `${currentDaeun.stem}${currentDaeun.branch} (${currentDaeun.startYear}-${currentDaeun.endYear})`
+      : "해당 없음"
 
-• **현재 대운**: ${currentDaeun ? `${currentDaeun.stem}${currentDaeun.branch} (${currentDaeun.startYear}-${currentDaeun.endYear})` : "해당 없음"}
+    return `대운(大運)은 10년 단위로 변화하는 인생의 큰 흐름을 나타냅니다.
+
+• **현재 대운**: ${currentDaeunText}
 • **대운의 의미**: 각 10년마다 다른 천간지지가 영향을 미쳐 운세의 흐름이 바뀝니다
 • **활용법**: 대운을 통해 인생의 전환점과 중요한 시기를 파악할 수 있습니다
 
-각 대운 기간을 클릭하면 상세 정보를 확인할 수 있습니다.
-  `
+각 대운 기간을 클릭하면 상세 정보를 확인할 수 있습니다.`
+  }, [currentDaeun])
 
-  if (!daeun || !Array.isArray(daeun) || daeun.length === 0) {
+  if (!correctedDaeun.length) {
     return (
       <div className="w-full">
         <div className="flex items-center justify-between mb-4">
@@ -100,14 +131,23 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
       {/* 대운 기간들을 가로 스크롤로 표시 */}
       <div className="overflow-x-auto">
         <div className="flex gap-2 min-w-max pb-2">
-          {daeun.slice(0, 8).map((period, index) => {
-            const isCurrent = currentYear >= period.startYear && currentYear <= period.endYear
-            const isPast = currentYear > period.endYear
-            const isFuture = currentYear < period.startYear
+          {correctedDaeun.slice(0, 8).map((period, index) => {
+            if (!period || !period.stem || !period.branch) return null
+
+            let isCurrent = false
+            let isPast = false
+            let isFuture = false
+
+            if (birthInfo?.solarYear && typeof period.age === "number") {
+              const currentAge = currentYear - birthInfo.solarYear
+              isCurrent = currentAge >= period.age && currentAge < period.age + 10
+              isPast = currentAge >= period.age + 10
+              isFuture = currentAge < period.age
+            }
 
             return (
               <div
-                key={index}
+                key={`${period.stem}-${period.branch}-${index}`}
                 onClick={() => setSelectedPeriod(period)}
                 className={`
                   flex-shrink-0 w-24 h-32 border rounded-lg p-2 cursor-pointer transition-all

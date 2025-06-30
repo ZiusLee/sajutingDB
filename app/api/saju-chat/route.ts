@@ -360,11 +360,14 @@ ${sajuInfo}${compatibilityInfo}
     const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
     try {
-      const result = streamText({
-        model: model,
+      const result = await streamText({
         messages: apiMessages,
-        maxTokens: 4000,
+        model: openai("gpt-4.1"),
+        temperature: 1.0,
+        maxTokens: 2048,
+        topP: 1.0,
       })
+      
 
       return result.toDataStreamResponse()
     } catch (streamError) {

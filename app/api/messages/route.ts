@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,11 +11,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Session ID is required" }, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createRouteHandlerClient({ cookies })
 
     const { data: messages, error } = await supabase
       .from("messages")
-      .select("*")
+      .select(`
+        id,
+        session_id,
+        role,
+        content,
+        message_order,
+        room_type,
+        model_used,
+        response_time_ms,
+        created_at
+      `)
       .eq("session_id", sessionId)
       .order("message_order", { ascending: true })
 
@@ -39,42 +50,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request data" }, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createRouteHandlerClient({ cookies })
 
-    // 기존 메시지 조회
-    const { data: existingMessages, error: fetchError } = await supabase
+    // Get existing message count for proper ordering
+    const { data: existingMessages, error: countError } = await supabase
       .from("messages")
-      .select("id, content")
+      .select("message_order")
       .eq("session_id", sessionId)
-      .order("message_order", { ascending: true })
+      .order("message_order", { ascending: false })
+      .limit(1)
 
-    if (fetchError) {
-      console.error("Error fetching existing messages:", fetchError)
-      return NextResponse.json({ error: "Failed to fetch existing messages" }, { status: 500 })
+    if (countError) {
+      console.error("Error getting message count:", countError)
+      return NextResponse.json({ error: "Failed to get message count" }, { status: 500 })
     }
 
-    const existingMessageContents = new Set(existingMessages?.map((msg) => msg.content) || [])
-    const newMessages = messages.filter((msg) => !existingMessageContents.has(msg.content))
+    const lastOrder = existingMessages && existingMessages.length > 0 ? existingMessages[0].message_order : 0
 
-    if (newMessages.length === 0) {
-      return NextResponse.json({
-        message: "No new messages to save",
-        savedCount: 0,
-        messageIds: [],
-      })
-    }
-
-    // 새 메시지들을 DB에 저장
-    const messagesToInsert = newMessages.map((message, index) => ({
+    // Prepare messages for insertion
+    const messagesToInsert = messages.map((message, index) => ({
       session_id: sessionId,
       role: message.role,
       content: message.content,
-      message_order: (existingMessages?.length || 0) + index,
-      room_type: roomType || "sajuping",
-      model_used: "gpt-4",
-      response_time_ms: 0,
+      message_order: lastOrder + index + 1,
+      room_type: roomType || "general",
+      model_used: message.model_used || null,
+      response_time_ms: message.response_time_ms || null,
+      created_at: new Date().toISOString(),
     }))
 
+    // Insert messages
     const { data: insertedMessages, error: insertError } = await supabase
       .from("messages")
       .insert(messagesToInsert)
@@ -85,13 +90,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
     }
 
-    // 간단한 요약 로그만 출력
-    console.log(`메시지 저장 완료: ${newMessages.length}개 신규`)
+    const messageIds = insertedMessages?.map((msg) => msg.id) || []
 
     return NextResponse.json({
-      message: "Messages saved successfully",
-      savedCount: newMessages.length,
-      messageIds: insertedMessages?.map((msg) => msg.id) || [],
+      success: true,
+      messageIds,
+      count: messageIds.length,
     })
   } catch (error) {
     console.error("Error in POST /api/messages:", error)
