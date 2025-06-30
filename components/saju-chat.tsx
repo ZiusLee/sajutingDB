@@ -272,7 +272,6 @@ export default function SajuChat({
   // Refs for preventing infinite loops
   const hasLoadedHistory = useRef(false)
   const lastMessageLength = useRef(0)
-  const initialMessagesRef = useRef<any[]>([])
   const isInitialized = useRef(false)
 
   // States
@@ -292,6 +291,7 @@ export default function SajuChat({
   const [retryCount, setRetryCount] = useState(0)
   const [isLoadingMessages, setIsLoadingMessages] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [initialMessages, setInitialMessages] = useState<any[]>([])
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -407,7 +407,6 @@ export default function SajuChat({
   // 현재 세션 ID 가져오기 - 안정화된 버전
   const getCurrentSessionId = useCallback(async (): Promise<string | null> => {
     try {
-      // 1. mypage에서 온 경우 - current_saju에서 세션 ID 확인
       const currentSajuData = localStorage.getItem("current_saju")
       if (currentSajuData) {
         const sajuData = JSON.parse(currentSajuData)
@@ -417,7 +416,6 @@ export default function SajuChat({
       }
 
       if (actualIsLoggedIn && userId) {
-        // 2. 로그인 상태: DB에서 사용자 세션 조회
         const { data: sessions, error } = await supabase
           .from("saju_sessions")
           .select("id, name, created_at")
@@ -437,14 +435,12 @@ export default function SajuChat({
 
         return null
       } else {
-        // 3. 비로그인 상태: localStorage에서 세션 ID 가져오기
         const storedSajuData = localStorage.getItem("tempSajuData")
         if (storedSajuData) {
           const sajuData = JSON.parse(storedSajuData)
           return sajuData.sessionId || null
         }
 
-        // user_id도 확인 (이전 버전 호환성)
         const userId = localStorage.getItem("user_id")
         if (userId) {
           return userId
@@ -456,7 +452,7 @@ export default function SajuChat({
       console.error("세션 ID 조회 오류:", error)
       return null
     }
-  }, [actualIsLoggedIn, userId, name, supabase])
+  }, [actualIsLoggedIn, userId, name])
 
   // 초기 메시지 생성 함수 - 메모화
   const generateInitialMessages = useCallback(() => {
@@ -496,7 +492,7 @@ export default function SajuChat({
 
       if (!sessionId) {
         const newInitialMessages = generateInitialMessages()
-        initialMessagesRef.current = newInitialMessages
+        setInitialMessages(newInitialMessages)
         isInitialized.current = true
         setIsLoadingMessages(false)
         return
@@ -504,7 +500,6 @@ export default function SajuChat({
 
       setDatabaseSessionId(sessionId)
 
-      // DB에서 메시지 로드
       const response = await fetch(`/api/messages?sessionId=${sessionId}`)
 
       if (response.ok) {
@@ -519,23 +514,23 @@ export default function SajuChat({
             content: msg.content,
           }))
 
-          initialMessagesRef.current = formattedMessages
+          setInitialMessages(formattedMessages)
         } else {
           // DB에 메시지가 없으면 초기 메시지 생성
           const newInitialMessages = generateInitialMessages()
-          initialMessagesRef.current = newInitialMessages
+          setInitialMessages(newInitialMessages)
         }
       } else {
         console.error("메시지 로드 실패:", response.status, response.statusText)
         // 실패 시 초기 메시지 생성
         const newInitialMessages = generateInitialMessages()
-        initialMessagesRef.current = newInitialMessages
+        setInitialMessages(newInitialMessages)
       }
     } catch (error) {
       console.error("채팅 히스토리 로드 오류:", error)
       // 에러 시 초기 메시지 생성
       const newInitialMessages = generateInitialMessages()
-      initialMessagesRef.current = newInitialMessages
+      setInitialMessages(newInitialMessages)
     } finally {
       isInitialized.current = true
       setIsLoadingMessages(false)
@@ -562,18 +557,13 @@ export default function SajuChat({
     append,
   } = useAIChat({
     api: "/api/saju-chat",
-    initialMessages: initialMessagesRef.current, // ref 사용으로 안정화
-    body: aiChatBody, // 메모화된 객체 사용
+    initialMessages: initialMessages,
+    body: aiChatBody,
     onFinish: async (message) => {
       try {
-        // 어시스턴트 메시지가 완료되면 현재 messages 배열에 새 메시지를 추가
-        const updatedMessages = [...messages, message]
-
-        // 어시스턴트 메시지만 추가 저장 (사용자 메시지는 이미 저장됨)
         if (databaseSessionId) {
           await saveMessagesToDatabase([message], databaseSessionId)
         }
-
         setShouldGenerateQuestions(true)
         setStreamingError(null)
         setRetryCount(0)
@@ -596,10 +586,10 @@ export default function SajuChat({
 
   // 메시지가 변경될 때만 스크롤 - 최적화된 버전
   useEffect(() => {
-    if (messages.length !== lastMessageLength.current && !isLoading && chatContainerRef.current) {
-      lastMessageLength.current = messages.length
-      const scrollContainer = chatContainerRef.current
+    const scrollContainer = chatContainerRef.current
+    if (scrollContainer && messages.length > 0) {
       const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
+      lastMessageLength.current = messages.length
 
       if (isNearBottom) {
         // 부드러운 애니메이션 없이 즉시 스크롤
