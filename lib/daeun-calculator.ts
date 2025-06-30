@@ -168,6 +168,10 @@ function generateDaeunPillars(
   const monthStemIdx = getStemIndex(saju.monthStem)
   const monthBranchIdx = getBranchIndex(saju.monthBranch)
 
+  console.log(
+    `대운 생성 - 월주: ${saju.monthStem}${saju.monthBranch}, 천간인덱스: ${monthStemIdx}, 지지인덱스: ${monthBranchIdx}, 방향: ${direction}`,
+  )
+
   if (monthStemIdx === -1 || monthBranchIdx === -1) {
     console.error(`Invalid month pillar for Daeun: ${saju.monthStem}${saju.monthBranch}`)
     return [] // Or default pillars
@@ -177,12 +181,13 @@ function generateDaeunPillars(
   for (let i = 0; i < count; i++) {
     let currentStemIndex, currentBranchIndex
     if (direction === "forward") {
+      // 순행: 월주 다음부터 시작
       currentStemIndex = (monthStemIdx + i + 1) % 10
       currentBranchIndex = (monthBranchIdx + i + 1) % 12
     } else {
-      // reverse
-      currentStemIndex = (monthStemIdx - (i + 1) + 100) % 10 // Ensure positive before modulo
-      currentBranchIndex = (monthBranchIdx - (i + 1) + 120) % 12 // Ensure positive
+      // 역행: 월주 이전부터 시작
+      currentStemIndex = (monthStemIdx - (i + 1) + 10) % 10
+      currentBranchIndex = (monthBranchIdx - (i + 1) + 12) % 12
     }
 
     const pillarStartAge = firstDaeunAge + i * 10
@@ -191,6 +196,10 @@ function generateDaeunPillars(
     const pillarStartYear = birthYear + pillarStartAge
     // Start date is birth month and day of the pillarStartYear
     const pillarStartDateFormatted = `${pillarStartYear}.${birthMonth}.${birthDay}`
+
+    console.log(
+      `대운 ${i + 1}: ${KR_STEMS[currentStemIndex]}${KR_BRANCHES[currentBranchIndex]} (${pillarStartAge}-${pillarEndAge}세)`,
+    )
 
     pillars.push({
       period: KR_STEMS[currentStemIndex] + KR_BRANCHES[currentBranchIndex],
@@ -204,6 +213,8 @@ function generateDaeunPillars(
       endAge: pillarEndAge,
     })
   }
+
+  console.log(`생성된 대운 pillars:`, pillars)
   return pillars
 }
 
@@ -231,12 +242,10 @@ export function calculateDaeunInfo(
     endAge: number
   }>
   direction: "forward" | "reverse"
-  // Optional debug fields
-  // daeunAgeRawD?: number;
-  // daeunAgeCalc?: number;
-  // firstDaeunAge?: number;
 } {
-  console.log(`대운 계산 시작 - 사주 연간: ${saju.yearStem}, 성별: ${gender}`)
+  console.log(
+    `대운 계산 시작 - 사주 연간: ${saju.yearStem}, 월주: ${saju.monthStem}${saju.monthBranch}, 성별: ${gender}`,
+  )
   const direction = getDaeunDirection(saju.yearStem, gender)
 
   const actualBirthHour = timeUnknown || birthHour === undefined ? 12 : birthHour
@@ -263,11 +272,12 @@ export function calculateDaeunInfo(
     birthDay,
   )
 
+  console.log(`최종 대운 결과:`, { cycles, pillars, direction })
+
   return {
     cycles,
     pillars,
     direction,
-    // firstDaeunAge: firstDaeunStartAge, // Could be useful for debugging
   }
 }
 
