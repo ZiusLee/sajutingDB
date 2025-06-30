@@ -1,11 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
-import { useChat } from "@/contexts/chat-context"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Send, ChevronDown, User, ArrowLeft, Settings } from "lucide-react"
@@ -20,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import DaeunDiagram from "@/components/daeun-diagram"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import type { BirthInfo } from "@/types/birth-info"
+import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -254,6 +253,32 @@ const getCurrentAge = (birthInfo?: BirthInfo) => {
   return 25 // 기본값
 }
 
+// 초기 메시지 생성 - 컴포넌트 외부로 이동하여 안정화
+const createInitialMessages = (name: string, roomType: string, birthInfo?: BirthInfo) => {
+  if (roomType === "sajuping") {
+    return [
+      {
+        id: "saju-analysis",
+        role: "assistant" as const,
+        content: getInitialMessageByRoomType(name, "sajuping", birthInfo),
+      },
+      {
+        id: "consultation-start",
+        role: "assistant" as const,
+        content: `오늘은 어떤 것이 궁금하세요? 😊`,
+      },
+    ]
+  } else {
+    return [
+      {
+        id: "welcome",
+        role: "assistant" as const,
+        content: getInitialMessageByRoomType(name, roomType, birthInfo),
+      },
+    ]
+  }
+}
+
 export default function SajuChat({
   saju,
   name,
@@ -269,16 +294,15 @@ export default function SajuChat({
   const userId = user?.id || null
   const actualIsLoggedIn = isAuthenticated || isLoggedIn
 
-  // Refs for preventing infinite loops
-  const hasLoadedHistory = useRef(false)
-  const lastMessageLength = useRef(0)
-  const isInitialized = useRef(false)
+  // 초기화 상태 - 단순화
+  const [isReady, setIsReady] = useState(false)
+  const [dbMessages, setDbMessages] = useState<any[]>([])
+  const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
 
-  // States
+  // UI 상태들
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [messageIds, setMessageIds] = useState<Record<string, string>>({})
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
   const [showCompatibilityTool, setShowCompatibilityTool] = useState(false)
   const [showToolsDrawer, setShowToolsDrawer] = useState(false)
   const [hasSeenToolsNotification, setHasSeenToolsNotification] = useState(false)
@@ -289,25 +313,32 @@ export default function SajuChat({
   const [streamingError, setStreamingError] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
-  const [isLoadingMessages, setIsLoadingMessages] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [initialMessages, setInitialMessages] = useState<any[]>([])
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isAutoScrolling = useRef(false)
-
-  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
-    initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
-  )
-  const [shouldGenerateQuestions, setShouldGenerateQuestions] = useState(true)
+  const lastMessageLength = useRef(0)
 
   const router = useRouter()
   const supabase = createClientComponentClient()
-  const { activeChatSession, setActiveChatSession, saveChatSession, getChatSession } = useChat()
 
   const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
+  const suggestedQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
+
+  // 안정화된 초기 메시지 - 한 번만 생성
+  const stableInitialMessages = useMemo(() => {
+    return createInitialMessages(name, roomType, birthInfo)
+  }, [name, roomType, birthInfo])
+
+  // 최종 메시지 배열 - DB 메시지가 있으면 사용, 없으면 초기 메시지 사용
+  const finalInitialMessages = useMemo(() => {
+    if (dbMessages.length > 0) {
+      return dbMessages
+    }
+    return stableInitialMessages
+  }, [dbMessages, stableInitialMessages])
 
   // 대운 계산을 메모화하여 무한 루프 방지 - 안전한 처리
   const calculatedDaeun = useMemo(() => {
@@ -404,147 +435,90 @@ export default function SajuChat({
     [compressedSaju, name, gender, initialInterpretation, roomType, userId, birthInfo],
   )
 
-  // 현재 세션 ID 가져오기 - 안정화된 버전
-  const getCurrentSessionId = useCallback(async (): Promise<string | null> => {
-    try {
-      const currentSajuData = localStorage.getItem("current_saju")
-      if (currentSajuData) {
-        const sajuData = JSON.parse(currentSajuData)
-        if (sajuData.sessionId) {
-          return sajuData.sessionId
-        }
-      }
-
-      if (actualIsLoggedIn && userId) {
-        const { data: sessions, error } = await supabase
-          .from("saju_sessions")
-          .select("id, name, created_at")
-          .eq("auth_user_id", userId)
-          .eq("name", name)
-          .order("created_at", { ascending: false })
-          .limit(1)
-
-        if (error) {
-          console.error("세션 조회 오류:", error)
-          return null
-        }
-
-        if (sessions && sessions.length > 0) {
-          return sessions[0].id
-        }
-
-        return null
-      } else {
-        const storedSajuData = localStorage.getItem("tempSajuData")
-        if (storedSajuData) {
-          const sajuData = JSON.parse(storedSajuData)
-          return sajuData.sessionId || null
-        }
-
-        const userId = localStorage.getItem("user_id")
-        if (userId) {
-          return userId
-        }
-
-        return null
-      }
-    } catch (error) {
-      console.error("세션 ID 조회 오류:", error)
-      return null
-    }
-  }, [actualIsLoggedIn, userId, name])
-
-  // 초기 메시지 생성 함수 - 메모화
-  const generateInitialMessages = useCallback(() => {
-    if (roomType === "sajuping") {
-      const firstMessage = {
-        id: "saju-analysis",
-        role: "assistant" as const,
-        content: getInitialMessageByRoomType(name, "sajuping", birthInfo),
-      }
-
-      const secondMessage = {
-        id: "consultation-start",
-        role: "assistant" as const,
-        content: `오늘은 어떤 것이 궁금하세요? 😊`,
-      }
-
-      return [firstMessage, secondMessage]
-    } else {
-      return [
-        {
-          id: "welcome",
-          role: "assistant" as const,
-          content: getInitialMessageByRoomType(name, roomType, birthInfo),
-        },
-      ]
-    }
-  }, [name, roomType, birthInfo])
-
-  // DB에서 채팅 히스토리 로드 - 안정화된 버전
-  const loadChatHistory = useCallback(async () => {
-    if (isInitialized.current) return
-
-    try {
-      setIsLoadingMessages(true)
-
-      const sessionId = await getCurrentSessionId()
-
-      if (!sessionId) {
-        const newInitialMessages = generateInitialMessages()
-        setInitialMessages(newInitialMessages)
-        isInitialized.current = true
-        setIsLoadingMessages(false)
-        return
-      }
-
-      setDatabaseSessionId(sessionId)
-
-      const response = await fetch(`/api/messages?sessionId=${sessionId}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        const dbMessages = data.messages || []
-
-        if (dbMessages.length > 0) {
-          // DB에 메시지가 있으면 사용
-          const formattedMessages = dbMessages.map((msg: any) => ({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-          }))
-
-          setInitialMessages(formattedMessages)
-        } else {
-          // DB에 메시지가 없으면 초기 메시지 생성
-          const newInitialMessages = generateInitialMessages()
-          setInitialMessages(newInitialMessages)
-        }
-      } else {
-        console.error("메시지 로드 실패:", response.status, response.statusText)
-        // 실패 시 초기 메시지 생성
-        const newInitialMessages = generateInitialMessages()
-        setInitialMessages(newInitialMessages)
-      }
-    } catch (error) {
-      console.error("채팅 히스토리 로드 오류:", error)
-      // 에러 시 초기 메시지 생성
-      const newInitialMessages = generateInitialMessages()
-      setInitialMessages(newInitialMessages)
-    } finally {
-      isInitialized.current = true
-      setIsLoadingMessages(false)
-    }
-  }, [getCurrentSessionId, generateInitialMessages])
-
-  // 컴포넌트 마운트 시 채팅 히스토리 로드 - 한 번만 실행
+  // 초기화 로직 - 한 번만 실행
   useEffect(() => {
-    if (!hasLoadedHistory.current) {
-      hasLoadedHistory.current = true
-      loadChatHistory()
-    }
-  }, [loadChatHistory])
+    let isMounted = true
 
+    const initializeChat = async () => {
+      try {
+        // 세션 ID 가져오기
+        let sessionId = null
+
+        const currentSajuData = localStorage.getItem("current_saju")
+        if (currentSajuData) {
+          const sajuData = JSON.parse(currentSajuData)
+          sessionId = sajuData.sessionId
+        }
+
+        if (!sessionId && actualIsLoggedIn && userId) {
+          const { data: sessions, error } = await supabase
+            .from("saju_sessions")
+            .select("id, name, created_at")
+            .eq("auth_user_id", userId)
+            .eq("name", name)
+            .order("created_at", { ascending: false })
+            .limit(1)
+
+          if (!error && sessions && sessions.length > 0) {
+            sessionId = sessions[0].id
+          }
+        }
+
+        if (!sessionId) {
+          const storedSajuData = localStorage.getItem("tempSajuData")
+          if (storedSajuData) {
+            const sajuData = JSON.parse(storedSajuData)
+            sessionId = sajuData.sessionId
+          } else {
+            sessionId = localStorage.getItem("user_id")
+          }
+        }
+
+        if (isMounted) {
+          setDatabaseSessionId(sessionId)
+        }
+
+        // DB에서 메시지 로드 시도
+        if (sessionId) {
+          try {
+            const response = await fetch(`/api/messages?sessionId=${sessionId}`)
+            if (response.ok) {
+              const data = await response.json()
+              const messages = data.messages || []
+
+              if (isMounted && messages.length > 0) {
+                const formattedMessages = messages.map((msg: any) => ({
+                  id: msg.id,
+                  role: msg.role,
+                  content: msg.content,
+                }))
+                setDbMessages(formattedMessages)
+              }
+            }
+          } catch (error) {
+            console.error("메시지 로드 오류:", error)
+          }
+        }
+
+        if (isMounted) {
+          setIsReady(true)
+        }
+      } catch (error) {
+        console.error("초기화 오류:", error)
+        if (isMounted) {
+          setIsReady(true)
+        }
+      }
+    }
+
+    initializeChat()
+
+    return () => {
+      isMounted = false
+    }
+  }, [actualIsLoggedIn, userId, name, supabase])
+
+  // useAIChat - isReady가 true일 때만 초기화
   const {
     messages,
     input,
@@ -557,14 +531,13 @@ export default function SajuChat({
     append,
   } = useAIChat({
     api: "/api/saju-chat",
-    initialMessages: initialMessages,
+    initialMessages: isReady ? finalInitialMessages : [],
     body: aiChatBody,
     onFinish: async (message) => {
       try {
         if (databaseSessionId) {
           await saveMessagesToDatabase([message], databaseSessionId)
         }
-        setShouldGenerateQuestions(true)
         setStreamingError(null)
         setRetryCount(0)
         setIsSubmitting(false)
@@ -576,7 +549,6 @@ export default function SajuChat({
     onError: (error) => {
       console.error("채팅 오류:", error)
       setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
-      setShouldGenerateQuestions(true)
       setIsSubmitting(false)
     },
     onResponse: (response) => {
@@ -587,28 +559,24 @@ export default function SajuChat({
   // 메시지가 변경될 때만 스크롤 - 최적화된 버전
   useEffect(() => {
     const scrollContainer = chatContainerRef.current
-    if (scrollContainer && messages.length > 0) {
+    if (scrollContainer && messages.length > lastMessageLength.current) {
       const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
       lastMessageLength.current = messages.length
 
       if (isNearBottom) {
-        // 부드러운 애니메이션 없이 즉시 스크롤
         scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
     }
-  }, [messages.length, isLoading])
+  }, [messages.length])
 
-  // 메시지를 데이터베이스에 저장하는 함수 - 개선된 버전
+  // 메시지를 데이터베이스에 저장하는 함수
   const saveMessagesToDatabase = useCallback(
     async (messagesToSave: any[], sessionId: string) => {
       if (!sessionId || !messagesToSave || messagesToSave.length === 0) {
-        console.log("세션 ID 또는 메시지가 없어 저장을 건너뜁니다.")
         return
       }
 
       try {
-        console.log("메시지 저장 시도:", { sessionId, messageCount: messagesToSave.length })
-
         const response = await fetch("/api/messages", {
           method: "POST",
           headers: {
@@ -627,17 +595,9 @@ export default function SajuChat({
           }),
         })
 
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error("DB 저장 실패:", response.status, errorText)
-          throw new Error(`HTTP ${response.status}: ${errorText}`)
-        }
-
-        const data = await response.json()
-        console.log("메시지 저장 성공:", data)
-
-        if (data.messageIds && data.messageIds.length > 0) {
-          setTimeout(() => {
+        if (response.ok) {
+          const data = await response.json()
+          if (data.messageIds && data.messageIds.length > 0) {
             const newMessageIds: Record<string, string> = {}
             messagesToSave.forEach((msg, index) => {
               if (data.messageIds[index]) {
@@ -645,11 +605,10 @@ export default function SajuChat({
               }
             })
             setMessageIds((prev) => ({ ...prev, ...newMessageIds }))
-          }, 0)
+          }
         }
       } catch (error) {
         console.error("DB 저장 오류:", error)
-        // 에러가 발생해도 채팅은 계속 진행되도록 함
       }
     },
     [roomType, name, gender, saju, birthInfo],
@@ -662,7 +621,6 @@ export default function SajuChat({
       return
     }
 
-    // 중복 전송 방지
     setIsSubmitting(true)
 
     try {
@@ -677,13 +635,12 @@ export default function SajuChat({
         setHasShownLoginPrompt(true)
       }
 
-      setShouldGenerateQuestions(false)
       setStreamingError(null)
       setRetryCount(0)
 
       const userMessage = input.trim()
 
-      // 사용자 메시지를 즉시 저장 (AI 응답 전에) - 세션 ID가 있을 때만
+      // 사용자 메시지를 즉시 저장
       if (databaseSessionId) {
         try {
           const userMessageObj = {
@@ -691,16 +648,12 @@ export default function SajuChat({
             role: "user" as const,
             content: userMessage,
           }
-
-          // 사용자 메시지만 저장
           await saveMessagesToDatabase([userMessageObj], databaseSessionId)
         } catch (error) {
           console.error("사용자 메시지 저장 오류:", error)
-          // 저장 실패해도 채팅은 계속 진행
         }
       }
 
-      // AI 채팅 제출
       aiHandleSubmit(e)
     } catch (error) {
       console.error("메시지 전송 오류:", error)
@@ -759,23 +712,15 @@ export default function SajuChat({
     [isLoading, setInput],
   )
 
-  const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-    }
-  }, [])
-
   const scrollToBottomSmooth = useCallback(() => {
     if (chatContainerRef.current) {
       const scrollContainer = chatContainerRef.current
-      // 스트리밍 중이 아닐 때만 부드러운 스크롤 사용
       if (!isLoading) {
         scrollContainer.scrollTo({
           top: scrollContainer.scrollHeight,
           behavior: "smooth",
         })
       } else {
-        // 스트리밍 중에는 즉시 스크롤
         scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
     }
@@ -795,17 +740,34 @@ export default function SajuChat({
     reload()
   }, [reload])
 
+  const handleRetryMessage = useCallback(
+    (messageId: string) => {
+      const messageIndex = messages.findIndex((msg) => msg.id === messageId)
+      if (messageIndex > 0) {
+        const previousUserMessage = messages[messageIndex - 1]
+        if (previousUserMessage && previousUserMessage.role === "user") {
+          setInput(previousUserMessage.content)
+          setTimeout(() => {
+            const form = document.querySelector("form")
+            if (form) {
+              form.requestSubmit()
+            }
+          }, 100)
+        }
+      }
+    },
+    [messages, setInput],
+  )
+
   const handleCompatibilityAnalysis = useCallback(
     (mainPerson: any, selectedPeople: any[]) => {
       try {
         const peopleNames = selectedPeople.map((p) => p.name).join(", ")
 
-        // 출생시간 정보 포맷팅 함수
         const formatBirthTime = (person: any) => {
           const birthDate = person.birth || `${person.birthYear}.${person.birthMonth}.${person.birthDay}`
           const gender = person.gender === "male" ? "남성" : person.gender === "female" ? "여성" : "성별미상"
 
-          // 시간 정보가 있고 timeUnknown이 아닌 경우
           if (person.birthHour && person.birthMinute && !person.timeUnknown) {
             return `${birthDate} ${person.birthHour}시 ${person.birthMinute}분 (${gender})`
           } else if (person.timeUnknown) {
@@ -815,11 +777,9 @@ export default function SajuChat({
           }
         }
 
-        // 사주 정보 직접 사용 (이미 완전한 데이터)
         const mainPersonSaju = mainPerson.fullSaju || mainPerson.saju
         const mainPersonBirthTime = formatBirthTime(mainPerson)
 
-        // 대표 사주 상세 정보
         const mainPersonInfo = `
 🔮 **${mainPerson.name}님 사주 정보**
 - 생년월일: ${mainPersonBirthTime}
@@ -830,7 +790,6 @@ export default function SajuChat({
 - 오행분포: 목${mainPersonSaju.elements.wood} 화${mainPersonSaju.elements.fire}  토${mainPersonSaju.elements.earth} 금${mainPersonSaju.elements.metal} 수${mainPersonSaju.elements.water}
 `
 
-        // 궁합 대상들 정보
         const selectedPeopleInfo = selectedPeople
           .map((person, index) => {
             const personSaju = person.fullSaju || person.saju
@@ -878,12 +837,6 @@ ${selectedPeopleInfo}
     [setInput],
   )
 
-  const handleToolsNotification = useCallback(() => {
-    if (!hasSeenToolsNotification) {
-      setHasSeenToolsNotification(true)
-    }
-  }, [hasSeenToolsNotification])
-
   // 외부 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -927,7 +880,8 @@ ${selectedPeopleInfo}
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
-  if (isLoadingMessages) {
+  // 로딩 상태
+  if (!isReady) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
         <div className="flex-1 flex items-center justify-center">
@@ -1073,61 +1027,76 @@ ${selectedPeopleInfo}
           )}
 
           {/* 메시지들 */}
-          {messages.map((message, index) => (
-            <div
-              key={message.id}
-              className={`px-3 sm:px-4 py-3 sm:py-4 ${message.role === "assistant" ? "bg-white/5" : ""}`}
-            >
-              <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
-                <div className="flex-shrink-0">
-                  {message.role === "assistant" ? (
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                      {currentCharacter.emoji}
-                    </div>
-                  ) : (
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
-                      나
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 prose prose-invert max-w-none min-w-0">
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }) => (
-                        <p className="text-white/90 leading-relaxed mb-2 sm:mb-3 last:mb-0 text-sm sm:text-base">
-                          {children}
-                        </p>
-                      ),
-                      strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-                      em: ({ children }) => <em className="italic text-white/80">{children}</em>,
-                      ul: ({ children }) => (
-                        <ul className="list-disc list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
-                          {children}
-                        </ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="list-decimal list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
-                          {children}
-                        </ol>
-                      ),
-                      li: ({ children }) => <li className="text-white/90 text-sm sm:text-base">{children}</li>,
-                      h1: ({ children }) => (
-                        <h1 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-white">{children}</h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2 text-white">{children}</h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3 className="text-sm sm:text-base font-semibold mb-1 sm:mb-2 text-white">{children}</h3>
-                      ),
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
+          {messages &&
+            messages.length > 0 &&
+            messages.map((message, index) => (
+              <div
+                key={message.id}
+                className={`px-3 sm:px-4 py-3 sm:py-4 ${message.role === "assistant" ? "bg-white/5" : ""} group relative`}
+              >
+                <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
+                  <div className="flex-shrink-0">
+                    {message.role === "assistant" ? (
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
+                        {currentCharacter.emoji}
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
+                        나
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 prose prose-invert max-w-none min-w-0">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => (
+                          <p className="text-white/90 leading-relaxed mb-2 sm:mb-3 last:mb-0 text-sm sm:text-base">
+                            {children}
+                          </p>
+                        ),
+                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                        em: ({ children }) => <em className="italic text-white/80">{children}</em>,
+                        ul: ({ children }) => (
+                          <ul className="list-disc list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
+                            {children}
+                          </ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
+                            {children}
+                          </ol>
+                        ),
+                        li: ({ children }) => <li className="text-white/90 text-sm sm:text-base">{children}</li>,
+                        h1: ({ children }) => (
+                          <h1 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-white">{children}</h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2 text-white">{children}</h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-sm sm:text-base font-semibold mb-1 sm:mb-2 text-white">{children}</h3>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+
+                    {/* 메시지 피드백 버튼들 - assistant 메시지에만 표시 */}
+                    {message.role === "assistant" && (
+                      <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <MessageFeedbackButtons
+                          messageId={messageIds[message.id] || message.id}
+                          messageContent={message.content}
+                          sessionId={databaseSessionId || "anonymous"}
+                          onRetry={() => handleRetryMessage(message.id)}
+                          className="flex items-center space-x-1"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
 
           {/* 로딩 상태 */}
           {isLoading && (
