@@ -40,7 +40,7 @@ const useHideHeaderAndFooter = () => {
         header.style.display = ""
       }
       if (footer) {
-      footer.style.display = ""
+        footer.style.display = ""
       }
       body.style.overflow = ""
     }
@@ -274,17 +274,17 @@ export default function SajuChat({
   // 컴포넌트 마운트 상태 추적
   const mountedRef = useRef(true)
   const initRef = useRef(false)
-  
+
   // useAuth를 완전히 제거하고 Supabase를 직접 사용
   const [authUser, setAuthUser] = useState<any>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authInitialized, setAuthInitialized] = useState(false)
-  
+
   // 컴포넌트 상태들
   const [isReady, setIsReady] = useState(false)
   const [dbMessages, setDbMessages] = useState<any[]>([])
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
-  
+
   // UI 상태들
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [messageIds, setMessageIds] = useState<Record<string, string>>({})
@@ -312,23 +312,27 @@ export default function SajuChat({
   const router = useRouter()
 
   // 정적 값들을 미리 계산
-  const currentCharacter = useMemo(() => 
-    pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
-  , [roomType])
-  
-  const suggestedQuestions = useMemo(() => 
-    initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
-  , [roomType])
+  const currentCharacter = useMemo(
+    () => pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0],
+    [roomType],
+  )
+
+  const suggestedQuestions = useMemo(
+    () => initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
+    [roomType],
+  )
 
   // 인증 상태 초기화 - 한 번만 실행
   useEffect(() => {
     let mounted = true
-    
+
     const initAuth = async () => {
       try {
         const supabase = supabaseRef.current
-        const { data: { user } } = await supabase.auth.getUser()
-        
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
         if (mounted) {
           setAuthUser(user)
           setIsAuthenticated(!!user)
@@ -347,7 +351,9 @@ export default function SajuChat({
     initAuth()
 
     // Auth state listener
-    const { data: { subscription } } = supabaseRef.current.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabaseRef.current.auth.onAuthStateChange((event, session) => {
       if (mounted) {
         setAuthUser(session?.user || null)
         setIsAuthenticated(!!session?.user)
@@ -363,7 +369,7 @@ export default function SajuChat({
   // birthInfo를 별도의 메모로 안정화
   const stableBirthInfo = useMemo(() => {
     if (!birthInfo) return null
-    
+
     return {
       solarYear: birthInfo.solarYear,
       solarMonth: birthInfo.solarMonth,
@@ -373,7 +379,7 @@ export default function SajuChat({
       timeUnknown: birthInfo.timeUnknown,
       lunarYear: birthInfo.lunarYear,
       lunarMonth: birthInfo.lunarMonth,
-      lunarDay: birthInfo.lunarDay
+      lunarDay: birthInfo.lunarDay,
     }
   }, [
     birthInfo?.solarYear,
@@ -384,7 +390,7 @@ export default function SajuChat({
     birthInfo?.timeUnknown,
     birthInfo?.lunarYear,
     birthInfo?.lunarMonth,
-    birthInfo?.lunarDay
+    birthInfo?.lunarDay,
   ])
 
   // 계산된 값들을 메모화
@@ -451,15 +457,19 @@ export default function SajuChat({
       userId,
       actualIsLoggedIn,
       calculatedDaeun,
-      compressedSaju
+      compressedSaju,
     }
   }, [
     authUser?.id,
     isAuthenticated,
     isLoggedIn,
     stableBirthInfo, // 안정화된 birthInfo 참조 사용
+    saju?.yearStem,
+    saju?.monthStem,
+    saju?.monthBranch,
+    saju?.dayMaster,
+    saju?.daeun,
     gender,
-    saju // saju 객체 참조 - React가 참조 동등성 체크
   ])
 
   // 초기 메시지를 메모화
@@ -491,13 +501,13 @@ export default function SajuChat({
     gender,
     initialInterpretation,
     roomType,
-    stableBirthInfo
+    stableBirthInfo,
   ])
 
   // 채팅 초기화 - 인증 완료 후 한 번만 실행
   useEffect(() => {
     if (!authInitialized || initRef.current) return
-    
+
     let mounted = true
     let timeoutId: NodeJS.Timeout
     initRef.current = true
@@ -520,7 +530,7 @@ export default function SajuChat({
         // computedValues 대신 직접 값 사용
         const userId = authUser?.id
         const actualIsLoggedIn = isAuthenticated || isLoggedIn
-        
+
         if (!sessionId && actualIsLoggedIn && userId) {
           try {
             const { data: sessions, error } = await supabaseRef.current
@@ -598,7 +608,7 @@ export default function SajuChat({
         clearTimeout(timeoutId)
       }
     }
-  }, [authInitialized, authUser?.id, isAuthenticated, isLoggedIn, name]) // 필요한 의존성 추가
+  }, [authInitialized]) // 인증 초기화 완료 시에만 실행
 
   // 메시지 저장 함수
   const saveMessagesToDatabase = useCallback(
@@ -646,19 +656,22 @@ export default function SajuChat({
   )
 
   // useAIChat 핸들러들
-  const onFinishHandler = useCallback(async (message: any) => {
-    try {
-      if (databaseSessionId) {
-        await saveMessagesToDatabase([message], databaseSessionId)
+  const onFinishHandler = useCallback(
+    async (message: any) => {
+      try {
+        if (databaseSessionId) {
+          await saveMessagesToDatabase([message], databaseSessionId)
+        }
+        setStreamingError(null)
+        setRetryCount(0)
+        setIsSubmitting(false)
+      } catch (error) {
+        console.error("onFinish 핸들러 오류:", error)
+        setIsSubmitting(false)
       }
-      setStreamingError(null)
-      setRetryCount(0)
-      setIsSubmitting(false)
-    } catch (error) {
-      console.error("onFinish 핸들러 오류:", error)
-      setIsSubmitting(false)
-    }
-  }, [databaseSessionId, saveMessagesToDatabase])
+    },
+    [databaseSessionId, saveMessagesToDatabase],
+  )
 
   const onErrorHandler = useCallback((error: Error) => {
     console.error("채팅 오류:", error)
@@ -685,11 +698,15 @@ export default function SajuChat({
     api: "/api/saju-chat",
     initialMessages: finalInitialMessages,
     body: {
-      roomType,
+      compressedSaju: computedValues.compressedSaju,
       name,
       gender,
+      initialInterpretation,
+      roomType,
+      userId: computedValues.userId,
       currentYear: 2025,
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+      birthInfo: stableBirthInfo,
     },
     onFinish: onFinishHandler,
     onError: onErrorHandler,
@@ -722,64 +739,67 @@ export default function SajuChat({
   }, [displayMessages.length])
 
   // 이벤트 핸들러들
-  const customHandleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const customHandleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault()
 
-    if (!input.trim() || isSubmitting || isLoading) {
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      setQuestionCount(prev => {
-        const newCount = prev + 1
-
-        const shouldShowLoginPrompt = newCount >= 5 && !computedValues.actualIsLoggedIn && !hasShownLoginPrompt
-
-        if (shouldShowLoginPrompt) {
-          setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-          setShowLoginPrompt(true)
-          setHasShownLoginPrompt(true)
-        }
-        
-        return newCount
-      })
-
-      setStreamingError(null)
-      setRetryCount(0)
-
-      const userMessage = input.trim()
-
-      // 사용자 메시지를 즉시 저장
-      if (databaseSessionId) {
-        try {
-          const userMessageObj = {
-            id: `user-${Date.now()}`,
-            role: "user" as const,
-            content: userMessage,
-          }
-          await saveMessagesToDatabase([userMessageObj], databaseSessionId)
-        } catch (error) {
-          console.error("사용자 메시지 저장 오류:", error)
-        }
+      if (!input.trim() || isSubmitting || isLoading) {
+        return
       }
 
-      aiHandleSubmit(e)
-    } catch (error) {
-      console.error("메시지 전송 오류:", error)
-      setIsSubmitting(false)
-    }
-  }, [
-    input,
-    isSubmitting,
-    isLoading,
-    computedValues.actualIsLoggedIn,
-    hasShownLoginPrompt,
-    databaseSessionId,
-    saveMessagesToDatabase,
-    aiHandleSubmit,
-  ])
+      setIsSubmitting(true)
+
+      try {
+        setQuestionCount((prev) => {
+          const newCount = prev + 1
+
+          const shouldShowLoginPrompt = newCount >= 5 && !computedValues.actualIsLoggedIn && !hasShownLoginPrompt
+
+          if (shouldShowLoginPrompt) {
+            setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+            setShowLoginPrompt(true)
+            setHasShownLoginPrompt(true)
+          }
+
+          return newCount
+        })
+
+        setStreamingError(null)
+        setRetryCount(0)
+
+        const userMessage = input.trim()
+
+        // 사용자 메시지를 즉시 저장
+        if (databaseSessionId) {
+          try {
+            const userMessageObj = {
+              id: `user-${Date.now()}`,
+              role: "user" as const,
+              content: userMessage,
+            }
+            await saveMessagesToDatabase([userMessageObj], databaseSessionId)
+          } catch (error) {
+            console.error("사용자 메시지 저장 오류:", error)
+          }
+        }
+
+        aiHandleSubmit(e)
+      } catch (error) {
+        console.error("메시지 전송 오류:", error)
+        setIsSubmitting(false)
+      }
+    },
+    [
+      input,
+      isSubmitting,
+      isLoading,
+      computedValues.actualIsLoggedIn,
+      hasShownLoginPrompt,
+      databaseSessionId,
+      saveMessagesToDatabase,
+      aiHandleSubmit,
+    ],
+  )
 
   const handleBackWithSave = useCallback(() => {
     try {
