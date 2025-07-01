@@ -705,10 +705,15 @@ export default function SajuChat({
         throw new Error("API 요청 실패")
       }
 
-      // 스트림 읽기
+      // 응답 타입 확인
+      console.log("Response headers:", response.headers.get('content-type'))
+      console.log("Response body exists:", !!response.body)
+
+      // 스트림 읽기 - 더 안전한 파싱
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let fullContent = ""
+      let buffer = ""
 
       if (reader) {
         try {
@@ -717,33 +722,101 @@ export default function SajuChat({
             if (done) break
 
             const chunk = decoder.decode(value, { stream: true })
+            buffer += chunk
+            console.log("받은 청크:", chunk)
             
-            // AI SDK의 데이터 스트림 파싱
-            const lines = chunk.split('\n')
+            // 완전한 라인들만 처리
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || "" // 마지막 불완전한 라인은 버퍼에 보관
+            
             for (const line of lines) {
-              if (line.startsWith('0:')) {
+              if (line.trim()) {
                 try {
-                  const data = JSON.parse(line.slice(2))
-                  if (data.type === 'text') {
-                    fullContent += data.value
-                    
-                    // 실시간으로 메시지 업데이트
-                    setChatMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === assistantMessageId 
-                          ? { ...msg, content: fullContent }
-                          : msg
-                      )
-                    )
+                  // AI SDK 스트림 포맷 처리
+                  if (line.startsWith('0:')) {
+                    const data = JSON.parse(line.slice(2))
+                    if (data.type === 'text') {
+                      fullContent += data.value
+                    }
+                  } else if (line.startsWith('data: ')) {
+                    // OpenAI 스타일 스트림
+                    const jsonStr = line.slice(6)
+                    if (jsonStr !== '[DONE]') {
+                      const data = JSON.parse(jsonStr)
+                      if (data.choices?.[0]?.delta?.content) {
+                        fullContent += data.choices[0].delta.content
+                      }
+                    }
+                  } else {
+                    // 일반 텍스트로 처리
+                    try {
+                      const data = JSON.parse(line)
+                      if (data.content) {
+                        fullContent = data.content
+                      }
+                    } catch {
+                      // JSON이 아니면 직접 텍스트로 추가
+                      fullContent += line
+                    }
                   }
+                  
+                  // 실시간으로 메시지 업데이트
+                  setChatMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === assistantMessageId 
+                        ? { ...msg, content: fullContent }
+                        : msg
+                    )
+                  )
                 } catch (e) {
-                  // JSON 파싱 실패는 무시
+                  console.log("파싱 에러:", e, "라인:", line)
                 }
               }
             }
           }
         } finally {
           reader.releaseLock()
+        }
+      }
+
+      // 스트림에서 내용을 못 가져온 경우 전체 응답 읽기
+      if (!fullContent) {
+        console.log("스트림에서 내용을 가져오지 못함, 전체 응답 읽기 시도")
+        try {
+          // response가 이미 읽혔을 수 있으므로 새로 요청
+          const fallbackResponse = await fetch("/api/saju-chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              messages: [...chatMessages, userMessage],
+              ...aiChatBody
+            })
+          })
+          
+          const responseText = await fallbackResponse.text()
+          console.log("Fallback 응답:", responseText)
+          fullContent = responseText
+          
+          // 실시간으로 메시지 업데이트
+          setChatMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantMessageId 
+                ? { ...msg, content: fullContent }
+                : msg
+            )
+          )
+        } catch (e) {
+          console.error("Fallback 요청 실패:", e)
+          fullContent = "응답을 받아오는 중 오류가 발생했습니다."
+          setChatMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantMessageId 
+                ? { ...msg, content: fullContent }
+                : msg
+            )
+          )
         }
       }
 
