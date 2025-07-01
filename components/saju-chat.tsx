@@ -2,12 +2,22 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Button } from "@/components/ui/button"
+import { Send, ChevronDown, User, ArrowLeft, Settings } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
+import SajuDiagram from "@/components/saju-diagram"
+import ReactMarkdown from "react-markdown"
+import CompatibilityTool from "@/components/compatibility-tool"
 import { compressSaju } from "@/lib/saju-compression"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Badge } from "@/components/ui/badge"
+import DaeunDiagram from "@/components/daeun-diagram"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import type { BirthInfo } from "@/types/birth-info"
+import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -30,7 +40,7 @@ const useHideHeaderAndFooter = () => {
         header.style.display = ""
       }
       if (footer) {
-        footer.style.display = ""
+      footer.style.display = ""
       }
       body.style.overflow = ""
     }
@@ -350,7 +360,7 @@ export default function SajuChat({
     }
   }, []) // 빈 의존성 배열
 
-  // Separate stableBirthInfo memoization to prevent object recreation
+  // birthInfo를 별도의 메모로 안정화
   const stableBirthInfo = useMemo(() => {
     if (!birthInfo) return null
     
@@ -377,11 +387,11 @@ export default function SajuChat({
     birthInfo?.lunarDay
   ])
 
-  // Simplified computedValues using stable birthInfo reference
+  // 계산된 값들을 메모화
   const computedValues = useMemo(() => {
     const userId = authUser?.id || null
     const actualIsLoggedIn = isAuthenticated || isLoggedIn
-    
+
     // 대운 계산
     let calculatedDaeun = null
     try {
@@ -447,11 +457,13 @@ export default function SajuChat({
     authUser?.id,
     isAuthenticated,
     isLoggedIn,
-    stableBirthInfo, // Use stable reference
+    stableBirthInfo, // 안정화된 birthInfo 참조 사용
+    // saju 주요 필드들
     saju?.yearStem,
     saju?.monthStem,
     saju?.monthBranch,
     saju?.dayMaster,
+    saju?.daeun,
     gender
   ])
 
@@ -582,7 +594,7 @@ export default function SajuChat({
     return () => {
       mounted = false
     }
-  }, [authInitialized]) // Only depend on authInitialized
+  }, [authInitialized]) // 인증 초기화 완료 시에만 실행
 
   // 메시지 저장 함수
   const saveMessagesToDatabase = useCallback(
@@ -891,7 +903,6 @@ export default function SajuChat({
           })
           .join("")
 
-        // Complete the compatibilityMessage string in handleCompatibilityAnalysis function:
         const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 궁합을 분석해주세요.
 
 ${mainPersonInfo}
@@ -900,15 +911,533 @@ ${selectedPeopleInfo}
 위 사주 정보를 바탕으로 다음 관점에서 궁합을 분석해주세요:
 
 1. 기본 궁합 구조 분석
+
 일주 궁합 (일간/일지 상호작용, 일간합·일지합·충·형 등)
+
 오행 상생·상극 구조 파악
+
 양쪽 명조의 균형 및 보완 여부
 
 2. 성향과 기질의 조화 여부
+
 각자의 성격, 감정 표현 방식, 관계 주도력
+
 대인관계 스타일(주도형/의존형/조율형 등)의 상호 보완 가능성
+
 일간 십성 비교를 통한 감정 흐름 분석
 
 3. 생활 궁합 (현실적 궁합)
+
 금전, 직업, 생활리듬 등 실생활 속 궁합 체크
-함께 지낼
+
+함께 지낼 때 충돌 요인/의사소통 패턴
+
+가치관/생활 습관의 일치 여부
+
+4. 인연의 지속성과 흐름
+
+궁합 구조가 일시적인 인연인지, 장기적인 흐름을 가지는지
+
+대운·세운에 따라 만남/이별 시기 흐름
+
+시기적 맞물림 또는 타이밍 불일치 여부
+
+5. 궁합 총평 및 조언
+
+긍정적인 시너지 포인트
+
+주의가 필요한 갈등 구조 및 현실 팁
+
+관계 지속을 위한 심리적/생활적 조언
+
+각 사람과의 궁합을 개별적으로 분석하고, 종합적인 조언도 부탁드립니다.`
+
+        setInput(compatibilityMessage)
+        setShowCompatibilityTool(false)
+
+        setTimeout(() => {
+          const form = document.querySelector("form")
+          if (form) {
+            form.requestSubmit()
+          }
+        }, 100)
+      } catch (error) {
+        console.error("궁합 분석 처리 중 오류:", error)
+        alert("궁합 분석 중 오류가 발생했습니다. 다시 시도해주세요.")
+      }
+    },
+    [setInput],
+  )
+
+  // 이벤트 리스너들
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
+
+  useEffect(() => {
+    const scrollContainer = chatContainerRef.current
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll)
+      return () => {
+        scrollContainer.removeEventListener("scroll", handleScroll)
+      }
+    }
+  }, [handleScroll])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [])
+
+  // 컴포넌트 정리
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  // 테마 및 헤더/푸터 숨김 처리
+  useHideHeaderAndFooter()
+  useForceDarkTheme()
+
+  // 로딩 상태
+  if (!isReady || !authInitialized) {
+    return (
+      <div className="flex h-screen bg-gray-900 text-white">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+            <p>채팅을 불러오는 중...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden h-screen supports-[height:100dvh]:h-[100dvh]">
+      {/* 헤더 */}
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 bg-white/10 backdrop-blur-md border-b border-white/20 safe-area-top">
+        <div className="flex items-center min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackWithSave}
+            className="mr-1 sm:mr-2 text-white/80 hover:text-white hover:bg-white/20 p-1.5 sm:p-2 rounded-lg flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+          </Button>
+        </div>
+
+        <div className="flex items-center min-w-0 flex-1 justify-center">
+          <div className="relative" ref={dropdownRef}>
+            <Button
+              variant="ghost"
+              className="flex items-center space-x-1 sm:space-x-2 text-white hover:text-white hover:bg-white/20 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg min-w-0"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <span className="text-base sm:text-lg flex-shrink-0">{currentCharacter.emoji}</span>
+              <span className="font-medium text-sm sm:text-base truncate">{currentCharacter.name}</span>
+              <ChevronDown
+                className={`h-3 w-3 sm:h-4 sm:w-4 transition-transform flex-shrink-0 ${isDropdownOpen ? "rotate-180" : ""}`}
+              />
+            </Button>
+
+            {isDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-[99998]" onClick={() => setIsDropdownOpen(false)} />
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-56 sm:w-64 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-xl z-[99999]">
+                  <div className="py-2">
+                    {pingCharacters.map((character) => (
+                      <button
+                        key={character.id}
+                        onClick={() => {
+                          router.push(
+                            `/saju-chat/${character.roomType}?name=${name}&gender=${gender}&solarYear=${stableBirthInfo?.solarYear}&solarMonth=${stableBirthInfo?.solarMonth}&solarDay=${stableBirthInfo?.solarDay}&solarHour=${stableBirthInfo?.solarHour}&solarMinute=${stableBirthInfo?.solarMinute}&timeUnknown=${stableBirthInfo?.timeUnknown}`,
+                          )
+                          setIsDropdownOpen(false)
+                        }}
+                        className={`w-full flex items-center space-x-3 p-2 sm:p-3 text-left hover:bg-white/20 transition-colors rounded-lg mx-2 ${
+                          character.roomType === roomType ? "bg-white/20" : ""
+                        }`}
+                      >
+                        <span className="text-base sm:text-lg flex-shrink-0">{character.emoji}</span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-white text-sm sm:text-base">{character.name}</p>
+                          <p className="text-xs text-white/70 truncate">{character.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+          {computedValues.actualIsLoggedIn ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/mypage")}
+              className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 sm:p-2 rounded-lg"
+              title="마이페이지"
+            >
+              <User className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/login")}
+              className="text-white border-white/30 hover:bg-white/20 hover:text-white hover:border-white/50 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm"
+            >
+              로그인
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* 메인 채팅 영역 */}
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto overscroll-behavior-y-contain"
+        onScroll={handleScroll}
+      >
+        <div className="pb-32 pt-4 sm:pt-6">
+          {/* 사주 다이어그램 */}
+          <div className="px-3 sm:px-4 mb-4 sm:mb-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
+                <SajuDiagram
+                  saju={saju}
+                  timeUnknown={stableBirthInfo?.timeUnknown}
+                  size="sm"
+                  name={name}
+                  gender={gender}
+                  solarYear={stableBirthInfo?.solarYear?.toString()}
+                  solarMonth={stableBirthInfo?.solarMonth?.toString()}
+                  solarDay={stableBirthInfo?.solarDay?.toString()}
+                  hour={stableBirthInfo?.solarHour?.toString()}
+                  minute={stableBirthInfo?.solarMinute?.toString()}
+                  lunarYear={stableBirthInfo?.lunarYear?.toString()}
+                  lunarMonth={stableBirthInfo?.lunarMonth?.toString()}
+                  lunarDay={stableBirthInfo?.lunarDay?.toString()}
+                  location="서울특별시"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 대운 다이어그램 */}
+          {computedValues.calculatedDaeun && (
+            <div className="px-3 sm:px-4 mb-4 sm:mb-6">
+              <div className="max-w-3xl mx-auto">
+                <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
+                  <DaeunDiagram
+                    daeun={convertDaeunData(computedValues.calculatedDaeun)}
+                    birthInfo={stableBirthInfo}
+                    name={name}
+                    gender={gender}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 메시지들 */}
+          {messages &&
+            messages.length > 0 &&
+            messages.map((message, index) => (
+              <div
+                key={message.id}
+                className={`px-3 sm:px-4 py-3 sm:py-4 ${message.role === "assistant" ? "bg-white/5" : ""} group relative`}
+              >
+                <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
+                  <div className="flex-shrink-0">
+                    {message.role === "assistant" ? (
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
+                        {currentCharacter.emoji}
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
+                        나
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 prose prose-invert max-w-none min-w-0">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => (
+                          <p className="text-white/90 leading-relaxed mb-2 sm:mb-3 last:mb-0 text-sm sm:text-base">
+                            {children}
+                          </p>
+                        ),
+                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                        em: ({ children }) => <em className="italic text-white/80">{children}</em>,
+                        ul: ({ children }) => (
+                          <ul className="list-disc list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
+                            {children}
+                          </ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal list-inside space-y-1 mb-2 sm:mb-3 text-white/90 text-sm sm:text-base">
+                            {children}
+                          </ol>
+                        ),
+                        li: ({ children }) => <li className="text-white/90 text-sm sm:text-base">{children}</li>,
+                        h1: ({ children }) => (
+                          <h1 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-white">{children}</h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2 text-white">{children}</h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-sm sm:text-base font-semibold mb-1 sm:mb-2 text-white">{children}</h3>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+
+                    {/* 메시지 피드백 버튼들 */}
+                    {message.role === "assistant" && (
+                      <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <MessageFeedbackButtons
+                          messageId={messageIds[message.id] || message.id}
+                          messageContent={message.content}
+                          sessionId={databaseSessionId || "anonymous"}
+                          onRetry={() => handleRetryMessage(message.id)}
+                          className="flex items-center space-x-1"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+          {/* 로딩 상태 */}
+          {isLoading && (
+            <div className="px-3 sm:px-4 py-3 sm:py-4 bg-white/5">
+              <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
+                    {currentCharacter.emoji}
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <div className="flex space-x-1">
+                    <div
+                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white/60 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 에러 상태 */}
+          {streamingError && (
+            <div className="px-3 sm:px-4 py-3 sm:py-4">
+              <div className="max-w-3xl mx-auto">
+                <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 sm:p-4">
+                  <p className="text-red-200 text-xs sm:text-sm mb-2 sm:mb-3">{streamingError}</p>
+                  <Button
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm"
+                  >
+                    {isRetrying ? "재시도 중..." : "다시 시도"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 하단 입력 영역 */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/95 to-transparent backdrop-blur-md safe-area-bottom">
+        {/* 추천 질문 */}
+        {suggestedQuestions.length > 0 && !isLoading && (
+          <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-white/10 max-h-[50px] sm:max-h-[60px] flex items-center">
+            <div className="max-w-3xl mx-auto w-full">
+              <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
+                {suggestedQuestions.slice(0, 6).map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSuggestedQuestionClick(question)}
+                    className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-2 sm:px-3 py-1 whitespace-nowrap flex-shrink-0 h-7 sm:h-8"
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 입력창 */}
+        <div className="px-3 sm:px-4 py-3 sm:py-4 pb-safe">
+          <div className="max-w-3xl mx-auto">
+            <form onSubmit={customHandleSubmit} className="relative">
+              <div className="flex items-center bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/20 focus-within:border-white/40">
+                <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
+                  <SheetTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ml-2 sm:ml-3 text-white/60 hover:text-white p-1.5 sm:p-2 relative flex-shrink-0"
+                      onClick={() => {
+                        setShowToolsDrawer(true)
+                        setHasSeenToolsNotification(true)
+                      }}
+                    >
+                      <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      {!hasSeenToolsNotification && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-0.5 -right-0.5 h-3 w-6 sm:h-4 sm:w-8 text-xs px-1 bg-red-500 text-white animate-pulse"
+                        >
+                          new
+                        </Badge>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="bg-slate-900/90 border-white/20 backdrop-blur-md">
+                    <div className="py-4">
+                      <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Tools</h3>
+                      <div className="space-y-3">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-white hover:bg-white/20 p-3 sm:p-4 rounded-lg relative"
+                          onClick={() => {
+                            setShowCompatibilityTool(true)
+                            setShowToolsDrawer(false)
+                          }}
+                        >
+                          <span className="mr-2 sm:mr-3">💕</span>
+                          궁합 보기
+                          {!hasSeenToolsNotification && (
+                            <Badge
+                              variant="destructive"
+                              className="ml-auto h-4 w-8 sm:h-5 sm:w-10 text-xs bg-red-500 text-white animate-pulse"
+                            >
+                              new
+                            </Badge>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Ask anything"
+                  className="flex-1 bg-transparent border-none px-3 sm:px-4 py-2.5 sm:py-3 text-white placeholder-white/50 focus:outline-none text-sm sm:text-base min-w-0"
+                  disabled={isLoading || isSubmitting}
+                />
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !input.trim() || isSubmitting}
+                  className="mr-2 sm:mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-1.5 sm:p-2 flex-shrink-0"
+                >
+                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* 스크롤 하단 버튼 */}
+      {showScrollToBottom && (
+        <Button
+          onClick={scrollToBottomSmooth}
+          className="fixed bottom-20 sm:bottom-24 right-3 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/20 hover:bg-white/30 text-white z-10"
+          size="sm"
+        >
+          <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+        </Button>
+      )}
+
+      {/* 궁합 분석 도구 모달 */}
+      {showCompatibilityTool && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-white">궁합 분석 도구</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCompatibilityTool(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </Button>
+              </div>
+              <CompatibilityTool
+                currentUserSaju={{
+                  name,
+                  gender,
+                  saju,
+                  birthInfo: stableBirthInfo,
+                }}
+                onAnalyze={handleCompatibilityAnalysis}
+                onClose={() => setShowCompatibilityTool(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 로그인 프롬프트 다이얼로그 */}
+      <LoginPromptDialog
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        message={loginPromptMessage}
+        onLogin={() => {
+          setShowLoginPrompt(false)
+          router.push("/login")
+        }}
+      />
+    </div>
+  )
+}
