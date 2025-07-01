@@ -458,13 +458,8 @@ export default function SajuChat({
     isAuthenticated,
     isLoggedIn,
     stableBirthInfo, // 안정화된 birthInfo 참조 사용
-    // saju 주요 필드들
-    saju?.yearStem,
-    saju?.monthStem,
-    saju?.monthBranch,
-    saju?.dayMaster,
-    saju?.daeun,
-    gender
+    gender,
+    saju // saju 객체 참조 - React가 참조 동등성 체크
   ])
 
   // 초기 메시지를 메모화
@@ -472,10 +467,8 @@ export default function SajuChat({
     return createInitialMessages(name, roomType, stableBirthInfo)
   }, [name, roomType, stableBirthInfo])
 
-  // 최종 메시지 배열
-  const finalInitialMessages = useMemo(() => {
-    return dbMessages.length > 0 ? dbMessages : initialMessages
-  }, [dbMessages, initialMessages])
+  // 최종 메시지 배열 - dbMessages가 로드되면 사용, 아니면 초기 메시지 사용
+  const finalInitialMessages = dbMessages.length > 0 ? dbMessages : initialMessages
 
   // AI Chat body를 메모화
   const aiChatBody = useMemo(() => ({
@@ -520,12 +513,16 @@ export default function SajuChat({
           }
         }
 
-        if (!sessionId && computedValues.actualIsLoggedIn && computedValues.userId) {
+        // computedValues 대신 직접 값 사용
+        const userId = authUser?.id
+        const actualIsLoggedIn = isAuthenticated || isLoggedIn
+        
+        if (!sessionId && actualIsLoggedIn && userId) {
           try {
             const { data: sessions, error } = await supabaseRef.current
               .from("saju_sessions")
               .select("id, name, created_at")
-              .eq("auth_user_id", computedValues.userId)
+              .eq("auth_user_id", userId)
               .eq("name", name)
               .order("created_at", { ascending: false })
               .limit(1)
@@ -594,7 +591,7 @@ export default function SajuChat({
     return () => {
       mounted = false
     }
-  }, [authInitialized]) // 인증 초기화 완료 시에만 실행
+  }, [authInitialized, authUser?.id, isAuthenticated, isLoggedIn, name]) // 필요한 의존성 추가
 
   // 메시지 저장 함수
   const saveMessagesToDatabase = useCallback(
@@ -666,7 +663,7 @@ export default function SajuChat({
     setStreamingError(null)
   }, [])
 
-  // useAIChat 초기화
+  // useAIChat 초기화 - initialMessages는 처음 한 번만 설정됨
   const {
     messages,
     input,
@@ -677,14 +674,21 @@ export default function SajuChat({
     error,
     reload,
     append,
+    setMessages,
   } = useAIChat({
     api: "/api/saju-chat",
-    initialMessages: isReady ? finalInitialMessages : [],
     body: aiChatBody,
     onFinish: onFinishHandler,
     onError: onErrorHandler,
     onResponse: onResponseHandler,
   })
+
+  // DB 메시지가 로드되면 채팅 메시지 업데이트
+  useEffect(() => {
+    if (dbMessages.length > 0 && messages.length === 0) {
+      setMessages(dbMessages)
+    }
+  }, [dbMessages, messages.length, setMessages])
 
   // 스크롤 처리
   useEffect(() => {
@@ -710,16 +714,19 @@ export default function SajuChat({
     setIsSubmitting(true)
 
     try {
-      const newQuestionCount = questionCount + 1
-      setQuestionCount(newQuestionCount)
+      setQuestionCount(prev => {
+        const newCount = prev + 1
 
-      const shouldShowLoginPrompt = newQuestionCount >= 5 && !computedValues.actualIsLoggedIn && !hasShownLoginPrompt
+        const shouldShowLoginPrompt = newCount >= 5 && !computedValues.actualIsLoggedIn && !hasShownLoginPrompt
 
-      if (shouldShowLoginPrompt) {
-        setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-        setShowLoginPrompt(true)
-        setHasShownLoginPrompt(true)
-      }
+        if (shouldShowLoginPrompt) {
+          setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+          setShowLoginPrompt(true)
+          setHasShownLoginPrompt(true)
+        }
+        
+        return newCount
+      })
 
       setStreamingError(null)
       setRetryCount(0)
@@ -749,7 +756,6 @@ export default function SajuChat({
     input,
     isSubmitting,
     isLoading,
-    questionCount,
     computedValues.actualIsLoggedIn,
     hasShownLoginPrompt,
     databaseSessionId,
@@ -1017,7 +1023,7 @@ ${selectedPeopleInfo}
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
-  // 로딩 상태
+  // 로딩 상태 - 컴포넌트가 완전히 초기화될 때까지 로딩 표시
   if (!isReady || !authInitialized) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
