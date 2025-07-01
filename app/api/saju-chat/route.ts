@@ -336,6 +336,7 @@ ${sajuInfo}${compatibilityInfo}
     const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
     try {
+      // 스트리밍 대신 단순한 텍스트 생성으로 변경
       const result = await streamText({
         messages: apiMessages,
         model: openai("gpt-4.1"),
@@ -344,21 +345,27 @@ ${sajuInfo}${compatibilityInfo}
         topP: 1.0,
       })
       
-      return result.toDataStreamResponse()
+      // 전체 텍스트를 수집
+      let fullText = ""
+      for await (const chunk of result.textStream) {
+        fullText += chunk
+      }
+      
+      // 단순한 텍스트 응답 반환
+      return new Response(fullText, {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      })
     } catch (streamError) {
       if (shouldLog("ERROR")) {
         console.error("StreamText error")
       }
 
       return new Response(
-        JSON.stringify({
-          id: "error-message",
-          role: "assistant",
-          content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        }),
+        "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
         {
           status: 200,
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
         },
       )
     }
@@ -368,14 +375,10 @@ ${sajuInfo}${compatibilityInfo}
     }
 
     return new Response(
-      JSON.stringify({
-        id: "error-message",
-        role: "assistant",
-        content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-      }),
+      "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
       },
     )
   }
