@@ -891,6 +891,7 @@ export default function SajuChat({
           })
           .join("")
 
+        // Complete the compatibilityMessage string in handleCompatibilityAnalysis function:
         const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 궁합을 분석해주세요.
 
 ${mainPersonInfo}
@@ -899,25 +900,15 @@ ${selectedPeopleInfo}
 위 사주 정보를 바탕으로 다음 관점에서 궁합을 분석해주세요:
 
 1. 기본 궁합 구조 분석
-
 일주 궁합 (일간/일지 상호작용, 일간합·일지합·충·형 등)
-
 오행 상생·상극 구조 파악
-
 양쪽 명조의 균형 및 보완 여부
 
 2. 성향과 기질의 조화 여부
-
 각자의 성격, 감정 표현 방식, 관계 주도력
-
 대인관계 스타일(주도형/의존형/조율형 등)의 상호 보완 가능성
-
 일간 십성 비교를 통한 감정 흐름 분석
 
 3. 생활 궁합 (현실적 궁합)
-
 금전, 직업, 생활리듬 등 실생활 속 궁합 체크
-
-함께 지낼 때 충돌 요인/의사소통 패턴
-
-가치관/생활 습관의 일치
+함께 지낼
