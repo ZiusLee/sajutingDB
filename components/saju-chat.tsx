@@ -467,27 +467,30 @@ export default function SajuChat({
     return createInitialMessages(name, roomType, stableBirthInfo)
   }, [name, roomType, stableBirthInfo])
 
-  // 최종 메시지 배열 - dbMessages가 로드되면 사용, 아니면 초기 메시지 사용
-  const finalInitialMessages = dbMessages.length > 0 ? dbMessages : initialMessages
+  // 빈 배열로 시작 - useAIChat이 안정적으로 초기화되도록
+  const finalInitialMessages: any[] = []
 
-  // AI Chat body를 메모화
-  const aiChatBody = useMemo(() => ({
-    compressedSaju: computedValues.compressedSaju,
-    name,
-    gender,
-    initialInterpretation,
-    roomType,
-    userId: computedValues.userId,
-    currentYear: 2025,
-    yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-    birthInfo: stableBirthInfo,
-  }), [
+  // AI Chat body를 메모화 - 안정적인 참조 유지
+  const aiChatBody = useMemo(() => {
+    const body = {
+      compressedSaju: computedValues.compressedSaju,
+      name,
+      gender,
+      initialInterpretation,
+      roomType,
+      userId: computedValues.userId,
+      currentYear: 2025,
+      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+      birthInfo: stableBirthInfo,
+    }
+    return body
+  }, [
     computedValues.compressedSaju,
+    computedValues.userId,
     name,
     gender,
     initialInterpretation,
     roomType,
-    computedValues.userId,
     stableBirthInfo
   ])
 
@@ -496,6 +499,7 @@ export default function SajuChat({
     if (!authInitialized || initRef.current) return
     
     let mounted = true
+    let timeoutId: NodeJS.Timeout
     initRef.current = true
 
     const initializeChat = async () => {
@@ -590,6 +594,9 @@ export default function SajuChat({
 
     return () => {
       mounted = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
     }
   }, [authInitialized, authUser?.id, isAuthenticated, isLoggedIn, name]) // 필요한 의존성 추가
 
@@ -663,7 +670,7 @@ export default function SajuChat({
     setStreamingError(null)
   }, [])
 
-  // useAIChat 초기화 - initialMessages는 처음 한 번만 설정됨
+  // useAIChat 초기화 - body는 고정된 값만 사용
   const {
     messages,
     input,
@@ -674,34 +681,45 @@ export default function SajuChat({
     error,
     reload,
     append,
-    setMessages,
   } = useAIChat({
     api: "/api/saju-chat",
-    body: aiChatBody,
+    initialMessages: finalInitialMessages,
+    body: {
+      roomType,
+      name,
+      gender,
+      currentYear: 2025,
+      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+    },
     onFinish: onFinishHandler,
     onError: onErrorHandler,
     onResponse: onResponseHandler,
   })
 
-  // DB 메시지가 로드되면 채팅 메시지 업데이트
-  useEffect(() => {
-    if (dbMessages.length > 0 && messages.length === 0) {
-      setMessages(dbMessages)
+  // 실제 표시할 메시지 결정
+  const displayMessages = useMemo(() => {
+    if (dbMessages.length > 0) {
+      return dbMessages
     }
-  }, [dbMessages, messages.length, setMessages])
+    if (messages.length > 0) {
+      return messages
+    }
+    // 아무 메시지도 없으면 초기 메시지 표시
+    return initialMessages
+  }, [dbMessages, messages, initialMessages])
 
   // 스크롤 처리
   useEffect(() => {
     const scrollContainer = chatContainerRef.current
-    if (scrollContainer && messages.length > lastMessageLength.current) {
+    if (scrollContainer && displayMessages.length > lastMessageLength.current) {
       const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
-      lastMessageLength.current = messages.length
+      lastMessageLength.current = displayMessages.length
 
       if (isNearBottom) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
     }
-  }, [messages.length])
+  }, [displayMessages.length])
 
   // 이벤트 핸들러들
   const customHandleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
@@ -844,9 +862,9 @@ export default function SajuChat({
 
   const handleRetryMessage = useCallback(
     (messageId: string) => {
-      const messageIndex = messages.findIndex((msg) => msg.id === messageId)
+      const messageIndex = displayMessages.findIndex((msg) => msg.id === messageId)
       if (messageIndex > 0) {
-        const previousUserMessage = messages[messageIndex - 1]
+        const previousUserMessage = displayMessages[messageIndex - 1]
         if (previousUserMessage && previousUserMessage.role === "user") {
           setInput(previousUserMessage.content)
           setTimeout(() => {
@@ -858,7 +876,7 @@ export default function SajuChat({
         }
       }
     },
-    [messages, setInput],
+    [displayMessages, setInput],
   )
 
   const handleCompatibilityAnalysis = useCallback(
@@ -1170,9 +1188,9 @@ ${selectedPeopleInfo}
           )}
 
           {/* 메시지들 */}
-          {messages &&
-            messages.length > 0 &&
-            messages.map((message, index) => (
+          {displayMessages &&
+            displayMessages.length > 0 &&
+            displayMessages.map((message, index) => (
               <div
                 key={message.id}
                 className={`px-3 sm:px-4 py-3 sm:py-4 ${message.role === "assistant" ? "bg-white/5" : ""} group relative`}
