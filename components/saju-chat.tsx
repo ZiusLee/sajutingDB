@@ -651,18 +651,21 @@ export default function SajuChat({
   const [chatLoading, setChatLoading] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
 
-  // 초기 메시지 설정
+  // 초기 메시지 설정 (한 번만 실행)
+  const [messagesInitialized, setMessagesInitialized] = useState(false)
+  
   useEffect(() => {
-    if (chatMessages.length === 0) {
+    if (!messagesInitialized) {
       if (dbMessages.length > 0) {
         setChatMessages(dbMessages)
       } else {
         setChatMessages(initialMessages)
       }
+      setMessagesInitialized(true)
     }
-  }, [dbMessages, initialMessages, chatMessages.length])
+  }, [dbMessages, initialMessages, messagesInitialized])
 
-  // 스트리밍 지원 메시지 전송 함수
+  // 안정화된 스트리밍 메시지 전송 함수
   const sendMessage = useCallback(async (messageContent: string) => {
     if (!messageContent.trim() || chatLoading) return
 
@@ -675,8 +678,12 @@ export default function SajuChat({
       content: messageContent.trim()
     }
 
+    // 현재 메시지 리스트를 캡처 (무한루프 방지)
+    const currentMessages = chatMessages
+    const messagesWithUser = [...currentMessages, userMessage]
+
     // 사용자 메시지 즉시 추가
-    setChatMessages(prev => [...prev, userMessage])
+    setChatMessages(messagesWithUser)
 
     // 스트리밍을 위한 빈 어시스턴트 메시지 추가
     const assistantMessageId = `assistant-${Date.now()}`
@@ -686,7 +693,8 @@ export default function SajuChat({
       content: ""
     }
     
-    setChatMessages(prev => [...prev, assistantMessage])
+    const messagesWithAssistant = [...messagesWithUser, assistantMessage]
+    setChatMessages(messagesWithAssistant)
 
     try {
       // API 호출 (스트리밍)
@@ -696,20 +704,16 @@ export default function SajuChat({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: [...chatMessages, userMessage],
+          messages: messagesWithUser, // 캡처된 메시지 사용
           ...aiChatBody
         })
       })
 
       if (!response.ok) {
-        throw new Error("API 요청 실패")
+        throw new Error(`API 요청 실패: ${response.status}`)
       }
 
-      // 응답 타입 확인
-      console.log("Response headers:", response.headers.get('content-type'))
-      console.log("Response body exists:", !!response.body)
-
-      // 스트림 읽기 - 더 안전한 파싱
+      // AI SDK DataStream 파싱 (toDataStreamResponse 사용시)
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let fullContent = ""
@@ -723,54 +727,37 @@ export default function SajuChat({
 
             const chunk = decoder.decode(value, { stream: true })
             buffer += chunk
-            console.log("받은 청크:", chunk)
             
-            // 완전한 라인들만 처리
+            // AI SDK DataStream 포맷 파싱
             const lines = buffer.split('\n')
-            buffer = lines.pop() || "" // 마지막 불완전한 라인은 버퍼에 보관
+            buffer = lines.pop() || ""
             
             for (const line of lines) {
-              if (line.trim()) {
-                try {
-                  // AI SDK 스트림 포맷 처리
-                  if (line.startsWith('0:')) {
-                    const data = JSON.parse(line.slice(2))
-                    if (data.type === 'text') {
-                      fullContent += data.value
-                    }
-                  } else if (line.startsWith('data: ')) {
-                    // OpenAI 스타일 스트림
-                    const jsonStr = line.slice(6)
-                    if (jsonStr !== '[DONE]') {
-                      const data = JSON.parse(jsonStr)
-                      if (data.choices?.[0]?.delta?.content) {
-                        fullContent += data.choices[0].delta.content
+              if (!line.trim()) continue
+              
+              try {
+                // AI SDK 표준 포맷: "0:{json}"
+                if (line.startsWith('0:')) {
+                  const data = JSON.parse(line.slice(2))
+                  if (data.type === 'text') {
+                    fullContent += data.value
+                    
+                    // 실시간으로 메시지 업데이트 (무한루프 방지)
+                    setChatMessages(prevMessages => {
+                      const lastMessage = prevMessages[prevMessages.length - 1]
+                      if (lastMessage?.id === assistantMessageId) {
+                        return [
+                          ...prevMessages.slice(0, -1),
+                          { ...lastMessage, content: fullContent }
+                        ]
                       }
-                    }
-                  } else {
-                    // 일반 텍스트로 처리
-                    try {
-                      const data = JSON.parse(line)
-                      if (data.content) {
-                        fullContent = data.content
-                      }
-                    } catch {
-                      // JSON이 아니면 직접 텍스트로 추가
-                      fullContent += line
-                    }
+                      return prevMessages
+                    })
                   }
-                  
-                  // 실시간으로 메시지 업데이트
-                  setChatMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === assistantMessageId 
-                        ? { ...msg, content: fullContent }
-                        : msg
-                    )
-                  )
-                } catch (e) {
-                  console.log("파싱 에러:", e, "라인:", line)
                 }
+              } catch (e) {
+                // 파싱 에러 무시하고 계속 진행
+                console.warn("Stream parsing error:", e)
               }
             }
           }
@@ -779,74 +766,55 @@ export default function SajuChat({
         }
       }
 
-      // 스트림에서 내용을 못 가져온 경우 전체 응답 읽기
+      // 스트림에서 내용을 못 가져온 경우 폴백
       if (!fullContent) {
-        console.log("스트림에서 내용을 가져오지 못함, 전체 응답 읽기 시도")
-        try {
-          // response가 이미 읽혔을 수 있으므로 새로 요청
-          const fallbackResponse = await fetch("/api/saju-chat", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              messages: [...chatMessages, userMessage],
-              ...aiChatBody
-            })
-          })
-          
-          const responseText = await fallbackResponse.text()
-          console.log("Fallback 응답:", responseText)
-          fullContent = responseText
-          
-          // 실시간으로 메시지 업데이트
-          setChatMessages(prev => 
-            prev.map(msg => 
-              msg.id === assistantMessageId 
-                ? { ...msg, content: fullContent }
-                : msg
-            )
-          )
-        } catch (e) {
-          console.error("Fallback 요청 실패:", e)
-          fullContent = "응답을 받아오는 중 오류가 발생했습니다."
-          setChatMessages(prev => 
-            prev.map(msg => 
-              msg.id === assistantMessageId 
-                ? { ...msg, content: fullContent }
-                : msg
-            )
-          )
-        }
-      }
-
-      // 최종 메시지로 업데이트
-      const finalAssistantMessage = {
-        id: assistantMessageId,
-        role: "assistant" as const,
-        content: fullContent
-      }
-
-      // DB 저장
-      if (databaseSessionId && fullContent) {
-        setTimeout(async () => {
-          try {
-            await saveMessagesToDatabase([userMessage, finalAssistantMessage], databaseSessionId)
-          } catch (error) {
-            console.error("DB 저장 오류:", error)
+        console.warn("스트림에서 내용을 가져오지 못함")
+        setChatMessages(prevMessages => {
+          const lastMessage = prevMessages[prevMessages.length - 1]
+          if (lastMessage?.id === assistantMessageId) {
+            return [
+              ...prevMessages.slice(0, -1),
+              { ...lastMessage, content: "응답을 받아오는 중 오류가 발생했습니다. 다시 시도해주세요." }
+            ]
           }
-        }, 0)
+          return prevMessages
+        })
+      }
+
+      // 메시지 저장
+      if (databaseSessionId && fullContent) {
+        await saveMessagesToDatabase(
+          [userMessage, { ...assistantMessage, content: fullContent }],
+          databaseSessionId
+        )
       }
 
     } catch (error) {
       console.error("메시지 전송 오류:", error)
       setChatError("메시지 전송 중 오류가 발생했습니다.")
-      // 실패한 경우 사용자 메시지와 빈 어시스턴트 메시지 제거
-      setChatMessages(prev => prev.slice(0, -2))
+      
+      // 에러 메시지로 대체
+      setChatMessages(prevMessages => {
+        const lastMessage = prevMessages[prevMessages.length - 1]
+        if (lastMessage?.id === assistantMessageId) {
+          return [
+            ...prevMessages.slice(0, -1),
+            { ...lastMessage, content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다." }
+          ]
+        }
+        return prevMessages
+      })
+    } finally {
+      setChatLoading(false)
     }
+  }, [chatLoading, aiChatBody, databaseSessionId, saveMessagesToDatabase]) // chatMessages 의존성 제거
 
-    setChatLoading(false)
-  }, [chatMessages, chatLoading, aiChatBody, databaseSessionId, saveMessagesToDatabase])
+  // 스트리밍 중 자동 스크롤
+  useEffect(() => {
+    if (chatLoading) {
+      scrollToBottomSmooth()
+    }
+  }, [chatMessages, chatLoading, scrollToBottomSmooth])
 
   // 입력 변경 핸들러
   const handleChatInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

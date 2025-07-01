@@ -88,7 +88,7 @@ function getModelForRoomType(roomType) {
   }
 }
 
-// 🚀 성능 최적화: 간소화된 메시지 최적화 함수 - 요약 기능 비활성화
+// 🚀 성능 최적화: 간소화된 메시지 최적화 함수
 async function processMessagesForContext(messages, compressedSaju, name, roomType) {
   const MAX_RECENT = 12 // 최근 12개 메시지만 유지
 
@@ -97,38 +97,94 @@ async function processMessagesForContext(messages, compressedSaju, name, roomTyp
     return messages
   }
 
-  // 초기 2개 + 최근 8개 유지 (요약 없이)
+  // 초기 2개 + 최근 8개 유지
   const initialMessages = messages.slice(0, 2)
   const recentMessages = messages.slice(-8)
+  const middleMessages = messages.slice(2, -8)
 
-  // 요약 기능을 완전히 비활성화하여 SWR 무한루프 방지
-  return [
-    ...initialMessages,
-    {
-      role: "system",
-      content: `📚 이전 대화가 있었습니다. 연속성을 유지하여 대화해주세요.`,
-    },
-    ...recentMessages,
-  ]
+  // 🚀 성능 최적화: 간단한 요약만 생성 (무한 루프 방지)
+  if (middleMessages.length > 0) {
+    try {
+      const summaryText = await createSimpleSummary(middleMessages, roomType)
+      return [
+        ...initialMessages,
+        {
+          role: "system",
+          content: `📚 이전 대화 요약: ${summaryText}`,
+        },
+        ...recentMessages,
+      ]
+    } catch (error) {
+      console.error("요약 생성 실패:", error)
+      // 요약 실패 시 기본 메시지로 대체
+      return [
+        ...initialMessages,
+        {
+          role: "system",
+          content: `📚 이전 대화 요약: 이전에 ${roomType} 상담이 있었습니다.`,
+        },
+        ...recentMessages,
+      ]
+    }
+  }
+
+  return [...initialMessages, ...recentMessages]
 }
 
-// 요약 함수 비활성화 - SWR 무한루프 방지를 위해 완전히 제거
-// async function createSimpleSummary는 더이상 사용하지 않음
+// 🚀 수정된 요약 함수 - 무한 루프 방지
+async function createSimpleSummary(messages, roomType) {
+  try {
+    const recentContent = messages
+      .slice(-3) // 최근 3개만 요약
+      .map((msg) => `${msg.role === "user" ? "사용자" : "AI"}: ${msg.content.slice(0, 100)}`) // 100자 제한
+      .join(" / ")
+
+    const summaryPrompt = `다음 ${roomType} 상담을 30자 이내로 요약: ${recentContent}`
+
+    // 🔧 무한 루프 방지: 타임아웃 설정
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Summary timeout")), 10000) // 10초 타임아웃
+    })
+
+    const summaryPromise = async () => {
+      const summary = await streamText({
+        model: openai("gpt-4o-mini"),
+        prompt: summaryPrompt,
+        maxTokens: 50,
+      })
+
+      let summaryText = ""
+      let chunkCount = 0
+      const MAX_CHUNKS = 20 // 최대 청크 수 제한
+
+      // 🔧 무한 루프 방지: 청크 수 제한과 타임아웃
+      for await (const chunk of summary.textStream) {
+        summaryText += chunk
+        chunkCount++
+        
+        // 최대 청크 수 또는 길이 제한에 도달하면 종료
+        if (chunkCount >= MAX_CHUNKS || summaryText.length > 100) {
+          break
+        }
+      }
+
+      return summaryText.trim() || "이전 대화 내용"
+    }
+
+    // 타임아웃과 함께 요약 실행
+    const result = await Promise.race([summaryPromise(), timeoutPromise])
+    return result
+
+  } catch (error) {
+    console.error("요약 생성 오류:", error)
+    return "이전 대화 내용"
+  }
+}
 
 export async function POST(req) {
   try {
-    // 요청 데이터 안전하게 파싱
-    const body = await req.json()
-    const { 
-      messages = [], 
-      compressedSaju = {}, 
-      name = "", 
-      gender = "", 
-      initialInterpretation = "", 
-      roomType = "sajuping", 
-      userId = null, 
-      compatibilityData = null 
-    } = body
+    const { messages, compressedSaju, name, gender, initialInterpretation, roomType, userId, compatibilityData } =
+      await req.json()
 
     const dateInfo = getCurrentDateInfo()
 
@@ -336,7 +392,6 @@ ${sajuInfo}${compatibilityInfo}
     const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
     try {
-      // 스트리밍 응답 복구 - 안전한 방식으로
       const result = await streamText({
         messages: apiMessages,
         model: openai("gpt-4.1"),
@@ -345,14 +400,12 @@ ${sajuInfo}${compatibilityInfo}
         topP: 1.0,
       })
       
-      // 스트림 응답을 그대로 반환 (ai 라이브러리의 안전한 방식)
       return result.toDataStreamResponse()
     } catch (streamError) {
       if (shouldLog("ERROR")) {
         console.error("StreamText error")
       }
 
-      // 에러 발생 시에도 스트림 형태로 응답
       return new Response(
         JSON.stringify({
           id: "error-message",
@@ -373,7 +426,7 @@ ${sajuInfo}${compatibilityInfo}
     return new Response(
       JSON.stringify({
         id: "error-message",
-        role: "assistant", 
+        role: "assistant",
         content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
       }),
       {
