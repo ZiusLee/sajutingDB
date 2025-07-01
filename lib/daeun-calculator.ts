@@ -12,14 +12,19 @@ const YANG_STEMS = ["甲", "丙", "戊", "庚", "壬", "갑", "병", "무", "경
 // 음년 천간 목록 (한자 및 한글)
 const YIN_STEMS = ["乙", "丁", "己", "辛", "癸", "을", "정", "기", "신", "계"]
 
-// Helper to parse EXACT_SOLAR_TERMS timestamps
-const getParsedSolarTerms = () => {
-  return EXACT_SOLAR_TERMS.map((term) => ({
-    ...term,
-    dateTime: new Date(term.timestamp.replace(/-/g, "/")), // Ensure cross-browser compatibility for parsing
-  })).sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
+// 입절 12개 (立春·驚蟄·清明·立夏·芒種·小暑·立秋·白露·寒露·立冬·大雪·小寒)
+const IPJEOL_TERMS = ["입춘", "경칩", "청명", "입하", "망종", "소서", "입추", "백로", "한로", "입동", "대설", "소한"]
+
+// Helper to parse EXACT_SOLAR_TERMS timestamps and filter only Ipjeol terms
+const getParsedIpjeolTerms = () => {
+  return EXACT_SOLAR_TERMS.filter((term) => IPJEOL_TERMS.includes(term.solarTerm)) // 입절만 필터링
+    .map((term) => ({
+      ...term,
+      dateTime: new Date(term.timestamp.replace(/-/g, "/")), // Ensure cross-browser compatibility for parsing
+    }))
+    .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
 }
-const PARSED_SOLAR_TERMS = getParsedSolarTerms()
+const PARSED_IPJEOL_TERMS = getParsedIpjeolTerms()
 
 // 1. 대운 방향 결정 함수
 export function getDaeunDirection(yearStem: string, gender: string): "forward" | "reverse" {
@@ -44,13 +49,14 @@ export function getDaeunDirection(yearStem: string, gender: string): "forward" |
   return direction
 }
 
-// 2. 관련 절기 찾기 함수 (정밀 데이터 사용)
-function findRelevantSolarTerm(
+// 2. 관련 입절 찾기 함수 (입절 12개만 사용)
+function findRelevantIpjeolTerm(
   birthDateTime: Date,
   direction: "forward" | "reverse",
 ): { name: string; dateTime: Date; year: number; month: number; day: number } | null {
   if (direction === "forward") {
-    for (const term of PARSED_SOLAR_TERMS) {
+    // 순행: 출생 이후 첫 입절
+    for (const term of PARSED_IPJEOL_TERMS) {
       if (term.dateTime.getTime() > birthDateTime.getTime()) {
         return {
           name: term.solarTerm,
@@ -62,8 +68,9 @@ function findRelevantSolarTerm(
       }
     }
   } else {
-    for (let i = PARSED_SOLAR_TERMS.length - 1; i >= 0; i--) {
-      const term = PARSED_SOLAR_TERMS[i]
+    // 역행: 출생 이전 마지막 입절
+    for (let i = PARSED_IPJEOL_TERMS.length - 1; i >= 0; i--) {
+      const term = PARSED_IPJEOL_TERMS[i]
       if (term.dateTime.getTime() < birthDateTime.getTime()) {
         return {
           name: term.solarTerm,
@@ -89,7 +96,7 @@ function calculateDaysToTerm(birthDateTime: Date, termDateTime: Date): number {
   return days
 }
 
-// 3. 대운수 계산 함수
+// 3. 대운수 계산 함수 (입절 기준)
 function calculateDaeunStartingAge(
   birthYear: number,
   birthMonth: number,
@@ -103,28 +110,25 @@ function calculateDaeunStartingAge(
   const actualBirthMinute = timeUnknown ? 0 : birthMinute
   const birthDateTime = new Date(birthYear, birthMonth - 1, birthDay, actualBirthHour, actualBirthMinute)
 
-  const relevantTerm = findRelevantSolarTerm(birthDateTime, direction)
+  const relevantTerm = findRelevantIpjeolTerm(birthDateTime, direction)
   if (!relevantTerm) {
-    console.error("Could not find relevant solar term for Daeun calculation.")
+    console.error("Could not find relevant ipjeol term for Daeun calculation.")
     return 1
   }
 
   // 시간까지 정확히 계산
   const D = calculateDaysToTerm(birthDateTime, relevantTerm.dateTime)
 
-  console.log(`대운 계산 디버그 - 출생: ${birthDateTime}, 절기: ${relevantTerm.dateTime}, 일수차이: ${D}`)
+  console.log(`입절 기준 대운 계산 - 출생: ${birthDateTime}, 입절: ${relevantTerm.dateTime}, 일수차이: ${D}`)
 
+  // 입절 기준 계산: days를 3으로 나누어 몫과 나머지 계산
   const q = Math.floor(D / 3)
   const r = Math.floor(D) % 3
+
+  // 나머지가 2면 반올림 (q += 1)
   let age = r === 2 ? q + 1 : q
 
-  console.log(`대운 계산 - q: ${q}, r: ${r}, 초기 age: ${age}`)
-
-  // 0이 나오면 10세로 설정 (0과 10이 같음)
-  if (age === 0) {
-    age = 10
-    console.log("대운세수 0 → 10으로 보정")
-  }
+  console.log(`입절 기준 대운 계산 - D: ${D}, q: ${q}, r: ${r}, 초기 age: ${age}`)
 
   // 1~10 범위로 제한
   age = Math.max(1, Math.min(10, age))
