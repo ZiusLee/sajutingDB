@@ -7,7 +7,7 @@ import { useRouter } from "@/next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Send, ChevronDown, User, ArrowLeft, Settings } from "lucide-react"
-import { useChat as useAIChat } from "ai/react"
+// useAIChat 제거 - 직접 구현으로 변경
 import SajuDiagram from "@/components/saju-diagram"
 import ReactMarkdown from "react-markdown"
 import CompatibilityTool from "@/components/compatibility-tool"
@@ -645,94 +645,104 @@ export default function SajuChat({
     [roomType, name, gender, saju, stableBirthInfo],
   )
 
-  // useAIChat 핸들러들 - 의존성 최소화
-  const onFinishHandler = useCallback(async (message: any) => {
+  // 직접 구현한 채팅 상태 관리
+  const [chatMessages, setChatMessages] = useState<any[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatError, setChatError] = useState<string | null>(null)
+
+  // 초기 메시지 설정
+  useEffect(() => {
+    if (chatMessages.length === 0) {
+      if (dbMessages.length > 0) {
+        setChatMessages(dbMessages)
+      } else {
+        setChatMessages(initialMessages)
+      }
+    }
+  }, [dbMessages, initialMessages, chatMessages.length])
+
+  // 직접 구현한 메시지 전송 함수
+  const sendMessage = useCallback(async (messageContent: string) => {
+    if (!messageContent.trim() || chatLoading) return
+
+    setChatLoading(true)
+    setChatError(null)
+
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      role: "user" as const,
+      content: messageContent.trim()
+    }
+
+    // 사용자 메시지 즉시 추가
+    setChatMessages(prev => [...prev, userMessage])
+
     try {
-      // DB 저장은 비동기로 처리하여 블로킹 방지
+      // API 호출
+      const response = await fetch("/api/saju-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [...chatMessages, userMessage],
+          ...aiChatBody
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error("API 요청 실패")
+      }
+
+      const responseText = await response.text()
+      
+      const assistantMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant" as const,
+        content: responseText
+      }
+
+      setChatMessages(prev => [...prev, assistantMessage])
+
+      // DB 저장
       if (databaseSessionId) {
         setTimeout(async () => {
           try {
-            await saveMessagesToDatabase([message], databaseSessionId)
+            await saveMessagesToDatabase([userMessage, assistantMessage], databaseSessionId)
           } catch (error) {
             console.error("DB 저장 오류:", error)
           }
         }, 0)
       }
-      setStreamingError(null)
-      setRetryCount(0)
-      setIsSubmitting(false)
+
     } catch (error) {
-      console.error("onFinish 핸들러 오류:", error)
-      setIsSubmitting(false)
+      console.error("메시지 전송 오류:", error)
+      setChatError("메시지 전송 중 오류가 발생했습니다.")
+      // 실패한 경우 사용자 메시지 제거
+      setChatMessages(prev => prev.slice(0, -1))
     }
-  }, []) // 의존성 제거
 
-  const onErrorHandler = useCallback((error: Error) => {
-    console.error("채팅 오류:", error)
-    setStreamingError("응답 생성 중 오류가 발생했습니다. 다시 시도해주세요.")
-    setIsSubmitting(false)
+    setChatLoading(false)
+  }, [chatMessages, chatLoading, aiChatBody, databaseSessionId, saveMessagesToDatabase])
+
+  // 입력 변경 핸들러
+  const handleChatInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setChatInput(e.target.value)
   }, [])
 
-  const onResponseHandler = useCallback((response: Response) => {
-    setStreamingError(null)
-  }, [])
-
-  // useAIChat 초기화 - 최대한 단순화하여 SWR 이슈 방지
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit: aiHandleSubmit,
-    isLoading,
-    setInput,
-    error,
-    reload,
-    append,
-  } = useAIChat({
-    api: "/api/saju-chat",
-    initialMessages: finalInitialMessages,
-    body: aiChatBody, // body를 다시 추가하되 안정화된 버전 사용
-    onFinish: onFinishHandler,
-    onError: onErrorHandler,
-    onResponse: onResponseHandler,
-  })
-
-  // 실제 표시할 메시지 결정
-  const displayMessages = useMemo(() => {
-    if (dbMessages.length > 0) {
-      return dbMessages
-    }
-    if (messages.length > 0) {
-      return messages
-    }
-    // 아무 메시지도 없으면 초기 메시지 표시
-    return initialMessages
-  }, [dbMessages, messages, initialMessages])
-
-  // 스크롤 처리
-  useEffect(() => {
-    const scrollContainer = chatContainerRef.current
-    if (scrollContainer && displayMessages.length > lastMessageLength.current) {
-      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
-      lastMessageLength.current = displayMessages.length
-
-      if (isNearBottom) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
-  }, [displayMessages.length])
-
-  // 이벤트 핸들러들
-  const customHandleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+  // 폼 제출 핸들러
+  const handleChatSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!input.trim() || isSubmitting || isLoading) {
+    
+    if (!chatInput.trim() || isSubmitting || chatLoading) {
       return
     }
 
     setIsSubmitting(true)
 
     try {
+      // 질문 카운트 증가 및 로그인 프롬프트 체크
       setQuestionCount(prev => {
         const newCount = prev + 1
 
@@ -747,40 +757,39 @@ export default function SajuChat({
         return newCount
       })
 
-      setStreamingError(null)
-      setRetryCount(0)
-
-      const userMessage = input.trim()
-
-      // 사용자 메시지를 즉시 저장
-      if (databaseSessionId) {
-        try {
-          const userMessageObj = {
-            id: `user-${Date.now()}`,
-            role: "user" as const,
-            content: userMessage,
-          }
-          await saveMessagesToDatabase([userMessageObj], databaseSessionId)
-        } catch (error) {
-          console.error("사용자 메시지 저장 오류:", error)
-        }
-      }
-
-      aiHandleSubmit(e)
+      await sendMessage(chatInput)
+      setChatInput("")
     } catch (error) {
       console.error("메시지 전송 오류:", error)
-      setIsSubmitting(false)
     }
+
+    setIsSubmitting(false)
   }, [
-    input,
-    isSubmitting,
-    isLoading,
-    computedValues.actualIsLoggedIn,
-    hasShownLoginPrompt,
-    databaseSessionId,
-    saveMessagesToDatabase,
-    aiHandleSubmit,
+    chatInput, 
+    sendMessage, 
+    isSubmitting, 
+    chatLoading, 
+    computedValues.actualIsLoggedIn, 
+    hasShownLoginPrompt
   ])
+
+  // 실제 표시할 메시지는 chatMessages를 직접 사용
+  const displayMessages = chatMessages
+
+  // 스크롤 처리
+  useEffect(() => {
+    const scrollContainer = chatContainerRef.current
+    if (scrollContainer && displayMessages.length > lastMessageLength.current) {
+      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
+      lastMessageLength.current = displayMessages.length
+
+      if (isNearBottom) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  }, [displayMessages.length])
+
+  // 기존 customHandleSubmit 제거됨 - handleChatSubmit 사용
 
   const handleBackWithSave = useCallback(() => {
     try {
@@ -821,8 +830,8 @@ export default function SajuChat({
 
   const handleSuggestedQuestionClick = useCallback(
     (question: string) => {
-      if (isLoading) return
-      setInput(question)
+      if (chatLoading) return
+      setChatInput(question)
       setTimeout(() => {
         const form = document.querySelector("form")
         if (form) {
@@ -830,13 +839,13 @@ export default function SajuChat({
         }
       }, 100)
     },
-    [isLoading, setInput],
+    [chatLoading],
   )
 
   const scrollToBottomSmooth = useCallback(() => {
     if (chatContainerRef.current) {
       const scrollContainer = chatContainerRef.current
-      if (!isLoading) {
+      if (!chatLoading) {
         scrollContainer.scrollTo({
           top: scrollContainer.scrollHeight,
           behavior: "smooth",
@@ -845,7 +854,7 @@ export default function SajuChat({
         scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
     }
-  }, [isLoading])
+  }, [chatLoading])
 
   const handleScroll = useCallback(() => {
     if (chatContainerRef.current && !isAutoScrolling.current) {
@@ -858,8 +867,14 @@ export default function SajuChat({
   const handleRetry = useCallback(() => {
     setIsRetrying(true)
     setRetryCount((prevCount) => prevCount + 1)
-    reload()
-  }, [reload])
+    setChatError(null)
+    // 재시도 로직 - 마지막 사용자 메시지를 다시 전송
+    const lastUserMessage = displayMessages.filter(msg => msg.role === "user").pop()
+    if (lastUserMessage) {
+      sendMessage(lastUserMessage.content)
+    }
+    setIsRetrying(false)
+  }, [displayMessages, sendMessage])
 
   const handleRetryMessage = useCallback(
     (messageId: string) => {
@@ -867,7 +882,7 @@ export default function SajuChat({
       if (messageIndex > 0) {
         const previousUserMessage = displayMessages[messageIndex - 1]
         if (previousUserMessage && previousUserMessage.role === "user") {
-          setInput(previousUserMessage.content)
+          setChatInput(previousUserMessage.content)
           setTimeout(() => {
             const form = document.querySelector("form")
             if (form) {
@@ -877,7 +892,7 @@ export default function SajuChat({
         }
       }
     },
-    [displayMessages, setInput],
+    [displayMessages],
   )
 
   const handleCompatibilityAnalysis = useCallback(
@@ -977,7 +992,7 @@ ${selectedPeopleInfo}
 
 각 사람과의 궁합을 개별적으로 분석하고, 종합적인 조언도 부탁드립니다.`
 
-        setInput(compatibilityMessage)
+        setChatInput(compatibilityMessage)
         setShowCompatibilityTool(false)
 
         setTimeout(() => {
@@ -991,7 +1006,7 @@ ${selectedPeopleInfo}
         alert("궁합 분석 중 오류가 발생했습니다. 다시 시도해주세요.")
       }
     },
-    [setInput],
+    [],
   )
 
   // 이벤트 리스너들
@@ -1261,7 +1276,7 @@ ${selectedPeopleInfo}
             ))}
 
           {/* 로딩 상태 */}
-          {isLoading && (
+          {chatLoading && (
             <div className="px-3 sm:px-4 py-3 sm:py-4 bg-white/5">
               <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
                 <div className="flex-shrink-0">
@@ -1290,11 +1305,11 @@ ${selectedPeopleInfo}
           )}
 
           {/* 에러 상태 */}
-          {streamingError && (
+          {chatError && (
             <div className="px-3 sm:px-4 py-3 sm:py-4">
               <div className="max-w-3xl mx-auto">
                 <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 sm:p-4">
-                  <p className="text-red-200 text-xs sm:text-sm mb-2 sm:mb-3">{streamingError}</p>
+                  <p className="text-red-200 text-xs sm:text-sm mb-2 sm:mb-3">{chatError}</p>
                   <Button
                     onClick={handleRetry}
                     disabled={isRetrying}
@@ -1313,7 +1328,7 @@ ${selectedPeopleInfo}
       {/* 하단 입력 영역 */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/95 to-transparent backdrop-blur-md safe-area-bottom">
         {/* 추천 질문 */}
-        {suggestedQuestions.length > 0 && !isLoading && (
+        {suggestedQuestions.length > 0 && !chatLoading && (
           <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-white/10 max-h-[50px] sm:max-h-[60px] flex items-center">
             <div className="max-w-3xl mx-auto w-full">
               <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
@@ -1336,7 +1351,7 @@ ${selectedPeopleInfo}
         {/* 입력창 */}
         <div className="px-3 sm:px-4 py-3 sm:py-4 pb-safe">
           <div className="max-w-3xl mx-auto">
-            <form onSubmit={customHandleSubmit} className="relative">
+            <form onSubmit={handleChatSubmit} className="relative">
               <div className="flex items-center bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/20 focus-within:border-white/40">
                 <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
                   <SheetTrigger asChild>
@@ -1391,16 +1406,16 @@ ${selectedPeopleInfo}
 
                 <input
                   ref={inputRef}
-                  value={input}
-                  onChange={handleInputChange}
+                  value={chatInput}
+                  onChange={handleChatInputChange}
                   placeholder="Ask anything"
                   className="flex-1 bg-transparent border-none px-3 sm:px-4 py-2.5 sm:py-3 text-white placeholder-white/50 focus:outline-none text-sm sm:text-base min-w-0"
-                  disabled={isLoading || isSubmitting}
+                  disabled={chatLoading || isSubmitting}
                 />
 
                 <Button
                   type="submit"
-                  disabled={isLoading || !input.trim() || isSubmitting}
+                  disabled={chatLoading || !chatInput.trim() || isSubmitting}
                   className="mr-2 sm:mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-1.5 sm:p-2 flex-shrink-0"
                 >
                   <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
