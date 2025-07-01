@@ -662,7 +662,7 @@ export default function SajuChat({
     }
   }, [dbMessages, initialMessages, chatMessages.length])
 
-  // 직접 구현한 메시지 전송 함수
+  // 스트리밍 지원 메시지 전송 함수
   const sendMessage = useCallback(async (messageContent: string) => {
     if (!messageContent.trim() || chatLoading) return
 
@@ -678,8 +678,18 @@ export default function SajuChat({
     // 사용자 메시지 즉시 추가
     setChatMessages(prev => [...prev, userMessage])
 
+    // 스트리밍을 위한 빈 어시스턴트 메시지 추가
+    const assistantMessageId = `assistant-${Date.now()}`
+    const assistantMessage = {
+      id: assistantMessageId,
+      role: "assistant" as const,
+      content: ""
+    }
+    
+    setChatMessages(prev => [...prev, assistantMessage])
+
     try {
-      // API 호출
+      // API 호출 (스트리밍)
       const response = await fetch("/api/saju-chat", {
         method: "POST",
         headers: {
@@ -695,21 +705,60 @@ export default function SajuChat({
         throw new Error("API 요청 실패")
       }
 
-      const responseText = await response.text()
-      
-      const assistantMessage = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant" as const,
-        content: responseText
+      // 스트림 읽기
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let fullContent = ""
+
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value, { stream: true })
+            
+            // AI SDK의 데이터 스트림 파싱
+            const lines = chunk.split('\n')
+            for (const line of lines) {
+              if (line.startsWith('0:')) {
+                try {
+                  const data = JSON.parse(line.slice(2))
+                  if (data.type === 'text') {
+                    fullContent += data.value
+                    
+                    // 실시간으로 메시지 업데이트
+                    setChatMessages(prev => 
+                      prev.map(msg => 
+                        msg.id === assistantMessageId 
+                          ? { ...msg, content: fullContent }
+                          : msg
+                      )
+                    )
+                  }
+                } catch (e) {
+                  // JSON 파싱 실패는 무시
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock()
+        }
       }
 
-      setChatMessages(prev => [...prev, assistantMessage])
+      // 최종 메시지로 업데이트
+      const finalAssistantMessage = {
+        id: assistantMessageId,
+        role: "assistant" as const,
+        content: fullContent
+      }
 
       // DB 저장
-      if (databaseSessionId) {
+      if (databaseSessionId && fullContent) {
         setTimeout(async () => {
           try {
-            await saveMessagesToDatabase([userMessage, assistantMessage], databaseSessionId)
+            await saveMessagesToDatabase([userMessage, finalAssistantMessage], databaseSessionId)
           } catch (error) {
             console.error("DB 저장 오류:", error)
           }
@@ -719,8 +768,8 @@ export default function SajuChat({
     } catch (error) {
       console.error("메시지 전송 오류:", error)
       setChatError("메시지 전송 중 오류가 발생했습니다.")
-      // 실패한 경우 사용자 메시지 제거
-      setChatMessages(prev => prev.slice(0, -1))
+      // 실패한 경우 사용자 메시지와 빈 어시스턴트 메시지 제거
+      setChatMessages(prev => prev.slice(0, -2))
     }
 
     setChatLoading(false)
@@ -776,18 +825,23 @@ export default function SajuChat({
   // 실제 표시할 메시지는 chatMessages를 직접 사용
   const displayMessages = chatMessages
 
-  // 스크롤 처리
+  // 스크롤 처리 - 스트리밍 중에도 자동 스크롤
   useEffect(() => {
     const scrollContainer = chatContainerRef.current
-    if (scrollContainer && displayMessages.length > lastMessageLength.current) {
+    if (scrollContainer) {
       const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
-      lastMessageLength.current = displayMessages.length
+      
+      // 메시지 수가 변하거나 마지막 메시지가 업데이트되면 스크롤
+      if (displayMessages.length > lastMessageLength.current || 
+          (chatLoading && displayMessages.length > 0)) {
+        lastMessageLength.current = displayMessages.length
 
-      if (isNearBottom) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
+        if (isNearBottom || chatLoading) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight
+        }
       }
     }
-  }, [displayMessages.length])
+  }, [displayMessages.length, displayMessages, chatLoading])
 
   // 기존 customHandleSubmit 제거됨 - handleChatSubmit 사용
 
@@ -1229,6 +1283,13 @@ ${selectedPeopleInfo}
                         p: ({ children }) => (
                           <p className="text-white/90 leading-relaxed mb-2 sm:mb-3 last:mb-0 text-sm sm:text-base">
                             {children}
+                            {/* 스트리밍 중인 마지막 메시지에 커서 추가 */}
+                            {message.role === "assistant" && 
+                             chatLoading && 
+                             index === displayMessages.length - 1 && 
+                             message.content.length > 0 && (
+                              <span className="inline-block w-2 h-4 bg-white/70 ml-1 animate-pulse" />
+                            )}
                           </p>
                         ),
                         strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
@@ -1275,8 +1336,8 @@ ${selectedPeopleInfo}
               </div>
             ))}
 
-          {/* 로딩 상태 */}
-          {chatLoading && (
+          {/* 로딩 상태 - 스트리밍 중일 때만 간단한 인디케이터 */}
+          {chatLoading && displayMessages.length > 0 && displayMessages[displayMessages.length - 1].content === "" && (
             <div className="px-3 sm:px-4 py-3 sm:py-4 bg-white/5">
               <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
                 <div className="flex-shrink-0">
