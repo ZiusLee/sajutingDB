@@ -40,7 +40,7 @@ const useHideHeaderAndFooter = () => {
         header.style.display = ""
       }
       if (footer) {
-      footer.style.display = ""
+        footer.style.display = ""
       }
       body.style.overflow = ""
     }
@@ -274,17 +274,17 @@ export default function SajuChat({
   // 컴포넌트 마운트 상태 추적
   const mountedRef = useRef(true)
   const initRef = useRef(false)
-  
+
   // useAuth를 완전히 제거하고 Supabase를 직접 사용
   const [authUser, setAuthUser] = useState<any>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authInitialized, setAuthInitialized] = useState(false)
-  
+
   // 컴포넌트 상태들
   const [isReady, setIsReady] = useState(false)
   const [dbMessages, setDbMessages] = useState<any[]>([])
   const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
-  
+
   // UI 상태들
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [messageIds, setMessageIds] = useState<Record<string, string>>({})
@@ -312,23 +312,27 @@ export default function SajuChat({
   const router = useRouter()
 
   // 정적 값들을 미리 계산
-  const currentCharacter = useMemo(() => 
-    pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
-  , [roomType])
-  
-  const suggestedQuestions = useMemo(() => 
-    initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
-  , [roomType])
+  const currentCharacter = useMemo(
+    () => pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0],
+    [roomType],
+  )
+
+  const suggestedQuestions = useMemo(
+    () => initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
+    [roomType],
+  )
 
   // 인증 상태 초기화 - 한 번만 실행
   useEffect(() => {
     let mounted = true
-    
+
     const initAuth = async () => {
       try {
         const supabase = supabaseRef.current
-        const { data: { user } } = await supabase.auth.getUser()
-        
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
         if (mounted) {
           setAuthUser(user)
           setIsAuthenticated(!!user)
@@ -347,7 +351,9 @@ export default function SajuChat({
     initAuth()
 
     // Auth state listener
-    const { data: { subscription } } = supabaseRef.current.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabaseRef.current.auth.onAuthStateChange((event, session) => {
       if (mounted) {
         setAuthUser(session?.user || null)
         setIsAuthenticated(!!session?.user)
@@ -363,7 +369,7 @@ export default function SajuChat({
   // birthInfo를 별도의 메모로 안정화
   const stableBirthInfo = useMemo(() => {
     if (!birthInfo) return null
-    
+
     return {
       solarYear: birthInfo.solarYear,
       solarMonth: birthInfo.solarMonth,
@@ -373,7 +379,7 @@ export default function SajuChat({
       timeUnknown: birthInfo.timeUnknown,
       lunarYear: birthInfo.lunarYear,
       lunarMonth: birthInfo.lunarMonth,
-      lunarDay: birthInfo.lunarDay
+      lunarDay: birthInfo.lunarDay,
     }
   }, [
     birthInfo?.solarYear,
@@ -384,7 +390,7 @@ export default function SajuChat({
     birthInfo?.timeUnknown,
     birthInfo?.lunarYear,
     birthInfo?.lunarMonth,
-    birthInfo?.lunarDay
+    birthInfo?.lunarDay,
   ])
 
   // 계산된 값들을 메모화
@@ -451,7 +457,7 @@ export default function SajuChat({
       userId,
       actualIsLoggedIn,
       calculatedDaeun,
-      compressedSaju
+      compressedSaju,
     }
   }, [
     authUser?.id,
@@ -459,7 +465,7 @@ export default function SajuChat({
     isLoggedIn,
     stableBirthInfo, // 안정화된 birthInfo 참조 사용
     gender,
-    saju // saju 객체 참조 - React가 참조 동등성 체크
+    saju, // saju 객체 참조 - React가 참조 동등성 체크
   ])
 
   // 초기 메시지를 메모화
@@ -491,13 +497,13 @@ export default function SajuChat({
     gender,
     initialInterpretation,
     roomType,
-    stableBirthInfo
+    stableBirthInfo,
   ])
 
   // 채팅 초기화 - 인증 완료 후 한 번만 실행
   useEffect(() => {
     if (!authInitialized || initRef.current) return
-    
+
     let mounted = true
     let timeoutId: NodeJS.Timeout
     initRef.current = true
@@ -520,7 +526,7 @@ export default function SajuChat({
         // computedValues 대신 직접 값 사용
         const userId = authUser?.id
         const actualIsLoggedIn = isAuthenticated || isLoggedIn
-        
+
         if (!sessionId && actualIsLoggedIn && userId) {
           try {
             const { data: sessions, error } = await supabaseRef.current
@@ -653,7 +659,7 @@ export default function SajuChat({
 
   // 초기 메시지 설정 (한 번만 실행)
   const [messagesInitialized, setMessagesInitialized] = useState(false)
-  
+
   useEffect(() => {
     if (!messagesInitialized) {
       if (dbMessages.length > 0) {
@@ -666,148 +672,158 @@ export default function SajuChat({
   }, [dbMessages, initialMessages, messagesInitialized])
 
   // 안정화된 스트리밍 메시지 전송 함수
-  const sendMessage = useCallback(async (messageContent: string) => {
-    if (!messageContent.trim() || chatLoading) return
+  const sendMessage = useCallback(
+    async (messageContent: string) => {
+      if (!messageContent.trim() || chatLoading) return
 
-    setChatLoading(true)
-    setChatError(null)
+      setChatLoading(true)
+      setChatError(null)
 
-    const userMessage = {
-      id: `user-${Date.now()}`,
-      role: "user" as const,
-      content: messageContent.trim()
-    }
-
-    // 현재 메시지 리스트를 캡처 (무한루프 방지)
-    const currentMessages = chatMessages
-    const messagesWithUser = [...currentMessages, userMessage]
-
-    // 사용자 메시지 즉시 추가
-    setChatMessages(messagesWithUser)
-
-    // 스트리밍을 위한 빈 어시스턴트 메시지 추가
-    const assistantMessageId = `assistant-${Date.now()}`
-    const assistantMessage = {
-      id: assistantMessageId,
-      role: "assistant" as const,
-      content: ""
-    }
-    
-    const messagesWithAssistant = [...messagesWithUser, assistantMessage]
-    setChatMessages(messagesWithAssistant)
-
-    try {
-      // API 호출 (스트리밍)
-      const response = await fetch("/api/saju-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: messagesWithUser, // 캡처된 메시지 사용
-          ...aiChatBody
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error(`API 요청 실패: ${response.status}`)
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: "user" as const,
+        content: messageContent.trim(),
       }
 
-      // AI SDK DataStream 파싱 (toDataStreamResponse 사용시)
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-      let fullContent = ""
-      let buffer = ""
+      // 현재 메시지 리스트를 캡처 (무한루프 방지)
+      const currentMessages = chatMessages
+      const messagesWithUser = [...currentMessages, userMessage]
 
-      if (reader) {
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
+      // 사용자 메시지 즉시 추가
+      setChatMessages(messagesWithUser)
 
-            const chunk = decoder.decode(value, { stream: true })
-            buffer += chunk
-            
-            // AI SDK DataStream 포맷 파싱
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ""
-            
-            for (const line of lines) {
-              if (!line.trim()) continue
-              
-              try {
-                // AI SDK 표준 포맷: "0:{json}"
-                if (line.startsWith('0:')) {
-                  const data = JSON.parse(line.slice(2))
-                  if (data.type === 'text') {
-                    fullContent += data.value
-                    
-                    // 실시간으로 메시지 업데이트 (무한루프 방지)
-                    setChatMessages(prevMessages => {
-                      const lastMessage = prevMessages[prevMessages.length - 1]
-                      if (lastMessage?.id === assistantMessageId) {
-                        return [
-                          ...prevMessages.slice(0, -1),
-                          { ...lastMessage, content: fullContent }
-                        ]
-                      }
-                      return prevMessages
-                    })
+      // 스트리밍을 위한 빈 어시스턴트 메시지 추가
+      const assistantMessageId = `assistant-${Date.now()}`
+      const assistantMessage = {
+        id: assistantMessageId,
+        role: "assistant" as const,
+        content: "",
+      }
+
+      const messagesWithAssistant = [...messagesWithUser, assistantMessage]
+      setChatMessages(messagesWithAssistant)
+
+      try {
+        // API 호출 (스트리밍)
+        const response = await fetch("/api/saju-chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: messagesWithUser, // 캡처된 메시지 사용
+            ...aiChatBody,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`API 요청 실패: ${response.status}`)
+        }
+
+        // AI SDK DataStream 파싱 (toDataStreamResponse 사용시)
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+        let fullContent = ""
+        let buffer = ""
+
+        if (reader) {
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+
+              const chunk = decoder.decode(value, { stream: true })
+              buffer += chunk
+
+              // AI SDK DataStream 포맷 파싱
+              const lines = buffer.split("\n")
+              buffer = lines.pop() || ""
+
+              for (const line of lines) {
+                if (!line.trim()) continue
+
+                try {
+                  // AI SDK 표준 포맷: "0:{json}"
+                  if (line.startsWith("0:")) {
+                    const data = JSON.parse(line.slice(2))
+                    if (data.type === "text") {
+                      fullContent += data.value
+
+                      // 실시간으로 메시지 업데이트 (무한루프 방지)
+                      setChatMessages((prevMessages) => {
+                        const lastMessage = prevMessages[prevMessages.length - 1]
+                        if (lastMessage?.id === assistantMessageId) {
+                          return [...prevMessages.slice(0, -1), { ...lastMessage, content: fullContent }]
+                        }
+                        return prevMessages
+                      })
+                    }
                   }
+                } catch (e) {
+                  // 파싱 에러 무시하고 계속 진행
+                  console.warn("Stream parsing error:", e)
                 }
-              } catch (e) {
-                // 파싱 에러 무시하고 계속 진행
-                console.warn("Stream parsing error:", e)
               }
             }
+          } finally {
+            reader.releaseLock()
           }
-        } finally {
-          reader.releaseLock()
         }
-      }
 
-      // 스트림에서 내용을 못 가져온 경우 폴백
-      if (!fullContent) {
-        console.warn("스트림에서 내용을 가져오지 못함")
-        setChatMessages(prevMessages => {
+        // 스트림에서 내용을 못 가져온 경우 폴백
+        if (!fullContent) {
+          console.warn("스트림에서 내용을 가져오지 못함")
+          setChatMessages((prevMessages) => {
+            const lastMessage = prevMessages[prevMessages.length - 1]
+            if (lastMessage?.id === assistantMessageId) {
+              return [
+                ...prevMessages.slice(0, -1),
+                { ...lastMessage, content: "응답을 받아오는 중 오류가 발생했습니다. 다시 시도해주세요." },
+              ]
+            }
+            return prevMessages
+          })
+        }
+
+        // 메시지 저장
+        if (databaseSessionId && fullContent) {
+          await saveMessagesToDatabase([userMessage, { ...assistantMessage, content: fullContent }], databaseSessionId)
+        }
+      } catch (error) {
+        console.error("메시지 전송 오류:", error)
+        setChatError("메시지 전송 중 오류가 발생했습니다.")
+
+        // 에러 메시지로 대체
+        setChatMessages((prevMessages) => {
           const lastMessage = prevMessages[prevMessages.length - 1]
           if (lastMessage?.id === assistantMessageId) {
             return [
               ...prevMessages.slice(0, -1),
-              { ...lastMessage, content: "응답을 받아오는 중 오류가 발생했습니다. 다시 시도해주세요." }
+              { ...lastMessage, content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다." },
             ]
           }
           return prevMessages
         })
+      } finally {
+        setChatLoading(false)
       }
+    },
+    [chatLoading, aiChatBody, databaseSessionId, saveMessagesToDatabase],
+  )
 
-      // 메시지 저장
-      if (databaseSessionId && fullContent) {
-        await saveMessagesToDatabase(
-          [userMessage, { ...assistantMessage, content: fullContent }],
-          databaseSessionId
-        )
+  const scrollToBottomSmooth = useCallback(() => {
+    if (chatContainerRef.current) {
+      const scrollContainer = chatContainerRef.current
+      if (!chatLoading) {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: "smooth",
+        })
+      } else {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
-
-    } catch (error) {
-      console.error("메시지 전송 오류:", error)
-      setChatError("메시지 전송 중 오류가 발생했습니다.")
-      
-      // 에러 메시지로 대체
-      setChatMessages(prevMessages => {
-        const lastMessage = prevMessages[prevMessages.length - 1]
-        if (lastMessage?.id === assistantMessageId) {
-          return [
-            ...prevMessages.slice(0, -1),
-            { ...lastMessage, content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다." }
-          ]
-        }
-        return prevMessages
-      })
-    } finally {
-      setChatLoading(false)
     }
-  }, [chatLoading, aiChatBody, databaseSessionId, saveMessagesToDatabase]) // chatMessages 의존성 제거
+  }, [chatLoading])
 
   // 스트리밍 중 자동 스크롤
   useEffect(() => {
@@ -822,46 +838,42 @@ export default function SajuChat({
   }, [])
 
   // 폼 제출 핸들러
-  const handleChatSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!chatInput.trim() || isSubmitting || chatLoading) {
-      return
-    }
+  const handleChatSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
 
-    setIsSubmitting(true)
+      if (!chatInput.trim() || isSubmitting || chatLoading) {
+        return
+      }
 
-    try {
-      // 질문 카운트 증가 및 로그인 프롬프트 체크
-      setQuestionCount(prev => {
-        const newCount = prev + 1
+      setIsSubmitting(true)
 
-        const shouldShowLoginPrompt = newCount >= 5 && !computedValues.actualIsLoggedIn && !hasShownLoginPrompt
+      try {
+        // 질문 카운트 증가 및 로그인 프롬프트 체크
+        setQuestionCount((prev) => {
+          const newCount = prev + 1
 
-        if (shouldShowLoginPrompt) {
-          setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-          setShowLoginPrompt(true)
-          setHasShownLoginPrompt(true)
-        }
-        
-        return newCount
-      })
+          const shouldShowLoginPrompt = newCount >= 5 && !computedValues.actualIsLoggedIn && !hasShownLoginPrompt
 
-      await sendMessage(chatInput)
-      setChatInput("")
-    } catch (error) {
-      console.error("메시지 전송 오류:", error)
-    }
+          if (shouldShowLoginPrompt) {
+            setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
+            setShowLoginPrompt(true)
+            setHasShownLoginPrompt(true)
+          }
 
-    setIsSubmitting(false)
-  }, [
-    chatInput, 
-    sendMessage, 
-    isSubmitting, 
-    chatLoading, 
-    computedValues.actualIsLoggedIn, 
-    hasShownLoginPrompt
-  ])
+          return newCount
+        })
+
+        await sendMessage(chatInput)
+        setChatInput("")
+      } catch (error) {
+        console.error("메시지 전송 오류:", error)
+      }
+
+      setIsSubmitting(false)
+    },
+    [chatInput, sendMessage, isSubmitting, chatLoading, computedValues.actualIsLoggedIn, hasShownLoginPrompt],
+  )
 
   // 실제 표시할 메시지는 chatMessages를 직접 사용
   const displayMessages = chatMessages
@@ -871,10 +883,9 @@ export default function SajuChat({
     const scrollContainer = chatContainerRef.current
     if (scrollContainer) {
       const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100
-      
+
       // 메시지 수가 변하거나 마지막 메시지가 업데이트되면 스크롤
-      if (displayMessages.length > lastMessageLength.current || 
-          (chatLoading && displayMessages.length > 0)) {
+      if (displayMessages.length > lastMessageLength.current || (chatLoading && displayMessages.length > 0)) {
         lastMessageLength.current = displayMessages.length
 
         if (isNearBottom || chatLoading) {
@@ -937,20 +948,6 @@ export default function SajuChat({
     [chatLoading],
   )
 
-  const scrollToBottomSmooth = useCallback(() => {
-    if (chatContainerRef.current) {
-      const scrollContainer = chatContainerRef.current
-      if (!chatLoading) {
-        scrollContainer.scrollTo({
-          top: scrollContainer.scrollHeight,
-          behavior: "smooth",
-        })
-      } else {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
-  }, [chatLoading])
-
   const handleScroll = useCallback(() => {
     if (chatContainerRef.current && !isAutoScrolling.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
@@ -964,7 +961,7 @@ export default function SajuChat({
     setRetryCount((prevCount) => prevCount + 1)
     setChatError(null)
     // 재시도 로직 - 마지막 사용자 메시지를 다시 전송
-    const lastUserMessage = displayMessages.filter(msg => msg.role === "user").pop()
+    const lastUserMessage = displayMessages.filter((msg) => msg.role === "user").pop()
     if (lastUserMessage) {
       sendMessage(lastUserMessage.content)
     }
@@ -990,28 +987,27 @@ export default function SajuChat({
     [displayMessages],
   )
 
-  const handleCompatibilityAnalysis = useCallback(
-    (mainPerson: any, selectedPeople: any[]) => {
-      try {
-        const peopleNames = selectedPeople.map((p) => p.name).join(", ")
+  const handleCompatibilityAnalysis = useCallback((mainPerson: any, selectedPeople: any[]) => {
+    try {
+      const peopleNames = selectedPeople.map((p) => p.name).join(", ")
 
-        const formatBirthTime = (person: any) => {
-          const birthDate = person.birth || `${person.birthYear}.${person.birthMonth}.${person.birthDay}`
-          const gender = person.gender === "male" ? "남성" : person.gender === "female" ? "여성" : "성별미상"
+      const formatBirthTime = (person: any) => {
+        const birthDate = person.birth || `${person.birthYear}.${person.birthMonth}.${person.birthDay}`
+        const gender = person.gender === "male" ? "남성" : person.gender === "female" ? "여성" : "성별미상"
 
-          if (person.birthHour && person.birthMinute && !person.timeUnknown) {
-            return `${birthDate} ${person.birthHour}시 ${person.birthMinute}분 (${gender})`
-          } else if (person.timeUnknown) {
-            return `${birthDate} (시간 미상, ${gender})`
-          } else {
-            return `${birthDate} (${gender})`
-          }
+        if (person.birthHour && person.birthMinute && !person.timeUnknown) {
+          return `${birthDate} ${person.birthHour}시 ${person.birthMinute}분 (${gender})`
+        } else if (person.timeUnknown) {
+          return `${birthDate} (시간 미상, ${gender})`
+        } else {
+          return `${birthDate} (${gender})`
         }
+      }
 
-        const mainPersonSaju = mainPerson.fullSaju || mainPerson.saju
-        const mainPersonBirthTime = formatBirthTime(mainPerson)
+      const mainPersonSaju = mainPerson.fullSaju || mainPerson.saju
+      const mainPersonBirthTime = formatBirthTime(mainPerson)
 
-        const mainPersonInfo = `
+      const mainPersonInfo = `
 🔮 **${mainPerson.name}님 사주 정보**
 - 생년월일: ${mainPersonBirthTime}
 - 사주팔자: ${mainPersonSaju.yearStem}${mainPersonSaju.yearBranch}년 ${mainPersonSaju.monthStem}${mainPersonSaju.monthBranch}월 ${mainPersonSaju.dayStem}${mainPersonSaju.dayBranch}일 ${mainPersonSaju.hourStem}${mainPersonSaju.hourBranch}시
@@ -1021,12 +1017,12 @@ export default function SajuChat({
 - 오행분포: 목${mainPersonSaju.elements.wood} 화${mainPersonSaju.elements.fire} 토${mainPersonSaju.elements.earth} 금${mainPersonSaju.elements.metal} 수${mainPersonSaju.elements.water}
 `
 
-        const selectedPeopleInfo = selectedPeople
-          .map((person, index) => {
-            const personSaju = person.fullSaju || person.saju
-            const personBirthTime = formatBirthTime(person)
+      const selectedPeopleInfo = selectedPeople
+        .map((person, index) => {
+          const personSaju = person.fullSaju || person.saju
+          const personBirthTime = formatBirthTime(person)
 
-            return `
+          return `
 💫 **${person.name}님 사주 정보**
 - 생년월일: ${personBirthTime}
 - 사주팔자: ${personSaju.yearStem}${personSaju.yearBranch}년 ${personSaju.monthStem}${personSaju.monthBranch}월 ${personSaju.dayStem}${personSaju.dayBranch}일 ${personSaju.hourStem}${personSaju.hourBranch}시
@@ -1035,10 +1031,10 @@ export default function SajuChat({
 - 십성: 년간(${personSaju.yearStemSibseong}) 년지(${personSaju.yearBranchSibseong}) 월간(${personSaju.monthStemSibseong}) 월지(${personSaju.monthBranchSibseong}) 일간(${personSaju.dayStemSibseong}) 일지(${personSaju.dayBranchSibseong}) 시간(${personSaju.hourStemSibseong}) 시지(${personSaju.hourBranchSibseong})
 - 오행분포: 목${personSaju.elements.wood} 화${personSaju.elements.fire} 토${personSaju.elements.earth} 금${personSaju.elements.metal} 수${personSaju.elements.water}
 `
-          })
-          .join("")
+        })
+        .join("")
 
-        const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 궁합을 분석해주세요.
+      const compatibilityMessage = `${mainPerson.name}님과 ${peopleNames}님의 궁합을 분석해주세요.
 
 ${mainPersonInfo}
 ${selectedPeopleInfo}
@@ -1087,22 +1083,20 @@ ${selectedPeopleInfo}
 
 각 사람과의 궁합을 개별적으로 분석하고, 종합적인 조언도 부탁드립니다.`
 
-        setChatInput(compatibilityMessage)
-        setShowCompatibilityTool(false)
+      setChatInput(compatibilityMessage)
+      setShowCompatibilityTool(false)
 
-        setTimeout(() => {
-          const form = document.querySelector("form")
-          if (form) {
-            form.requestSubmit()
-          }
-        }, 100)
-      } catch (error) {
-        console.error("궁합 분석 처리 중 오류:", error)
-        alert("궁합 분석 중 오류가 발생했습니다. 다시 시도해주세요.")
-      }
-    },
-    [],
-  )
+      setTimeout(() => {
+        const form = document.querySelector("form")
+        if (form) {
+          form.requestSubmit()
+        }
+      }, 100)
+    } catch (error) {
+      console.error("궁합 분석 처리 중 오류:", error)
+      alert("궁합 분석 중 오류가 발생했습니다. 다시 시도해주세요.")
+    }
+  }, [])
 
   // 이벤트 리스너들
   useEffect(() => {
@@ -1325,12 +1319,12 @@ ${selectedPeopleInfo}
                           <p className="text-white/90 leading-relaxed mb-2 sm:mb-3 last:mb-0 text-sm sm:text-base">
                             {children}
                             {/* 스트리밍 중인 마지막 메시지에 커서 추가 */}
-                            {message.role === "assistant" && 
-                             chatLoading && 
-                             index === displayMessages.length - 1 && 
-                             message.content.length > 0 && (
-                              <span className="inline-block w-2 h-4 bg-white/70 ml-1 animate-pulse" />
-                            )}
+                            {message.role === "assistant" &&
+                              chatLoading &&
+                              index === displayMessages.length - 1 &&
+                              message.content.length > 0 && (
+                                <span className="inline-block w-2 h-4 bg-white/70 ml-1 animate-pulse" />
+                              )}
                           </p>
                         ),
                         strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
