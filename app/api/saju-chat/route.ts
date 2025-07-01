@@ -336,7 +336,7 @@ ${sajuInfo}${compatibilityInfo}
     const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
     try {
-      // 스트리밍 대신 단순한 텍스트 생성으로 변경
+      // 스트리밍 응답 복구 - 안전한 방식으로
       const result = await streamText({
         messages: apiMessages,
         model: openai("gpt-4.1"),
@@ -345,27 +345,23 @@ ${sajuInfo}${compatibilityInfo}
         topP: 1.0,
       })
       
-      // 전체 텍스트를 수집
-      let fullText = ""
-      for await (const chunk of result.textStream) {
-        fullText += chunk
-      }
-      
-      // 단순한 텍스트 응답 반환
-      return new Response(fullText, {
-        status: 200,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
-      })
+      // 스트림 응답을 그대로 반환 (ai 라이브러리의 안전한 방식)
+      return result.toDataStreamResponse()
     } catch (streamError) {
       if (shouldLog("ERROR")) {
         console.error("StreamText error")
       }
 
+      // 에러 발생 시에도 스트림 형태로 응답
       return new Response(
-        "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        JSON.stringify({
+          id: "error-message",
+          role: "assistant",
+          content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        }),
         {
           status: 200,
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
+          headers: { "Content-Type": "application/json" },
         },
       )
     }
@@ -375,10 +371,14 @@ ${sajuInfo}${compatibilityInfo}
     }
 
     return new Response(
-      "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+      JSON.stringify({
+        id: "error-message",
+        role: "assistant", 
+        content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+      }),
       {
         status: 200,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
+        headers: { "Content-Type": "application/json" },
       },
     )
   }
