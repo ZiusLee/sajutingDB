@@ -1075,7 +1075,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1964, month: 4, solarTerm: '청명', timestamp: '1964-04-05 03:18' },
   { year: 1964, month: 4, solarTerm: '곡우', timestamp: '1964-04-20 10:27' },
   { year: 1964, month: 5, solarTerm: '입하', timestamp: '1964-05-05 20:51' },
-  { year: 1964, month: 5, solarTerm: '소만', timestamp: '1964-05-21 09:50' },
+  { year: 1964, month: 5, solarTerm: '���만', timestamp: '1964-05-21 09:50' },
   { year: 1964, month: 6, solarTerm: '망종', timestamp: '1964-06-06 01:12' },
   { year: 1964, month: 6, solarTerm: '하지', timestamp: '1964-06-21 17:57' },
   { year: 1964, month: 7, solarTerm: '소서', timestamp: '1964-07-07 11:32' },

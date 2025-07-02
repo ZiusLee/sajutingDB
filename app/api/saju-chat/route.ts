@@ -1,7 +1,10 @@
 import { streamText } from "ai"
 import { openai } from "@ai-sdk/openai"
 import { calculateSaju } from "@/lib/saju"
+import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { solarToLunar } from "@/lib/lunar-calendar"
+import { parseMessageForDatesAndBirth, formatDateForDisplay, testMessageParsing } from "@/lib/message-parser"
+import { parseMessageWithGPT } from "@/lib/gpt-date-parser"
 
 export const runtime = "edge"
 
@@ -11,6 +14,9 @@ const shouldLog = (level) => {
   if (LOG_LEVEL === "ERROR") return level === "ERROR"
   return true // DEBUG 모드에서는 모든 로그
 }
+
+// 🚀 GPT 파싱 설정 (환경변수로 제어 가능)
+const ENABLE_GPT_PARSING = process.env.ENABLE_GPT_PARSING !== "false" // 기본값: true
 
 // 🚀 로그 최적화: 현재 날짜 정보를 가져오는 함수
 function getCurrentDateInfo() {
@@ -188,10 +194,171 @@ export async function POST(req) {
 
     const dateInfo = getCurrentDateInfo()
 
+    // 🚀 최신 메시지에서 날짜/생년월일 파싱 (GPT 우선, 패턴 기반 fallback)
+    const latestMessage = messages[messages.length - 1]?.content || ""
+    
+    // 이전 메시지들에서 기존 파트너 정보 확인 (컨텍스트 유지)
+    let existingPartnerContext = ""
+    const recentMessages = messages.slice(-5) // 최근 5개 메시지 확인
+    for (const msg of recentMessages) {
+      if (msg.role === "assistant" && msg.content.includes("상대방 사주 정보")) {
+        const partnerMatch = msg.content.match(/🔮 \*\*상대방 사주 정보[\s\S]*?(?=\n\n|\n�|$)/)
+        if (partnerMatch) {
+          existingPartnerContext = partnerMatch[0]
+          console.log("🔍 Found existing partner context in recent messages")
+          break
+        }
+      }
+    }
+    
+    const parsedInfo = ENABLE_GPT_PARSING 
+      ? await parseMessageWithGPT(latestMessage)
+      : parseMessageForDatesAndBirth(latestMessage)
+    
+    // 항상 로깅 (문제 해결용)
+    console.log("🔍 Latest message:", latestMessage)
+    
+    // 상세 패턴 테스팅 (GPT 파싱 비활성화 시에만)
+    if (!ENABLE_GPT_PARSING && latestMessage.includes("년") && latestMessage.includes("월") && latestMessage.includes("일")) {
+      console.log("🔧 Pattern testing (GPT disabled):")
+      testMessageParsing(latestMessage)
+    }
+    
+    console.log("🔍 Parsed message info:", JSON.stringify(parsedInfo, null, 2))
+
     // 🚀 성능 최적화: 간소화된 메시지 최적화
     const optimizedMessages = await processMessagesForContext(messages, compressedSaju, name, roomType)
 
-    // 사주 정보 문자열 생성
+    // 🚀 추가 사주 데이터 계산 (파싱된 정보 기반)
+    let additionalSajuData = ""
+    
+    // 파싱 결과 상태 확인
+    console.log("🔍 Parsing result check:", {
+      hasPartnerInfo: !!parsedInfo.partnerInfo,
+      hasEventInfo: !!parsedInfo.eventInfo,
+      partnerInfo: parsedInfo.partnerInfo,
+      eventInfo: parsedInfo.eventInfo,
+      hasExistingContext: !!existingPartnerContext
+    })
+    
+    // 기존 파트너 컨텍스트가 있으면 재사용, 없으면 새로 계산
+    if (existingPartnerContext) {
+      // 기존 파트너 정보 재사용 (컨텍스트 유지)
+      additionalSajuData = existingPartnerContext
+      console.log("♻️ Reusing existing partner context - no recalculation needed")
+    } else if (parsedInfo.partnerInfo && parsedInfo.partnerInfo.year && parsedInfo.partnerInfo.month && parsedInfo.partnerInfo.day) {
+      try {
+        console.log("🚀 Partner info detected, calculating saju:", parsedInfo.partnerInfo)
+        
+        const lunarDate = solarToLunar(
+          parsedInfo.partnerInfo.year,
+          parsedInfo.partnerInfo.month,
+          parsedInfo.partnerInfo.day
+        )
+        
+        console.log("🌙 Lunar date conversion result:", lunarDate)
+        
+        const partnerSaju = calculateSaju(
+          lunarDate.year.toString(),
+          lunarDate.month.toString(), 
+          lunarDate.day.toString(),
+          parsedInfo.partnerInfo.hour || 12,
+          parsedInfo.partnerInfo.minute || 0,
+          parsedInfo.partnerInfo.year,
+          parsedInfo.partnerInfo.month,
+          parsedInfo.partnerInfo.day,
+          parsedInfo.partnerInfo.gender || "unknown",
+          parsedInfo.partnerInfo.name || "상대방",
+          parsedInfo.partnerInfo.timeUnknown || false,
+          lunarDate.isLeapMonth,
+          lunarDate.monthStem,
+          lunarDate.monthBranch,
+          "동경135도"
+        )
+        
+        console.log("📊 Calculated partner saju:", {
+          yearStem: partnerSaju.yearStem,
+          yearBranch: partnerSaju.yearBranch,
+          monthStem: partnerSaju.monthStem,
+          monthBranch: partnerSaju.monthBranch,
+          dayStem: partnerSaju.dayStem,
+          dayBranch: partnerSaju.dayBranch,
+          hourStem: partnerSaju.hourStem,
+          hourBranch: partnerSaju.hourBranch,
+          elements: partnerSaju.elements
+        })
+        
+        // 대운 정보도 계산 (성별이 있는 경우에만)
+        let partnerDaeunInfo = ""
+        if (parsedInfo.partnerInfo.gender) {
+          const partnerDaeun = calculateDaeunInfo(
+            partnerSaju,
+            parsedInfo.partnerInfo.year,
+            parsedInfo.partnerInfo.month,
+            parsedInfo.partnerInfo.day,
+            parsedInfo.partnerInfo.gender
+          )
+          
+          partnerDaeunInfo = `\n대운정보: ${partnerDaeun.direction === 'forward' ? '순행' : '역행'} - ${partnerDaeun.pillars.slice(0,3).map(p => `${p.ages}세(${p.period})`).join(', ')}`
+        }
+        
+        const partnerSajuText = `
+
+🔮 **상대방 사주 정보 (시스템 계산 완료):**
+이름: ${parsedInfo.partnerInfo.name || "상대방"}
+생년월일시: ${parsedInfo.partnerInfo.year}년 ${parsedInfo.partnerInfo.month}월 ${parsedInfo.partnerInfo.day}일 ${parsedInfo.partnerInfo.timeUnknown ? '시간미상' : `${parsedInfo.partnerInfo.hour || 12}시${parsedInfo.partnerInfo.minute || 0}분`}
+성별: ${parsedInfo.partnerInfo.gender === "male" ? "남성" : parsedInfo.partnerInfo.gender === "female" ? "여성" : "성별미상"}
+사주팔자: ${partnerSaju.yearStem}${partnerSaju.yearBranch}년 ${partnerSaju.monthStem}${partnerSaju.monthBranch}월 ${partnerSaju.dayStem}${partnerSaju.dayBranch}일 ${partnerSaju.hourStem}${partnerSaju.hourBranch}시
+일간: ${partnerSaju.dayMaster}
+십성: 년간(${partnerSaju.yearStemSibseong}) 년지(${partnerSaju.yearBranchSibseong}) 월간(${partnerSaju.monthStemSibseong}) 월지(${partnerSaju.monthBranchSibseong}) 일간(${partnerSaju.dayStemSibseong}) 일지(${partnerSaju.dayBranchSibseong}) 시간(${partnerSaju.hourStemSibseong}) 시지(${partnerSaju.hourBranchSibseong})
+오행분포: 목${partnerSaju.elements.wood} 화${partnerSaju.elements.fire} 토${partnerSaju.elements.earth} 금${partnerSaju.elements.metal} 수${partnerSaju.elements.water}${partnerDaeunInfo}
+
+⚠️ **중요:** 위 사주 정보는 시스템에서 정확히 계산된 결과입니다. 새로 계산하지 말고 이 정보를 사용하세요.`
+
+        console.log("📝 Partner saju text being added to system message:", partnerSajuText)
+        additionalSajuData += partnerSajuText
+      } catch (error) {
+        console.error("Partner saju calculation error:", error)
+        additionalSajuData += `\n\n❌ **상대방 사주 계산 오류:** ${parsedInfo.partnerInfo.year}년 ${parsedInfo.partnerInfo.month}월 ${parsedInfo.partnerInfo.day}일 정보로 사주 계산 중 오류가 발생했습니다.`
+      }
+    }
+    
+    // 이벤트 정보가 파싱된 경우 특별 처리
+    if (parsedInfo.eventInfo) {
+      const eventText = `
+      
+🗓️ **이벤트 날짜 정보:**
+이벤트: ${parsedInfo.eventInfo.eventType}
+날짜: ${parsedInfo.eventInfo.year}년 ${parsedInfo.eventInfo.month}월 ${parsedInfo.eventInfo.day}일
+원본: ${parsedInfo.eventInfo.original}
+
+⚠️ **중요:** 이것은 이벤트 날짜입니다. 상대방의 생년월일이 아닙니다. 해당 날짜의 운세와 타이밍을 분석해주세요.`
+      
+      console.log("📅 Event info detected:", parsedInfo.eventInfo)
+      additionalSajuData += eventText
+    }
+    
+    // 특정 날짜들이 파싱된 경우 컨텍스트 추가
+    if (parsedInfo.dates.length > 0) {
+      const dateContext = parsedInfo.dates.map(date => 
+        formatDateForDisplay(date)
+      ).join(", ")
+      
+      additionalSajuData += `
+
+📅 **질문 관련 날짜들:** ${dateContext}${parsedInfo.eventContext.length ? `\n관련 키워드: ${parsedInfo.eventContext.join(", ")}` : ""}`
+    }
+    
+    // Follow-up 질문이 필요한 경우 - GPT가 직접 질문하도록 유도
+    if (parsedInfo.needsFollowUp.length > 0) {
+      additionalSajuData += `
+
+❓ **추가 정보가 필요합니다 (GPT가 직접 질문해야 함):** ${parsedInfo.needsFollowUp.join(" / ")}
+
+**지시사항:** 위 정보 중 하나라도 누락된 경우, 사주 분석을 진행하기 전에 사용자에게 부족한 정보를 자연스럽게 질문하세요. 예: "상대방의 성별을 알려주시면 더 정확한 궁합 분석이 가능해요" 또는 "태어난 시간을 아시나요? 시간이 있으면 더 세밀한 분석을 해드릴 수 있어요"`
+    }
+
+    // 사주 정보 문자열 생성 (추가 데이터 포함)
     const sajuInfo = `
 이름: ${compressedSaju.name}
 생년월일시: ${compressedSaju.birth}
@@ -200,7 +367,12 @@ export async function POST(req) {
 일간: ${compressedSaju.dayMaster}
 십성: 년간(${compressedSaju.sibseong.yearStem}) 년지(${compressedSaju.sibseong.yearBranch}) 월간(${compressedSaju.sibseong.monthStem}) 월지(${compressedSaju.sibseong.monthBranch}) 일간(${compressedSaju.sibseong.dayStem}) 일지(${compressedSaju.sibseong.dayBranch}) 시간(${compressedSaju.sibseong.hourStem}) 시지(${compressedSaju.sibseong.hourBranch})
 오행분포: 목${compressedSaju.elements.목} 화${compressedSaju.elements.화} 토${compressedSaju.elements.토} 금${compressedSaju.elements.금} 수${compressedSaju.elements.수}
-특징: ${compressedSaju.summary}${compressedSaju.daeun ? `\n대운: ${compressedSaju.daeun}` : ""}${compressedSaju.currentAge ? ` (현재 ${compressedSaju.currentAge}세)` : ""}`
+특징: ${compressedSaju.summary}${compressedSaju.daeun ? `\n대운: ${compressedSaju.daeun}` : ""}${compressedSaju.currentAge ? ` (현재 ${compressedSaju.currentAge}세)` : ""}${additionalSajuData}`
+
+    console.log("🎯 Final sajuInfo being sent to GPT:")
+    console.log("=".repeat(50))
+    console.log(sajuInfo)
+    console.log("=".repeat(50))
 
     // 궁합 분석 데이터 처리
     let compatibilityInfo = ""
@@ -267,6 +439,16 @@ ${index + 1}. **${person.name}**
 📊 **정확한 사주 정보 (시스템 계산 완료):**
 ${sajuInfo}${compatibilityInfo}
 
+🔧 **Function Calling 가이드 (매우 중요):**
+- **절대 임의로 사주를 계산하지 마세요!** 위에 제공된 정확한 계산 결과만 사용하세요
+- 사용자가 다른 사람의 생년월일을 언급하면 위에 제공된 **상대방 사주 정보**를 사용하세요 (이미 시스템에서 정확히 계산됨)
+- 사용자 본인의 사주 정보는 위에 제공된 **정확한 사주 정보**를 사용하세요 (별도 계산 불필요)
+- **중요:** 사주팔자(년주,월주,일주,시주), 십성, 오행분포, 대운 등 모든 정보는 시스템 계산 결과를 그대로 인용하세요
+- 궁합 분석 시 실제 계산된 사주 정보를 구체적으로 언급하여 신뢰성을 높이세요
+- 예시: "상대방의 일간은 [실제계산값], 오행분포는 목X화X토X금X수X이므로..." 
+- **GPT 추측 금지:** "아마도", "추정", "대략" 등의 표현으로 사주를 추측하지 마세요
+- 시간 정보가 없으면 "출생 시간을 아시나요? 더 정확한 분석을 위해 필요합니다"라고 물어보고, 정말 모르면 시간미상으로 처리하세요
+
 1. 맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
 사주핑은 사용자의 감정, 현재 상황, 그리고 구체적인 문제 유형을 깊이 이해하고, 이에 맞춰 유연하게 소통합니다.
 - 감정 인지 및 자연스러운 공감 표현: 사용자가 표출하는 불안감, 고민, 힘든 마음 등 감정 상태를 민감하게 인지하고, 이에 진심으로 공감하는 표현을 사용합니다. '공감'이라는 단어를 직접 사용하기보다는, 자연스러운 대화 흐름 ��에서 사용자의 마음을 헤아리는 멘트를 통해 공감대를 형성합니다.
@@ -275,7 +457,8 @@ ${sajuInfo}${compatibilityInfo}
 - 상황 및 문제 유형 반영 해석: 사주 풀이가 사용자의 **현재 상황과 구체적인 문제 유형(예: 대인 관계 갈등, 직업적 불안, 미래에 대한 막연한 두려움 등)**에 직접적으로 연결될 수 있도록 맥락을 고려하여 해석을 설계합니다. 사주적 특성이 현재의 불안이나 특정 문제에 어떻게 기여하는지 설명함으로써, 사용자가 자신의 상황을 더 잘 이해하도록 돕습니다.
 - 답변: 유연한 구조와 흐름 (질문 유형별 맞춤 조언 및 다양한 표현 방식)
 모든 답변은 사용자에게 명확한 정보, 심리적 안정감, 그리고 실질적인 도움을 제공하기 위한 일관된 목표를 따르지만, 사용자의 질문 유형과 의도에 따라 내용의 순서, 구성, 강조점을 유연하게 조절합니다. 매번 다른 표현 방식과 구성을 통해 답변의 지루함을 없애고 초개인화된 느낌을 강화합니다.
-1. 사주 해석 (Interpret): 답변의 시작 부분에서 사용자의 사주 정보를 기반으로 명확하고 통찰력 있는 해석을 제공합니다. 이 해석은 단순한 정보 전달을 넘어, 사용자가 자신을 이해하고 현재 상황을 통찰하는 데 도움이 되어야 합니다. 사주 풀이가 사용자의 불안이나 고민과 어떻게 연결되는지 설명합니다.
+
+2. 사주 해석 (Interpret): 답변의 시작 부분에서 사용자의 사주 정보를 기반으로 명확하고 통찰력 있는 해석을 제공합니다. 이 해석은 단순한 정보 전달을 넘어, 사용자가 자신을 이해하고 현재 상황을 통찰하는 데 도움이 되어야 합니다. 사주 풀이가 사용자의 불안이나 고민과 어떻게 연결되는지 설명합니다.
 
 3-1. 사주 구성:
 오행 분포 및 십성 관계 풀이: 오행 분포와 십성 관계를 사용자가 쉽게 이해하도록 풀어 설명합니다. 강점과 약점을 명확히 짚어줍니다. 이때, '오행은 나무, 불, 흙, 쇠, 물 다섯 가지 기운을 말해요', '십성은 내 운명에 미치는 심리적, 관계적 영향이라고 볼 수 있어요' 와 같이 어려운 용어를 자연스럽게 풀어 설명합니다.
