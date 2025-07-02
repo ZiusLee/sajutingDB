@@ -410,7 +410,7 @@ export default function CompatibilityTool({
         onAnalyze(mainPerson, selectedPeople)
       }
 
-      // onCompatibilityAnalysis 콜백 호출 (새로운 방식)
+      // onCompatibilityAnalysis 콜백 호출 (새로운 방��)
       if (typeof onCompatibilityAnalysis === "function") {
         onCompatibilityAnalysis(compressedMainPerson, compressedSelectedPeople)
       }

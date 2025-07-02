@@ -245,65 +245,39 @@ export default function SajuChat({
   sessionKey,
   birthInfo,
 }: SajuChatProps) {
-  // 🔧 완전히 안정화된 정적 값들 - 한 번만 계산
-  const staticValues = useMemo(
-    () => ({
-      sessionId: `${sessionKey}-${roomType}`,
-      currentCharacter: pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0],
-      suggestedQuestions: initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general,
-      stableBirthInfo: birthInfo
-        ? {
-            solarYear: birthInfo.solarYear,
-            solarMonth: birthInfo.solarMonth,
-            solarDay: birthInfo.solarDay,
-            solarHour: birthInfo.solarHour,
-            solarMinute: birthInfo.solarMinute,
-            timeUnknown: birthInfo.timeUnknown,
-            lunarYear: birthInfo.lunarYear,
-            lunarMonth: birthInfo.lunarMonth,
-            lunarDay: birthInfo.lunarDay,
-          }
-        : null,
-    }),
-    [sessionKey, roomType, birthInfo],
-  )
+  // 🔧 Ultra-Stable: 절대 변경되지 않는 정적 데이터
+  const immutableDataRef = useRef<{
+    currentCharacter: any
+    suggestedQuestions: string[]
+    stableBirthInfo: any
+    calculatedDaeun: any
+    compressedSaju: string
+    defaultInitialMessages: any[]
+    chatId: string
+    baseAiChatBody: any
+  } | null>(null)
 
-  // 기본 상태들
-  const [authUser, setAuthUser] = useState<any>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isReady, setIsReady] = useState(false)
-  const [questionCount, setQuestionCount] = useState(0)
-  const [dbMessages, setDbMessages] = useState<any[]>([])
-  const [databaseSessionId, setDatabaseSessionId] = useState<string | null>(null)
+  // 🔧 Ultra-Stable: 한 번만 계산하고 절대 변경하지 않음
+  if (!immutableDataRef.current) {
+    const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
+    const suggestedQuestions = initialSuggestedQuestionsByType[roomType] || initialSuggestedQuestionsByType.general
 
-  // UI 상태
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
-  const [loginPromptMessage, setLoginPromptMessage] = useState("")
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [showCompatibilityTool, setShowCompatibilityTool] = useState(false)
-  const [showToolsDrawer, setShowToolsDrawer] = useState(false)
-  const [hasSeenToolsNotification, setHasSeenToolsNotification] = useState(false)
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+    const stableBirthInfo = birthInfo
+      ? {
+          solarYear: birthInfo.solarYear,
+          solarMonth: birthInfo.solarMonth,
+          solarDay: birthInfo.solarDay,
+          solarHour: birthInfo.solarHour,
+          solarMinute: birthInfo.solarMinute,
+          timeUnknown: birthInfo.timeUnknown,
+          lunarYear: birthInfo.lunarYear,
+          lunarMonth: birthInfo.lunarMonth,
+          lunarDay: birthInfo.lunarDay,
+        }
+      : null
 
-  // Refs
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const supabaseRef = useRef(createClientComponentClient())
-  const initRef = useRef(false)
-  const lastMessageLength = useRef(0)
-  const isAutoScrolling = useRef(false)
-
-  const router = useRouter()
-
-  // 🔧 계산된 값들 - 한 번만 계산하고 캐시
-  const computedValues = useMemo(() => {
     let calculatedDaeun = null
-    let compressedSaju = ""
-
     try {
-      // 대운 계산
       if (
         saju?.daeun &&
         saju.daeun.pillars &&
@@ -316,9 +290,9 @@ export default function SajuChat({
         saju?.yearStem &&
         saju?.monthStem &&
         saju?.monthBranch &&
-        staticValues.stableBirthInfo?.solarYear &&
-        staticValues.stableBirthInfo?.solarMonth &&
-        staticValues.stableBirthInfo?.solarDay &&
+        stableBirthInfo?.solarYear &&
+        stableBirthInfo?.solarMonth &&
+        stableBirthInfo?.solarDay &&
         gender
       ) {
         calculatedDaeun = calculateDaeunInfo(
@@ -327,113 +301,167 @@ export default function SajuChat({
             monthStem: saju.monthStem,
             monthBranch: saju.monthBranch,
           },
-          staticValues.stableBirthInfo.solarYear,
-          staticValues.stableBirthInfo.solarMonth,
-          staticValues.stableBirthInfo.solarDay,
+          stableBirthInfo.solarYear,
+          stableBirthInfo.solarMonth,
+          stableBirthInfo.solarDay,
           gender,
-          staticValues.stableBirthInfo.timeUnknown ? undefined : staticValues.stableBirthInfo.solarHour,
-          staticValues.stableBirthInfo.timeUnknown ? undefined : staticValues.stableBirthInfo.solarMinute,
-          staticValues.stableBirthInfo.timeUnknown || false,
+          stableBirthInfo.timeUnknown ? undefined : stableBirthInfo.solarHour,
+          stableBirthInfo.timeUnknown ? undefined : stableBirthInfo.solarMinute,
+          stableBirthInfo.timeUnknown || false,
         )
       }
+    } catch (error) {
+      console.error("대운 계산 중 오류:", error)
+    }
 
-      // 사주 압축
+    let compressedSaju = ""
+    try {
       compressedSaju = compressSaju(
         saju,
-        staticValues.stableBirthInfo?.solarYear?.toString(),
-        staticValues.stableBirthInfo?.solarMonth?.toString(),
-        staticValues.stableBirthInfo?.solarDay?.toString(),
-        staticValues.stableBirthInfo?.solarHour?.toString(),
-        staticValues.stableBirthInfo?.solarMinute?.toString(),
-        staticValues.stableBirthInfo?.timeUnknown,
+        stableBirthInfo?.solarYear?.toString(),
+        stableBirthInfo?.solarMonth?.toString(),
+        stableBirthInfo?.solarDay?.toString(),
+        stableBirthInfo?.solarHour?.toString(),
+        stableBirthInfo?.solarMinute?.toString(),
+        stableBirthInfo?.timeUnknown,
       )
     } catch (error) {
-      console.error("계산 중 오류:", error)
+      console.error("사주 압축 중 오류:", error)
     }
 
-    return {
-      calculatedDaeun,
+    const defaultInitialMessages =
+      roomType === "sajuping"
+        ? [
+            {
+              id: "saju-analysis",
+              role: "assistant" as const,
+              content: getInitialMessageByRoomType(name, "sajuping", stableBirthInfo),
+            },
+            {
+              id: "consultation-start",
+              role: "assistant" as const,
+              content: `오늘은 어떤 것이 궁금하세요? 😊`,
+            },
+          ]
+        : [
+            {
+              id: "welcome",
+              role: "assistant" as const,
+              content: getInitialMessageByRoomType(name, roomType, stableBirthInfo),
+            },
+          ]
+
+    const chatId = `${sessionKey}-${roomType}-${Date.now()}`
+
+    const baseAiChatBody = {
       compressedSaju,
-    }
-  }, [saju, staticValues.stableBirthInfo, gender])
-
-  // 🔧 초기 메시지 - 한 번만 생성
-  const initialMessages = useMemo(() => {
-    if (!isReady) return []
-
-    if (roomType === "sajuping") {
-      return [
-        {
-          id: "saju-analysis",
-          role: "assistant" as const,
-          content: getInitialMessageByRoomType(name, "sajuping", staticValues.stableBirthInfo),
-        },
-        {
-          id: "consultation-start",
-          role: "assistant" as const,
-          content: `오늘은 어떤 것이 궁금하세요? 😊`,
-        },
-      ]
-    } else {
-      return [
-        {
-          id: "welcome",
-          role: "assistant" as const,
-          content: getInitialMessageByRoomType(name, roomType, staticValues.stableBirthInfo),
-        },
-      ]
-    }
-  }, [isReady, name, roomType, staticValues.stableBirthInfo])
-
-  // 🔧 AI Chat Body - 완전히 고정된 참조
-  const aiChatBody = useMemo(
-    () => ({
-      compressedSaju: computedValues.compressedSaju,
       name,
       gender,
       initialInterpretation,
       roomType,
-      userId: authUser?.id || null,
+      userId: null, // 나중에 설정
       currentYear: 2025,
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-      birthInfo: staticValues.stableBirthInfo,
-    }),
-    [
-      computedValues.compressedSaju,
-      name,
-      gender,
-      initialInterpretation,
-      roomType,
-      authUser?.id,
-      staticValues.stableBirthInfo,
-    ],
-  )
+      birthInfo: stableBirthInfo,
+    }
 
-  // 초기화 - 딱 한번만 실행
+    immutableDataRef.current = {
+      currentCharacter,
+      suggestedQuestions,
+      stableBirthInfo,
+      calculatedDaeun,
+      compressedSaju,
+      defaultInitialMessages,
+      chatId,
+      baseAiChatBody,
+    }
+  }
+
+  // 🔧 Ultra-Stable: 초기화 상태만 관리하는 최소 상태
+  const [initState, setInitState] = useState<{
+    isReady: boolean
+    authUser: any
+    sessionId: string | null
+    dbMessages: any[]
+  }>({
+    isReady: false,
+    authUser: null,
+    sessionId: null,
+    dbMessages: [],
+  })
+
+  // 🔧 Ultra-Stable: UI 상태만 관리하는 분리된 상태
+  const [uiState, setUiState] = useState({
+    questionCount: 0,
+    showLoginPrompt: false,
+    loginPromptMessage: "",
+    isDropdownOpen: false,
+    showCompatibilityTool: false,
+    showToolsDrawer: false,
+    hasSeenToolsNotification: false,
+    showScrollToBottom: false,
+    isSubmitting: false,
+  })
+
+  // Refs
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const supabaseRef = useRef(createClientComponentClient())
+  const lastMessageLength = useRef(0)
+  const isAutoScrolling = useRef(false)
+  const initOnceRef = useRef(false)
+  const router = useRouter()
+
+  // 🔧 Ultra-Stable: 완전히 고정된 초기 메시지
+  const stableInitialMessages = useMemo(() => {
+    if (!initState.isReady) return []
+
+    // DB 메시지가 있으면 사용 (한 번만)
+    if (initState.dbMessages.length > 0) {
+      return [...initState.dbMessages]
+    }
+
+    // 기본 메시지 사용 (한 번만)
+    return [...(immutableDataRef.current?.defaultInitialMessages || [])]
+  }, [initState.isReady, initState.dbMessages]) // Removed .length from dependency
+
+  // 🔧 Ultra-Stable: 완전히 고정된 AI Chat Body
+  const stableAiChatBody = useMemo(() => {
+    if (!immutableDataRef.current?.baseAiChatBody) return {}
+
+    return {
+      ...immutableDataRef.current.baseAiChatBody,
+      userId: initState.authUser?.id || null,
+    }
+  }, [initState.authUser?.id]) // ID만 의존성으로 사용
+
+  // 🔧 Ultra-Stable: 한 번만 실행되는 초기화
   useEffect(() => {
-    if (initRef.current) return
-    initRef.current = true
+    if (initOnceRef.current) return
+    initOnceRef.current = true
 
-    const initialize = async () => {
+    let isMounted = true
+
+    const initializeOnce = async () => {
       try {
         const supabase = supabaseRef.current
         const {
           data: { user },
         } = await supabase.auth.getUser()
 
-        setAuthUser(user)
-        setIsAuthenticated(!!user)
+        if (!isMounted) return
 
         // 세션 ID 가져오기
         let sessionId = null
-        const currentSajuData = localStorage.getItem("current_saju")
-        if (currentSajuData) {
-          try {
+        try {
+          const currentSajuData = localStorage.getItem("current_saju")
+          if (currentSajuData) {
             const sajuData = JSON.parse(currentSajuData)
             sessionId = sajuData.sessionId
-          } catch (e) {
-            console.error("Failed to parse current_saju:", e)
           }
+        } catch (e) {
+          console.error("Failed to parse current_saju:", e)
         }
 
         if (!sessionId && user) {
@@ -454,10 +482,9 @@ export default function SajuChat({
           }
         }
 
-        setDatabaseSessionId(sessionId)
-
-        // DB에서 메시지 로드 시도
-        if (sessionId) {
+        // DB에서 메시지 로드
+        let dbMessages: any[] = []
+        if (sessionId && isMounted) {
           try {
             const response = await fetch(`/api/messages?sessionId=${sessionId}`)
             if (response.ok) {
@@ -465,12 +492,11 @@ export default function SajuChat({
               const messages = data.messages || []
 
               if (messages.length > 0) {
-                const formattedMessages = messages.map((msg: any) => ({
+                dbMessages = messages.map((msg: any) => ({
                   id: msg.id,
                   role: msg.role,
                   content: msg.content,
                 }))
-                setDbMessages(formattedMessages)
               }
             }
           } catch (error) {
@@ -478,22 +504,31 @@ export default function SajuChat({
           }
         }
 
-        setIsReady(true)
+        if (isMounted) {
+          // 🔧 Ultra-Stable: 한 번에 모든 초기화 상태 설정
+          setInitState({
+            isReady: true,
+            authUser: user,
+            sessionId,
+            dbMessages,
+          })
+        }
       } catch (error) {
         console.error("초기화 오류:", error)
-        setIsReady(true)
+        if (isMounted) {
+          setInitState((prev) => ({ ...prev, isReady: true }))
+        }
       }
     }
 
-    initialize()
-  }, [name]) // name만 의존성으로
+    initializeOnce()
 
-  // 🔧 최종 초기 메시지
-  const finalInitialMessages = useMemo(() => {
-    return dbMessages.length > 0 ? dbMessages : initialMessages
-  }, [dbMessages, initialMessages])
+    return () => {
+      isMounted = false
+    }
+  }, [name]) // name만 의존성
 
-  // useAIChat 복원 - 안정화된 설정으로
+  // useAIChat 초기화 - 완전히 안정화된 설정 사용
   const {
     messages,
     input,
@@ -506,94 +541,97 @@ export default function SajuChat({
     append,
   } = useAIChat({
     api: "/api/saju-chat",
-    id: staticValues.sessionId,
-    initialMessages: finalInitialMessages,
-    body: aiChatBody,
-    onFinish: async (message: any) => {
-      try {
-        if (databaseSessionId) {
-          await saveMessagesToDatabase([message], databaseSessionId)
+    id: immutableDataRef.current?.chatId || `fallback-${sessionKey}`,
+    initialMessages: stableInitialMessages,
+    body: stableAiChatBody,
+    onFinish: useCallback(
+      async (message: any) => {
+        // 🔧 Ultra-Stable: 메시지 저장을 비동기로 처리하여 스트리밍 방해 방지
+        if (initState.sessionId) {
+          setTimeout(async () => {
+            try {
+              await fetch("/api/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId: initState.sessionId,
+                  messages: [message],
+                  roomType,
+                  sajuData: {
+                    name,
+                    gender,
+                    saju,
+                    birthInfo: immutableDataRef.current?.stableBirthInfo,
+                  },
+                }),
+              })
+            } catch (error) {
+              console.error("메시지 저장 오류:", error)
+            }
+          }, 100) // 100ms 지연으로 스트리밍과 분리
         }
-      } catch (error) {
-        console.error("메시지 저장 오류:", error)
-      }
-    },
-    onError: (error: Error) => {
+      },
+      [initState.sessionId, roomType, name, gender, saju],
+    ),
+    onError: useCallback((error: Error) => {
       console.error("채팅 오류:", error)
-    },
+    }, []),
   })
 
-  // 메시지 저장 함수
-  const saveMessagesToDatabase = useCallback(
-    async (messagesToSave: any[], sessionId: string) => {
-      if (!sessionId || !messagesToSave || messagesToSave.length === 0) {
-        return
-      }
-
-      try {
-        const response = await fetch("/api/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            sessionId,
-            messages: messagesToSave,
-            roomType,
-            sajuData: {
-              name,
-              gender,
-              saju,
-              birthInfo: staticValues.stableBirthInfo,
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error("Failed to save messages")
-        }
-      } catch (error) {
-        console.error("DB 저장 오류:", error)
-      }
-    },
-    [roomType, name, gender, saju, staticValues.stableBirthInfo],
-  )
-
-  // 커스텀 submit 핸들러
+  // 🔧 Ultra-Stable: 완전히 안정화된 submit 핸들러
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
 
-      if (!input.trim() || isSubmitting || isLoading) {
+      if (!input.trim() || uiState.isSubmitting || isLoading) {
         return
       }
 
-      setIsSubmitting(true)
+      setUiState((prev) => ({ ...prev, isSubmitting: true }))
 
       try {
-        const newQuestionCount = questionCount + 1
-        setQuestionCount(newQuestionCount)
+        const newQuestionCount = uiState.questionCount + 1
+        setUiState((prev) => ({ ...prev, questionCount: newQuestionCount }))
 
-        const actualIsLoggedIn = isAuthenticated || isLoggedIn
+        const actualIsLoggedIn = !!initState.authUser || isLoggedIn
         if (newQuestionCount >= 5 && !actualIsLoggedIn) {
-          setLoginPromptMessage("5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.")
-          setShowLoginPrompt(true)
-          setIsSubmitting(false)
+          setUiState((prev) => ({
+            ...prev,
+            loginPromptMessage: "5개의 질문을 모두 사용하셨습니다. 로그인하시면 무제한으로 질문하실 수 있습니다.",
+            showLoginPrompt: true,
+            isSubmitting: false,
+          }))
           return
         }
 
-        // 사용자 메시지를 즉시 저장
-        if (databaseSessionId) {
-          try {
-            const userMessageObj = {
-              id: `user-${Date.now()}`,
-              role: "user" as const,
-              content: input.trim(),
+        // 🔧 Ultra-Stable: 사용자 메시지 저장을 비동기로 처리
+        if (initState.sessionId) {
+          setTimeout(async () => {
+            try {
+              const userMessageObj = {
+                id: `user-${Date.now()}`,
+                role: "user" as const,
+                content: input.trim(),
+              }
+              await fetch("/api/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId: initState.sessionId,
+                  messages: [userMessageObj],
+                  roomType,
+                  sajuData: {
+                    name,
+                    gender,
+                    saju,
+                    birthInfo: immutableDataRef.current?.stableBirthInfo,
+                  },
+                }),
+              })
+            } catch (error) {
+              console.error("사용자 메시지 저장 오류:", error)
             }
-            await saveMessagesToDatabase([userMessageObj], databaseSessionId)
-          } catch (error) {
-            console.error("사용자 메시지 저장 오류:", error)
-          }
+          }, 50) // 50ms 지연으로 스트리밍과 분리
         }
 
         // useAIChat의 handleSubmit 호출 (스트리밍)
@@ -601,22 +639,26 @@ export default function SajuChat({
       } catch (error) {
         console.error("메시지 전송 오류:", error)
       } finally {
-        setIsSubmitting(false)
+        setUiState((prev) => ({ ...prev, isSubmitting: false }))
       }
     },
     [
       input,
-      isSubmitting,
+      uiState.isSubmitting,
+      uiState.questionCount,
       isLoading,
-      questionCount,
-      isAuthenticated,
+      initState.authUser,
+      initState.sessionId,
       isLoggedIn,
-      databaseSessionId,
-      saveMessagesToDatabase,
       aiHandleSubmit,
+      roomType,
+      name,
+      gender,
+      saju,
     ],
   )
 
+  // 🔧 Ultra-Stable: 완전히 안정화된 뒤로가기 핸들러
   const handleBackWithSave = useCallback(() => {
     try {
       localStorage.setItem(
@@ -626,7 +668,7 @@ export default function SajuChat({
           name,
           gender,
           interpretation: initialInterpretation,
-          birthInfo: staticValues.stableBirthInfo,
+          birthInfo: immutableDataRef.current?.stableBirthInfo,
         }),
       )
 
@@ -652,9 +694,9 @@ export default function SajuChat({
         window.location.href = "/"
       }, 100)
     }
-  }, [saju, name, gender, initialInterpretation, staticValues.stableBirthInfo, onBack])
+  }, [saju, name, gender, initialInterpretation, onBack])
 
-  // 스크롤 처리
+  // 🔧 Ultra-Stable: 스크롤 처리 - 메시지 길이만 체크
   useEffect(() => {
     const scrollContainer = chatContainerRef.current
     if (scrollContainer && messages.length > lastMessageLength.current) {
@@ -665,8 +707,9 @@ export default function SajuChat({
         scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
     }
-  }, [messages])
+  }, [messages]) // Removed .length from dependency
 
+  // 🔧 Ultra-Stable: 완전히 안정화된 이벤트 핸들러들
   const handleSuggestedQuestionClick = useCallback(
     (question: string) => {
       if (isLoading) return
@@ -699,7 +742,7 @@ export default function SajuChat({
     if (chatContainerRef.current && !isAutoScrolling.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-      setShowScrollToBottom(!isNearBottom)
+      setUiState((prev) => ({ ...prev, showScrollToBottom: !isNearBottom }))
     }
   }, [])
 
@@ -707,8 +750,8 @@ export default function SajuChat({
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
-  // 로딩 상태
-  if (!isReady) {
+  // 🔧 Ultra-Stable: 로딩 상태 체크
+  if (!initState.isReady || !immutableDataRef.current) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
         <div className="flex-1 flex items-center justify-center">
@@ -720,6 +763,8 @@ export default function SajuChat({
       </div>
     )
   }
+
+  const { currentCharacter, suggestedQuestions, stableBirthInfo, calculatedDaeun } = immutableDataRef.current
 
   return (
     <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden h-screen supports-[height:100dvh]:h-[100dvh]">
@@ -741,19 +786,19 @@ export default function SajuChat({
             <Button
               variant="ghost"
               className="flex items-center space-x-1 sm:space-x-2 text-white hover:text-white hover:bg-white/20 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg min-w-0"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              onClick={() => setUiState((prev) => ({ ...prev, isDropdownOpen: !prev.isDropdownOpen }))}
             >
-              <span className="text-base sm:text-lg flex-shrink-0">{staticValues.currentCharacter.emoji}</span>
-              <span className="font-medium text-sm sm:text-base truncate">{staticValues.currentCharacter.name}</span>
+              <span className="text-base sm:text-lg flex-shrink-0">{currentCharacter.emoji}</span>
+              <span className="font-medium text-sm sm:text-base truncate">{currentCharacter.name}</span>
               <ChevronDown
-                className={`h-3 w-3 sm:h-4 sm:w-4 transition-transform flex-shrink-0 ${isDropdownOpen ? "rotate-180" : ""}`}
+                className={`h-3 w-3 sm:h-4 sm:w-4 transition-transform flex-shrink-0 ${uiState.isDropdownOpen ? "rotate-180" : ""}`}
               />
             </Button>
           </div>
         </div>
 
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-          {isAuthenticated ? (
+          {initState.authUser ? (
             <Button
               variant="ghost"
               size="sm"
@@ -789,18 +834,18 @@ export default function SajuChat({
               <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
                 <SajuDiagram
                   saju={saju}
-                  timeUnknown={staticValues.stableBirthInfo?.timeUnknown}
+                  timeUnknown={stableBirthInfo?.timeUnknown}
                   size="sm"
                   name={name}
                   gender={gender}
-                  solarYear={staticValues.stableBirthInfo?.solarYear?.toString()}
-                  solarMonth={staticValues.stableBirthInfo?.solarMonth?.toString()}
-                  solarDay={staticValues.stableBirthInfo?.solarDay?.toString()}
-                  hour={staticValues.stableBirthInfo?.solarHour?.toString()}
-                  minute={staticValues.stableBirthInfo?.solarMinute?.toString()}
-                  lunarYear={staticValues.stableBirthInfo?.lunarYear?.toString()}
-                  lunarMonth={staticValues.stableBirthInfo?.lunarMonth?.toString()}
-                  lunarDay={staticValues.stableBirthInfo?.lunarDay?.toString()}
+                  solarYear={stableBirthInfo?.solarYear?.toString()}
+                  solarMonth={stableBirthInfo?.solarMonth?.toString()}
+                  solarDay={stableBirthInfo?.solarDay?.toString()}
+                  hour={stableBirthInfo?.solarHour?.toString()}
+                  minute={stableBirthInfo?.solarMinute?.toString()}
+                  lunarYear={stableBirthInfo?.lunarYear?.toString()}
+                  lunarMonth={stableBirthInfo?.lunarMonth?.toString()}
+                  lunarDay={stableBirthInfo?.lunarDay?.toString()}
                   location="서울특별시"
                 />
               </div>
@@ -808,13 +853,13 @@ export default function SajuChat({
           </div>
 
           {/* 대운 다이어그램 */}
-          {computedValues.calculatedDaeun && (
+          {calculatedDaeun && (
             <div className="px-3 sm:px-4 mb-4 sm:mb-6">
               <div className="max-w-3xl mx-auto">
                 <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
                   <DaeunDiagram
-                    daeun={convertDaeunData(computedValues.calculatedDaeun)}
-                    birthInfo={staticValues.stableBirthInfo}
+                    daeun={convertDaeunData(calculatedDaeun)}
+                    birthInfo={stableBirthInfo}
                     name={name}
                     gender={gender}
                   />
@@ -833,7 +878,7 @@ export default function SajuChat({
                 <div className="flex-shrink-0">
                   {message.role === "assistant" ? (
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                      {staticValues.currentCharacter.emoji}
+                      {currentCharacter.emoji}
                     </div>
                   ) : (
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">
@@ -881,12 +926,12 @@ export default function SajuChat({
           ))}
 
           {/* 로딩 상태 */}
-          {(isLoading || isSubmitting) && (
+          {(isLoading || uiState.isSubmitting) && (
             <div className="px-3 sm:px-4 py-3 sm:py-4 bg-white/5">
               <div className="max-w-3xl mx-auto flex space-x-2 sm:space-x-4">
                 <div className="flex-shrink-0">
                   <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                    {staticValues.currentCharacter.emoji}
+                    {currentCharacter.emoji}
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -912,7 +957,7 @@ export default function SajuChat({
       </div>
 
       {/* 스크롤 하단 버튼 */}
-      {showScrollToBottom && (
+      {uiState.showScrollToBottom && (
         <Button
           onClick={scrollToBottomSmooth}
           className="fixed bottom-20 sm:bottom-24 right-3 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/20 hover:bg-white/30 text-white z-10"
@@ -925,11 +970,11 @@ export default function SajuChat({
       {/* 하단 입력 영역 */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/95 to-transparent backdrop-blur-md safe-area-bottom">
         {/* 추천 질문 */}
-        {staticValues.suggestedQuestions.length > 0 && !isLoading && !isSubmitting && (
+        {suggestedQuestions.length > 0 && !isLoading && !uiState.isSubmitting && (
           <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-white/10 max-h-[50px] sm:max-h-[60px] flex items-center">
             <div className="max-w-3xl mx-auto w-full">
               <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
-                {staticValues.suggestedQuestions.slice(0, 6).map((question, index) => (
+                {suggestedQuestions.slice(0, 6).map((question, index) => (
                   <Button
                     key={index}
                     variant="outline"
@@ -950,7 +995,10 @@ export default function SajuChat({
           <div className="max-w-3xl mx-auto">
             <form onSubmit={handleSubmit} className="relative">
               <div className="flex items-center bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/20 focus-within:border-white/40">
-                <Sheet open={showToolsDrawer} onOpenChange={setShowToolsDrawer}>
+                <Sheet
+                  open={uiState.showToolsDrawer}
+                  onOpenChange={(open) => setUiState((prev) => ({ ...prev, showToolsDrawer: open }))}
+                >
                   <SheetTrigger asChild>
                     <Button
                       type="button"
@@ -958,12 +1006,15 @@ export default function SajuChat({
                       size="sm"
                       className="ml-2 sm:ml-3 text-white/60 hover:text-white p-1.5 sm:p-2 relative flex-shrink-0"
                       onClick={() => {
-                        setShowToolsDrawer(true)
-                        setHasSeenToolsNotification(true)
+                        setUiState((prev) => ({
+                          ...prev,
+                          showToolsDrawer: true,
+                          hasSeenToolsNotification: true,
+                        }))
                       }}
                     >
                       <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      {!hasSeenToolsNotification && (
+                      {!uiState.hasSeenToolsNotification && (
                         <Badge
                           variant="destructive"
                           className="absolute -top-0.5 -right-0.5 h-3 w-6 sm:h-4 sm:w-8 text-xs px-1 bg-red-500 text-white animate-pulse"
@@ -981,13 +1032,16 @@ export default function SajuChat({
                           variant="ghost"
                           className="w-full justify-start text-white hover:bg-white/20 p-3 sm:p-4 rounded-lg relative"
                           onClick={() => {
-                            setShowCompatibilityTool(true)
-                            setShowToolsDrawer(false)
+                            setUiState((prev) => ({
+                              ...prev,
+                              showCompatibilityTool: true,
+                              showToolsDrawer: false,
+                            }))
                           }}
                         >
                           <span className="mr-2 sm:mr-3">💕</span>
                           궁합 보기
-                          {!hasSeenToolsNotification && (
+                          {!uiState.hasSeenToolsNotification && (
                             <Badge
                               variant="destructive"
                               className="ml-auto h-4 w-8 sm:h-5 sm:w-10 text-xs bg-red-500 text-white animate-pulse"
@@ -1007,12 +1061,12 @@ export default function SajuChat({
                   onChange={handleInputChange}
                   placeholder="Ask anything"
                   className="flex-1 bg-transparent border-none px-3 sm:px-4 py-2.5 sm:py-3 text-white placeholder-white/50 focus:outline-none text-sm sm:text-base min-w-0"
-                  disabled={isLoading || isSubmitting}
+                  disabled={isLoading || uiState.isSubmitting}
                 />
 
                 <Button
                   type="submit"
-                  disabled={isLoading || isSubmitting || !input.trim()}
+                  disabled={isLoading || uiState.isSubmitting || !input.trim()}
                   className="mr-2 sm:mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-1.5 sm:p-2 flex-shrink-0"
                 >
                   <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -1024,7 +1078,7 @@ export default function SajuChat({
       </div>
 
       {/* 궁합 분석 도구 모달 */}
-      {showCompatibilityTool && (
+      {uiState.showCompatibilityTool && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
@@ -1033,7 +1087,7 @@ export default function SajuChat({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowCompatibilityTool(false)}
+                  onClick={() => setUiState((prev) => ({ ...prev, showCompatibilityTool: false }))}
                   className="text-gray-400 hover:text-white"
                 >
                   ✕
@@ -1044,13 +1098,13 @@ export default function SajuChat({
                   name,
                   gender,
                   saju,
-                  birthInfo: staticValues.stableBirthInfo,
+                  birthInfo: stableBirthInfo,
                 }}
                 onAnalyze={(mainPerson: any, selectedPeople: any[]) => {
                   // 궁합 분석 로직 생략...
-                  setShowCompatibilityTool(false)
+                  setUiState((prev) => ({ ...prev, showCompatibilityTool: false }))
                 }}
-                onClose={() => setShowCompatibilityTool(false)}
+                onClose={() => setUiState((prev) => ({ ...prev, showCompatibilityTool: false }))}
               />
             </div>
           </div>
@@ -1059,11 +1113,11 @@ export default function SajuChat({
 
       {/* 로그인 프롬프트 다이얼로그 */}
       <LoginPromptDialog
-        isOpen={showLoginPrompt}
-        onClose={() => setShowLoginPrompt(false)}
-        message={loginPromptMessage}
+        isOpen={uiState.showLoginPrompt}
+        onClose={() => setUiState((prev) => ({ ...prev, showLoginPrompt: false }))}
+        message={uiState.loginPromptMessage}
         onLogin={() => {
-          setShowLoginPrompt(false)
+          setUiState((prev) => ({ ...prev, showLoginPrompt: false }))
           router.push("/login")
         }}
       />

@@ -1076,7 +1076,7 @@ export default function AdditionalQuestions({
                         id="partnerTime-mobile"
                         value={partnerTime}
                         onChange={(e) => setPartnerTime(e.target.value)}
-                        placeholder="2330 또는 23:30 형식으로 입력"
+                        placeholder="2330 ���는 23:30 형식으로 입력"
                         disabled={partnerTimeUnknown}
                         className={`border-pink-100 focus-visible:ring-pink-500 dark:border-pink-800 ${partnerTimeUnknown ? "bg-muted" : ""}`}
                       />
