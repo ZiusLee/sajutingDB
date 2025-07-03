@@ -96,7 +96,7 @@ function getModelForRoomType(roomType) {
 
 // 🚀 성능 최적화: 간소화된 메시지 최적화 함수
 async function processMessagesForContext(messages, compressedSaju, name, roomType) {
-  const MAX_RECENT = 12 // 최근 12개 메시지만 유지
+  const MAX_RECENT = 40 // 최근 20개 메시지만 유지
 
   // 메시지가 적으면 모두 유지
   if (messages.length <= MAX_RECENT) {
