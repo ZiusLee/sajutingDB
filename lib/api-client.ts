@@ -1,13 +1,27 @@
-// API 클라이언트 함수들
 export async function fetchLunarDate(year: string, month: string, day: string) {
   try {
     const response = await fetch(`/api/lunar-date?year=${year}&month=${month}&day=${day}`)
+
     if (!response.ok) {
-      throw new Error("음력 날짜 조회 실패")
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
-    return await response.json()
+
+    const contentType = response.headers.get("content-type")
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text()
+      console.error("Non-JSON response received:", text.substring(0, 200))
+      throw new Error("Server returned non-JSON response")
+    }
+
+    const data = await response.json()
+
+    if (!data || typeof data !== "object") {
+      throw new Error("Invalid response format")
+    }
+
+    return data
   } catch (error) {
-    console.error("음력 날짜 API 호출 오류:", error)
+    console.error("Error fetching lunar date:", error)
     throw error
   }
 }
@@ -23,30 +37,22 @@ export async function saveSajuData(sajuData: any) {
     })
 
     if (!response.ok) {
-      throw new Error("사주 데이터 저장 실패")
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const contentType = response.headers.get("content-type")
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Server returned non-JSON response")
     }
 
     return await response.json()
   } catch (error) {
-    console.error("사주 데이터 저장 오류:", error)
+    console.error("Error saving saju data:", error)
     throw error
   }
 }
 
-export async function fetchUserSajuData(userId: string) {
-  try {
-    const response = await fetch(`/api/user-saju-data?userId=${userId}`)
-    if (!response.ok) {
-      throw new Error("사용자 사주 데이터 조회 실패")
-    }
-    return await response.json()
-  } catch (error) {
-    console.error("사용자 사주 데이터 조회 오류:", error)
-    throw error
-  }
-}
-
-export async function getSajuInterpretation(sajuData: any) {
+export async function fetchSajuInterpretation(sajuData: any) {
   try {
     const response = await fetch("/api/saju-interpretation", {
       method: "POST",
@@ -57,12 +63,83 @@ export async function getSajuInterpretation(sajuData: any) {
     })
 
     if (!response.ok) {
-      throw new Error("사주 해석 조회 실패")
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const contentType = response.headers.get("content-type")
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Server returned non-JSON response")
     }
 
     return await response.json()
   } catch (error) {
-    console.error("사주 해석 API 호출 오류:", error)
+    console.error("Error fetching saju interpretation:", error)
     throw error
   }
 }
+
+interface ApiResponse<T = any> {
+  data?: T
+  error?: string
+  success: boolean
+}
+
+class ApiClient {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+        ...options,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Response is not JSON")
+      }
+
+      const data = await response.json()
+
+      return {
+        data,
+        success: true,
+      }
+    } catch (error) {
+      console.error("API request failed:", error)
+      return {
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+        success: false,
+      }
+    }
+  }
+
+  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: "GET" })
+  }
+
+  async post<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async put<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: "DELETE" })
+  }
+}
+
+export const apiClient = new ApiClient()

@@ -26,34 +26,47 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
     const sajuData = JSON.parse(tempSajuData)
     const supabase = getSupabase()
 
-    // 사주 세션 데이터 저장
+    // First, create the saju_sessions record with only the fields that belong to it
     const { data: sessionData, error: sessionError } = await supabase
       .from("saju_sessions")
       .insert({
         name: sajuData.name,
         gender: sajuData.gender,
-        birth_year: sajuData.year,
-        birth_month: sajuData.month,
-        birth_day: sajuData.day,
-        birth_hour: sajuData.timeUnknown ? null : sajuData.hour,
-        birth_minute: sajuData.timeUnknown ? null : sajuData.minute,
-        time_unknown: sajuData.timeUnknown,
-        lunar_year: sajuData.lunarYear,
-        lunar_month: sajuData.lunarMonth,
-        lunar_day: sajuData.lunarDay,
-        is_leap_month: sajuData.isLeapMonth,
-        year_stem: sajuData.yearStem,
-        year_branch: sajuData.yearBranch,
-        month_stem: sajuData.monthStem,
-        month_branch: sajuData.monthBranch,
-        day_stem: sajuData.dayStem,
-        day_branch: sajuData.dayBranch,
-        hour_stem: sajuData.hourStem,
-        hour_branch: sajuData.hourBranch,
-        day_master: sajuData.dayMaster,
-        elements: sajuData.elements,
-        interpretation: sajuData.interpretation,
+        relationship_status: sajuData.relationshipStatus || "solo",
+        is_beta_applicant: false,
         auth_user_id: authUserId,
+        saju: {
+          yearStem: sajuData.yearStem,
+          yearBranch: sajuData.yearBranch,
+          yearStemHanja: sajuData.yearStemHanja,
+          yearBranchHanja: sajuData.yearBranchHanja,
+          monthStem: sajuData.monthStem,
+          monthBranch: sajuData.monthBranchHanja,
+          monthStemHanja: sajuData.monthStemHanja,
+          monthBranchHanja: sajuData.monthBranchHanja,
+          dayStem: sajuData.dayStem,
+          dayBranch: sajuData.dayBranchHanja,
+          dayStemHanja: sajuData.dayStemHanja,
+          dayBranchHanja: sajuData.dayBranchHanja,
+          hourStem: sajuData.hourStem,
+          hourBranch: sajuData.hourBranchHanja,
+          hourStemHanja: sajuData.hourStemHanja,
+          hourBranchHanja: sajuData.hourBranchHanja,
+          dayMaster: sajuData.dayMaster,
+          dayMasterHanja: sajuData.dayMasterHanja,
+          yearAnimal: sajuData.yearAnimal,
+          elements: sajuData.elements,
+          interpretation: sajuData.interpretation,
+          yearStemSibseong: sajuData.yearStemSibseong,
+          monthStemSibseong: sajuData.monthStemSibseong,
+          dayStemSibseong: sajuData.dayStemSibseong,
+          hourStemSibseong: sajuData.hourStemSibseong,
+          yearBranchSibseong: sajuData.yearBranchSibseong,
+          monthBranchSibseong: sajuData.monthBranchSibseong,
+          dayBranchSibseong: sajuData.dayBranchSibseong,
+          hourBranchSibseong: sajuData.hourBranchSibseong,
+          daeun: sajuData.daeun,
+        },
         created_at: new Date().toISOString(),
       })
       .select()
@@ -65,6 +78,72 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
     }
 
     console.log("Successfully saved saju session:", sessionData.id)
+
+    // Now create the birth_info record with the session ID
+    const { data: birthInfoData, error: birthInfoError } = await supabase
+      .from("birth_info")
+      .insert({
+        user_id: sessionData.id,
+        solar_year: sajuData.year,
+        solar_month: sajuData.month,
+        solar_day: sajuData.day,
+        solar_hour: sajuData.timeUnknown ? null : sajuData.hour,
+        solar_minute: sajuData.timeUnknown ? null : sajuData.minute,
+        lunar_year: sajuData.lunarYear,
+        lunar_month: sajuData.lunarMonth,
+        lunar_day: sajuData.lunarDay,
+        is_leap_month: sajuData.isLeapMonth,
+        time_unknown: sajuData.timeUnknown,
+        birth_city_id: sajuData.birthCityId || "seoul",
+        time_standard: sajuData.timeStandard || "동경135도",
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (birthInfoError) {
+      console.error("Error saving birth info:", birthInfoError)
+      // Clean up the session if birth info creation fails
+      await supabase.from("saju_sessions").delete().eq("id", sessionData.id)
+      return null
+    }
+
+    console.log("Successfully saved birth info:", birthInfoData.id)
+
+    // Create saju_info record for compatibility with existing queries
+    const { data: sajuInfoData, error: sajuInfoError } = await supabase
+      .from("saju_info")
+      .insert({
+        user_id: sessionData.id,
+        year_stem: sajuData.yearStem,
+        year_branch: sajuData.yearBranch,
+        year_stem_hanja: sajuData.yearStemHanja,
+        year_branch_hanja: sajuData.yearBranchHanja,
+        month_stem: sajuData.monthStem,
+        month_branch: sajuData.monthBranch,
+        month_stem_hanja: sajuData.monthStemHanja,
+        month_branch_hanja: sajuData.monthBranchHanja,
+        day_stem: sajuData.dayStem,
+        day_branch: sajuData.dayBranch,
+        day_stem_hanja: sajuData.dayStemHanja,
+        day_branch_hanja: sajuData.dayBranchHanja,
+        hour_stem: sajuData.hourStem,
+        hour_branch: sajuData.hourBranch,
+        hour_stem_hanja: sajuData.hourStemHanja,
+        hour_branch_hanja: sajuData.hourBranchHanja,
+        day_master: sajuData.dayMaster,
+        day_master_hanja: sajuData.dayMasterHanja,
+        year_animal: sajuData.yearAnimal,
+      })
+      .select()
+      .single()
+
+    if (sajuInfoError) {
+      console.error("Error saving saju info:", sajuInfoError)
+      // Don't fail the entire operation if this fails, as it's for compatibility
+    } else {
+      console.log("Successfully saved saju info:", sajuInfoData.id)
+    }
 
     // localStorage에서 임시 데이터 제거
     localStorage.removeItem("tempSajuData")

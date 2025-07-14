@@ -730,7 +730,7 @@ export default function CompatibilityTool({
 
               <div className="flex space-x-2">
                 <Button onClick={handleAddPerson} disabled={isLoading} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                  {isLoading ? "계산 중..." : "추가"}
+                  {isLoading ? "��산 중..." : "추가"}
                 </Button>
                 <Button
                   variant="outline"

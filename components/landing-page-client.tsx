@@ -2,111 +2,111 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import BirthDateFormClient from "@/components/birth-date-form-client"
-import { SajuLogo } from "@/components/saju-logo"
+import { SajuOnboardingFlow } from "@/components/saju-onboarding-flow"
+import { useRouter } from "next/navigation"
 
 export default function LandingPageClient() {
-  const [showForm, setShowForm] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const router = useRouter()
 
-  if (showForm) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
-        <div className="container max-w-2xl mx-auto px-4">
-          <div className="text-center mb-8">
-            <SajuLogo size="lg" className="mb-4" />
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">나만의 사주 분석</h1>
-            <p className="text-gray-600">정확한 생년월일과 시간을 입력해주세요</p>
-          </div>
+  const handleStartSaju = () => {
+    setShowOnboarding(true)
+  }
 
-          <Card>
-            <CardHeader>
-              <CardTitle>사주 정보 입력</CardTitle>
-              <CardDescription>AI가 당신의 사주를 분석해드립니다</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <BirthDateFormClient />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
+  const handleOnboardingComplete = (sessionId: string) => {
+    setShowOnboarding(false)
+    router.push(`/saju-chat/sajuping?session=${sessionId}`)
+  }
+
+  const handleCloseOnboarding = () => {
+    setShowOnboarding(false)
+  }
+
+  if (showOnboarding) {
+    return <SajuOnboardingFlow onComplete={handleOnboardingComplete} onClose={handleCloseOnboarding} />
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
-      {/* Hero Section */}
-      <section className="py-20 px-4">
-        <div className="container max-w-4xl mx-auto text-center">
-          <SajuLogo size="lg" className="mb-8" />
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            AI와 함께하는 <br />
-            <span className="text-purple-600">스마트한 사주 상담</span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            전통 사주학과 최신 AI 기술이 만나 더욱 정확하고 개인화된 사주 분석을 제공합니다
-          </p>
-          <Button size="lg" className="text-lg px-8 py-4" onClick={() => setShowForm(true)}>
-            무료로 사주 보기 🔮
-          </Button>
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">S</span>
+          </div>
+          <span className="text-xl font-bold text-black">SAJUPING</span>
         </div>
-      </section>
+        <Button variant="default" className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded-lg">
+          로그인
+        </Button>
+      </header>
 
-      {/* Features Section */}
-      <section className="py-16 px-4 bg-white">
-        <div className="container max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">왜 사주핑을 선택해야 할까요?</h2>
+      {/* Main Content */}
+      <div className="flex min-h-[calc(100vh-80px)]">
+        {/* Left Side - Korean Content */}
+        <div className="flex-1 flex items-center justify-center px-12">
+          <div className="max-w-lg space-y-8">
+            <div className="space-y-6">
+              <h1 className="text-5xl font-bold text-black leading-tight">
+                걱정은 내려놓고,
+                <br />
+                자신에게 집중해보세요.
+              </h1>
+              <p className="text-lg text-gray-600">사주를 바탕으로 나와 대화하는 AI 불인에게 물어봐, 사주핑!</p>
+            </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card>
-              <CardHeader>
-                <div className="text-4xl mb-4">🤖</div>
-                <CardTitle>AI 기반 분석</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  최신 AI 기술로 전통 사주학을 현대적으로 해석하여 더욱 정확한 분석을 제공합니다
-                </p>
-              </CardContent>
-            </Card>
+            <Button
+              onClick={handleStartSaju}
+              className="bg-gray-800 hover:bg-gray-900 text-white px-8 py-4 rounded-lg text-lg font-medium flex items-center space-x-2"
+            >
+              <span>사주 프로필 생성하기</span>
+              <span>→</span>
+            </Button>
 
-            <Card>
-              <CardHeader>
-                <div className="text-4xl mb-4">💬</div>
-                <CardTitle>실시간 맥락 기반 상담</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  궁금한 점을  가변적 맥락을 바탕으로 언제든지 AI 사주 전문가와 실시간으로 대화하며 해결할 수 있습니다
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="text-4xl mb-4">🔒</div>
-                <CardTitle>개인정보 보호</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  모든 개인정보는 안전하게 암호화되어 저장되며, 사용자의 프라이버시를 최우선으로 보호합니다
-                </p>
-              </CardContent>
-            </Card>
+            <div className="flex items-center space-x-4 text-sm">
+              <span className="text-gray-500">계정이 없으신가요?</span>
+              <button className="text-blue-600 hover:underline">회원가입</button>
+            </div>
           </div>
         </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="py-16 px-4 bg-purple-600 text-white">
-        <div className="container max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-6">지금 바로 시작해보세요</h2>
-          <p className="text-xl mb-8 opacity-90">무료로 나만의 사주를 확인하고 AI와 상담해보세요</p>
-          <Button size="lg" variant="secondary" className="text-lg px-8 py-4" onClick={() => setShowForm(true)}>
-            사주 분석 시작하기
-          </Button>
+        {/* Right Side - Gradient Background with English Text */}
+        <div className="flex-1 relative overflow-hidden">
+          <div
+            className="absolute inset-0 bg-gradient-to-br from-purple-200 via-pink-200 to-blue-200"
+            style={{
+              background: `linear-gradient(135deg, 
+                rgba(196, 181, 253, 0.8) 0%, 
+                rgba(251, 207, 232, 0.8) 25%, 
+                rgba(147, 197, 253, 0.8) 50%, 
+                rgba(196, 181, 253, 0.8) 75%, 
+                rgba(251, 207, 232, 0.8) 100%)`,
+            }}
+          />
+
+          <div className="relative z-10 flex items-center justify-center h-full px-12">
+            <div className="max-w-lg space-y-6 text-white">
+              <h2 className="text-5xl font-bold leading-tight opacity-90">
+                Leave worries,
+                <br />
+                live the present
+              </h2>
+
+              <div className="space-y-4 text-lg opacity-80">
+                <p>Theraping is more than just a chatbot.</p>
+                <p>
+                  It's an inner sanctuary for the digital age — a way of living with AI advisors who truly understand
+                  you.
+                </p>
+                <p>
+                  We build bridges between technology and philosophy, so people can design their lives with themselves
+                  at the center again.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   )
 }

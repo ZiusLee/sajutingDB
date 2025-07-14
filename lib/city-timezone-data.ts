@@ -824,7 +824,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   {
     id: "kabul",
     city: "카불",
-    country: "아프가니스탄",
+    country: "아프가니스��",
     timezone: "Asia/Kabul",
     utcOffset: 4.5,
     timeStandard: "서머타임",
