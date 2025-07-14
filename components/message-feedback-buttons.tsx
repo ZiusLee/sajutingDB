@@ -78,15 +78,15 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 text-gray-400">
       {/* Like Button */}
       <Button
         variant="ghost"
         size="sm"
         onClick={handleLike}
         disabled={isSubmittingFeedback}
-        className={`p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10 ${
-          feedback === "like" ? "text-green-400 bg-green-400/10" : ""
+        className={`p-1.5 h-auto text-gray-400 hover:text-gray-500 hover:bg-gray-100 ${
+          feedback === "like" ? "text-green-400 bg-green-50" : ""
         }`}
       >
         <ThumbsUp className="h-3 w-3" />
@@ -98,8 +98,8 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
         size="sm"
         onClick={handleDislike}
         disabled={isSubmittingFeedback}
-        className={`p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10 ${
-          feedback === "dislike" ? "text-red-400 bg-red-400/10" : ""
+        className={`p-1.5 h-auto text-gray-400 hover:text-gray-500 hover:bg-gray-100 ${
+          feedback === "dislike" ? "text-red-400 bg-red-50" : ""
         }`}
       >
         <ThumbsDown className="h-3 w-3" />
@@ -110,7 +110,7 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
         variant="ghost"
         size="sm"
         onClick={handleCopy}
-        className="p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10"
+        className="p-1.5 h-auto text-gray-400 hover:text-gray-500 hover:bg-gray-100"
       >
         {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
       </Button>
@@ -121,7 +121,7 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
           variant="ghost"
           size="sm"
           onClick={onRetry}
-          className="p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10"
+          className="p-1.5 h-auto text-gray-400 hover:text-gray-500 hover:bg-gray-100"
         >
           <RefreshCw className="h-3 w-3" />
         </Button>

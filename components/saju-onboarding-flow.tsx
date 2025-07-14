@@ -250,8 +250,24 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
       sajuResult.daeun = daeunData
 
-      // Create separate saju and daeun objects
-      const sajuData = {
+      // Store data with the correct structure including birthInfo
+      const sajuDataToStore = {
+        name: birthInfo.name,
+        gender: birthInfo.gender,
+        relationshipStatus: "solo",
+        year: Number.parseInt(year),
+        month: Number.parseInt(month),
+        day: Number.parseInt(day),
+        hour,
+        minute,
+        timeUnknown: false,
+        timeStandard,
+        birthCityId,
+        lunarYear: Number.parseInt(lunarData.year),
+        lunarMonth: Number.parseInt(lunarData.month),
+        lunarDay: Number.parseInt(lunarData.day),
+        isLeapMonth: lunarData.isLeapMonth,
+        // Store saju data with the correct structure
         yearStem: sajuResult.yearStem,
         yearBranch: sajuResult.yearBranch,
         yearStemHanja: sajuResult.yearStemHanja,
@@ -280,25 +296,25 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         monthBranchSibseong: sajuResult.monthBranchSibseong,
         dayBranchSibseong: sajuResult.dayBranchSibseong,
         hourBranchSibseong: sajuResult.hourBranchSibseong,
-      }
-
-      const sajuDataToStore = {
-        name: birthInfo.name,
-        gender: birthInfo.gender,
-        relationshipStatus: "solo",
-        year: Number.parseInt(year),
-        month: Number.parseInt(month),
-        day: Number.parseInt(day),
-        hour,
-        minute,
-        timeUnknown: false,
-        timeStandard,
-        birthCityId,
-        lunarYear: Number.parseInt(lunarData.year),
-        lunarMonth: Number.parseInt(lunarData.month),
-        lunarDay: Number.parseInt(lunarData.day),
-        isLeapMonth: lunarData.isLeapMonth,
-        saju: sajuData, // Store saju data as nested object
+        // Add birthInfo structure
+        birthInfo: {
+          solar: {
+            year: Number.parseInt(year),
+            month: Number.parseInt(month),
+            day: Number.parseInt(day),
+            hour: hour,
+            minute: minute,
+          },
+          lunar: {
+            year: Number.parseInt(lunarData.year),
+            month: Number.parseInt(lunarData.month),
+            day: Number.parseInt(lunarData.day),
+            isLeapMonth: lunarData.isLeapMonth,
+          },
+          birthCityId: birthCityId,
+          timeUnknown: false,
+          timeStandard: timeStandard,
+        },
         daeun: daeunData, // Store daeun data separately
         interpretation: sajuResult.interpretation,
         concerns: birthInfo.concerns,

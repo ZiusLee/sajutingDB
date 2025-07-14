@@ -977,7 +977,7 @@ export default function SajuChat({
   const { currentCharacter, suggestedQuestions, stableBirthInfo, calculatedDaeun } = immutableDataRef.current
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-white" style={{ height: "100dvh" }}>
       {/* Desktop Sidebar */}
       <div className={`hidden lg:flex w-80 bg-gray-50 border-r border-gray-200 flex-col`}>
         <div className="p-4 space-y-6">
@@ -1028,7 +1028,7 @@ export default function SajuChat({
               variant="ghost"
               size="icon"
               className="lg:hidden p-2"
-              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: true }))}
+              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: open }))}
             >
               <Menu className="h-5 w-5 text-gray-600" />
             </Button>
@@ -1190,18 +1190,21 @@ export default function SajuChat({
         )}
 
         {/* Input Area - Clean and minimal with tool button */}
-        <div className="border-t border-gray-200 bg-white px-4 py-4">
-          <div className="max-w-2xl mx-auto">
-            <form onSubmit={handleSubmit} className="flex gap-3 items-end">
-              <div className="flex-1 relative">
-                <div className="flex items-center border border-gray-300 rounded-full bg-white pr-2">
+        <div
+          className="border-t border-gray-200 bg-white px-6 py-6"
+          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="max-w-2xl mx-auto w-full">
+            <form onSubmit={handleSubmit} className="flex gap-3 items-end w-full">
+              <div className="flex-1 relative min-w-0">
+                <div className="flex items-center border border-gray-300 rounded-full bg-white pr-2 w-full">
                   <input
                     ref={inputRef}
                     type="text"
                     value={input}
                     onChange={handleInputChange}
                     placeholder="무엇이든 물어보세요"
-                    className="flex-1 px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none bg-transparent rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none bg-transparent rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-0"
                     disabled={isLoading || uiState.isSubmitting}
                   />
 

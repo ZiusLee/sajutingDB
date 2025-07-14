@@ -166,7 +166,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
       setSaju(sajuResult)
 
-      // 대운 계산 추가 - ��주 계산 후에 정확한 데이터로 계산
+      // 대운 계산 추가 - 사주 계산 후에 정확한 데이터로 계산
       console.log("사주 계산 완료, 대운 계산 시작:", {
         yearStem: sajuResult.yearStem,
         monthStem: sajuResult.monthStem,
@@ -200,20 +200,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
       // 사주 결과에 대운 데이터 추가
       sajuResult.daeun = daeunData
 
-      // 대운 계산 추가
-      // const daeunData = calculateDaeunInfo(
-      //   sajuResult,
-      //   Number.parseInt(year),
-      //   Number.parseInt(month),
-      //   Number.parseInt(day),
-      //   gender,
-      //   timeUnknown ? undefined : hour,
-      //   timeUnknown ? undefined : minute,
-      // )
-
-      // console.log("Calculated daeun data:", daeunData)
-
-      // Store calculation data in localStorage for later use
+      // Store calculation data in localStorage for later use with correct structure
       const sajuDataToStore = {
         name,
         gender,
@@ -230,6 +217,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         lunarMonth: Number.parseInt(lunarData.month),
         lunarDay: Number.parseInt(lunarData.day),
         isLeapMonth: lunarData.isLeapMonth,
+        // Store saju data with the correct structure including birthInfo
         yearStem: sajuResult.yearStem,
         yearBranch: sajuResult.yearBranch,
         yearStemHanja: sajuResult.yearStemHanja,
@@ -259,6 +247,25 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         monthBranchSibseong: sajuResult.monthBranchSibseong,
         dayBranchSibseong: sajuResult.dayBranchSibseong,
         hourBranchSibseong: sajuResult.hourBranchSibseong,
+        // Add birthInfo structure
+        birthInfo: {
+          solar: {
+            year: Number.parseInt(year),
+            month: Number.parseInt(month),
+            day: Number.parseInt(day),
+            hour: timeUnknown ? 0 : hour,
+            minute: timeUnknown ? 0 : minute,
+          },
+          lunar: {
+            year: Number.parseInt(lunarData.year),
+            month: Number.parseInt(lunarData.month),
+            day: Number.parseInt(lunarData.day),
+            isLeapMonth: lunarData.isLeapMonth,
+          },
+          birthCityId: birthCityId,
+          timeUnknown: timeUnknown,
+          timeStandard: timeStandard,
+        },
         daeun: daeunData, // Include daeun data
       }
 
