@@ -136,7 +136,7 @@ class MemoryService {
         if (stored) {
           userMemory = JSON.parse(stored)
           this.memories.set(userId, userMemory!)
-          console.log(`📖 로컬 스토리지에서 메모리 복원: ${userMemory?.entries.length}개 항목`)
+          console.log(`📖 로컬 스토��지에서 메모리 복원: ${userMemory?.entries.length}개 항목`)
         }
       } catch (error) {
         console.error("로컬 스토리지 메모리 로드 실패:", error)

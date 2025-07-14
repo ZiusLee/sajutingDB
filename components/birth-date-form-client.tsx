@@ -166,7 +166,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
       setSaju(sajuResult)
 
-      // 대운 계산 추가 - 사주 계산 후에 정확한 데이터로 계산
+      // 대운 계산 추가 - ��주 계산 후에 정확한 데이터로 계산
       console.log("사주 계산 완료, 대운 계산 시작:", {
         yearStem: sajuResult.yearStem,
         monthStem: sajuResult.monthStem,

@@ -2841,7 +2841,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 2037, month: 11, solarTerm: '입동', timestamp: '2037-11-08 11:11' },
   { year: 2037, month: 11, solarTerm: '소설', timestamp: '2037-11-23 06:54' },
   { year: 2037, month: 12, solarTerm: '대설', timestamp: '2037-12-08 02:18' },
-  { year: 2037, month: 12, solarTerm: '동지', timestamp: '2037-12-22 10:30' },
+  { year: 2037, month: 12, solarTerm: '���지', timestamp: '2037-12-22 10:30' },
   { year: 2038, month: 1, solarTerm: '소한', timestamp: '2038-01-06 13:29' },
   { year: 2038, month: 1, solarTerm: '대한', timestamp: '2038-01-21 06:49' },
   { year: 2038, month: 2, solarTerm: '입춘', timestamp: '2038-02-05 01:09' },

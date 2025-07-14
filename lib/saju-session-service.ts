@@ -29,29 +29,7 @@ export async function getUserSajuProfiles() {
         auth_user_id,
         is_default,
         saju,
-        birth_info (
-          id,
-          solar_year,
-          solar_month,
-          solar_day,
-          solar_hour,
-          solar_minute,
-          lunar_year,
-          lunar_month,
-          lunar_day,
-          time_unknown
-        ),
-        saju_info (
-          id,
-          year_stem,
-          year_branch,
-          month_stem,
-          month_branch,
-          day_stem,
-          day_branch,
-          hour_stem,
-          hour_branch
-        )
+        daeun
       `)
       .eq("auth_user_id", authUserId)
 
@@ -66,43 +44,51 @@ export async function getUserSajuProfiles() {
 
     const profiles = await Promise.all(
       sessions.map(async (session) => {
-        const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
-        const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
-        const sajuJsonb = session.saju || {}
+        const sajuData = session.saju || {}
+        const daeunData = session.daeun || {}
+        const birthInfo = sajuData.birthInfo || {}
+        const solarBirth = birthInfo.solar || {}
+        const lunarBirth = birthInfo.lunar || {}
 
-        let daeunData = sajuJsonb.daeun
+        // Check if we need to recalculate daeun
         let shouldUpdateDB = false
+        let finalDaeunData = daeunData
 
         if (
-          !daeunData ||
-          !daeunData.pillars ||
-          (daeunData.pillars &&
-            daeunData.pillars.length > 0 &&
-            daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
+          !daeunData.daeun ||
+          !daeunData.daeun.pillars ||
+          (daeunData.daeun.pillars &&
+            daeunData.daeun.pillars.length > 0 &&
+            daeunData.daeun.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
         ) {
           if (
-            (sajuInfo?.year_stem || sajuJsonb.yearStem) &&
-            (sajuInfo?.month_stem || sajuJsonb.monthStem) &&
-            (sajuInfo?.month_branch || sajuJsonb.monthBranch) &&
-            birthInfo?.solar_year &&
-            birthInfo?.solar_month &&
-            birthInfo?.solar_day
+            sajuData.yearStem &&
+            sajuData.monthStem &&
+            sajuData.monthBranch &&
+            solarBirth.year &&
+            solarBirth.month &&
+            solarBirth.day
           ) {
             try {
-              daeunData = calculateDaeunInfo(
+              const calculatedDaeun = calculateDaeunInfo(
                 {
-                  yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem,
-                  monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem,
-                  monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch,
+                  yearStem: sajuData.yearStem,
+                  monthStem: sajuData.monthStem,
+                  monthBranch: sajuData.monthBranch,
                 },
-                birthInfo.solar_year,
-                birthInfo.solar_month,
-                birthInfo.solar_day,
+                solarBirth.year,
+                solarBirth.month,
+                solarBirth.day,
                 session.gender || "female",
-                birthInfo.time_unknown ? undefined : birthInfo.solar_hour,
-                birthInfo.time_unknown ? undefined : birthInfo.solar_minute,
-                birthInfo.time_unknown || false,
+                birthInfo.timeUnknown ? undefined : solarBirth.hour,
+                birthInfo.timeUnknown ? undefined : solarBirth.minute,
+                birthInfo.timeUnknown || false,
               )
+              
+              finalDaeunData = {
+                daeun: calculatedDaeun,
+                interpretation: sajuData.interpretation || daeunData.interpretation || ""
+              }
               shouldUpdateDB = true
             } catch (error) {
               console.error(`Error calculating daeun for session ${session.id}:`, error)
@@ -110,11 +96,11 @@ export async function getUserSajuProfiles() {
           }
         }
 
-        if (shouldUpdateDB && daeunData) {
-          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
+        // Update database with daeun if needed
+        if (shouldUpdateDB && finalDaeunData) {
           supabase
             .from("saju_sessions")
-            .update({ saju: updatedSajuJsonb })
+            .update({ daeun: finalDaeunData })
             .eq("id", session.id)
             .then(({ error }) => {
               if (error) {
@@ -127,36 +113,36 @@ export async function getUserSajuProfiles() {
           id: session.id,
           name: session.name || "무명",
           gender: session.gender || "unknown",
-          birthYear: birthInfo?.solar_year?.toString() || "N/A",
-          birthMonth: birthInfo?.solar_month?.toString().padStart(2, "0") || "N/A",
-          birthDay: birthInfo?.solar_day?.toString().padStart(2, "0") || "N/A",
-          birthHour: birthInfo?.solar_hour?.toString().padStart(2, "0") || "N/A",
-          birthMinute: birthInfo?.solar_minute?.toString().padStart(2, "0") || "N/A",
-          lunarYear: birthInfo?.lunar_year?.toString() || "N/A",
-          lunarMonth: birthInfo?.lunar_month?.toString().padStart(2, "0") || "N/A",
-          lunarDay: birthInfo?.lunar_day?.toString() || "N/A",
-          timeUnknown: birthInfo?.time_unknown || false,
+          birthYear: solarBirth.year?.toString() || "N/A",
+          birthMonth: solarBirth.month?.toString().padStart(2, "0") || "N/A",
+          birthDay: solarBirth.day?.toString().padStart(2, "0") || "N/A",
+          birthHour: solarBirth.hour?.toString().padStart(2, "0") || "N/A",
+          birthMinute: solarBirth.minute?.toString().padStart(2, "0") || "N/A",
+          lunarYear: lunarBirth.year?.toString() || "N/A",
+          lunarMonth: lunarBirth.month?.toString().padStart(2, "0") || "N/A",
+          lunarDay: lunarBirth.day?.toString().padStart(2, "0") || "N/A",
+          timeUnknown: birthInfo.timeUnknown || false,
           createdAt: session.created_at || new Date().toISOString(),
-          birthInfoId: birthInfo?.id || null,
+          birthInfoId: session.id, // Use session id as birth info id
           isDefault: session.is_default || false,
           saju: {
-            yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem || "N/A",
-            yearBranch: sajuInfo?.year_branch || sajuJsonb.yearBranch || "N/A",
-            monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem || "N/A",
-            monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch || "N/A",
-            dayStem: sajuInfo?.day_stem || sajuJsonb.dayStem || "N/A",
-            dayBranch: sajuInfo?.day_branch || sajuJsonb.dayBranch || "N/A",
-            hourStem: sajuInfo?.hour_stem || sajuJsonb.hourStem || "N/A",
-            hourBranch: sajuInfo?.hour_branch || sajuJsonb.hourBranch || "N/A",
-            yearStemSibseong: sajuJsonb.yearStemSibseong || "",
-            monthStemSibseong: sajuJsonb.monthStemSibseong || "",
-            dayStemSibseong: sajuJsonb.dayStemSibseong || "",
-            hourStemSibseong: sajuJsonb.hourStemSibseong || "",
-            yearBranchSibseong: sajuJsonb.yearBranchSibseong || "",
-            monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
-            dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
-            hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-            daeun: daeunData,
+            yearStem: sajuData.yearStem || "N/A",
+            yearBranch: sajuData.yearBranch || "N/A",
+            monthStem: sajuData.monthStem || "N/A",
+            monthBranch: sajuData.monthBranch || "N/A",
+            dayStem: sajuData.dayStem || "N/A",
+            dayBranch: sajuData.dayBranch || "N/A",
+            hourStem: sajuData.hourStem || "N/A",
+            hourBranch: sajuData.hourBranch || "N/A",
+            yearStemSibseong: sajuData.yearStemSibseong || "",
+            monthStemSibseong: sajuData.monthStemSibseong || "",
+            dayStemSibseong: sajuData.dayStemSibseong || "",
+            hourStemSibseong: sajuData.hourStemSibseong || "",
+            yearBranchSibseong: sajuData.yearBranchSibseong || "",
+            monthBranchSibseong: sajuData.monthBranchSibseong || "",
+            dayBranchSibseong: sajuData.dayBranchSibseong || "",
+            hourBranchSibseong: sajuData.hourBranchSibseong || "",
+            daeun: finalDaeunData.daeun || finalDaeunData, // Handle both structures
           },
         }
       }),
@@ -326,66 +312,18 @@ export async function getSajuDataByUuid(uuid: string) {
 
     const { data: session, error: sessionError } = await supabase
       .from("saju_sessions")
-      .select(`
-        *,
-        birth_info(*),
-        saju_info(*)
-      `)
+      .select("*")
       .eq("id", uuid)
       .single()
 
-    if (sessionError) {
-      const { data: birthInfo, error: birthError } = await supabase
-        .from("birth_info")
-        .select(`
-          *,
-          saju_sessions(*),
-          saju_info!inner(*)
-        `)
-        .eq("id", uuid)
-        .single()
-
-      if (birthError || !birthInfo) {
-        return null
-      }
-
-      const userData = {
-        id: birthInfo.saju_sessions?.id || "",
-        name: birthInfo.saju_sessions?.name || "무명",
-        gender: birthInfo.saju_sessions?.gender || "unknown",
-        createdAt: birthInfo.created_at || new Date().toISOString(),
-      }
-
-      const sajuInfo = birthInfo.saju_info?.[0] || {}
-
-      const sajuData = {
-        yearStem: sajuInfo.year_stem || "",
-        yearBranch: sajuInfo.year_branch || "",
-        monthStem: sajuInfo.month_stem || "",
-        monthBranch: sajuInfo.month_branch || "",
-        dayStem: sajuInfo.day_stem || "",
-        dayBranch: sajuInfo.day_branch || "",
-        hourStem: sajuInfo.hour_stem || "",
-        hourBranch: sajuInfo.hour_branch || "",
-        year: birthInfo.solar_year?.toString() || "",
-        month: birthInfo.solar_month?.toString() || "",
-        day: birthInfo.solar_day?.toString() || "",
-        hour: birthInfo.solar_hour?.toString() || "",
-        minute: birthInfo.solar_minute?.toString() || "",
-        lunarYear: birthInfo.lunar_year?.toString() || "",
-        lunarMonth: birthInfo.lunar_month?.toString() || "",
-        lunarDay: birthInfo.lunar_day?.toString() || "",
-      }
-
-      return { userData, sajuData }
-    }
-
-    if (!session) {
+    if (sessionError || !session) {
       return null
     }
 
-    const birthInfo = session.birth_info?.[0] || {}
-    const sajuInfo = session.saju_info?.[0] || {}
+    const sajuData = session.saju || {}
+    const birthInfo = sajuData.birthInfo || {}
+    const solarBirth = birthInfo.solar || {}
+    const lunarBirth = birthInfo.lunar || {}
 
     const userData = {
       id: session.id,
@@ -394,26 +332,26 @@ export async function getSajuDataByUuid(uuid: string) {
       createdAt: session.created_at || new Date().toISOString(),
     }
 
-    const sajuData = {
-      yearStem: sajuInfo.year_stem || "",
-      yearBranch: sajuInfo.year_branch || "",
-      monthStem: sajuInfo.month_stem || "",
-      monthBranch: sajuInfo.month_branch || "",
-      dayStem: sajuInfo.day_stem || "",
-      dayBranch: sajuInfo.day_branch || "",
-      hourStem: sajuInfo.hour_stem || "",
-      hourBranch: sajuInfo.hour_branch || "",
-      year: birthInfo.solar_year?.toString() || "",
-      month: birthInfo.solar_month?.toString() || "",
-      day: birthInfo.solar_day?.toString() || "",
-      hour: birthInfo.solar_hour?.toString() || "",
-      minute: birthInfo.solar_minute?.toString() || "",
-      lunarYear: birthInfo.lunar_year?.toString() || "",
-      lunarMonth: birthInfo.lunar_month?.toString() || "",
-      lunarDay: birthInfo.lunar_day?.toString() || "",
+    const processedSajuData = {
+      yearStem: sajuData.yearStem || "",
+      yearBranch: sajuData.yearBranch || "",
+      monthStem: sajuData.monthStem || "",
+      monthBranch: sajuData.monthBranch || "",
+      dayStem: sajuData.dayStem || "",
+      dayBranch: sajuData.dayBranch || "",
+      hourStem: sajuData.hourStem || "",
+      hourBranch: sajuData.hourBranch || "",
+      year: solarBirth.year?.toString() || "",
+      month: solarBirth.month?.toString() || "",
+      day: solarBirth.day?.toString() || "",
+      hour: solarBirth.hour?.toString() || "",
+      minute: solarBirth.minute?.toString() || "",
+      lunarYear: lunarBirth.year?.toString() || "",
+      lunarMonth: lunarBirth.month?.toString() || "",
+      lunarDay: lunarBirth.day?.toString() || "",
     }
 
-    return { userData, sajuData }
+    return { userData, sajuData: processedSajuData }
   } catch (error) {
     console.error("Error in getSajuDataByUuid:", error)
     return null
@@ -539,45 +477,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     const { data, error } = await supabase
       .from("saju_sessions")
-      .select(`
-        id,
-        name,
-        gender,
-        created_at,
-        saju,
-        birth_info (
-          id,
-          solar_year,
-          solar_month,
-          solar_day,
-          solar_hour,
-          solar_minute,
-          lunar_year,
-          lunar_month,
-          lunar_day,
-          time_unknown
-        ),
-        saju_info (
-          year_stem,
-          year_branch,
-          month_stem,
-          month_branch,
-          day_stem,
-          day_branch,
-          hour_stem,
-          hour_branch,
-          year_stem_hanja,
-          year_branch_hanja,
-          month_stem_hanja,
-          month_branch_hanja,
-          day_stem_hanja,
-          day_branch_hanja,
-          hour_stem_hanja,
-          hour_branch_hanja,
-          day_master,
-          day_master_hanja
-        )
-      `)
+      .select("*")
       .eq("id", sessionId)
       .single()
 
@@ -586,48 +486,55 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
       return null
     }
 
-    const birthInfo = data?.birth_info?.[0] || {}
-    const sajuInfo = data?.saju_info?.[0] || {}
-    const sajuJsonb = data?.saju || {}
+    const sajuData = data?.saju || {}
+    const daeunData = data?.daeun || {}
+    const birthInfo = sajuData.birthInfo || {}
+    const solarBirth = birthInfo.solar || {}
+    const lunarBirth = birthInfo.lunar || {}
 
-    let daeunData = sajuJsonb.daeun
+    // Check if we need to recalculate daeun
+    let finalDaeunData = daeunData
 
     if (
-      !daeunData ||
-      !daeunData.pillars ||
-      (daeunData.pillars &&
-        daeunData.pillars.length > 0 &&
-        daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
+      !daeunData.daeun ||
+      !daeunData.daeun.pillars ||
+      (daeunData.daeun.pillars &&
+        daeunData.daeun.pillars.length > 0 &&
+        daeunData.daeun.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
     ) {
       if (
-        (sajuInfo?.year_stem || sajuJsonb.yearStem) &&
-        (sajuInfo?.month_stem || sajuJsonb.monthStem) &&
-        (sajuInfo?.month_branch || sajuJsonb.monthBranch) &&
-        birthInfo?.solar_year &&
-        birthInfo?.solar_month &&
-        birthInfo?.solar_day
+        sajuData.yearStem &&
+        sajuData.monthStem &&
+        sajuData.monthBranch &&
+        solarBirth.year &&
+        solarBirth.month &&
+        solarBirth.day
       ) {
         try {
-          daeunData = calculateDaeunInfo(
+          const calculatedDaeun = calculateDaeunInfo(
             {
-              yearStem: sajuInfo?.year_stem || sajuJsonb.yearStem,
-              monthStem: sajuInfo?.month_stem || sajuJsonb.monthStem,
-              monthBranch: sajuInfo?.month_branch || sajuJsonb.monthBranch,
+              yearStem: sajuData.yearStem,
+              monthStem: sajuData.monthStem,
+              monthBranch: sajuData.monthBranch,
             },
-            birthInfo.solar_year,
-            birthInfo.solar_month,
-            birthInfo.solar_day,
+            solarBirth.year,
+            solarBirth.month,
+            solarBirth.day,
             data.gender || "female",
-            birthInfo.time_unknown ? undefined : birthInfo.solar_hour,
-            birthInfo.time_unknown ? undefined : birthInfo.solar_minute,
-            birthInfo.time_unknown || false,
+            birthInfo.timeUnknown ? undefined : solarBirth.hour,
+            birthInfo.timeUnknown ? undefined : solarBirth.minute,
+            birthInfo.timeUnknown || false,
           )
 
-          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
+          finalDaeunData = {
+            daeun: calculatedDaeun,
+            interpretation: sajuData.interpretation || daeunData.interpretation || ""
+          }
 
+          // Update database with daeun
           supabase
             .from("saju_sessions")
-            .update({ saju: updatedSajuJsonb })
+            .update({ daeun: finalDaeunData })
             .eq("id", sessionId)
             .then(({ error }) => {
               if (error) {
@@ -644,45 +551,45 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
       id: data.id,
       name: data.name || "Unknown",
       gender: data.gender || "unknown",
-      birthYear: birthInfo.solar_year?.toString() || "",
-      birthMonth: birthInfo.solar_month?.toString().padStart(2, "0") || "",
-      birthDay: birthInfo.solar_day?.toString().padStart(2, "0") || "",
-      birthHour: birthInfo.solar_hour?.toString().padStart(2, "0") || "00",
-      birthMinute: birthInfo.solar_minute?.toString().padStart(2, "0") || "00",
-      lunarYear: birthInfo.lunar_year?.toString() || "",
-      lunarMonth: birthInfo.lunar_month?.toString().padStart(2, "0") || "",
-      lunarDay: birthInfo.lunar_day?.toString().padStart(2, "0") || "",
-      timeUnknown: birthInfo.time_unknown || false,
+      birthYear: solarBirth.year?.toString() || "",
+      birthMonth: solarBirth.month?.toString().padStart(2, "0") || "",
+      birthDay: solarBirth.day?.toString().padStart(2, "0") || "",
+      birthHour: solarBirth.hour?.toString().padStart(2, "0") || "00",
+      birthMinute: solarBirth.minute?.toString().padStart(2, "0") || "00",
+      lunarYear: lunarBirth.year?.toString() || "",
+      lunarMonth: lunarBirth.month?.toString().padStart(2, "0") || "",
+      lunarDay: lunarBirth.day?.toString().padStart(2, "0") || "",
+      timeUnknown: birthInfo.timeUnknown || false,
       createdAt: data.created_at || new Date().toISOString(),
       saju: {
-        yearStem: sajuInfo.year_stem || sajuJsonb.yearStem || "",
-        yearBranch: sajuInfo.year_branch || sajuJsonb.yearBranch || "",
-        monthStem: sajuInfo.month_stem || sajuJsonb.monthStem || "",
-        monthBranch: sajuInfo.month_branch || sajuJsonb.monthBranch || "",
-        dayStem: sajuInfo.day_stem || sajuJsonb.dayStem || "",
-        dayBranch: sajuInfo.day_branch || sajuJsonb.dayBranch || "",
-        hourStem: sajuInfo.hour_stem || sajuJsonb.hourStem || "",
-        hourBranch: sajuInfo.hour_branch || sajuJsonb.hourBranch || "",
-        yearStemHanja: sajuInfo.year_stem_hanja || sajuJsonb.yearStemHanja || "",
-        yearBranchHanja: sajuInfo.year_branch_hanja || sajuJsonb.yearBranchHanja || "",
-        monthStemHanja: sajuInfo.month_stem_hanja || sajuJsonb.monthStemHanja || "",
-        monthBranchHanja: sajuInfo.month_branch_hanja || sajuJsonb.monthBranchHanja || "",
-        dayStemHanja: sajuInfo.day_stem_hanja || sajuJsonb.dayStemHanja || "",
-        dayBranchHanja: sajuInfo.day_branch_hanja || sajuJsonb.dayBranchHanja || "",
-        hourStemHanja: sajuInfo.hour_stem_hanja || sajuJsonb.hourStemHanja || "",
-        hourBranchHanja: sajuInfo.hour_branch_hanja || sajuJsonb.hourBranchHanja || "",
-        dayMaster: sajuInfo.day_master || sajuJsonb.dayMaster || "",
-        dayMasterHanja: sajuInfo.day_master_hanja || sajuJsonb.dayMasterHanja || "",
-        yearStemSibseong: sajuJsonb.yearStemSibseong || "",
-        monthStemSibseong: sajuJsonb.monthStemSibseong || "",
-        dayStemSibseong: sajuJsonb.dayStemSibseong || "비견",
-        hourStemSibseong: sajuJsonb.hourStemSibseong || "",
-        yearBranchSibseong: sajuJsonb.yearBranchSibseong || "",
-        monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
-        dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
-        hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-        elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
-        daeun: daeunData,
+        yearStem: sajuData.yearStem || "",
+        yearBranch: sajuData.yearBranch || "",
+        monthStem: sajuData.monthStem || "",
+        monthBranch: sajuData.monthBranch || "",
+        dayStem: sajuData.dayStem || "",
+        dayBranch: sajuData.dayBranch || "",
+        hourStem: sajuData.hourStem || "",
+        hourBranch: sajuData.hourBranch || "",
+        yearStemHanja: sajuData.yearStemHanja || "",
+        yearBranchHanja: sajuData.yearBranchHanja || "",
+        monthStemHanja: sajuData.monthStemHanja || "",
+        monthBranchHanja: sajuData.monthBranchHanja || "",
+        dayStemHanja: sajuData.dayStemHanja || "",
+        dayBranchHanja: sajuData.dayBranchHanja || "",
+        hourStemHanja: sajuData.hourStemHanja || "",
+        hourBranchHanja: sajuData.hourBranchHanja || "",
+        dayMaster: sajuData.dayMaster || "",
+        dayMasterHanja: sajuData.dayMasterHanja || "",
+        yearStemSibseong: sajuData.yearStemSibseong || "",
+        monthStemSibseong: sajuData.monthStemSibseong || "",
+        dayStemSibseong: sajuData.dayStemSibseong || "비견",
+        hourStemSibseong: sajuData.hourStemSibseong || "",
+        yearBranchSibseong: sajuData.yearBranchSibseong || "",
+        monthBranchSibseong: sajuData.monthBranchSibseong || "",
+        dayBranchSibseong: sajuData.dayBranchSibseong || "",
+        hourBranchSibseong: sajuData.hourBranchSibseong || "",
+        elements: sajuData.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+        daeun: finalDaeunData.daeun || finalDaeunData,
       },
     }
   } catch (error) {
@@ -733,22 +640,6 @@ export async function saveSajuSession(birthInfo: BirthInfo): Promise<string> {
   const supabase = getSupabase()
 
   try {
-    // Let Supabase generate the UUID automatically - don't specify an id
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("saju_sessions")
-      .insert({
-        name: birthInfo.name,
-        gender: birthInfo.gender,
-        created_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single()
-
-    if (sessionError) {
-      console.error("Error creating saju session:", sessionError)
-      throw new Error("Failed to create saju session")
-    }
-
     // Parse the birth_date to extract year, month, day
     const birthDate = new Date(birthInfo.birth_date)
     const year = birthDate.getFullYear()
@@ -784,27 +675,45 @@ export async function saveSajuSession(birthInfo: BirthInfo): Promise<string> {
       }
     }
 
-    // Create the birth_info record with proper solar date fields
-    const { error: birthInfoError } = await supabase.from("birth_info").insert({
-      user_id: sessionData.id,
-      solar_year: year,
-      solar_month: month,
-      solar_day: day,
-      solar_hour: hour,
-      solar_minute: minute,
-      birth_city_id: birthInfo.birth_place, // Use birth_city_id instead of birth_place
-      time_unknown: false, // Since we're getting time input
+    // Create the session with the correct nested structure
+    const sessionData = {
+      name: birthInfo.name,
+      gender: birthInfo.gender,
+      saju: {
+        birthInfo: {
+          solar: {
+            year: year,
+            month: month,
+            day: day,
+            hour: hour,
+            minute: minute
+          },
+          lunar: {
+            year: year, // This should be calculated properly
+            month: month, // This should be calculated properly
+            day: day, // This should be calculated properly
+            isLeapMonth: false
+          },
+          birthCityId: birthInfo.birth_place,
+          timeUnknown: false,
+          timeStandard: "동경135도"
+        }
+      },
       created_at: new Date().toISOString(),
-    })
-
-    if (birthInfoError) {
-      console.error("Error creating birth info:", birthInfoError)
-      // Clean up the session if birth info creation fails
-      await supabase.from("saju_sessions").delete().eq("id", sessionData.id)
-      throw new Error("Failed to create birth info")
     }
 
-    return sessionData.id
+    const { data: session, error: sessionError } = await supabase
+      .from("saju_sessions")
+      .insert(sessionData)
+      .select("id")
+      .single()
+
+    if (sessionError) {
+      console.error("Error creating saju session:", sessionError)
+      throw new Error("Failed to create saju session")
+    }
+
+    return session.id
   } catch (error) {
     console.error("Error in saveSajuSession:", error)
     throw error
@@ -817,10 +726,7 @@ export async function getSajuSession(sessionId: string) {
   try {
     const { data, error } = await supabase
       .from("saju_sessions")
-      .select(`
-        *,
-        birth_info (*)
-      `)
+      .select("*")
       .eq("id", sessionId)
       .single()
 

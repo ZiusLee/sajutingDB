@@ -121,6 +121,7 @@ export default function SajuChatPage() {
         isLoggedIn={isLoggedIn}
         sessionKey={sessionKey}
         birthInfo={saju.birthInfo}
+        concerns={saju.concerns || []}
       />
     </div>
   )

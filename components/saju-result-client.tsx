@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import DaeunDiagram from "./daeun-diagram"
+import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 
 interface SajuResultClientProps {
   saju: Saju
@@ -79,10 +80,22 @@ export default function SajuResultClient({
   const sajuKey = `${saju.yearStem}${saju.yearBranch}${saju.monthStem}${saju.monthBranch}${saju.dayStem}${saju.dayBranch}${saju.hourStem || ""}${saju.hourBranch || ""}`
   const storageKey = `saju_interpretation_${sajuKey}`
 
+  // Calculate daeun info
+  const daeunInfo =
+    solarYear && solarMonth && solarDay
+      ? calculateDaeunInfo(
+          saju,
+          Number.parseInt(solarYear),
+          Number.parseInt(solarMonth),
+          Number.parseInt(solarDay),
+          normalizedGender,
+        )
+      : null
+
   // 모바일 감지
   useEffect(() => {
     const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 640)
+      setIsMobile(window.innerWidth < 1024)
     }
 
     checkIfMobile()
@@ -273,12 +286,14 @@ ${interpretation}
       name: name || "사용자",
       gender: normalizedGender || "male",
       interpretation: interpretation || "",
-      year: solarYear,
-      month: solarMonth,
-      day: solarDay,
-      hour: hour,
-      minute: minute,
-      timeUnknown: timeUnknown,
+      birthInfo: {
+        solarYear: Number.parseInt(solarYear),
+        solarMonth: Number.parseInt(solarMonth),
+        solarDay: Number.parseInt(solarDay),
+        solarHour: Number.parseInt(hour || "12"),
+        solarMinute: Number.parseInt(minute || "0"),
+        timeUnknown: timeUnknown,
+      },
     }
 
     localStorage.setItem("current_saju", JSON.stringify(sajuData))
@@ -302,21 +317,79 @@ ${interpretation}
 
       <Card>
         <CardContent className="p-4">
-          <SajuDiagram
-            saju={saju}
-            timeUnknown={timeUnknown}
-            name={name}
-            gender={normalizedGender}
-            solarYear={solarYear}
-            solarMonth={solarMonth}
-            solarDay={solarDay}
-            hour={hour}
-            minute={minute}
-            lunarYear={lunarYear}
-            lunarMonth={lunarMonth}
-            lunarDay={lunarDay}
-            location={location}
-          />
+          {/* Desktop: Side by side layout */}
+          {!isMobile ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SajuDiagram
+                saju={saju}
+                timeUnknown={timeUnknown}
+                name={name}
+                gender={normalizedGender}
+                solarYear={solarYear}
+                solarMonth={solarMonth}
+                solarDay={solarDay}
+                hour={hour}
+                minute={minute}
+                lunarYear={lunarYear}
+                lunarMonth={lunarMonth}
+                lunarDay={lunarDay}
+                location={location}
+                variant="chat"
+              />
+
+              {daeunInfo && (
+                <DaeunDiagram
+                  daeun={daeunInfo.pillars}
+                  birthInfo={{
+                    solarYear: Number.parseInt(solarYear),
+                    solarMonth: Number.parseInt(solarMonth),
+                    solarDay: Number.parseInt(solarDay),
+                    solarHour: Number.parseInt(hour || "12"),
+                    solarMinute: Number.parseInt(minute || "0"),
+                    timeUnknown: timeUnknown,
+                  }}
+                  name={name}
+                  gender={normalizedGender}
+                />
+              )}
+            </div>
+          ) : (
+            /* Mobile: Stacked layout */
+            <div className="space-y-6">
+              <SajuDiagram
+                saju={saju}
+                timeUnknown={timeUnknown}
+                name={name}
+                gender={normalizedGender}
+                solarYear={solarYear}
+                solarMonth={solarMonth}
+                solarDay={solarDay}
+                hour={hour}
+                minute={minute}
+                lunarYear={lunarYear}
+                lunarMonth={lunarMonth}
+                lunarDay={lunarDay}
+                location={location}
+                variant="card"
+              />
+
+              {daeunInfo && (
+                <DaeunDiagram
+                  daeun={daeunInfo.pillars}
+                  birthInfo={{
+                    solarYear: Number.parseInt(solarYear),
+                    solarMonth: Number.parseInt(solarMonth),
+                    solarDay: Number.parseInt(solarDay),
+                    solarHour: Number.parseInt(hour || "12"),
+                    solarMinute: Number.parseInt(minute || "0"),
+                    timeUnknown: timeUnknown,
+                  }}
+                  name={name}
+                  gender={normalizedGender}
+                />
+              )}
+            </div>
+          )}
 
           {/* 총운 리포트 섹션 */}
           <div className="mt-8">
@@ -443,20 +516,6 @@ ${interpretation}
                 </div>
               </div>
             )}
-          </div>
-
-          {/* 대운 다이어그램 */}
-          <div className="mt-8">
-            <DaeunDiagram
-              saju={saju}
-              gender={normalizedGender}
-              solarYear={solarYear}
-              solarMonth={solarMonth}
-              solarDay={solarDay}
-              hour={hour}
-              minute={minute}
-              timeUnknown={timeUnknown}
-            />
           </div>
 
           {/* 채팅 버튼 */}

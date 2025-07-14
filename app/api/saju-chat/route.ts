@@ -389,7 +389,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 이벤트 정보가 파싱된 경우 특별 처리
+    // 이벤트 정보가 ���싱된 경우 특별 처리
     if (parsedInfo.eventInfo) {
       const eventText = `
       

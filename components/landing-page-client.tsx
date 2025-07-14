@@ -13,36 +13,53 @@ export default function LandingPageClient() {
     setShowOnboarding(true)
   }
 
-  const handleOnboardingComplete = (sessionId: string) => {
-    setShowOnboarding(false)
-    router.push(`/saju-chat/sajuping?session=${sessionId}`)
-  }
+  // Remove the handleOnboardingComplete function entirely
+  // const handleOnboardingComplete = (sessionId: string) => {
+  //   setShowOnboarding(false)
+  //   router.push(`/saju-chat/sajuping?session=${sessionId}`)
+  // }
 
   const handleCloseOnboarding = () => {
     setShowOnboarding(false)
   }
 
+  const handleLogoClick = () => {
+    router.push("/")
+  }
+
+  const handleLoginClick = () => {
+    router.push("/login")
+  }
+
+  const handleRegisterClick = () => {
+    router.push("/register")
+  }
+
   if (showOnboarding) {
-    return <SajuOnboardingFlow onComplete={handleOnboardingComplete} onClose={handleCloseOnboarding} />
+    return <SajuOnboardingFlow onClose={handleCloseOnboarding} />
   }
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center space-x-2">
+      {/* Floating Navigation */}
+      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4">
+        <button onClick={handleLogoClick} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">S</span>
           </div>
           <span className="text-xl font-bold text-black">SAJUPING</span>
-        </div>
-        <Button variant="default" className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded-lg">
+        </button>
+        <Button
+          onClick={handleLoginClick}
+          variant="default"
+          className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded-lg"
+        >
           로그인
         </Button>
-      </header>
+      </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:flex min-h-[calc(100vh-80px)]">
+      <div className="hidden lg:flex min-h-screen">
         {/* Left Side - Korean Content */}
         <div className="flex-1 flex items-center justify-center px-12">
           <div className="max-w-lg space-y-8">
@@ -52,7 +69,7 @@ export default function LandingPageClient() {
                 <br />
                 자신에게 집중해보세요.
               </h1>
-              <p className="text-lg text-gray-600">사주를 바탕으로 나와 대화하는 AI 불인에게 물어봐, 사주핑!</p>
+              <p className="text-lg text-gray-600">사주를 바탕으로 나와 대화하는 AI 불안케어 플랫폼, 사주핑</p>
             </div>
 
             <Button
@@ -65,7 +82,9 @@ export default function LandingPageClient() {
 
             <div className="flex items-center space-x-4 text-sm">
               <span className="text-gray-500">계정이 없으신가요?</span>
-              <button className="text-blue-600 hover:underline">회원가입</button>
+              <button onClick={handleRegisterClick} className="text-blue-600 hover:underline">
+                회원가입
+              </button>
             </div>
           </div>
         </div>
@@ -109,7 +128,7 @@ export default function LandingPageClient() {
       </div>
 
       {/* Mobile Layout */}
-      <div className="lg:hidden min-h-[calc(100vh-80px)] relative overflow-hidden">
+      <div className="lg:hidden min-h-screen relative overflow-hidden">
         {/* Mobile Gradient Background */}
         <div
           className="absolute inset-0"
@@ -124,7 +143,7 @@ export default function LandingPageClient() {
         />
 
         {/* Mobile Content */}
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-80px)] px-6 text-center">
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
           {/* English Title */}
           <div className="mb-16">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-600 leading-tight mb-4">
@@ -159,7 +178,9 @@ export default function LandingPageClient() {
 
             <div className="flex items-center justify-center space-x-2 text-sm">
               <span className="text-gray-500">계정이 없으신가요?</span>
-              <button className="text-blue-600 hover:underline font-medium">회원가입</button>
+              <button onClick={handleRegisterClick} className="text-blue-600 hover:underline font-medium">
+                회원가입
+              </button>
             </div>
           </div>
         </div>

@@ -4,20 +4,18 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowRight, Check, Search } from "lucide-react"
+import { ArrowRight, Check, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
-import { fetchLunarDate } from "@/lib/api-client"
 import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
 import { syncLocalStorageToDatabase } from "@/lib/data-sync"
 import { getSupabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
-import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
+import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } from "@/lib/city-timezone-data"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 
 interface SajuOnboardingFlowProps {
-  onComplete: (sessionId: string) => void
   onClose: () => void
 }
 
@@ -25,6 +23,7 @@ interface BirthInfo {
   name: string
   gender: "male" | "female" | ""
   birthPlace: string
+  birthPlaceId: string
   birthDate: string
   birthTime: string
   isLunar: boolean
@@ -47,39 +46,20 @@ const concernOptions = [
   { id: "family", label: "가족 관계", icon: "🏠" },
 ]
 
-const cityOptions = [
-  "서울",
-  "부산",
-  "대구",
-  "인천",
-  "광주",
-  "대전",
-  "울산",
-  "세종",
-  "경기",
-  "강원",
-  "충북",
-  "충남",
-  "전북",
-  "전남",
-  "경북",
-  "경남",
-  "제주",
-]
-
-export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowProps) {
+export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [birthInfo, setBirthInfo] = useState<BirthInfo>({
     name: "",
     gender: "",
     birthPlace: "",
+    birthPlaceId: DEFAULT_CITY_ID,
     birthDate: "",
     birthTime: "",
     isLunar: false,
     concerns: [],
   })
-  const [citySearchResults, setCitySearchResults] = useState<string[]>([])
+  const [citySearchResults, setCitySearchResults] = useState<CityTimezoneData[]>([])
   const [showCityDropdown, setShowCityDropdown] = useState(false)
   const router = useRouter()
 
@@ -92,7 +72,7 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
   const handleCitySearch = (value: string) => {
     setBirthInfo({ ...birthInfo, birthPlace: value })
     if (value.trim()) {
-      const filtered = cityOptions.filter((city) => city.toLowerCase().includes(value.toLowerCase()))
+      const filtered = searchCities(value)
       setCitySearchResults(filtered)
       setShowCityDropdown(true)
     } else {
@@ -101,8 +81,12 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
     }
   }
 
-  const selectCity = (city: string) => {
-    setBirthInfo({ ...birthInfo, birthPlace: city })
+  const selectCity = (city: CityTimezoneData) => {
+    setBirthInfo({
+      ...birthInfo,
+      birthPlace: `${city.city}, ${city.country}`,
+      birthPlaceId: city.id,
+    })
     setShowCityDropdown(false)
     setCitySearchResults([])
   }
@@ -119,7 +103,7 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
   }
 
   const getTimeStandardFromCity = (): TimeStandard => {
-    const cityData = getCityById(DEFAULT_CITY_ID)
+    const cityData = getCityById(birthInfo.birthPlaceId)
     return cityData?.timeStandard || "동경135도"
   }
 
@@ -195,12 +179,29 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
       const { hour, minute } = parsedTime
 
       const timeStandard = getTimeStandardFromCity()
-      const birthCityId = DEFAULT_CITY_ID
+      const birthCityId = birthInfo.birthPlaceId
 
       let lunarData: any = null
 
       try {
-        lunarData = await fetchLunarDate(year, month, day)
+        const response = await fetch("/api/lunar-date", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ year, month, day }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const contentType = response.headers.get("content-type")
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Response is not JSON")
+        }
+
+        lunarData = await response.json()
       } catch (apiError) {
         console.error("API error, falling back to local calculation:", apiError)
         const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
@@ -249,22 +250,8 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
 
       sajuResult.daeun = daeunData
 
-      const sajuDataToStore = {
-        name: birthInfo.name,
-        gender: birthInfo.gender,
-        relationshipStatus: "solo",
-        year: Number.parseInt(year),
-        month: Number.parseInt(month),
-        day: Number.parseInt(day),
-        hour,
-        minute,
-        timeUnknown: false,
-        timeStandard,
-        birthCityId,
-        lunarYear: Number.parseInt(lunarData.year),
-        lunarMonth: Number.parseInt(lunarData.month),
-        lunarDay: Number.parseInt(lunarData.day),
-        isLeapMonth: lunarData.isLeapMonth,
+      // Create separate saju and daeun objects
+      const sajuData = {
         yearStem: sajuResult.yearStem,
         yearBranch: sajuResult.yearBranch,
         yearStemHanja: sajuResult.yearStemHanja,
@@ -285,7 +272,6 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
         dayMasterHanja: sajuResult.dayMasterHanja,
         yearAnimal: sajuResult.yearAnimal,
         elements: sajuResult.elements,
-        interpretation: sajuResult.interpretation,
         yearStemSibseong: sajuResult.yearStemSibseong,
         monthStemSibseong: sajuResult.monthStemSibseong,
         dayStemSibseong: "본원",
@@ -294,7 +280,27 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
         monthBranchSibseong: sajuResult.monthBranchSibseong,
         dayBranchSibseong: sajuResult.dayBranchSibseong,
         hourBranchSibseong: sajuResult.hourBranchSibseong,
-        daeun: daeunData,
+      }
+
+      const sajuDataToStore = {
+        name: birthInfo.name,
+        gender: birthInfo.gender,
+        relationshipStatus: "solo",
+        year: Number.parseInt(year),
+        month: Number.parseInt(month),
+        day: Number.parseInt(day),
+        hour,
+        minute,
+        timeUnknown: false,
+        timeStandard,
+        birthCityId,
+        lunarYear: Number.parseInt(lunarData.year),
+        lunarMonth: Number.parseInt(lunarData.month),
+        lunarDay: Number.parseInt(lunarData.day),
+        isLeapMonth: lunarData.isLeapMonth,
+        saju: sajuData, // Store saju data as nested object
+        daeun: daeunData, // Store daeun data separately
+        interpretation: sajuResult.interpretation,
         concerns: birthInfo.concerns,
       }
 
@@ -359,10 +365,8 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
 
         // Go directly to saju-chat without showing toast or going to homepage
         if (sajuResult) {
-          if (onComplete && userId) {
-            onComplete(userId)
-          }
-          router.push("/saju-chat/sajuping")
+          // Don't call onComplete - go directly to avoid URL flashing
+          window.location.href = "/saju-chat/sajuping"
         }
       } catch (e) {
         console.error("Error storing saju data:", e)
@@ -394,6 +398,14 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
       default:
         return false
     }
+  }
+
+  const getSelectedCityInfo = () => {
+    const cityData = getCityById(birthInfo.birthPlaceId)
+    if (cityData) {
+      return `현재 선택: ${cityData.city}, ${cityData.country} (UTC${cityData.utcOffset >= 0 ? "+" : ""}${cityData.utcOffset})`
+    }
+    return ""
   }
 
   const renderStep = () => {
@@ -463,7 +475,7 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
               <button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "male" })}
                 className={cn(
-                  "px-8 py-4 rounded-full border-2 transition-all text-lg font-medium",
+                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium",
                   birthInfo.gender === "male"
                     ? "bg-gray-800 text-white border-gray-800"
                     : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -474,7 +486,7 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
               <button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "female" })}
                 className={cn(
-                  "px-8 py-4 rounded-full border-2 transition-all text-lg font-medium",
+                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium",
                   birthInfo.gender === "female"
                     ? "bg-gray-800 text-white border-gray-800"
                     : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -512,41 +524,54 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
             <h1 className="text-3xl font-bold text-blue-600 mb-12">태어난 도시를 알려주세요.</h1>
 
             <div className="w-full max-w-md mb-4 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                value={birthInfo.birthPlace}
-                onChange={(e) => handleCitySearch(e.target.value)}
-                onFocus={() => {
-                  if (birthInfo.birthPlace.trim()) {
-                    const filtered = cityOptions.filter((city) =>
-                      city.toLowerCase().includes(birthInfo.birthPlace.toLowerCase()),
-                    )
-                    setCitySearchResults(filtered)
-                    setShowCityDropdown(true)
-                  }
-                }}
-                onBlur={() => {
-                  // Delay hiding dropdown to allow for clicks
-                  setTimeout(() => setShowCityDropdown(false), 200)
-                }}
-                placeholder="ex: 서울"
-                className="text-center text-lg py-4 pl-10 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full text-gray-800 placeholder:text-gray-500"
-              />
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  value={birthInfo.birthPlace ? birthInfo.birthPlace : ""}
+                  onChange={(e) => handleCitySearch(e.target.value)}
+                  onFocus={() => {
+                    if (birthInfo.birthPlace.trim()) {
+                      const filtered = searchCities(birthInfo.birthPlace)
+                      setCitySearchResults(filtered)
+                      setShowCityDropdown(true)
+                    }
+                  }}
+                  onBlur={() => {
+                    // Delay hiding dropdown to allow for clicks
+                    setTimeout(() => setShowCityDropdown(false), 200)
+                  }}
+                  placeholder="ex: 서울"
+                  className="text-left text-lg py-4 pl-10 pr-10 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full text-gray-800 placeholder:text-gray-500"
+                />
+                {birthInfo.birthPlace && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <Check className="w-5 h-5 text-green-500" />
+                  </div>
+                )}
+              </div>
 
               {showCityDropdown && citySearchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border max-h-40 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border max-h-60 overflow-y-auto z-10">
                   {citySearchResults.map((city) => (
                     <button
-                      key={city}
+                      key={city.id}
                       onClick={() => selectCity(city)}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors"
+                      className="w-full px-4 py-3 text-left hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0"
                     >
-                      {city}
+                      <div className="font-medium text-gray-800">
+                        {city.city}, {city.country}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        UTC{city.utcOffset >= 0 ? "+" : ""}
+                        {city.utcOffset}
+                      </div>
                     </button>
                   ))}
                 </div>
               )}
             </div>
+
+            {birthInfo.birthPlace && <p className="text-gray-500 text-sm mb-8">{getSelectedCityInfo()}</p>}
 
             <p className="text-gray-500 text-sm mb-12">이거는 시간 조정에 활용됩니다</p>
 
