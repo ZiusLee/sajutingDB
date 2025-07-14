@@ -856,7 +856,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1955, month: 2, solarTerm: '우수', timestamp: '1955-02-19 18:49' },
   { year: 1955, month: 3, solarTerm: '경칩', timestamp: '1955-03-06 17:01' },
   { year: 1955, month: 3, solarTerm: '춘분', timestamp: '1955-03-21 18:05' },
-  { year: 1955, month: 4, solarTerm: '청명', timestamp: '1955-04-05 22:09' },
+  { year: 1955, month: 4, solarTerm: '청��', timestamp: '1955-04-05 22:09' },
   { year: 1955, month: 4, solarTerm: '곡우', timestamp: '1955-04-21 05:28' },
   { year: 1955, month: 5, solarTerm: '입하', timestamp: '1955-05-06 17:41' },
   { year: 1955, month: 5, solarTerm: '소만', timestamp: '1955-05-22 05:54' },

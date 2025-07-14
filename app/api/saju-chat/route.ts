@@ -7,10 +7,11 @@ import { parseMessageForDatesAndBirth, formatDateForDisplay, testMessageParsing 
 import { parseMessageWithGPT } from "@/lib/gpt-date-parser"
 
 export const runtime = "edge"
+export const maxDuration = 300 // 5분으로 최대 연장
 
 // 🚀 로그 레벨 설정
 const LOG_LEVEL = process.env.NODE_ENV === "development" ? "DEBUG" : "ERROR"
-const shouldLog = (level) => {
+const shouldLog = (level: string) => {
   if (LOG_LEVEL === "ERROR") return level === "ERROR"
   return true // DEBUG 모드에서는 모든 로그
 }
@@ -78,25 +79,9 @@ function getCurrentDateInfo() {
   }
 }
 
-// 🚀 로그 최적화: 모델 선택 함수
-function getModelForRoomType(roomType) {
-  try {
-    switch (roomType) {
-      case "sajuping":
-        return "gpt-4.1"
-      case "tarot":
-        return "gpt-4.1"
-      default:
-        return "gpt-4.1"
-    }
-  } catch (error) {
-    return "gpt-4.1"
-  }
-}
-
 // 🚀 성능 최적화: 간소화된 메시지 최적화 함수
-async function processMessagesForContext(messages, compressedSaju, name, roomType) {
-  const MAX_RECENT = 30 // 최근 20개 메시지만 유지
+async function processMessagesForContext(messages: any[], compressedSaju: any, name: string, roomType: string) {
+  const MAX_RECENT = 30 // 최근 30개 메시지만 유지
 
   // 메시지가 적으면 모두 유지
   if (messages.length <= MAX_RECENT) {
@@ -137,8 +122,8 @@ async function processMessagesForContext(messages, compressedSaju, name, roomTyp
   return [...initialMessages, ...recentMessages]
 }
 
-// 🚀 수정된 요약 함수 - 무한 루프 방지
-async function createSimpleSummary(messages, roomType) {
+// 🚀 수정된 요약 함수 - 무한 루프 방지 및 타임아웃 연장
+async function createSimpleSummary(messages: any[], roomType: string) {
   try {
     const recentContent = messages
       .slice(-3) // 최근 3개만 요약
@@ -147,9 +132,9 @@ async function createSimpleSummary(messages, roomType) {
 
     const summaryPrompt = `다음 ${roomType} 상담을 30자 이내로 요약: ${recentContent}`
 
-    // 🔧 무한 루프 방지: 타임아웃 설정
+    // 🔧 무한 루프 방지: 타임아웃 설정을 60초로 연장
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Summary timeout")), 10000) // 10초 타임아웃
+      setTimeout(() => reject(new Error("Summary timeout")), 60000) // 60초 타임아웃
     })
 
     const summaryPromise = async () => {
@@ -161,15 +146,15 @@ async function createSimpleSummary(messages, roomType) {
 
       let summaryText = ""
       let chunkCount = 0
-      const MAX_CHUNKS = 20 // 최대 청크 수 제한
+      const MAX_CHUNKS = 50 // 최대 청크 수 증가
 
       // 🔧 무한 루프 방지: 청크 수 제한과 타임아웃
       for await (const chunk of summary.textStream) {
         summaryText += chunk
         chunkCount++
-        
+
         // 최대 청크 수 또는 길이 제한에 도달하면 종료
-        if (chunkCount >= MAX_CHUNKS || summaryText.length > 100) {
+        if (chunkCount >= MAX_CHUNKS || summaryText.length > 200) {
           break
         }
       }
@@ -180,23 +165,77 @@ async function createSimpleSummary(messages, roomType) {
     // 타임아웃과 함께 요약 실행
     const result = await Promise.race([summaryPromise(), timeoutPromise])
     return result
-
   } catch (error) {
     console.error("요약 생성 오류:", error)
     return "이전 대화 내용"
   }
 }
 
-export async function POST(req) {
+export async function POST(req: Request) {
   try {
-    const { messages, compressedSaju, name, gender, initialInterpretation, roomType, userId, compatibilityData } =
-      await req.json()
+    const {
+      messages,
+      compressedSaju,
+      name,
+      gender,
+      initialInterpretation,
+      roomType,
+      userId,
+      compatibilityData,
+      continueFromMessage,
+    } = await req.json()
 
     const dateInfo = getCurrentDateInfo()
 
+    // Continue generation 처리
+    if (continueFromMessage) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && lastMessage.role === "assistant") {
+        // 마지막 메시지에 "계속 작성해주세요"를 추가
+        const continueMessages = [
+          ...messages,
+          {
+            role: "user",
+            content: "계속 작성해주세요. 이어서 말씀해주세요.",
+          },
+        ]
+
+        const optimizedMessages = await processMessagesForContext(continueMessages, compressedSaju, name, roomType)
+
+        // 시스템 메시지 설정 (기존과 동일)
+        const systemMessage = getSystemMessage(roomType, dateInfo, compressedSaju, name, gender, compatibilityData)
+        const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
+
+        try {
+          const result = await streamText({
+            messages: apiMessages,
+            model: openai("gpt-4o"),
+            temperature: 1.0,
+            maxTokens: 4096, // 토큰 수 증가
+            topP: 1.0,
+          })
+
+          return result.toDataStreamResponse()
+        } catch (streamError) {
+          console.error("Continue generation error:", streamError)
+          return new Response(
+            JSON.stringify({
+              id: "error-message",
+              role: "assistant",
+              content: "죄송합니다. 계속 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          )
+        }
+      }
+    }
+
     // 🚀 최신 메시지에서 날짜/생년월일 파싱 (GPT 우선, 패턴 기반 fallback)
     const latestMessage = messages[messages.length - 1]?.content || ""
-    
+
     // 이전 메시지들에서 기존 파트너 정보 확인 (컨텍스트 유지)
     let existingPartnerContext = ""
     const recentMessages = messages.slice(-5) // 최근 5개 메시지 확인
@@ -205,78 +244,99 @@ export async function POST(req) {
         const partnerMatch = msg.content.match(/🔮 \*\*상대방 사주 정보[\s\S]*?(?=\n\n|\n�|$)/)
         if (partnerMatch) {
           existingPartnerContext = partnerMatch[0]
-          console.log("🔍 Found existing partner context in recent messages")
+          console.log("🔍 기존 파트너 컨텍스트 발견")
           break
         }
       }
     }
-    
-    const parsedInfo = ENABLE_GPT_PARSING 
+
+    const parsedInfo = ENABLE_GPT_PARSING
       ? await parseMessageWithGPT(latestMessage)
       : parseMessageForDatesAndBirth(latestMessage)
-    
+
     // 항상 로깅 (문제 해결용)
-    console.log("🔍 Latest message:", latestMessage)
-    
+    console.log("🔍 최신 메시지:", latestMessage)
+
     // 상세 패턴 테스팅 (GPT 파싱 비활성화 시에만)
-    if (!ENABLE_GPT_PARSING && latestMessage.includes("년") && latestMessage.includes("월") && latestMessage.includes("일")) {
-      console.log("🔧 Pattern testing (GPT disabled):")
+    if (
+      !ENABLE_GPT_PARSING &&
+      latestMessage.includes("년") &&
+      latestMessage.includes("월") &&
+      latestMessage.includes("일")
+    ) {
+      console.log("🔧 패턴 테스팅 (GPT 비활성화):")
       testMessageParsing(latestMessage)
     }
-    
-    console.log("🔍 Parsed message info:", JSON.stringify(parsedInfo, null, 2))
+
+    console.log("🔍 파싱된 메시지 정보:", JSON.stringify(parsedInfo, null, 2))
 
     // 🚀 성능 최적화: 간소화된 메시지 최적화
     const optimizedMessages = await processMessagesForContext(messages, compressedSaju, name, roomType)
 
     // 🚀 추가 사주 데이터 계산 (파싱된 정보 기반)
     let additionalSajuData = ""
-    
+
     // 파싱 결과 상태 확인
-    console.log("🔍 Parsing result check:", {
+    console.log("🔍 파싱 결과 확인:", {
       hasPartnerInfo: !!parsedInfo.partnerInfo,
       hasEventInfo: !!parsedInfo.eventInfo,
       partnerInfo: parsedInfo.partnerInfo,
       eventInfo: parsedInfo.eventInfo,
-      hasExistingContext: !!existingPartnerContext
+      hasExistingContext: !!existingPartnerContext,
+      hasCalculatedSaju: !!parsedInfo.partnerInfo?.calculatedSaju,
     })
-    
+
     // 기존 파트너 컨텍스트가 있으면 재사용, 없으면 새로 계산
     if (existingPartnerContext) {
       // 기존 파트너 정보 재사용 (컨텍스트 유지)
       additionalSajuData = existingPartnerContext
-      console.log("♻️ Reusing existing partner context - no recalculation needed")
-    } else if (parsedInfo.partnerInfo && parsedInfo.partnerInfo.year && parsedInfo.partnerInfo.month && parsedInfo.partnerInfo.day) {
+      console.log("♻️ 기존 파트너 컨텍스트 재사용 - 재계산 불필요")
+    } else if (
+      parsedInfo.partnerInfo &&
+      parsedInfo.partnerInfo.year &&
+      parsedInfo.partnerInfo.month &&
+      parsedInfo.partnerInfo.day
+    ) {
       try {
-        console.log("🚀 Partner info detected, calculating saju:", parsedInfo.partnerInfo)
-        
-        const lunarDate = solarToLunar(
-          parsedInfo.partnerInfo.year,
-          parsedInfo.partnerInfo.month,
-          parsedInfo.partnerInfo.day
-        )
-        
-        console.log("🌙 Lunar date conversion result:", lunarDate)
-        
-        const partnerSaju = calculateSaju(
-          lunarDate.year.toString(),
-          lunarDate.month.toString(), 
-          lunarDate.day.toString(),
-          parsedInfo.partnerInfo.hour || 12,
-          parsedInfo.partnerInfo.minute || 0,
-          parsedInfo.partnerInfo.year,
-          parsedInfo.partnerInfo.month,
-          parsedInfo.partnerInfo.day,
-          parsedInfo.partnerInfo.gender || "unknown",
-          parsedInfo.partnerInfo.name || "상대방",
-          parsedInfo.partnerInfo.timeUnknown || false,
-          lunarDate.isLeapMonth,
-          lunarDate.monthStem,
-          lunarDate.monthBranch,
-          "동경135도"
-        )
-        
-        console.log("📊 Calculated partner saju:", {
+        console.log("🚀 파트너 정보 감지, 사주 계산:", parsedInfo.partnerInfo)
+
+        let partnerSaju = parsedInfo.partnerInfo.calculatedSaju
+        let lunarDate = parsedInfo.partnerInfo.lunarDate
+
+        // GPT에서 이미 계산된 사주가 없으면 직접 계산
+        if (!partnerSaju) {
+          console.log("🔄 GPT에서 사주 계산이 안됨, 직접 계산 시작")
+
+          lunarDate = solarToLunar(
+            parsedInfo.partnerInfo.year,
+            parsedInfo.partnerInfo.month,
+            parsedInfo.partnerInfo.day,
+          )
+
+          console.log("🌙 음력 날짜 변환 결과:", lunarDate)
+
+          partnerSaju = calculateSaju(
+            lunarDate.year.toString(),
+            lunarDate.month.toString(),
+            lunarDate.day.toString(),
+            parsedInfo.partnerInfo.hour || 12,
+            parsedInfo.partnerInfo.minute || 0,
+            parsedInfo.partnerInfo.year,
+            parsedInfo.partnerInfo.month,
+            parsedInfo.partnerInfo.day,
+            parsedInfo.partnerInfo.gender || "unknown",
+            parsedInfo.partnerInfo.name || "상대방",
+            parsedInfo.partnerInfo.timeUnknown || false,
+            lunarDate.isLeapMonth,
+            lunarDate.monthStem,
+            lunarDate.monthBranch,
+            "동경135도",
+          )
+        } else {
+          console.log("✅ GPT에서 이미 계산된 사주 사용")
+        }
+
+        console.log("📊 계산된 파트너 사주:", {
           yearStem: partnerSaju.yearStem,
           yearBranch: partnerSaju.yearBranch,
           monthStem: partnerSaju.monthStem,
@@ -285,9 +345,9 @@ export async function POST(req) {
           dayBranch: partnerSaju.dayBranch,
           hourStem: partnerSaju.hourStem,
           hourBranch: partnerSaju.hourBranch,
-          elements: partnerSaju.elements
+          elements: partnerSaju.elements,
         })
-        
+
         // 대운 정보도 계산 (성별이 있는 경우에만)
         let partnerDaeunInfo = ""
         if (parsedInfo.partnerInfo.gender) {
@@ -296,17 +356,21 @@ export async function POST(req) {
             parsedInfo.partnerInfo.year,
             parsedInfo.partnerInfo.month,
             parsedInfo.partnerInfo.day,
-            parsedInfo.partnerInfo.gender
+            parsedInfo.partnerInfo.gender,
           )
-          
-          partnerDaeunInfo = `\n대운정보: ${partnerDaeun.direction === 'forward' ? '순행' : '역행'} - ${partnerDaeun.pillars.slice(0,3).map(p => `${p.ages}세(${p.period})`).join(', ')}`
+
+          partnerDaeunInfo = `
+대운정보: ${partnerDaeun.direction === "forward" ? "순행" : "역행"} - ${partnerDaeun.pillars
+            .slice(0, 3)
+            .map((p: any) => `${p.ages}세(${p.period})`)
+            .join(", ")}`
         }
-        
+
         const partnerSajuText = `
 
 🔮 **상대방 사주 정보 (시스템 계산 완료):**
 이름: ${parsedInfo.partnerInfo.name || "상대방"}
-생년월일시: ${parsedInfo.partnerInfo.year}년 ${parsedInfo.partnerInfo.month}월 ${parsedInfo.partnerInfo.day}일 ${parsedInfo.partnerInfo.timeUnknown ? '시간미상' : `${parsedInfo.partnerInfo.hour || 12}시${parsedInfo.partnerInfo.minute || 0}분`}
+생년월일시: ${parsedInfo.partnerInfo.year}년 ${parsedInfo.partnerInfo.month}월 ${parsedInfo.partnerInfo.day}일 ${parsedInfo.partnerInfo.timeUnknown ? "시간미상" : `${parsedInfo.partnerInfo.hour || 12}시${parsedInfo.partnerInfo.minute || 0}분`}
 성별: ${parsedInfo.partnerInfo.gender === "male" ? "남성" : parsedInfo.partnerInfo.gender === "female" ? "여성" : "성별미상"}
 사주팔자: ${partnerSaju.yearStem}${partnerSaju.yearBranch}년 ${partnerSaju.monthStem}${partnerSaju.monthBranch}월 ${partnerSaju.dayStem}${partnerSaju.dayBranch}일 ${partnerSaju.hourStem}${partnerSaju.hourBranch}시
 일간: ${partnerSaju.dayMaster}
@@ -315,14 +379,16 @@ export async function POST(req) {
 
 ⚠️ **중요:** 위 사주 정보는 시스템에서 정확히 계산된 결과입니다. 새로 계산하지 말고 이 정보를 사용하세요.`
 
-        console.log("📝 Partner saju text being added to system message:", partnerSajuText)
+        console.log("📝 파트너 사주 텍스트가 시스템 메시지에 추가됨:", partnerSajuText)
         additionalSajuData += partnerSajuText
       } catch (error) {
-        console.error("Partner saju calculation error:", error)
-        additionalSajuData += `\n\n❌ **상대방 사주 계산 오류:** ${parsedInfo.partnerInfo.year}년 ${parsedInfo.partnerInfo.month}월 ${parsedInfo.partnerInfo.day}일 정보로 사주 계산 중 오류가 발생했습니다.`
+        console.error("파트너 사주 계산 오류:", error)
+        additionalSajuData += `
+
+❌ **상대방 사주 계산 오류:** ${parsedInfo.partnerInfo.year}년 ${parsedInfo.partnerInfo.month}월 ${parsedInfo.partnerInfo.day}일 정보로 사주 계산 중 오류가 발생했습니다.`
       }
     }
-    
+
     // 이벤트 정보가 파싱된 경우 특별 처리
     if (parsedInfo.eventInfo) {
       const eventText = `
@@ -333,24 +399,27 @@ export async function POST(req) {
 원본: ${parsedInfo.eventInfo.original}
 
 ⚠️ **중요:** 이것은 이벤트 날짜입니다. 상대방의 생년월일이 아닙니다. 해당 날짜의 운세와 타이밍을 분석해주세요.`
-      
-      console.log("📅 Event info detected:", parsedInfo.eventInfo)
+
+      console.log("📅 이벤트 정보 감지:", parsedInfo.eventInfo)
       additionalSajuData += eventText
     }
-    
+
     // 특정 날짜들이 파싱된 경우 컨텍스트 추가
-    if (parsedInfo.dates.length > 0) {
-      const dateContext = parsedInfo.dates.map(date => 
-        formatDateForDisplay(date)
-      ).join(", ")
-      
+    if (parsedInfo.dates && parsedInfo.dates.length > 0) {
+      const dateContext = parsedInfo.dates.map((date) => formatDateForDisplay(date)).join(", ")
+
       additionalSajuData += `
 
-📅 **질문 관련 날짜들:** ${dateContext}${parsedInfo.eventContext.length ? `\n관련 키워드: ${parsedInfo.eventContext.join(", ")}` : ""}`
+📅 **질문 관련 날짜들:** ${dateContext}${
+        parsedInfo.eventContext && parsedInfo.eventContext.length
+          ? `
+관련 키워드: ${parsedInfo.eventContext.join(", ")}`
+          : ""
+      }`
     }
-    
+
     // Follow-up 질문이 필요한 경우 - GPT가 직접 질문하도록 유도
-    if (parsedInfo.needsFollowUp.length > 0) {
+    if (parsedInfo.needsFollowUp && parsedInfo.needsFollowUp.length > 0) {
       additionalSajuData += `
 
 ❓ **추가 정보가 필요합니다 (GPT가 직접 질문해야 함):** ${parsedInfo.needsFollowUp.join(" / ")}
@@ -367,9 +436,14 @@ export async function POST(req) {
 일간: ${compressedSaju.dayMaster}
 십성: 년간(${compressedSaju.sibseong.yearStem}) 년지(${compressedSaju.sibseong.yearBranch}) 월간(${compressedSaju.sibseong.monthStem}) 월지(${compressedSaju.sibseong.monthBranch}) 일간(${compressedSaju.sibseong.dayStem}) 일지(${compressedSaju.sibseong.dayBranch}) 시간(${compressedSaju.sibseong.hourStem}) 시지(${compressedSaju.sibseong.hourBranch})
 오행분포: 목${compressedSaju.elements.목} 화${compressedSaju.elements.화} 토${compressedSaju.elements.토} 금${compressedSaju.elements.금} 수${compressedSaju.elements.수}
-특징: ${compressedSaju.summary}${compressedSaju.daeun ? `\n대운: ${compressedSaju.daeun}` : ""}${compressedSaju.currentAge ? ` (현재 ${compressedSaju.currentAge}세)` : ""}${additionalSajuData}`
+특징: ${compressedSaju.summary}${
+      compressedSaju.daeun
+        ? `
+대운: ${compressedSaju.daeun}`
+        : ""
+    }${compressedSaju.currentAge ? ` (현재 ${compressedSaju.currentAge}세)` : ""}${additionalSajuData}`
 
-    console.log("🎯 Final sajuInfo being sent to GPT:")
+    console.log("🎯 GPT에 전송되는 최종 sajuInfo:")
     console.log("=".repeat(50))
     console.log(sajuInfo)
     console.log("=".repeat(50))
@@ -394,14 +468,14 @@ export async function POST(req) {
 **궁합 대상들:**
 ${selectedPeople
   .map(
-    (person, index) => `
+    (person: any, index: number) => `
 ${index + 1}. **${person.name}**
-   - 생년월일시: ${person.birth}
-   - 성별: ${person.gender === "male" ? "남성" : "여성"}
-   - 사주팔자: ${person.sajuPalja.year.stem}${person.sajuPalja.year.branch}년 ${person.sajuPalja.month.stem}${person.sajuPalja.month.branch}월 ${person.sajuPalja.day.stem}${person.sajuPalja.day.branch}일 ${person.sajuPalja.hour.stem}${person.sajuPalja.hour.branch}시
-   - 일간: ${person.dayMaster}
-   - 십성: 년간(${person.sibseong.yearStem}) 년지(${person.sibseong.yearBranch}) 월간(${person.sibseong.monthStem}) 월지(${person.sibseong.monthBranch}) 일간(${person.sibseong.dayStem}) 일지(${person.sibseong.dayBranch}) 시간(${person.sibseong.hourStem}) 시지(${person.sibseong.hourBranch})
-   - 오행분포: 목${person.elements.목} 화${person.elements.화} 토${person.elements.토} 금${person.elements.금} 수${person.elements.수}
+  - 생년월일시: ${person.birth}
+  - 성별: ${person.gender === "male" ? "남성" : "여성"}
+  - 사주팔자: ${person.sajuPalja.year.stem}${person.sajuPalja.year.branch}년 ${person.sajuPalja.month.stem}${person.sajuPalja.month.branch}월 ${person.sajuPalja.day.stem}${person.sajuPalja.day.branch}일 ${person.sajuPalja.hour.stem}${person.sajuPalja.hour.branch}시
+  - 일간: ${person.dayMaster}
+  - 십성: 년간(${person.sibseong.yearStem}) 년지(${person.sibseong.yearBranch}) 월간(${person.sibseong.monthStem}) 월지(${person.sibseong.monthBranch}) 일간(${person.sibseong.dayStem}) 일지(${person.sibseong.dayBranch}) 시간(${person.sibseong.hourStem}) 시지(${person.sibseong.hourBranch})
+  - 오행분포: 목${person.elements.목} 화${person.elements.화} 토${person.elements.토} 금${person.elements.금} 수${person.elements.수}
 `,
   )
   .join("")}
@@ -413,14 +487,59 @@ ${index + 1}. **${person.name}**
     }
 
     // 모델 선택 및 시스템 메시지 설정
-    const modelName = getModelForRoomType(roomType)
-    const model = openai(modelName)
-    let systemMessage = ""
+    const systemMessage = getSystemMessage(roomType, dateInfo, sajuInfo, compatibilityInfo)
+    const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
-    // 룸 타입에 따른 시스템 메시지 설정
-    switch (roomType) {
-      case "sajuping":
-        systemMessage = `1. 역할: 사주 전문가이자 다재다능하고 친근한 조언자
+    try {
+      const result = await streamText({
+        messages: apiMessages,
+        model: openai("gpt-4.1"),
+        temperature: 1.0,
+        maxTokens: 4096, // 토큰 수 증가
+        topP: 1.0,
+      })
+
+      return result.toDataStreamResponse()
+    } catch (streamError) {
+      if (shouldLog("ERROR")) {
+        console.error("StreamText error")
+      }
+
+      return new Response(
+        JSON.stringify({
+          id: "error-message",
+          role: "assistant",
+          content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      )
+    }
+  } catch (error) {
+    if (shouldLog("ERROR")) {
+      console.error("API error")
+    }
+
+    return new Response(
+      JSON.stringify({
+        id: "error-message",
+        role: "assistant",
+        content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    )
+  }
+}
+
+function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, compatibilityInfo = "") {
+  switch (roomType) {
+    case "sajuping":
+      return `1. 역할: 사주 전문가이자 다재다능하고 친근한 조언자
 사주핑 AI는 두 가지 핵심 역할을 유연하게 수행합니다.
 - 사주 전문가: 사용자가 제공한 사주, 오행, 십성 등의 사주정보를 기반으로 개인의 특성과 운의 흐름을 심층적으로 분석합니다. 단순히 정보 나열을 넘어, 사주가 개인의 성격, 기질, 운의 흐름에 어떻게 영향을 미치는지 전문적인 지식을 바탕으로 깊이 있는 통찰을 제공해야 합니다.
 - 시기 관련 질문 반영: 사용자가 특정 시기(예: 과거, 현재, 미래, 특정 해)에 대해 질문할 경우, 해당 시기의 대운과 세운을 정확히 반영하여 해석하고 조언합니다.
@@ -435,19 +554,6 @@ ${index + 1}. **${person.name}**
 올해: ${dateInfo.yearGanji}년
 이번 달: ${dateInfo.monthGanji}월
 오늘 시간: ${dateInfo.hourGanji}시
-
-📊 **정확한 사주 정보 (시스템 계산 완료):**
-${sajuInfo}${compatibilityInfo}
-
-🔧 **Function Calling 가이드 (매우 중요):**
-- **절대 임의로 사주를 계산하지 마세요!** 위에 제공된 정확한 계산 결과만 사용하세요
-- 사용자가 다른 사람의 생년월일을 언급하면 위에 제공된 **상대방 사주 정보**를 사용하세요 (이미 시스템에서 정확히 계산됨)
-- 사용자 본인의 사주 정보는 위에 제공된 **정확한 사주 정보**를 사용하세요 (별도 계산 불필요)
-- **중요:** 사주팔자(년주,월주,일주,시주), 십성, 오행분포, 대운 등 모든 정보는 시스템 계산 결과를 그대로 인용하세요
-- 궁합 분석 시 실제 계산된 사주 정보를 구체적으로 언급하여 신뢰성을 높이세요
-- 예시: "상대방의 일간은 [실제계산값], 오행분포는 목X화X토X금X수X이므로..." 
-- **GPT 추측 금지:** "아마도", "추정", "대략" 등의 표현으로 사주를 추측하지 마세요
-- 시간 정보가 없으면 "출생 시간을 아시나요? 더 정확한 분석을 위해 필요합니다"라고 물어보고, 정말 모르면 시간미상으로 처리하세요
 
 1. 맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
 사주핑은 사용자의 감정, 현재 상황, 그리고 구체적인 문제 유형을 깊이 이해하고, 이에 맞춰 유연하게 소통합니다.
@@ -482,14 +588,75 @@ ${sajuInfo}${compatibilityInfo}
 1. 사용자에게 질문 (가장 하단 배치):
 - 답변의 가장 마지막에 사용자에게 추가 정보를 얻거나 대화를 이어갈 수 있는 질문을 배치합니다. 질문의 내용과 형식은 이전 대화 맥락과 사용자 페르소나에 맞춰 유연하게 구성합니다.
 
+
+📊 **정확한 사주 정보 (시스템 계산 완료):**
+${sajuInfo}${compatibilityInfo}
+
+-----------------
+궁합 질문이 들어올시:
+
+단순히 맞다/틀리다의 결과가 아니라, 두 사람의 관계가 어떤 구조로 이어져 있으며 어떤게 잘맞고 어떤걸 주의해야 하며, 어떻게 발전해갈 수 있는 지를 중심으로 해석합니다. 사주 전문용어를 사용하지 않고 일반인도 알아들을 수 있는 쉬운 일상 용어로 해석해줍니다.
+
+🧭 해석 구성 순서
+
+1. 기본 궁합 구조 분석
+
+일주 궁합 (일간/일지 상호작용, 일간합·일지합·충·형 등)
+
+오행 상생·상극 구조 파악
+
+양쪽 명조의 균형 및 보완 여부
+
+1. 성향과 기질의 조화 여부
+
+각자의 성격, 감정 표현 방식, 관계 주도력
+
+대인관계 스타일(주도형/의존형/조율형 등)의 상호 보완 가능성
+
+일간 십성 비교를 통한 감정 흐름 분석
+
+1. 생활 궁합 (현실적 궁합)
+
+금전, 직업, 생활리듬 등 실생활 속 궁합 체크
+
+함께 지낼 때 충돌 요인/의사소통 패턴
+
+가치관/생활 습관의 일치 여부
+
+1. 인연의 지속성과 흐름
+
+궁합 구조가 일시적인 인연인지, 장기적인 흐름을 가지는지
+
+대운·세운에 따라 만남/이별 시기 흐름
+
+시기적 맞물림 또는 타이밍 불일치 여부
+
+1. 궁합 총평 및 조언
+
+긍정적인 시너지 포인트
+
+주의가 필요한 갈등 구조 및 현실 팁
+
+관계 지속을 위한 심리적/생활적 조언
+
+🔧 **Function Calling 가이드 (매우 중요):**
+- **절대 임의로 사주를 계산하지 마세요!** 위에 제공된 정확한 계산 결과만 사용하세요
+- 사용자가 다른 사람의 생년월일을 언급하면 위에 제공된 **상대방 사주 정보**를 사용하세요 (이미 시스템에서 정확히 계산됨)
+- 사용자 본인의 사주 정보는 위에 제공된 **정확한 사주 정보**를 사용하세요 (별도 계산 불필요)
+- **중요:** 사주팔자(년주,월주,일주,시주), 십성, 오행분포, 대운 등 모든 정보는 시스템 계산 결과를 그대로 인용하세요
+- 궁합 분석 시 실제 계산된 사주 정보를 구체적으로 언급하여 신뢰성을 높이세요
+- 예시: "상대방의 일간은 [실제계산값], 오행분포는 목X화X토X금X수X이므로..." 
+- **GPT 추측 금지:** "아마도", "추정", "대략" 등의 표현으로 사주를 추측하지 마세요
+- 시간 정보가 없으면 "출생 시간을 아시나요? 더 정확한 분석을 위해 필요합니다"라고 물어보고, 정말 모르면 시간미상으로 처리하세요
+
+
 🔁 입력 최적화 (개선됨)
 - 12개 메시지까지 유지, 최근 8개는 원본 보존
 - 간소화된 요약으로 응답 속도 향상
 - 대화 연속성을 위해 이전 맥락을 적극 활용하여 응답`
-        break
 
-      case "tarot":
-        systemMessage = `🎭 페르소나 (Persona)
+    case "tarot":
+      return `🎭 페르소나 (Persona)
 당신은 '타로핑'이라는 이름의 AI 타로 상담 캐릭터입니다.
 실물 타로카드를 사용하지 않고, 78장의 타로카드 중 사용자가 번호로 카드를 선택하는 방식으로 상담을 진행합니다.
 타로카드의 상징을 기반으로 사용자의 감정 흐름, 상황 맥락, 선택지 가능성을 분석하고, 결정의 기준이 될 수 있는 통찰을 제공합니다.
@@ -547,10 +714,9 @@ step4. 다음 질문유도
 - 12개 메시지까지 유지, 최근 8개는 원본 보존
 - 간소화된 요약으로 응답 속도 향상
 - 대화 연속성을 위해 이전 맥락을 적극 활용하여 응답`
-        break
 
-      default:
-        systemMessage = `당신은 사주팔자 전문가이자 심리 상담가입니다. 사용자에게 친절하고 자세하게 답변해주세요.
+    default:
+      return `당신은 사주팔자 전문가이자 심리 상담가입니다. 사용자에게 친절하고 자세하게 답변해주세요.
 
 📅 **오늘 날짜 정보:**
 오늘은 ${dateInfo.formattedDate}입니다.
@@ -569,53 +735,5 @@ ${sajuInfo}${compatibilityInfo}
 - 사용자가 이전에 언급한 내용들을 기억하고 연결하여 응답
 - 12개 메시지까지 유지, 최근 8개는 원본 보존
 - 간소화된 요약으로 응답 속도 향상`
-        break
-    }
-
-    const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
-
-    try {
-      const result = await streamText({
-        messages: apiMessages,
-        model: openai("gpt-4.1"),
-        temperature: 1.0,
-        maxTokens: 2048,
-        topP: 1.0,
-      })
-      
-      return result.toDataStreamResponse()
-    } catch (streamError) {
-      if (shouldLog("ERROR")) {
-        console.error("StreamText error")
-      }
-
-      return new Response(
-        JSON.stringify({
-          id: "error-message",
-          role: "assistant",
-          content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      )
-    }
-  } catch (error) {
-    if (shouldLog("ERROR")) {
-      console.error("API error")
-    }
-
-    return new Response(
-      JSON.stringify({
-        id: "error-message",
-        role: "assistant",
-        content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    )
   }
 }

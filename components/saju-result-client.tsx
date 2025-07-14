@@ -12,8 +12,6 @@ import SajuDiagram from "./saju-diagram"
 import { getSajuInterpretation } from "@/lib/api-client"
 import FeedbackButtons from "./feedback-buttons"
 import { Progress } from "@/components/ui/progress"
-import AdditionalQuestions from "./additional-questions"
-// 추가: useSearchParams 임포트
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import DaeunDiagram from "./daeun-diagram"
@@ -63,7 +61,6 @@ export default function SajuResultClient({
   const [loadingMessages, setLoadingMessages] = useState<string[]>([])
   const loadingAnimationRef = useRef<NodeJS.Timeout | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  // 컴포넌트 내부에서 searchParams 사용
   const searchParams = useSearchParams()
   const router = useRouter()
   const [questionSet, setQuestionSet] = useState<string | null>(null)
@@ -373,7 +370,7 @@ ${interpretation}
             {error && (
               <div className="text-red-500 text-center py-4">
                 <p>오류가 발생했습니다: {error}</p>
-                <Button onClick={fetchInterpretation} className="mt-3" variant="outline" size="sm">
+                <Button onClick={fetchInterpretation} className="mt-3 bg-transparent" variant="outline" size="sm">
                   다시 시도
                 </Button>
               </div>
@@ -444,18 +441,6 @@ ${interpretation}
                     </div>
                   </div>
                 </div>
-
-                {/* 추가 질문 섹션 */}
-                <div id="additional-questions" className="mt-6">
-                  <AdditionalQuestions
-                    saju={saju}
-                    name={name}
-                    gender={normalizedGender}
-                    model={model}
-                    relationshipStatus={relationshipStatus}
-                    interpretation={interpretation}
-                  />
-                </div>
               </div>
             )}
           </div>
@@ -474,26 +459,12 @@ ${interpretation}
             />
           </div>
 
-          {/* 채팅 버튼 및 대운 분석 버튼 */}
+          {/* 채팅 버튼 */}
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
             <Button className="flex-1 flex items-center justify-center gap-2" onClick={navigateToChatList}>
               <MessageSquare className="h-4 w-4" />
               <span>사주 채팅 상담 시작하기</span>
             </Button>
-            {/* 대운 상세분석 버튼 임시 숨김 - 아직 완성되지 않은 기능 */}
-            {/* <Button variant="outline" className="flex-1" asChild>
-              <Link
-                href={
-                  uuid
-                    ? `/daeun-analysis?uuid=${uuid}`
-                    : sajuParam
-                      ? `/daeun-analysis?saju=${encodeURIComponent(sajuParam)}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                      : `/daeun-analysis?date=${solarYear}${solarMonth}${solarDay}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                }
-              >
-                10년 대운 상세분석
-              </Link>
-            </Button> */}
           </div>
         </CardContent>
       </Card>

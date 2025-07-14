@@ -17,6 +17,9 @@ import { Badge } from "@/components/ui/badge"
 import DaeunDiagram from "@/components/daeun-diagram"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import type { BirthInfo } from "@/types/birth-info"
+import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
+import { toast } from "sonner"
+import { BackNavigationErrorDialog } from "@/components/back-navigation-error-dialog"
 
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
@@ -234,6 +237,31 @@ function convertDaeunData(daeunData: any) {
   return []
 }
 
+// 메시지가 중간에 멈췄는지 감지하는 함수
+function isMessageIncomplete(content: string): boolean {
+  const trimmedContent = content.trim()
+
+  // 빈 메시지
+  if (!trimmedContent) return true
+
+  // 문장이 중간에 끊어진 경우들
+  const incompletePatterns = [
+    /[가-힣][ㄱ-ㅎㅏ-ㅣ]$/, // 한글 자음/모음으로 끝남
+    /\s+$/, // 공백으로 끝남
+    /[,，]\s*$/, // 쉼표로 끝남
+    /[가-힣]\s*\.\.\.$/, // 말줄임표로 끝남
+    /[가-힣]\s*…$/, // 말줄임표로 끝남
+    /[가-힣]\s*-$/, // 하이픈으로 끝남
+    /[가-힣]\s*:$/, // 콜론으로 끝남
+    /[가-힣]\s*;$/, // 세미콜론으로 끝남
+    /\*\*[^*]*$/, // 볼드 마크다운이 닫히지 않음
+    /\*[^*]*$/, // 이탤릭 마크다운이 닫히지 않음
+    /^[^가-힣]*$/, // 한글이 전혀 없음 (에러 메시지 등)
+  ]
+
+  return incompletePatterns.some((pattern) => pattern.test(trimmedContent))
+}
+
 export default function SajuChat({
   saju,
   name,
@@ -401,6 +429,7 @@ export default function SajuChat({
     hasSeenToolsNotification: false,
     showScrollToBottom: false,
     isSubmitting: false,
+    showBackError: false, // 추가
   })
 
   // Refs
@@ -424,7 +453,7 @@ export default function SajuChat({
 
     // 기본 메시지 사용 (한 번만)
     return [...(immutableDataRef.current?.defaultInitialMessages || [])]
-  }, [initState.isReady, initState.dbMessages]) // Removed .length from dependency
+  }, [initState.isReady, initState.dbMessages])
 
   // 🔧 Ultra-Stable: 완전히 고정된 AI Chat Body
   const stableAiChatBody = useMemo(() => {
@@ -434,7 +463,7 @@ export default function SajuChat({
       ...immutableDataRef.current.baseAiChatBody,
       userId: initState.authUser?.id || null,
     }
-  }, [initState.authUser?.id]) // ID만 의존성으로 사용
+  }, [initState.authUser?.id])
 
   // 🔧 Ultra-Stable: 한 번만 실행되는 초기화
   useEffect(() => {
@@ -526,7 +555,7 @@ export default function SajuChat({
     return () => {
       isMounted = false
     }
-  }, [name]) // name만 의존성
+  }, [name])
 
   // useAIChat 초기화 - 완전히 안정화된 설정 사용
   const {
@@ -539,6 +568,8 @@ export default function SajuChat({
     error,
     reload,
     append,
+    setMessages,
+    stop,
   } = useAIChat({
     api: "/api/saju-chat",
     id: immutableDataRef.current?.chatId || `fallback-${sessionKey}`,
@@ -568,7 +599,7 @@ export default function SajuChat({
             } catch (error) {
               console.error("메시지 저장 오류:", error)
             }
-          }, 100) // 100ms 지연으로 스트리밍과 분리
+          }, 100)
         }
       },
       [initState.sessionId, roomType, name, gender, saju],
@@ -631,7 +662,7 @@ export default function SajuChat({
             } catch (error) {
               console.error("사용자 메시지 저장 오류:", error)
             }
-          }, 50) // 50ms 지연으로 스트리밍과 분리
+          }, 50)
         }
 
         // useAIChat의 handleSubmit 호출 (스트리밍)
@@ -690,11 +721,158 @@ export default function SajuChat({
       }
     } catch (error) {
       console.error("뒤로가기 처리 중 오류:", error)
-      setTimeout(() => {
-        window.location.href = "/"
-      }, 100)
+      // 에러 다이얼로그 표시
+      setUiState((prev) => ({ ...prev, showBackError: true }))
     }
   }, [saju, name, gender, initialInterpretation, onBack])
+
+  // 에러 다이얼로그 핸들러들 추가:
+  const handleBackErrorClose = useCallback(() => {
+    setUiState((prev) => ({ ...prev, showBackError: false }))
+  }, [])
+
+  const handleGoHome = useCallback(() => {
+    setUiState((prev) => ({ ...prev, showBackError: false }))
+    setTimeout(() => {
+      window.location.href = "/"
+    }, 100)
+  }, [])
+
+  const handleGoLogin = useCallback(() => {
+    setUiState((prev) => ({ ...prev, showBackError: false }))
+    setTimeout(() => {
+      window.location.href = "/login"
+    }, 100)
+  }, [])
+
+  // Continue generation 함수
+  const handleContinueGeneration = useCallback(async () => {
+    if (isLoading || uiState.isSubmitting) return
+
+    setUiState((prev) => ({ ...prev, isSubmitting: true }))
+
+    try {
+      const response = await fetch("/api/saju-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages,
+          ...stableAiChatBody,
+          continueFromMessage: true,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Continue generation failed")
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("No reader available")
+      }
+
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && lastMessage.role === "assistant") {
+        let updatedContent = lastMessage.content
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = chunk.split("\n")
+
+            for (const line of lines) {
+              if (line.startsWith("0:")) {
+                try {
+                  const data = JSON.parse(line.slice(2))
+                  if (data.type === "text-delta" && data.textDelta) {
+                    updatedContent += data.textDelta
+
+                    // 실시간으로 메시지 업데이트
+                    setMessages((prev) => {
+                      const newMessages = [...prev]
+                      newMessages[newMessages.length - 1] = {
+                        ...lastMessage,
+                        content: updatedContent,
+                      }
+                      return newMessages
+                    })
+                  }
+                } catch (parseError) {
+                  console.error("Parse error:", parseError)
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock()
+        }
+      }
+    } catch (error) {
+      console.error("Continue generation error:", error)
+      toast.error("계속 생성하는 중 오류가 발생했습니다")
+    } finally {
+      setUiState((prev) => ({ ...prev, isSubmitting: false }))
+    }
+  }, [messages, stableAiChatBody, isLoading, uiState.isSubmitting, setMessages])
+
+  // 피드백 핸들러들
+  const handleLike = useCallback(
+    async (messageId: string) => {
+      try {
+        await fetch("/api/message-feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message_id: messageId,
+            feedback_type: "like",
+            session_id: initState.sessionId,
+          }),
+        })
+      } catch (error) {
+        console.error("Like feedback error:", error)
+      }
+    },
+    [initState.sessionId],
+  )
+
+  const handleDislike = useCallback(
+    async (messageId: string) => {
+      try {
+        await fetch("/api/message-feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message_id: messageId,
+            feedback_type: "dislike",
+            session_id: initState.sessionId,
+          }),
+        })
+      } catch (error) {
+        console.error("Dislike feedback error:", error)
+      }
+    },
+    [initState.sessionId],
+  )
+
+  const handleCopy = useCallback((content: string) => {
+    navigator.clipboard.writeText(content).catch((err) => {
+      console.error("복사 실패:", err)
+    })
+  }, [])
+
+  const handleRetry = useCallback(() => {
+    if (isLoading || uiState.isSubmitting) return
+    setUiState((prev) => ({ ...prev, isSubmitting: true }))
+    reload()
+    setTimeout(() => {
+      setUiState((prev) => ({ ...prev, isSubmitting: false }))
+    }, 1000)
+  }, [reload, isLoading, uiState.isSubmitting])
 
   // 🔧 Ultra-Stable: 스크롤 처리 - 메시지 길이만 체크
   useEffect(() => {
@@ -707,7 +885,7 @@ export default function SajuChat({
         scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
     }
-  }, [messages]) // Removed .length from dependency
+  }, [messages])
 
   // 🔧 Ultra-Stable: 완전히 안정화된 이벤트 핸들러들
   const handleSuggestedQuestionClick = useCallback(
@@ -920,6 +1098,33 @@ export default function SajuChat({
                   >
                     {message.content}
                   </ReactMarkdown>
+
+                  {/* 피드백 버튼들 - AI 메시지에만 표시 */}
+                  {message.role === "assistant" && (
+                    <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between">
+                      <MessageFeedbackButtons
+                        messageId={message.id || `msg-${index}`}
+                        messageContent={message.content}
+                        sessionId={initState.sessionId || ""}
+                        onRetry={index === messages.length - 1 ? handleRetry : undefined}
+                      />
+
+                      {/* Continue Generate 버튼 - 마지막 메시지이고 불완전한 경우에만 표시 */}
+                      {index === messages.length - 1 &&
+                        !isLoading &&
+                        !uiState.isSubmitting &&
+                        isMessageIncomplete(message.content) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleContinueGeneration}
+                            className="text-xs bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white rounded-full px-3 py-1"
+                          >
+                            계속 생성
+                          </Button>
+                        )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -934,7 +1139,7 @@ export default function SajuChat({
                     {currentCharacter.emoji}
                   </div>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center space-x-2">
                   <div className="flex space-x-1">
                     <div
                       className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white/60 rounded-full animate-bounce"
@@ -949,6 +1154,15 @@ export default function SajuChat({
                       style={{ animationDelay: "300ms" }}
                     />
                   </div>
+                  <span className="text-sm text-white/60">답변 생성 중...</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={stop}
+                    className="text-xs text-white/60 hover:text-white px-2 py-1"
+                  >
+                    중단
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1005,50 +1219,30 @@ export default function SajuChat({
                       variant="ghost"
                       size="sm"
                       className="ml-2 sm:ml-3 text-white/60 hover:text-white p-1.5 sm:p-2 relative flex-shrink-0"
-                      onClick={() => {
-                        setUiState((prev) => ({
-                          ...prev,
-                          showToolsDrawer: true,
-                          hasSeenToolsNotification: true,
-                        }))
-                      }}
                     >
-                      <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                       {!uiState.hasSeenToolsNotification && (
-                        <Badge
-                          variant="destructive"
-                          className="absolute -top-0.5 -right-0.5 h-3 w-6 sm:h-4 sm:w-8 text-xs px-1 bg-red-500 text-white animate-pulse"
-                        >
-                          new
-                        </Badge>
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                       )}
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="bottom" className="bg-slate-900/90 border-white/20 backdrop-blur-md">
+                  <SheetContent side="bottom" className="bg-slate-900 border-white/20 text-white">
                     <div className="py-4">
-                      <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Tools</h3>
+                      <h3 className="text-lg font-semibold mb-4">추가 도구</h3>
                       <div className="space-y-3">
                         <Button
-                          variant="ghost"
-                          className="w-full justify-start text-white hover:bg-white/20 p-3 sm:p-4 rounded-lg relative"
                           onClick={() => {
                             setUiState((prev) => ({
                               ...prev,
                               showCompatibilityTool: true,
                               showToolsDrawer: false,
+                              hasSeenToolsNotification: true,
                             }))
                           }}
+                          className="w-full justify-start bg-white/10 hover:bg-white/20 text-white border-white/20"
+                          variant="outline"
                         >
-                          <span className="mr-2 sm:mr-3">💕</span>
-                          궁합 보기
-                          {!uiState.hasSeenToolsNotification && (
-                            <Badge
-                              variant="destructive"
-                              className="ml-auto h-4 w-8 sm:h-5 sm:w-10 text-xs bg-red-500 text-white animate-pulse"
-                            >
-                              new
-                            </Badge>
-                          )}
+                          💕 궁합 분석 도구
                         </Button>
                       </div>
                     </div>
@@ -1057,69 +1251,113 @@ export default function SajuChat({
 
                 <input
                   ref={inputRef}
+                  type="text"
                   value={input}
                   onChange={handleInputChange}
-                  placeholder="Ask anything"
-                  className="flex-1 bg-transparent border-none px-3 sm:px-4 py-2.5 sm:py-3 text-white placeholder-white/50 focus:outline-none text-sm sm:text-base min-w-0"
+                  placeholder={`${currentCharacter.name}에게 질문해보세요...`}
+                  className="flex-1 bg-transparent text-white placeholder-white/50 px-2 sm:px-3 py-2.5 sm:py-3 focus:outline-none text-sm sm:text-base min-w-0"
                   disabled={isLoading || uiState.isSubmitting}
                 />
 
                 <Button
                   type="submit"
-                  disabled={isLoading || uiState.isSubmitting || !input.trim()}
-                  className="mr-2 sm:mr-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 rounded-full p-1.5 sm:p-2 flex-shrink-0"
+                  disabled={!input.trim() || isLoading || uiState.isSubmitting}
+                  className="mr-2 sm:mr-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg p-2 sm:p-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                 >
-                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </div>
+
+              {/* 질문 카운터 */}
+              {!initState.authUser && !isLoggedIn && (
+                <div className="flex justify-center mt-2">
+                  <Badge variant="secondary" className="bg-white/10 text-white/70 text-xs">
+                    {uiState.questionCount}/5 질문 사용
+                  </Badge>
+                </div>
+              )}
             </form>
           </div>
         </div>
       </div>
 
-      {/* 궁합 분석 도구 모달 */}
+      {/* 궁합 분석 도구 */}
       {uiState.showCompatibilityTool && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-2xl border border-white/20 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-white">궁합 분석 도구</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white">궁합 분석 도구</h2>
                 <Button
                   variant="ghost"
-                  size="sm"
                   onClick={() => setUiState((prev) => ({ ...prev, showCompatibilityTool: false }))}
-                  className="text-gray-400 hover:text-white"
+                  className="text-white/60 hover:text-white"
                 >
                   ✕
                 </Button>
               </div>
               <CompatibilityTool
-                currentUserSaju={{
-                  name,
-                  gender,
-                  saju,
-                  birthInfo: stableBirthInfo,
-                }}
-                onAnalyze={(mainPerson: any, selectedPeople: any[]) => {
-                  // 궁합 분석 로직 생략...
+                mainPersonSaju={saju}
+                mainPersonName={name}
+                mainPersonGender={gender}
+                onAnalysisComplete={(data) => {
                   setUiState((prev) => ({ ...prev, showCompatibilityTool: false }))
+                  // 궁합 분석 결과를 채팅에 추가
+                  append({
+                    role: "user",
+                    content: `${data.mainPerson.name}과 ${data.selectedPeople.map((p: any) => p.name).join(", ")}의 궁합을 분석해주세요.`,
+                  })
                 }}
-                onClose={() => setUiState((prev) => ({ ...prev, showCompatibilityTool: false }))}
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* 로그인 프롬프트 다이얼로그 */}
+      {/* 로그인 프롬프트 */}
       <LoginPromptDialog
         isOpen={uiState.showLoginPrompt}
         onClose={() => setUiState((prev) => ({ ...prev, showLoginPrompt: false }))}
         message={uiState.loginPromptMessage}
-        onLogin={() => {
-          setUiState((prev) => ({ ...prev, showLoginPrompt: false }))
-          router.push("/login")
-        }}
+      />
+
+      {/* 캐릭터 선택 드롭다운 */}
+      {uiState.isDropdownOpen && (
+        <div className="absolute top-12 sm:top-14 left-1/2 transform -translate-x-1/2 z-50 bg-slate-800/95 backdrop-blur-md rounded-xl border border-white/20 shadow-xl min-w-[200px] sm:min-w-[240px]">
+          <div className="p-2">
+            {pingCharacters.map((character) => (
+              <Button
+                key={character.id}
+                variant="ghost"
+                className={`w-full justify-start p-2 sm:p-3 rounded-lg mb-1 last:mb-0 ${
+                  character.roomType === roomType
+                    ? "bg-white/20 text-white"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                }`}
+                onClick={() => {
+                  if (character.roomType !== roomType) {
+                    router.push(`/saju-chat/${character.roomType}`)
+                  }
+                  setUiState((prev) => ({ ...prev, isDropdownOpen: false }))
+                }}
+              >
+                <span className="text-base sm:text-lg mr-2 sm:mr-3">{character.emoji}</span>
+                <div className="text-left">
+                  <div className="font-medium text-sm sm:text-base">{character.name}</div>
+                  <div className="text-xs text-white/60">{character.description}</div>
+                </div>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 뒤로가기 에러 다이얼로그 */}
+      <BackNavigationErrorDialog
+        isOpen={uiState.showBackError}
+        onClose={handleBackErrorClose}
+        onGoHome={handleGoHome}
+        onLogin={handleGoLogin}
       />
     </div>
   )

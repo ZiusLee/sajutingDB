@@ -164,7 +164,7 @@ export default async function ResultPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* 사주 결과 표시 */}
+              {/* 사주 결과 표�� */}
               <div className="space-y-6">
                 <SajuResult
                   saju={{

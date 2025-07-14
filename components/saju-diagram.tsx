@@ -89,7 +89,7 @@ export default function SajuDiagram({
     해: "water",
   }
 
-  // 간의 오행 색상 가져오기
+  // ���의 오행 색상 가져오기
   const getStemColor = (stem: string) => {
     if (stem === "?" || !stem) return elementColors.unknown
     return elementColors[stemElements[stem as keyof typeof stemElements] || "unknown"]

@@ -1,5 +1,7 @@
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
+import { calculateSaju } from "@/lib/saju"
+import { solarToLunar } from "@/lib/lunar-calendar"
 
 // Simplified interface for testing
 export interface GPTDateParseResult {
@@ -19,9 +21,12 @@ export interface GPTDateParseResult {
     hour?: number
     minute?: number
     timeUnknown?: boolean
-    gender?: 'male' | 'female'
+    gender?: "male" | "female"
     name?: string
     original: string
+    // 계산된 사주 정보 추가
+    calculatedSaju?: any
+    lunarDate?: any
   }
   eventInfo?: {
     year: number
@@ -38,10 +43,10 @@ export interface GPTDateParseResult {
 
 export async function parseMessageWithGPT(message: string): Promise<GPTDateParseResult> {
   const startTime = Date.now()
-  
+
   try {
-    console.log('🤖 Attempting GPT-based date parsing for:', message.substring(0, 50) + '...')
-    
+    console.log("🤖 GPT 기반 날짜 파싱 시작:", message.substring(0, 50) + "...")
+
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
       temperature: 0.1,
@@ -74,7 +79,7 @@ export async function parseMessageWithGPT(message: string): Promise<GPTDateParse
 - 월/일 정보가 없으면 중간값 추정 (6월, 15일)
 - 시간 정보가 있으면 반드시 hour, minute 필드에 숫자로 입력
 
-현재 날짜: ${new Date().toLocaleDateString('ko-KR')}
+현재 날짜: ${new Date().toLocaleDateString("ko-KR")}
 
 **시간 파싱 예시:**
 - "2003년 12월 7일 0755시" → hour=7, minute=55
@@ -100,6 +105,8 @@ JSON만 응답하세요 (다른 텍스트 금지):
     "day": 7,
     "hour": 7,
     "minute": 55,
+    "gender": "male",
+    "name": "상대방",
     "original": "상대방 생년월일 텍스트"
   },
   "eventInfo": {
@@ -112,13 +119,13 @@ JSON만 응답하세요 (다른 텍스트 금지):
   "eventContext": ["결혼"],
   "needsFollowUp": ["상대방의 성별을 알려주세요"]
 }
-      `
+      `,
     })
 
     // Parse JSON response with better error handling
     const cleanText = text.trim()
     let jsonMatch = cleanText.match(/\{[\s\S]*\}/)
-    
+
     if (!jsonMatch) {
       // Try to find JSON even if wrapped in markdown
       jsonMatch = cleanText.match(/```(?:json)?\n?(\{[\s\S]*?\})\n?```/)
@@ -126,51 +133,144 @@ JSON만 응답하세요 (다른 텍스트 금지):
         jsonMatch = [jsonMatch[1]]
       }
     }
-    
+
     if (!jsonMatch) {
-      throw new Error('No valid JSON found in GPT response')
+      throw new Error("GPT 응답에서 유효한 JSON을 찾을 수 없습니다")
     }
-    
+
     const result = JSON.parse(jsonMatch[0])
     const parseTime = Date.now() - startTime
-    
-    console.log(`✅ GPT parsing successful in ${parseTime}ms`)
-    console.log('🎯 GPT result:', {
+
+    console.log(`✅ GPT 파싱 성공 (${parseTime}ms)`)
+    console.log("🎯 GPT 결과:", {
       hasPartnerInfo: !!result.partnerInfo,
-      partnerDate: result.partnerInfo ? `${result.partnerInfo.year}년 ${result.partnerInfo.month}월 ${result.partnerInfo.day}일` : null,
-      eventContext: result.eventContext
+      partnerDate: result.partnerInfo
+        ? `${result.partnerInfo.year}년 ${result.partnerInfo.month}월 ${result.partnerInfo.day}일`
+        : null,
+      eventContext: result.eventContext,
     })
-    
-    // Validate basic structure
-    if (!result.dates && !result.partnerInfo) {
-      throw new Error('GPT result missing both dates and partnerInfo')
+
+    // 🚀 파트너 정보가 있으면 사주 계산 수행
+    if (result.partnerInfo && result.partnerInfo.year && result.partnerInfo.month && result.partnerInfo.day) {
+      try {
+        console.log("🔮 파트너 사주 계산 시작:", result.partnerInfo)
+
+        // 음력 변환
+        const lunarDate = solarToLunar(result.partnerInfo.year, result.partnerInfo.month, result.partnerInfo.day)
+
+        console.log("🌙 음력 변환 결과:", lunarDate)
+
+        // 사주 계산
+        const partnerSaju = calculateSaju(
+          lunarDate.year.toString(),
+          lunarDate.month.toString(),
+          lunarDate.day.toString(),
+          result.partnerInfo.hour || 12, // 기본값: 정오
+          result.partnerInfo.minute || 0,
+          result.partnerInfo.year,
+          result.partnerInfo.month,
+          result.partnerInfo.day,
+          result.partnerInfo.gender || "unknown",
+          result.partnerInfo.name || "상대방",
+          result.partnerInfo.timeUnknown || !result.partnerInfo.hour,
+          lunarDate.isLeapMonth,
+          lunarDate.monthStem,
+          lunarDate.monthBranch,
+          "동경135도",
+        )
+
+        console.log("📊 파트너 사주 계산 완료:", {
+          yearStem: partnerSaju.yearStem,
+          yearBranch: partnerSaju.yearBranch,
+          monthStem: partnerSaju.monthStem,
+          monthBranch: partnerSaju.monthBranch,
+          dayStem: partnerSaju.dayStem,
+          dayBranch: partnerSaju.dayBranch,
+          hourStem: partnerSaju.hourStem,
+          hourBranch: partnerSaju.hourBranch,
+          elements: partnerSaju.elements,
+        })
+
+        // 계산된 사주 정보를 결과에 추가
+        result.partnerInfo.calculatedSaju = partnerSaju
+        result.partnerInfo.lunarDate = lunarDate
+
+        console.log("✅ 파트너 사주 계산 및 저장 완료")
+      } catch (sajuError) {
+        console.error("❌ 파트너 사주 계산 실패:", sajuError)
+        // 사주 계산 실패해도 파싱 결과는 반환
+      }
     }
-    
+
+    // Validate basic structure
+    if (!result.dates && !result.partnerInfo && !result.eventInfo) {
+      throw new Error("GPT 결과에 날짜, 파트너 정보, 이벤트 정보가 모두 없습니다")
+    }
+
     return result
-    
   } catch (error) {
     const parseTime = Date.now() - startTime
-    console.log(`❌ GPT parsing failed after ${parseTime}ms:`, error.message)
-    console.log('🔄 Falling back to pattern-based parsing...')
-    
+    console.log(`❌ GPT 파싱 실패 (${parseTime}ms):`, error.message)
+    console.log("🔄 패턴 기반 파싱으로 대체...")
+
     // Fallback to current pattern-based parser
-    const { parseMessageForDatesAndBirth } = await import('./message-parser')
+    const { parseMessageForDatesAndBirth } = await import("./message-parser")
     const fallbackResult = parseMessageForDatesAndBirth(message)
-    
-    console.log('🔧 Pattern-based fallback result:', {
+
+    console.log("🔧 패턴 기반 대체 결과:", {
       hasPartnerInfo: !!fallbackResult.partnerInfo,
-      partnerDate: fallbackResult.partnerInfo ? `${fallbackResult.partnerInfo.year}년 ${fallbackResult.partnerInfo.month}월 ${fallbackResult.partnerInfo.day}일` : null
+      partnerDate: fallbackResult.partnerInfo
+        ? `${fallbackResult.partnerInfo.year}년 ${fallbackResult.partnerInfo.month}월 ${fallbackResult.partnerInfo.day}일`
+        : null,
     })
-    
+
     return fallbackResult
   }
 }
 
 // Helper function to validate and sanitize GPT output
 export function validateGPTDateResult(result: any): boolean {
-  // Add validation logic for dates, times, etc.
   try {
-    DateTimeExtractionSchema.parse(result)
+    // 기본 구조 검증
+    if (!result || typeof result !== "object") {
+      return false
+    }
+
+    // 날짜 배열 검증
+    if (result.dates && Array.isArray(result.dates)) {
+      for (const date of result.dates) {
+        if (!date.year || !date.month || !date.day) {
+          return false
+        }
+        if (date.year < 1900 || date.year > 2100) {
+          return false
+        }
+        if (date.month < 1 || date.month > 12) {
+          return false
+        }
+        if (date.day < 1 || date.day > 31) {
+          return false
+        }
+      }
+    }
+
+    // 파트너 정보 검증
+    if (result.partnerInfo) {
+      const partner = result.partnerInfo
+      if (!partner.year || !partner.month || !partner.day) {
+        return false
+      }
+      if (partner.year < 1900 || partner.year > 2100) {
+        return false
+      }
+      if (partner.month < 1 || partner.month > 12) {
+        return false
+      }
+      if (partner.day < 1 || partner.day > 31) {
+        return false
+      }
+    }
+
     return true
   } catch {
     return false

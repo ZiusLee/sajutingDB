@@ -1,39 +1,53 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabase } from "@/lib/supabase-client"
+import type { User } from "@supabase/supabase-js"
 
 export function useAuth() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const supabase = createClientComponentClient()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const checkAuth = async () => {
-      setIsLoading(true)
+    const supabase = getSupabase()
+
+    // 현재 세션 확인
+    const getSession = async () => {
       try {
-        const { data } = await supabase.auth.getSession()
-        setIsAuthenticated(!!data.session)
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        setUser(session?.user ?? null)
       } catch (error) {
-        console.error("Error checking authentication:", error)
-        setIsAuthenticated(false)
+        console.error("세션 확인 오류:", error)
+        setUser(null)
       } finally {
-        setIsLoading(false)
+        setLoading(false)
       }
     }
 
-    checkAuth()
+    getSession()
 
+    // 인증 상태 변경 리스너
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session)
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
     })
 
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [supabase])
+    return () => subscription.unsubscribe()
+  }, [])
 
-  return { isAuthenticated, isLoading }
+  const signOut = async () => {
+    const supabase = getSupabase()
+    await supabase.auth.signOut()
+  }
+
+  return {
+    user,
+    loading,
+    signOut,
+    isAuthenticated: !!user,
+  }
 }

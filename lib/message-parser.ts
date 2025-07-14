@@ -492,7 +492,7 @@ export function isValidDate(year: number, month: number, day: number): boolean {
 export function testMessageParsing(message: string): void {
   console.log(`🧪 Testing message: "${message}"`)
   
-  // 각 패턴별로 테스트
+  // 각 패턴��로 테스트
   for (let i = 0; i < birthPatterns.length; i++) {
     const pattern = birthPatterns[i]
     const matches = [...message.matchAll(pattern.pattern)]
