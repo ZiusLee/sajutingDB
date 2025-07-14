@@ -85,8 +85,8 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
         size="sm"
         onClick={handleLike}
         disabled={isSubmittingFeedback}
-        className={`p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10 ${
-          feedback === "like" ? "text-green-400 bg-green-400/10" : ""
+        className={`p-1.5 h-auto text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 ${
+          feedback === "like" ? "text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20" : ""
         }`}
       >
         <ThumbsUp className="h-3 w-3" />
@@ -98,8 +98,8 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
         size="sm"
         onClick={handleDislike}
         disabled={isSubmittingFeedback}
-        className={`p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10 ${
-          feedback === "dislike" ? "text-red-400 bg-red-400/10" : ""
+        className={`p-1.5 h-auto text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 ${
+          feedback === "dislike" ? "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20" : ""
         }`}
       >
         <ThumbsDown className="h-3 w-3" />
@@ -110,9 +110,9 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
         variant="ghost"
         size="sm"
         onClick={handleCopy}
-        className="p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10"
+        className="p-1.5 h-auto text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800"
       >
-        {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+        {copied ? <Check className="h-3 w-3 text-green-600 dark:text-green-400" /> : <Copy className="h-3 w-3" />}
       </Button>
 
       {/* Retry Button */}
@@ -121,7 +121,7 @@ export function MessageFeedbackButtons({ messageId, messageContent, sessionId, o
           variant="ghost"
           size="sm"
           onClick={onRetry}
-          className="p-1.5 h-auto text-white/60 hover:text-white hover:bg-white/10"
+          className="p-1.5 h-auto text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800"
         >
           <RefreshCw className="h-3 w-3" />
         </Button>

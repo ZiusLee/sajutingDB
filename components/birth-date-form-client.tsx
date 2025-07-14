@@ -122,7 +122,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         const parsedTime = parseTimeInput(time)
         hour = parsedTime.hour
         minute = parsedTime.minute
-        console.log("Final parsed time for storage:", { hour, minute, originalInput: time })
       }
 
       try {
@@ -198,6 +197,9 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
       console.log("Calculated daeun data:", daeunData)
 
+      // 사주 결과에 대운 데이터 추가
+      sajuResult.daeun = daeunData
+
       // Store calculation data in localStorage for later use with correct structure
       const sajuDataToStore = {
         name,
@@ -206,8 +208,8 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         year: Number.parseInt(year),
         month: Number.parseInt(month),
         day: Number.parseInt(day),
-        hour: timeUnknown ? 0 : hour, // 명시적으로 hour 값 사용
-        minute: timeUnknown ? 0 : minute, // 명시적으로 minute 값 사용
+        hour,
+        minute,
         timeUnknown,
         timeStandard,
         birthCityId,
@@ -267,12 +269,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         daeun: daeunData, // Include daeun data
       }
 
-      console.log("Storing time values:", {
-        hour: sajuDataToStore.hour,
-        minute: sajuDataToStore.minute,
-        timeUnknown: sajuDataToStore.timeUnknown,
-      })
-
       console.log("Storing saju data to localStorage:", sajuDataToStore)
       localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
 
@@ -326,41 +322,32 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
       // Store the current saju data in localStorage for later use
       try {
-        const currentSajuData = {
-          sessionId: userId, // 세션 ID 추가
-          saju: sajuResult,
-          name: name,
-          gender: gender,
-          year: year,
-          month: month,
-          day: day,
-          hour: timeUnknown ? "00" : hour.toString().padStart(2, "0"),
-          minute: timeUnknown ? "00" : minute.toString().padStart(2, "0"),
-          lunarYear: lunarData.year,
-          lunarMonth: lunarData.month,
-          lunarDay: lunarData.day,
-          timeUnknown: timeUnknown,
-          interpretation: "",
-          returnPath: router.asPath,
-          timeStandard: getTimeStandardFromCity(),
-          birthCityId,
-          daeun: daeunData, // 대운 데이터 추가
-          birthInfo: {
-            solarYear: Number.parseInt(year),
-            solarMonth: Number.parseInt(month),
-            solarDay: Number.parseInt(day),
-            solarHour: timeUnknown ? undefined : hour,
-            solarMinute: timeUnknown ? undefined : minute,
-            lunarYear: Number.parseInt(lunarData.year),
-            lunarMonth: Number.parseInt(lunarData.month),
-            lunarDay: Number.parseInt(lunarData.day),
-            timeUnknown: timeUnknown,
-            birthCityId: birthCityId,
-            timeStandard: timeStandard,
-          },
-        }
-
-        localStorage.setItem("current_saju", JSON.stringify(currentSajuData))
+        localStorage.setItem(
+          "current_saju",
+          JSON.stringify({
+            saju: sajuResult,
+            name: name,
+            gender: gender,
+            interpretation: "",
+            returnPath: router.asPath,
+            timeStandard: getTimeStandardFromCity(),
+            birthCityId,
+            daeun: daeunData, // 대운 데이터 추가
+            birthInfo: {
+              solarYear: Number.parseInt(year),
+              solarMonth: Number.parseInt(month),
+              solarDay: Number.parseInt(day),
+              solarHour: timeUnknown ? undefined : hour,
+              solarMinute: timeUnknown ? undefined : minute,
+              lunarYear: Number.parseInt(lunarData.year),
+              lunarMonth: Number.parseInt(lunarData.month),
+              lunarDay: Number.parseInt(lunarData.day),
+              timeUnknown: timeUnknown,
+              birthCityId: birthCityId,
+              timeStandard: timeStandard,
+            },
+          }),
+        )
 
         // After successfully retrieving all results, update the auth_user_id if we have a userId
         if (userId) {
@@ -369,6 +356,34 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
 
         // 사주 계산 성공 후 바로 채팅으로 이동 부분을 조건부로 변경
         if (sajuResult) {
+          // 사주 데이터를 localStorage에 저장한 후
+          localStorage.setItem(
+            "current_saju",
+            JSON.stringify({
+              saju: sajuResult,
+              name: name,
+              gender: gender,
+              interpretation: "",
+              returnPath: "/",
+              timeStandard: getTimeStandardFromCity(),
+              birthCityId,
+              daeun: daeunData, // 대운 데이터 추가
+              birthInfo: {
+                solarYear: Number.parseInt(year),
+                solarMonth: Number.parseInt(month),
+                solarDay: Number.parseInt(day),
+                solarHour: timeUnknown ? undefined : hour,
+                solarMinute: timeUnknown ? undefined : minute,
+                lunarYear: Number.parseInt(lunarData.year),
+                lunarMonth: Number.parseInt(lunarData.month),
+                lunarDay: Number.parseInt(lunarData.day),
+                timeUnknown: timeUnknown,
+                birthCityId: birthCityId,
+                timeStandard: timeStandard,
+              },
+            }),
+          )
+
           // 성공 콜백 호출
           if (onSuccess && userId) {
             onSuccess(userId)
@@ -402,25 +417,18 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
       return { hour, minute }
     }
 
-    console.log("Parsing time input:", input)
-
-    // 콜론(:)이 포함된 경우 (예: "23:30", "00:30")
+    // 콜론(:)이 포함된 경우 (예: "23:30")
     if (input.includes(":")) {
       const [hourStr, minuteStr] = input.split(":")
       hour = Number.parseInt(hourStr, 10)
       minute = Number.parseInt(minuteStr, 10)
     }
-    // 4자리 숫자인 경우 (예: "2330", "0030")
+    // 4자리 숫자인 경우 (예: "2330")
     else if (input.length === 4) {
       hour = Number.parseInt(input.substring(0, 2), 10)
       minute = Number.parseInt(input.substring(2), 10)
     }
-    // 3자리 숫자인 경우 (예: "030" -> "00:30")
-    else if (input.length === 3) {
-      hour = Number.parseInt(input.substring(0, 1), 10)
-      minute = Number.parseInt(input.substring(1), 10)
-    }
-    // 1-2자리 숫자인 경우 (예: "23", "0")
+    // 1-2자리 숫자인 경우 (예: "23")
     else {
       hour = Number.parseInt(input, 10)
       minute = 0
@@ -433,8 +441,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
     // 범위 제한
     hour = Math.max(0, Math.min(23, hour))
     minute = Math.max(0, Math.min(59, minute))
-
-    console.log("Parsed time result:", { hour, minute })
 
     return { hour, minute }
   }

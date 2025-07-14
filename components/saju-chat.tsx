@@ -1149,7 +1149,7 @@ export default function SajuChat({
 
         {/* Suggested Questions */}
         {messages.length <= 1 && !isLoading && (
-          <div className="px-4 py-3 border-t border-gray-100 absolute bottom-20 left-0 right-0 bg-white">
+          <div className="px-4 py-3 border-t border-gray-100 absolute bottom-24 left-0 right-0 bg-white">
             <div className="max-w-2xl mx-auto">
               <div className="flex flex-wrap gap-2">
                 {suggestedQuestions.slice(0, 3).map((question, index) => (
