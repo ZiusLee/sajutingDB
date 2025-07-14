@@ -74,7 +74,7 @@ interface SajuChatProps {
   isLoggedIn?: boolean
   sessionKey: string
   birthInfo?: BirthInfo
-  concerns?: string[] // Add this line
+  concerns?: string[]
 }
 
 const pingCharacters = [
@@ -100,7 +100,6 @@ const pingCharacters = [
   },
 ]
 
-// Replace the static object with this function
 const generateSuggestedQuestions = (concerns: string[], roomType: string): string[] => {
   const concernQuestionMap: Record<string, string[]> = {
     love: ["몇 월달에 연애운이 좋을까요?", "연애운 알려주세요"],
@@ -138,7 +137,6 @@ const generateSuggestedQuestions = (concerns: string[], roomType: string): strin
     general: ["2025년 운세는 어떤가요?", "제 사주의 장단점은?", "가장 강한 기운은 무엇인가요?"],
   }
 
-  // Get personalized questions based on concerns
   const personalizedQuestions: string[] = []
   concerns.forEach((concern) => {
     if (concernQuestionMap[concern]) {
@@ -146,17 +144,13 @@ const generateSuggestedQuestions = (concerns: string[], roomType: string): strin
     }
   })
 
-  // Get base questions for the room type
   const baseQuestionsForType = baseQuestions[roomType] || baseQuestions.general
-
-  // Combine and deduplicate
   const allQuestions = [...personalizedQuestions, ...baseQuestionsForType]
   const uniqueQuestions = Array.from(new Set(allQuestions))
 
-  return uniqueQuestions.slice(0, 6) // Return max 6 questions
+  return uniqueQuestions.slice(0, 6)
 }
 
-// 정적 함수들을 컴포넌트 외부로 이동
 function formatBirthInfo(birthInfo?: BirthInfo): string {
   if (!birthInfo) return ""
 
@@ -244,26 +238,23 @@ function convertDaeunData(daeunData: any) {
   return []
 }
 
-// 메시지가 중간에 멈췄는지 감지하는 함수
 function isMessageIncomplete(content: string): boolean {
   const trimmedContent = content.trim()
 
-  // 빈 메시지
   if (!trimmedContent) return true
 
-  // 문장이 중간에 끊어진 경우들
   const incompletePatterns = [
-    /[가-힣][ㄱ-ㅎㅏ-ㅣ]$/, // 한글 자음/모음으로 끝남
-    /\s+$/, // 공백으로 끝남
-    /[,，]\s*$/, // 쉼표로 끝남
-    /[가-힣]\s*\.\.\.$/, // 말줄임표로 끝남
-    /[가-힣]\s*…$/, // 말줄임표로 끝남
-    /[가-힣]\s*-$/, // 하이픈으로 끝남
-    /[가-힣]\s*:$/, // 콜론으로 끝남
-    /[가-힣]\s*;$/, // 세미콜론으로 끝남
-    /\*\*[^*]*$/, // 볼드 마크다운이 닫히지 않음
-    /\*[^*]*$/, // 이탤릭 마크다운이 닫히지 않음
-    /^[^가-힣]*$/, // 한글이 전혀 없음 (에러 메시지 등)
+    /[가-힣][ㄱ-ㅎㅏ-ㅣ]$/,
+    /\s+$/,
+    /[,，]\s*$/,
+    /[가-힣]\s*\.\.\.$/,
+    /[가-힣]\s*…$/,
+    /[가-힣]\s*-$/,
+    /[가-힣]\s*:$/,
+    /[가-힣]\s*;$/,
+    /\*\*[^*]*$/,
+    /\*[^*]*$/,
+    /^[^가-힣]*$/,
   ]
 
   return incompletePatterns.some((pattern) => pattern.test(trimmedContent))
@@ -279,9 +270,8 @@ export default function SajuChat({
   isLoggedIn = false,
   sessionKey,
   birthInfo,
-  concerns = [], // Add this line
+  concerns = [],
 }: SajuChatProps) {
-  // 🔧 Ultra-Stable: 절대 변경되지 않는 정적 데이터
   const immutableDataRef = useRef<{
     currentCharacter: any
     suggestedQuestions: string[]
@@ -293,7 +283,6 @@ export default function SajuChat({
     baseAiChatBody: any
   } | null>(null)
 
-  // 🔧 Ultra-Stable: 한 번만 계산하고 절대 변경하지 않음
   if (!immutableDataRef.current) {
     const currentCharacter = pingCharacters.find((char) => char.roomType === roomType) || pingCharacters[0]
     const suggestedQuestions = generateSuggestedQuestions(concerns, roomType)
@@ -381,7 +370,7 @@ export default function SajuChat({
       gender,
       initialInterpretation,
       roomType,
-      userId: null, // 나중에 설정
+      userId: null,
       currentYear: 2025,
       yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
       birthInfo: stableBirthInfo,
@@ -399,7 +388,6 @@ export default function SajuChat({
     }
   }
 
-  // 🔧 Ultra-Stable: 초기화 상태만 관리하는 최소 상태
   const [initState, setInitState] = useState<{
     isReady: boolean
     authUser: any
@@ -412,7 +400,6 @@ export default function SajuChat({
     dbMessages: [],
   })
 
-  // 🔧 Ultra-Stable: UI 상태만 관리하는 분리된 상태
   const [uiState, setUiState] = useState({
     questionCount: 0,
     showLoginPrompt: false,
@@ -424,11 +411,10 @@ export default function SajuChat({
     showScrollToBottom: false,
     isSubmitting: false,
     showBackError: false,
-    showSidebar: false, // 사이드바 상태 추가
+    showSidebar: false,
     showToolMenu: false,
   })
 
-  // Refs
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -438,20 +424,16 @@ export default function SajuChat({
   const initOnceRef = useRef(false)
   const router = useRouter()
 
-  // 🔧 Ultra-Stable: 완전히 고정된 초기 메시지
   const stableInitialMessages = useMemo(() => {
     if (!initState.isReady) return []
 
-    // DB 메시지가 있으면 사용 (한 번만)
     if (initState.dbMessages.length > 0) {
       return [...initState.dbMessages]
     }
 
-    // 기본 메시지 사용 (한 번만)
     return [...(immutableDataRef.current?.defaultInitialMessages || [])]
   }, [initState.isReady, initState.dbMessages])
 
-  // 🔧 Ultra-Stable: 완전히 고정된 AI Chat Body
   const stableAiChatBody = useMemo(() => {
     if (!immutableDataRef.current?.baseAiChatBody) return {}
 
@@ -461,7 +443,6 @@ export default function SajuChat({
     }
   }, [initState.authUser?.id])
 
-  // 🔧 Ultra-Stable: 한 번만 실행되는 초기화
   useEffect(() => {
     if (initOnceRef.current) return
     initOnceRef.current = true
@@ -477,7 +458,6 @@ export default function SajuChat({
 
         if (!isMounted) return
 
-        // 세션 ID 가져오기
         let sessionId = null
         try {
           const currentSajuData = localStorage.getItem("current_saju")
@@ -507,7 +487,6 @@ export default function SajuChat({
           }
         }
 
-        // DB에서 메시지 로드
         let dbMessages: any[] = []
         if (sessionId && isMounted) {
           try {
@@ -530,7 +509,6 @@ export default function SajuChat({
         }
 
         if (isMounted) {
-          // 🔧 Ultra-Stable: 한 번에 모든 초기화 상태 설정
           setInitState({
             isReady: true,
             authUser: user,
@@ -553,7 +531,6 @@ export default function SajuChat({
     }
   }, [name])
 
-  // useAIChat 초기화 - 완전히 안정화된 설정 사용
   const {
     messages,
     input,
@@ -573,7 +550,6 @@ export default function SajuChat({
     body: stableAiChatBody,
     onFinish: useCallback(
       async (message: any) => {
-        // 🔧 Ultra-Stable: 메시지 저장을 비동기로 처리하여 스트리밍 방해 방지
         if (initState.sessionId) {
           setTimeout(async () => {
             try {
@@ -605,7 +581,6 @@ export default function SajuChat({
     }, []),
   })
 
-  // 🔧 Ultra-Stable: 완전히 안정화된 submit 핸들러
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
@@ -631,7 +606,6 @@ export default function SajuChat({
           return
         }
 
-        // 🔧 Ultra-Stable: 사용자 메시지 저장을 비동기로 처리
         if (initState.sessionId) {
           setTimeout(async () => {
             try {
@@ -661,7 +635,6 @@ export default function SajuChat({
           }, 50)
         }
 
-        // useAIChat의 handleSubmit 호출 (스트리밍)
         await aiHandleSubmit(e)
       } catch (error) {
         console.error("메시지 전송 오류:", error)
@@ -685,7 +658,6 @@ export default function SajuChat({
     ],
   )
 
-  // 🔧 Ultra-Stable: 완전히 안정화된 뒤로가기 핸들러
   const handleBackWithSave = useCallback(() => {
     try {
       localStorage.setItem(
@@ -717,12 +689,10 @@ export default function SajuChat({
       }
     } catch (error) {
       console.error("뒤로가기 처리 중 오류:", error)
-      // 에러 다이얼로그 표시
       setUiState((prev) => ({ ...prev, showBackError: true }))
     }
   }, [saju, name, gender, initialInterpretation, onBack])
 
-  // 에러 다이얼로그 핸들러들 추가:
   const handleBackErrorClose = useCallback(() => {
     setUiState((prev) => ({ ...prev, showBackError: false }))
   }, [])
@@ -741,7 +711,6 @@ export default function SajuChat({
     }, 100)
   }, [])
 
-  // Continue generation 함수
   const handleContinueGeneration = useCallback(async () => {
     if (isLoading || uiState.isSubmitting) return
 
@@ -788,7 +757,6 @@ export default function SajuChat({
                   if (data.type === "text-delta" && data.textDelta) {
                     updatedContent += data.textDelta
 
-                    // 실시간으로 메시지 업데이트
                     setMessages((prev) => {
                       const newMessages = [...prev]
                       newMessages[newMessages.length - 1] = {
@@ -816,7 +784,6 @@ export default function SajuChat({
     }
   }, [messages, stableAiChatBody, isLoading, uiState.isSubmitting, setMessages])
 
-  // 피드백 핸들러들
   const handleLike = useCallback(
     async (messageId: string) => {
       try {
@@ -870,7 +837,6 @@ export default function SajuChat({
     }, 1000)
   }, [reload, isLoading, uiState.isSubmitting])
 
-  // 🔧 Ultra-Stable: 스크롤 처리 - 메시지 길이만 체크
   useEffect(() => {
     const scrollContainer = chatContainerRef.current
     if (scrollContainer && messages.length > lastMessageLength.current) {
@@ -883,7 +849,6 @@ export default function SajuChat({
     }
   }, [messages])
 
-  // 🔧 Ultra-Stable: 완전히 안정화된 이벤트 핸들러들
   const handleSuggestedQuestionClick = useCallback(
     (question: string) => {
       if (isLoading) return
@@ -934,7 +899,6 @@ export default function SajuChat({
 
   const handleCompatibilityCheck = useCallback(() => {
     setUiState((prev) => ({ ...prev, showToolMenu: false }))
-    // Add compatibility check logic here
     setInput("궁합을 봐주세요")
     setTimeout(() => {
       const form = document.querySelector("form")
@@ -946,7 +910,6 @@ export default function SajuChat({
 
   const handleOtherPersonSaju = useCallback(() => {
     setUiState((prev) => ({ ...prev, showToolMenu: false }))
-    // Add other person saju logic here
     setInput("다른 사람 사주를 봐주세요")
     setTimeout(() => {
       const form = document.querySelector("form")
@@ -956,11 +919,9 @@ export default function SajuChat({
     }, 100)
   }, [setInput])
 
-  // 테마 및 헤더/푸터 숨김 처리
   useHideHeaderAndFooter()
   useForceDarkTheme()
 
-  // 🔧 Ultra-Stable: 로딩 상태 체크
   if (!initState.isReady || !immutableDataRef.current) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
@@ -977,7 +938,20 @@ export default function SajuChat({
   const { currentCharacter, suggestedQuestions, stableBirthInfo, calculatedDaeun } = immutableDataRef.current
 
   return (
-    <div className="flex h-screen bg-white" style={{ height: "100dvh" }}>
+    <div
+      className="flex bg-white"
+      style={{
+        height: "100vh",
+        minHeight: "100vh",
+        maxHeight: "100vh",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: "hidden",
+      }}
+    >
       {/* Desktop Sidebar */}
       <div className={`hidden lg:flex w-80 bg-gray-50 border-r border-gray-200 flex-col`}>
         <div className="p-4 space-y-6">
@@ -1019,7 +993,7 @@ export default function SajuChat({
       </Sheet>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-white relative">
         {/* Header - Clean and minimal like screenshot */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-3">
@@ -1028,7 +1002,7 @@ export default function SajuChat({
               variant="ghost"
               size="icon"
               className="lg:hidden p-2"
-              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: open }))}
+              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: true }))}
             >
               <Menu className="h-5 w-5 text-gray-600" />
             </Button>
@@ -1056,7 +1030,12 @@ export default function SajuChat({
         </div>
 
         {/* Chat Messages - No bubbles, clean text blocks */}
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-white" onScroll={handleScroll}>
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto bg-white"
+          onScroll={handleScroll}
+          style={{ paddingBottom: "120px" }}
+        >
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
             {messages.map((message, index) => (
               <div key={message.id || index} className="space-y-4">
@@ -1170,7 +1149,7 @@ export default function SajuChat({
 
         {/* Suggested Questions */}
         {messages.length <= 1 && !isLoading && (
-          <div className="px-4 py-3 border-t border-gray-100">
+          <div className="px-4 py-3 border-t border-gray-100 absolute bottom-20 left-0 right-0 bg-white">
             <div className="max-w-2xl mx-auto">
               <div className="flex flex-wrap gap-2">
                 {suggestedQuestions.slice(0, 3).map((question, index) => (
@@ -1189,11 +1168,8 @@ export default function SajuChat({
           </div>
         )}
 
-        {/* Input Area - Clean and minimal with tool button */}
-        <div
-          className="border-t border-gray-200 bg-white px-6 py-6"
-          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
-        >
+        {/* Input Area - Positioned only within the main chat area */}
+        <div className="border-t border-gray-200 bg-white px-6 py-6 absolute bottom-0 left-0 right-0">
           <div className="max-w-2xl mx-auto w-full">
             <form onSubmit={handleSubmit} className="flex gap-3 items-end w-full">
               <div className="flex-1 relative min-w-0">
@@ -1274,7 +1250,7 @@ export default function SajuChat({
       {uiState.showScrollToBottom && (
         <Button
           onClick={scrollToBottomSmooth}
-          className="fixed bottom-20 right-4 rounded-full shadow-lg z-10 bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+          className="fixed bottom-32 right-4 rounded-full shadow-lg z-10 bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
           size="icon"
         >
           <ChevronDown className="h-4 w-4" />

@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/use-toast"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { MessageCircle, LogOut, Plus, Star, ChevronDown, ChevronUp, Calendar } from "lucide-react"
+import { MessageCircle, LogOut, Plus, Star, ChevronDown, ChevronUp, Calendar } from 'lucide-react'
 import { getUserSajuProfiles } from "@/lib/saju-session-service"
 import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
