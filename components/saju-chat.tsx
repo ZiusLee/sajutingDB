@@ -1169,7 +1169,10 @@ export default function SajuChat({
         )}
 
         {/* Input Area - Positioned only within the main chat area */}
-        <div className="border-t border-gray-200 bg-white px-6 py-6 absolute bottom-0 left-0 right-0">
+        <div
+          className="border-t border-gray-200 bg-white px-6 py-6 absolute left-0 right-0"
+          style={{ bottom: "env(safe-area-inset-bottom, 0px)" }}
+        >
           <div className="max-w-2xl mx-auto w-full">
             <form onSubmit={handleSubmit} className="flex gap-3 items-end w-full">
               <div className="flex-1 relative min-w-0">
