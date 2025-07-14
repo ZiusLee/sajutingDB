@@ -41,8 +41,8 @@ export default function LandingPageClient() {
         </Button>
       </header>
 
-      {/* Main Content */}
-      <div className="flex min-h-[calc(100vh-80px)]">
+      {/* Desktop Layout */}
+      <div className="hidden lg:flex min-h-[calc(100vh-80px)]">
         {/* Left Side - Korean Content */}
         <div className="flex-1 flex items-center justify-center px-12">
           <div className="max-w-lg space-y-8">
@@ -103,6 +103,63 @@ export default function LandingPageClient() {
                   at the center again.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="lg:hidden min-h-[calc(100vh-80px)] relative overflow-hidden">
+        {/* Mobile Gradient Background */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(135deg, 
+              rgba(196, 181, 253, 0.3) 0%, 
+              rgba(251, 207, 232, 0.3) 25%, 
+              rgba(147, 197, 253, 0.3) 50%, 
+              rgba(134, 239, 172, 0.3) 75%, 
+              rgba(251, 207, 232, 0.3) 100%)`,
+          }}
+        />
+
+        {/* Mobile Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-80px)] px-6 text-center">
+          {/* English Title */}
+          <div className="mb-16">
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-600 leading-tight mb-4">
+              Leave worries,
+              <br />
+              live the present
+            </h1>
+          </div>
+
+          {/* Korean Content */}
+          <div className="space-y-8 max-w-md">
+            <div className="space-y-4">
+              <h2 className="text-2xl md:text-3xl font-bold text-black leading-tight">
+                걱정은 내려놓고,
+                <br />
+                자신에게 집중해보세요.
+              </h2>
+              <p className="text-base text-gray-600">
+                사주를 바탕으로 나와 대화하는
+                <br />
+                AI 불안에게 물어봐, 사주핑
+              </p>
+            </div>
+
+            <Button
+              onClick={handleStartSaju}
+              className="w-full bg-gray-800 hover:bg-gray-900 text-white px-8 py-4 rounded-full text-lg font-medium flex items-center justify-center space-x-2"
+            >
+              <span>사주 프로필 생성하기</span>
+              <span>→</span>
+            </Button>
+
+            <div className="flex items-center justify-center space-x-2 text-sm">
+              <span className="text-gray-500">계정이 없으신가요?</span>
+              <button className="text-blue-600 hover:underline font-medium">회원가입</button>
             </div>
           </div>
         </div>

@@ -420,7 +420,7 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
                 value={birthInfo.name}
                 onChange={(e) => setBirthInfo({ ...birthInfo, name: e.target.value })}
                 placeholder="홍길동"
-                className="text-center text-lg py-4 border-2 border-dashed border-blue-300 bg-white/80 backdrop-blur-sm"
+                className="text-center text-lg py-4 border-2 border-dashed border-blue-300 bg-white/90 backdrop-blur-sm text-gray-800 placeholder:text-gray-500"
                 style={{ borderStyle: "dotted" }}
               />
               {birthInfo.name && (
@@ -530,7 +530,7 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
                   setTimeout(() => setShowCityDropdown(false), 200)
                 }}
                 placeholder="ex: 서울"
-                className="text-center text-lg py-4 pl-10 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full"
+                className="text-center text-lg py-4 pl-10 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full text-gray-800 placeholder:text-gray-500"
               />
 
               {showCityDropdown && citySearchResults.length > 0 && (
@@ -582,14 +582,14 @@ export function SajuOnboardingFlow({ onComplete, onClose }: SajuOnboardingFlowPr
                 value={birthInfo.birthDate}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthDate: e.target.value })}
                 placeholder="생년월일: ex: 19950505"
-                className="flex-1 text-center bg-white/80 backdrop-blur-sm rounded-full py-4"
+                className="flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500"
               />
 
               <Input
                 value={birthInfo.birthTime}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthTime: e.target.value })}
                 placeholder="태어난 시간: ex: 0930"
-                className="flex-1 text-center bg-white/80 backdrop-blur-sm rounded-full py-4"
+                className="flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500"
               />
             </div>
 
