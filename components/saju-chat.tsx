@@ -6,7 +6,7 @@ import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Send, ChevronDown, ArrowLeft, Menu, User, MoreHorizontal } from "lucide-react"
+import { Send, ChevronDown, ArrowLeft, Menu, User } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { compressSaju } from "@/lib/saju-compression"
@@ -1002,7 +1002,7 @@ export default function SajuChat({
               variant="ghost"
               size="icon"
               className="lg:hidden p-2"
-              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: true }))}
+              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: open }))}
             >
               <Menu className="h-5 w-5 text-gray-600" />
             </Button>
@@ -1034,9 +1034,9 @@ export default function SajuChat({
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto bg-white"
           onScroll={handleScroll}
-          style={{ paddingBottom: "120px" }}
+          style={{ paddingBottom: "140px" }}
         >
-          <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+          <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
             {messages.map((message, index) => (
               <div key={message.id || index} className="space-y-4">
                 {message.role === "assistant" && (
@@ -1147,17 +1147,17 @@ export default function SajuChat({
           </div>
         </div>
 
-        {/* Suggested Questions */}
+        {/* Suggested Questions - Between messages and input */}
         {messages.length <= 1 && !isLoading && (
-          <div className="px-4 py-3 border-t border-gray-100 absolute bottom-24 left-0 right-0 bg-white">
+          <div className="px-6 py-4 bg-white border-t border-gray-100">
             <div className="max-w-2xl mx-auto">
-              <div className="flex flex-wrap gap-2">
-                {suggestedQuestions.slice(0, 3).map((question, index) => (
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {suggestedQuestions.slice(0, 6).map((question, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
-                    className="text-sm bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    className="text-sm bg-white border-gray-200 text-gray-600 hover:bg-gray-50 whitespace-nowrap rounded-full px-4 py-2 flex-shrink-0"
                     onClick={() => handleSuggestedQuestionClick(question)}
                   >
                     {question}
@@ -1170,13 +1170,51 @@ export default function SajuChat({
 
         {/* Input Area - Positioned only within the main chat area */}
         <div
-          className="border-t border-gray-200 bg-white px-6 py-6 absolute left-0 right-0"
+          className="border-t border-gray-200 bg-white px-6 py-4 absolute left-0 right-0"
           style={{ bottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           <div className="max-w-2xl mx-auto w-full">
-            <form onSubmit={handleSubmit} className="flex gap-3 items-end w-full">
+            <form onSubmit={handleSubmit} className="flex gap-3 items-center w-full">
+              {/* Tool Button - Moved to left */}
+              <Popover
+                open={uiState.showToolMenu}
+                onOpenChange={(open) => setUiState((prev) => ({ ...prev, showToolMenu: open }))}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full w-10 h-10 text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0"
+                    onClick={handleToolButtonClick}
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="start" side="top" sideOffset={8}>
+                  <div className="space-y-1">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
+                      onClick={handleCompatibilityCheck}
+                    >
+                      <span className="mr-3 text-base">💕</span>
+                      궁합 보기
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
+                      onClick={handleOtherPersonSaju}
+                    >
+                      <span className="mr-3 text-base">👥</span>
+                      다른 사람 사주 봐주기
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <div className="flex-1 relative min-w-0">
-                <div className="flex items-center border border-gray-300 rounded-full bg-white pr-2 w-full">
+                <div className="flex items-center border border-gray-300 rounded-full bg-white">
                   <input
                     ref={inputRef}
                     type="text"
@@ -1186,44 +1224,6 @@ export default function SajuChat({
                     className="flex-1 px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none bg-transparent rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-0"
                     disabled={isLoading || uiState.isSubmitting}
                   />
-
-                  {/* Tool Button */}
-                  <Popover
-                    open={uiState.showToolMenu}
-                    onOpenChange={(open) => setUiState((prev) => ({ ...prev, showToolMenu: open }))}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0"
-                        onClick={handleToolButtonClick}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2" align="end" side="top" sideOffset={8}>
-                      <div className="space-y-1">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
-                          onClick={handleCompatibilityCheck}
-                        >
-                          <span className="mr-3 text-base">💕</span>
-                          궁합 보기
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
-                          onClick={handleOtherPersonSaju}
-                        >
-                          <span className="mr-3 text-base">👥</span>
-                          다른 사람 사주 봐주기
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
                 </div>
               </div>
 
