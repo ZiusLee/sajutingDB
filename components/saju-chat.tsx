@@ -49,20 +49,6 @@ const useHideHeaderAndFooter = () => {
   }, [])
 }
 
-const useForceDarkTheme = () => {
-  useEffect(() => {
-    const wasAlreadyDark = document.documentElement.classList.contains("dark")
-    const currentTheme = localStorage.getItem("theme")
-
-    document.documentElement.classList.add("dark")
-
-    return () => {
-      if (!wasAlreadyDark && currentTheme !== "dark") {
-        document.documentElement.classList.remove("dark")
-      }
-    }
-  }, [])
-}
 
 interface SajuChatProps {
   saju: any
@@ -920,8 +906,7 @@ export default function SajuChat({
   }, [setInput])
 
   useHideHeaderAndFooter()
-  useForceDarkTheme()
-
+  
   if (!initState.isReady || !immutableDataRef.current) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">

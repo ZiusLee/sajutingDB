@@ -149,6 +149,100 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     }
   }
 
+  const navigateToChat = async (sajuResult: any, daeunData: any) => {
+    try {
+      console.log("Starting navigation to chat...")
+
+      // Store current saju data for chat
+      const chatSajuData = {
+        saju: sajuResult,
+        name: birthInfo.name,
+        gender: birthInfo.gender,
+        interpretation: "",
+        returnPath: "/",
+        timeStandard: getTimeStandardFromCity(),
+        birthCityId: birthInfo.birthPlaceId,
+        daeun: daeunData,
+        concerns: birthInfo.concerns,
+        birthInfo: {
+          solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
+          solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
+          solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
+          solarHour: parseTime(birthInfo.birthTime).hour,
+          solarMinute: parseTime(birthInfo.birthTime).minute,
+          lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
+          lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
+          lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
+          timeUnknown: false,
+          birthCityId: birthInfo.birthPlaceId,
+          timeStandard: getTimeStandardFromCity(),
+        },
+      }
+
+      localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+      console.log("Stored current_saju data for chat")
+
+      // Wait a bit to ensure localStorage is written
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      // Use Next.js router for navigation with error handling
+      console.log("Attempting navigation with Next.js router...")
+
+      try {
+        await router.push("/saju-chat/sajuping")
+        console.log("Navigation successful with router.push")
+      } catch (routerError) {
+        console.error("Router.push failed, trying alternative methods:", routerError)
+
+        // Fallback 1: Try router.replace
+        try {
+          await router.replace("/saju-chat/sajuping")
+          console.log("Navigation successful with router.replace")
+        } catch (replaceError) {
+          console.error("Router.replace failed, using window.location:", replaceError)
+
+          // Fallback 2: Use window.location with better error handling
+          try {
+            // For mobile browsers, sometimes a small delay helps
+            await new Promise((resolve) => setTimeout(resolve, 200))
+            window.location.href = "/saju-chat/sajuping"
+          } catch (locationError) {
+            console.error("All navigation methods failed:", locationError)
+
+            // Final fallback: Show error and manual navigation option
+            toast({
+              title: "페이지 이동 중 오류가 발생했습니다",
+              description: "잠시 후 다시 시도해주세요.",
+              variant: "destructive",
+            })
+
+            // Try one more time after a longer delay
+            setTimeout(() => {
+              try {
+                window.location.assign("/saju-chat/sajuping")
+              } catch (finalError) {
+                console.error("Final navigation attempt failed:", finalError)
+                // At this point, we should show a manual link or reload the page
+                toast({
+                  title: "자동 이동에 실패했습니다",
+                  description: "페이지를 새로고침하거나 직접 채팅 페이지로 이동해주세요.",
+                  variant: "destructive",
+                })
+              }
+            }, 1000)
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Navigation error:", error)
+      toast({
+        title: "페이지 이동 중 오류가 발생했습니다",
+        description: "잠시 후 다시 시도해주세요.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSubmit = async () => {
     if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlace || !birthInfo.birthDate || !birthInfo.birthTime) {
       toast({
@@ -341,52 +435,17 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           storedData.sessionId = userId
           localStorage.setItem("tempSajuData", JSON.stringify(storedData))
           localStorage.setItem("user_id", userId)
+
+          // Update auth user ID
+          await updateUserAuthId(userId)
         }
       } catch (dbError) {
         console.error("Failed to save saju data to database:", dbError)
+        // Continue even if database save fails
       }
 
-      try {
-        localStorage.setItem(
-          "current_saju",
-          JSON.stringify({
-            saju: sajuResult,
-            name: birthInfo.name,
-            gender: birthInfo.gender,
-            interpretation: "",
-            returnPath: "/",
-            timeStandard: getTimeStandardFromCity(),
-            birthCityId,
-            daeun: daeunData,
-            concerns: birthInfo.concerns,
-            birthInfo: {
-              solarYear: Number.parseInt(year),
-              solarMonth: Number.parseInt(month),
-              solarDay: Number.parseInt(day),
-              solarHour: hour,
-              solarMinute: minute,
-              lunarYear: Number.parseInt(lunarData.year),
-              lunarMonth: Number.parseInt(lunarData.month),
-              lunarDay: Number.parseInt(lunarData.day),
-              timeUnknown: false,
-              birthCityId: birthCityId,
-              timeStandard: timeStandard,
-            },
-          }),
-        )
-
-        if (userId) {
-          updateUserAuthId(userId)
-        }
-
-        // Go directly to saju-chat without showing toast or going to homepage
-        if (sajuResult) {
-          // Don't call onComplete - go directly to avoid URL flashing
-          window.location.href = "/saju-chat/sajuping"
-        }
-      } catch (e) {
-        console.error("Error storing saju data:", e)
-      }
+      // Navigate to chat with improved error handling
+      await navigateToChat(sajuResult, daeunData)
     } catch (error) {
       console.error("Error in saju calculation:", error)
       toast({
