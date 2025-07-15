@@ -546,11 +546,11 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
             <h1 className="text-3xl font-bold text-blue-600 mb-12">성별을 알려주세요.</h1>
 
-            <div className="flex gap-4 mb-12">
+            <div className="flex flex-col md:flex-row gap-4 mb-12 w-full max-w-md">
               <button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "male" })}
                 className={cn(
-                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium",
+                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium w-full",
                   birthInfo.gender === "male"
                     ? "bg-gray-800 text-white border-gray-800"
                     : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -561,7 +561,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
               <button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "female" })}
                 className={cn(
-                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium",
+                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium w-full",
                   birthInfo.gender === "female"
                     ? "bg-gray-800 text-white border-gray-800"
                     : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -677,20 +677,27 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
             <h1 className="text-3xl font-bold text-blue-600 mb-12">태어난 일시를 알려주세요.</h1>
 
-            <div className="flex gap-4 mb-4 max-w-md w-full">
+            <div className="flex flex-col md:flex-row gap-4 mb-4 max-w-md w-full">
               <Input
                 value={birthInfo.birthDate}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthDate: e.target.value })}
-                placeholder="생년월일: ex: 19950505"
+                placeholder="19950505"
                 className="flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500"
               />
 
               <Input
                 value={birthInfo.birthTime}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthTime: e.target.value })}
-                placeholder="태어난 시간: ex: 0930"
+                placeholder="0930"
                 className="flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500"
               />
+            </div>
+
+            <div className="text-xs text-gray-500 mb-8 max-w-md">
+              <div className="flex flex-col md:flex-row gap-2 md:gap-8 justify-center">
+                <span>생년월일: YYYYMMDD</span>
+                <span>시간: HHMM</span>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 mb-12">
