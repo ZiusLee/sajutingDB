@@ -21,6 +21,77 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
+const HanjiTexture = () => {
+  // 한지 텍스처 패턴
+  const hanjiPattern = `
+    <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+      <filter id="roughPaper">
+        <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise" />
+        <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="2">
+          <feDistantLight azimuth="45" elevation="60" />
+        </feDiffuseLighting>
+        <feComposite operator="multiply" in2="SourceGraphic" />
+      </filter>
+      <rect width="100%" height="100%" filter="url(#roughPaper)" opacity="0.4" />
+      <g opacity="0.3">
+        <path d="M10,20 Q50,40 90,20 T170,20" stroke="#d4c5b9" strokeWidth="0.5" fill="none" />
+        <path d="M0,60 Q40,80 80,60 T160,60" stroke="#d4c5b9" strokeWidth="0.8" fill="none" />
+        <path d="M20,100 Q60,120 100,100 T180,100" stroke="#d4c5b9" strokeWidth="0.3" fill="none" />
+        <path d="M0,140 Q40,160 80,140 T160,140" stroke="#d4c5b9" strokeWidth="0.6" fill="none" />
+        <path d="M30,180 Q70,200 110,180 T190,180" stroke="#d4c5b9" strokeWidth="0.4" fill="none" />
+      </g>
+    </svg>
+  `
+
+  const encodedPattern = `data:image/svg+xml,${encodeURIComponent(hanjiPattern)}`
+
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        backgroundColor: "#faf8f5",
+        backgroundImage: `url("${encodedPattern}")`,
+        backgroundSize: "200px 200px",
+        backgroundPosition: "0 0, 100px 100px",
+        opacity: 0.6,
+      }}
+    >
+      {/* Additional texture layers */}
+      <div
+        className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{
+          background: `
+            repeating-linear-gradient(
+              45deg,
+              transparent,
+              transparent 10px,
+              rgba(212, 197, 185, 0.1) 10px,
+              rgba(212, 197, 185, 0.1) 20px
+            ),
+            repeating-linear-gradient(
+              -45deg,
+              transparent,
+              transparent 15px,
+              rgba(212, 197, 185, 0.05) 15px,
+              rgba(212, 197, 185, 0.05) 25px
+            )
+          `,
+          mixBlendMode: "multiply",
+        }}
+      />
+
+      {/* Grain effect */}
+      <div
+        className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.5'/%3E%3C/svg%3E")`,
+          mixBlendMode: "multiply",
+        }}
+      />
+    </div>
+  )
+}
+
 const useHideHeaderAndFooter = () => {
   useEffect(() => {
     const header = document.querySelector("header")
@@ -48,7 +119,6 @@ const useHideHeaderAndFooter = () => {
     }
   }, [])
 }
-
 
 interface SajuChatProps {
   saju: any
@@ -906,7 +976,7 @@ export default function SajuChat({
   }, [setInput])
 
   useHideHeaderAndFooter()
-  
+
   if (!initState.isReady || !immutableDataRef.current) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
@@ -924,9 +994,9 @@ export default function SajuChat({
 
   return (
     <div
-      className="flex bg-white"
+      className="flex relative"
       style={{
-        height: "100dvh", // Use dynamic viewport height for mobile
+        height: "100dvh",
         minHeight: "100dvh",
         maxHeight: "100dvh",
         position: "fixed",
@@ -982,7 +1052,7 @@ export default function SajuChat({
       </Sheet>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-white relative">
+      <div className="flex-1 flex flex-col bg-transparent relative">
         {/* Header - Clean and minimal like screenshot */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-3">
@@ -991,7 +1061,7 @@ export default function SajuChat({
               variant="ghost"
               size="icon"
               className="lg:hidden p-2"
-              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: true }))}
+              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: open }))}
             >
               <Menu className="h-5 w-5 text-gray-600" />
             </Button>
@@ -1021,7 +1091,7 @@ export default function SajuChat({
         {/* Chat Messages - No bubbles, clean text blocks */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto bg-white"
+          className="flex-1 overflow-y-auto bg-transparent relative"
           onScroll={handleScroll}
           style={{
             paddingBottom: "140px", // Increased padding for mobile
@@ -1029,7 +1099,10 @@ export default function SajuChat({
             maxHeight: "calc(100dvh - 60px)",
           }}
         >
-          <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+          {/* 한지 텍스처 배경 - Only for chat messages area */}
+          <HanjiTexture />
+
+          <div className="max-w-4xl mx-auto px-4 py-6 space-y-6 relative z-10">
             {messages.map((message, index) => (
               <div key={message.id || index} className="space-y-4">
                 {message.role === "assistant" && (
@@ -1233,7 +1306,7 @@ export default function SajuChat({
           className="border-t border-gray-200 bg-white px-4 sm:px-6 py-4 sm:py-6 absolute left-0 right-0"
           style={{
             bottom: "env(safe-area-inset-bottom, 0px)",
-            minHeight: "80px", // Ensure minimum height for mobile
+            minHeight: "80px",
           }}
         >
           <div className="max-w-4xl mx-auto w-full">
