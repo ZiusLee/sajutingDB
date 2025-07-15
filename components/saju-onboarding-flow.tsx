@@ -709,7 +709,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 className="rounded"
               />
               <label htmlFor="isLunar" className="text-gray-600">
-                태어난 시간 모름 ☐
+                태어난 시간 모름
               </label>
             </div>
 

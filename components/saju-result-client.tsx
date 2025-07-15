@@ -460,7 +460,7 @@ ${interpretation}
                 {/* Donation Section */}
                 <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
                   <div className="flex flex-col items-center">
-                    <h3 className="text-xl font-bold mb-3">복채 주면 운이 더 좋아진다냥!</h3>
+                    <h3 className="text-xl font-bold mb-3">복채 주면 운이 더 ��아진다냥!</h3>
                     <img src="/images/donation-cat.png" alt="복채 고양이" className="w-32 h-32 object-contain mb-3" />
                     <div className="text-center space-y-1 text-xs dark:text-gray-200">
                       <p>사주 다 보고 나면,오늘 운이 조금 더 잘 풀렸으면 좋겠다냥~ 🐾</p>

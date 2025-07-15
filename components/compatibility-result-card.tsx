@@ -50,7 +50,7 @@ export default function CompatibilityResultCard({ result, onReset }: Compatibili
           <ReactMarkdown>{isExpanded ? result : firstSection}</ReactMarkdown>
         </div>
 
-        {/* 더보기/접기 버튼 */}
+        {/* 더보기/접기 버�� */}
         {result.length > 500 && (
           <Button
             variant="ghost"

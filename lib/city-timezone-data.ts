@@ -1307,7 +1307,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
     country: "러시아",
     timezone: "Asia/Vladivostok",
     utcOffset: 10,
-    timeStandard: "서머타임",
+    timeStandard: "서머타��",
   },
   {
     id: "port_moresby",
