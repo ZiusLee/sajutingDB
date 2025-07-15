@@ -200,7 +200,20 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
       // 사주 결과에 대운 데이터 추가
       sajuResult.daeun = daeunData
 
-      // Store calculation data in localStorage for later use with correct structure
+      // 대운 계산 추가
+      // const daeunData = calculateDaeunInfo(
+      //   sajuResult,
+      //   Number.parseInt(year),
+      //   Number.parseInt(month),
+      //   Number.parseInt(day),
+      //   gender,
+      //   timeUnknown ? undefined : hour,
+      //   timeUnknown ? undefined : minute,
+      // )
+
+      // console.log("Calculated daeun data:", daeunData)
+
+      // Store calculation data in localStorage for later use
       const sajuDataToStore = {
         name,
         gender,
@@ -217,7 +230,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         lunarMonth: Number.parseInt(lunarData.month),
         lunarDay: Number.parseInt(lunarData.day),
         isLeapMonth: lunarData.isLeapMonth,
-        // Store saju data with the correct structure including birthInfo
         yearStem: sajuResult.yearStem,
         yearBranch: sajuResult.yearBranch,
         yearStemHanja: sajuResult.yearStemHanja,
@@ -247,25 +259,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         monthBranchSibseong: sajuResult.monthBranchSibseong,
         dayBranchSibseong: sajuResult.dayBranchSibseong,
         hourBranchSibseong: sajuResult.hourBranchSibseong,
-        // Add birthInfo structure
-        birthInfo: {
-          solar: {
-            year: Number.parseInt(year),
-            month: Number.parseInt(month),
-            day: Number.parseInt(day),
-            hour: timeUnknown ? 0 : hour,
-            minute: timeUnknown ? 0 : minute,
-          },
-          lunar: {
-            year: Number.parseInt(lunarData.year),
-            month: Number.parseInt(lunarData.month),
-            day: Number.parseInt(lunarData.day),
-            isLeapMonth: lunarData.isLeapMonth,
-          },
-          birthCityId: birthCityId,
-          timeUnknown: timeUnknown,
-          timeStandard: timeStandard,
-        },
         daeun: daeunData, // Include daeun data
       }
 
@@ -411,27 +404,39 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
     // 기본값
     let hour = 0
     let minute = 0
+    const cleanedInput = input.trim()
 
     // 입력값이 없는 경우
-    if (!input.trim()) {
+    if (!cleanedInput) {
       return { hour, minute }
     }
 
     // 콜론(:)이 포함된 경우 (예: "23:30")
-    if (input.includes(":")) {
-      const [hourStr, minuteStr] = input.split(":")
+    if (cleanedInput.includes(":")) {
+      const [hourStr, minuteStr] = cleanedInput.split(":")
       hour = Number.parseInt(hourStr, 10)
       minute = Number.parseInt(minuteStr, 10)
     }
-    // 4자리 숫자인 경우 (예: "2330")
-    else if (input.length === 4) {
-      hour = Number.parseInt(input.substring(0, 2), 10)
-      minute = Number.parseInt(input.substring(2), 10)
+    // 4자리 숫자인 경우 (예: "2330", "0030")
+    else if (cleanedInput.length === 4) {
+      const hourStr = cleanedInput.substring(0, 2)
+      const minuteStr = cleanedInput.substring(2)
+      // '00' 시를 0시(자정)로 정확하게 파싱합니다.
+      hour = Number.parseInt(hourStr, 10)
+      minute = Number.parseInt(minuteStr, 10)
     }
-    // 1-2자리 숫자인 경우 (예: "23")
+    // 1-3자리 숫자인 경우 (예: "23", "1", "130")
     else {
-      hour = Number.parseInt(input, 10)
-      minute = 0
+      const num = Number.parseInt(cleanedInput, 10)
+      if (!isNaN(num)) {
+        if (cleanedInput.length <= 2) {
+          hour = num
+          minute = 0
+        } else if (cleanedInput.length === 3) {
+          hour = Math.floor(num / 100)
+          minute = num % 100
+        }
+      }
     }
 
     // 유효성 검사
