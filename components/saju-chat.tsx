@@ -6,7 +6,7 @@ import { LoginPromptDialog } from "@/components/login-prompt-dialog"
 import { useRouter } from "@/next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Send, ChevronDown, ArrowLeft, Menu, User } from "lucide-react"
+import { Send, ChevronDown, ArrowLeft, Menu, User, MoreHorizontal } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { compressSaju } from "@/lib/saju-compression"
@@ -941,9 +941,9 @@ export default function SajuChat({
     <div
       className="flex bg-white"
       style={{
-        height: "100vh",
-        minHeight: "100vh",
-        maxHeight: "100vh",
+        height: "100dvh", // Use dynamic viewport height for mobile
+        minHeight: "100dvh",
+        maxHeight: "100dvh",
         position: "fixed",
         top: 0,
         left: 0,
@@ -953,28 +953,9 @@ export default function SajuChat({
       }}
     >
       {/* Desktop Sidebar */}
-      <div className={`hidden lg:flex w-80 bg-gray-50 border-r border-gray-200 flex-col`}>
-        <div className="p-4 space-y-6">
-          <SajuDiagram
-            saju={saju}
-            name={name}
-            gender={gender}
-            variant="sidebar"
-            solarYear={stableBirthInfo?.solarYear?.toString()}
-            solarMonth={stableBirthInfo?.solarMonth?.toString()}
-            solarDay={stableBirthInfo?.solarDay?.toString()}
-            hour={stableBirthInfo?.solarHour?.toString()}
-            minute={stableBirthInfo?.solarMinute?.toString()}
-            location={stableBirthInfo?.location}
-            timeUnknown={stableBirthInfo?.timeUnknown}
-          />
-        </div>
-      </div>
-
-      {/* Mobile Sidebar Sheet */}
-      <Sheet open={uiState.showSidebar} onOpenChange={(open) => setUiState((prev) => ({ ...prev, showSidebar: open }))}>
-        <SheetContent side="left" className="w-80 p-0 bg-gray-50">
-          <div className="p-4 space-y-6">
+      <div className={`hidden lg:flex w-80 bg-gray-50 border-r border-gray-200 flex-col overflow-hidden`}>
+        <div className="p-4 space-y-6 overflow-y-auto">
+          <div className="w-full max-w-full">
             <SajuDiagram
               saju={saju}
               name={name}
@@ -989,6 +970,29 @@ export default function SajuChat({
               timeUnknown={stableBirthInfo?.timeUnknown}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Mobile Sidebar Sheet */}
+      <Sheet open={uiState.showSidebar} onOpenChange={(open) => setUiState((prev) => ({ ...prev, showSidebar: open }))}>
+        <SheetContent side="left" className="w-80 p-0 bg-gray-50 overflow-y-auto">
+          <div className="p-4 space-y-6">
+            <div className="w-full max-w-full">
+              <SajuDiagram
+                saju={saju}
+                name={name}
+                gender={gender}
+                variant="sidebar"
+                solarYear={stableBirthInfo?.solarYear?.toString()}
+                solarMonth={stableBirthInfo?.solarMonth?.toString()}
+                solarDay={stableBirthInfo?.solarDay?.toString()}
+                hour={stableBirthInfo?.solarHour?.toString()}
+                minute={stableBirthInfo?.solarMinute?.toString()}
+                location={stableBirthInfo?.location}
+                timeUnknown={stableBirthInfo?.timeUnknown}
+              />
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -1002,7 +1006,7 @@ export default function SajuChat({
               variant="ghost"
               size="icon"
               className="lg:hidden p-2"
-              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: open }))}
+              onClick={() => setUiState((prev) => ({ ...prev, showSidebar: true }))}
             >
               <Menu className="h-5 w-5 text-gray-600" />
             </Button>
@@ -1034,9 +1038,13 @@ export default function SajuChat({
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto bg-white"
           onScroll={handleScroll}
-          style={{ paddingBottom: "140px" }}
+          style={{
+            paddingBottom: "140px", // Increased padding for mobile
+            height: "calc(100dvh - 60px)", // Account for header height
+            maxHeight: "calc(100dvh - 60px)",
+          }}
         >
-          <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
+          <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
             {messages.map((message, index) => (
               <div key={message.id || index} className="space-y-4">
                 {message.role === "assistant" && (
@@ -1081,19 +1089,23 @@ export default function SajuChat({
                           <span className="text-sm">🔮</span>
                           <span className="text-sm font-medium text-gray-700">{name}님의 사주 프로필</span>
                         </div>
-                        <SajuDiagram
-                          saju={saju}
-                          name={name}
-                          gender={gender}
-                          variant="card"
-                          solarYear={stableBirthInfo?.solarYear?.toString()}
-                          solarMonth={stableBirthInfo?.solarMonth?.toString()}
-                          solarDay={stableBirthInfo?.solarDay?.toString()}
-                          hour={stableBirthInfo?.solarHour?.toString()}
-                          minute={stableBirthInfo?.solarMinute?.toString()}
-                          location={stableBirthInfo?.location}
-                          timeUnknown={stableBirthInfo?.timeUnknown}
-                        />
+                        <div className="w-full overflow-x-auto">
+                          <div className="min-w-0 w-full">
+                            <SajuDiagram
+                              saju={saju}
+                              name={name}
+                              gender={gender}
+                              variant="card"
+                              solarYear={stableBirthInfo?.solarYear?.toString()}
+                              solarMonth={stableBirthInfo?.solarMonth?.toString()}
+                              solarDay={stableBirthInfo?.solarDay?.toString()}
+                              hour={stableBirthInfo?.solarHour?.toString()}
+                              minute={stableBirthInfo?.solarMinute?.toString()}
+                              location={stableBirthInfo?.location}
+                              timeUnknown={stableBirthInfo?.timeUnknown}
+                            />
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -1104,12 +1116,16 @@ export default function SajuChat({
                           <span className="text-sm">📅</span>
                           <span className="text-sm font-medium text-gray-700">{name}님의 현재 대운</span>
                         </div>
-                        <DaeunDiagram
-                          daeun={calculatedDaeun.pillars || []}
-                          birthInfo={stableBirthInfo}
-                          name={name}
-                          gender={gender}
-                        />
+                        <div className="w-full overflow-x-auto">
+                          <div className="min-w-0 w-full">
+                            <DaeunDiagram
+                              daeun={calculatedDaeun.pillars || []}
+                              birthInfo={stableBirthInfo}
+                              name={name}
+                              gender={gender}
+                            />
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -1147,17 +1163,20 @@ export default function SajuChat({
           </div>
         </div>
 
-        {/* Suggested Questions - Between messages and input */}
+        {/* Suggested Questions */}
         {messages.length <= 1 && !isLoading && (
-          <div className="px-6 py-4 bg-white border-t border-gray-100">
+          <div
+            className="px-4 py-3 border-t border-gray-100 absolute left-0 right-0 bg-white"
+            style={{ bottom: "100px" }}
+          >
             <div className="max-w-2xl mx-auto">
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {suggestedQuestions.slice(0, 6).map((question, index) => (
+              <div className="flex flex-wrap gap-2">
+                {suggestedQuestions.slice(0, 3).map((question, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
-                    className="text-sm bg-white border-gray-200 text-gray-600 hover:bg-gray-50 whitespace-nowrap rounded-full px-4 py-2 flex-shrink-0"
+                    className="text-xs sm:text-sm bg-white border-gray-200 text-gray-600 hover:bg-gray-50 px-2 py-1 sm:px-3 sm:py-2"
                     onClick={() => handleSuggestedQuestionClick(question)}
                   >
                     {question}
@@ -1170,60 +1189,63 @@ export default function SajuChat({
 
         {/* Input Area - Positioned only within the main chat area */}
         <div
-          className="border-t border-gray-200 bg-white px-6 py-4 absolute left-0 right-0"
-          style={{ bottom: "env(safe-area-inset-bottom, 0px)" }}
+          className="border-t border-gray-200 bg-white px-4 sm:px-6 py-4 sm:py-6 absolute left-0 right-0"
+          style={{
+            bottom: "env(safe-area-inset-bottom, 0px)",
+            minHeight: "80px", // Ensure minimum height for mobile
+          }}
         >
           <div className="max-w-2xl mx-auto w-full">
-            <form onSubmit={handleSubmit} className="flex gap-3 items-center w-full">
-              {/* Tool Button - Moved to left */}
-              <Popover
-                open={uiState.showToolMenu}
-                onOpenChange={(open) => setUiState((prev) => ({ ...prev, showToolMenu: open }))}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full w-10 h-10 text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0"
-                    onClick={handleToolButtonClick}
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-2" align="start" side="top" sideOffset={8}>
-                  <div className="space-y-1">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
-                      onClick={handleCompatibilityCheck}
-                    >
-                      <span className="mr-3 text-base">💕</span>
-                      궁합 보기
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
-                      onClick={handleOtherPersonSaju}
-                    >
-                      <span className="mr-3 text-base">👥</span>
-                      다른 사람 사주 봐주기
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-
+            <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3 items-end w-full">
               <div className="flex-1 relative min-w-0">
-                <div className="flex items-center border border-gray-300 rounded-full bg-white">
+                <div className="flex items-center border border-gray-300 rounded-full bg-white pr-2 w-full">
                   <input
                     ref={inputRef}
                     type="text"
                     value={input}
                     onChange={handleInputChange}
                     placeholder="무엇이든 물어보세요"
-                    className="flex-1 px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none bg-transparent rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-0"
+                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-900 placeholder-gray-500 focus:outline-none bg-transparent rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-0"
                     disabled={isLoading || uiState.isSubmitting}
                   />
+
+                  {/* Tool Button */}
+                  <Popover
+                    open={uiState.showToolMenu}
+                    onOpenChange={(open) => setUiState((prev) => ({ ...prev, showToolMenu: open }))}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0"
+                        onClick={handleToolButtonClick}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2" align="end" side="top" sideOffset={8}>
+                      <div className="space-y-1">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
+                          onClick={handleCompatibilityCheck}
+                        >
+                          <span className="mr-3 text-base">💕</span>
+                          궁합 보기
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-sm py-2.5 px-3 hover:bg-gray-100 rounded-md"
+                          onClick={handleOtherPersonSaju}
+                        >
+                          <span className="mr-3 text-base">👥</span>
+                          다른 사람 사주 봐주기
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 
