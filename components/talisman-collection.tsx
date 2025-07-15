@@ -97,7 +97,7 @@ export function TalismanCollection({ talismans }: TalismanCollectionProps) {
                     <>
                       <p className="text-xs text-muted-foreground mt-1">{talismanInfo.description}</p>
                       <Badge variant="outline" className="mt-2">
-                        수집 완료
+                        수집 완���
                       </Badge>
                     </>
                   )}

@@ -1197,7 +1197,7 @@ export default function SajuChat({
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                  <span className="text-sm text-gray-500">답변을 생성하고 있습니다...</span>
+                  <span className="text-sm text-gray-500">✨사주풀이중 입니다...</span>
                 </div>
               </div>
             )}

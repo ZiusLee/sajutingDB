@@ -603,7 +603,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1944, month: 8, solarTerm: '입추', timestamp: '1944-08-08 01:09' },
   { year: 1944, month: 8, solarTerm: '처서', timestamp: '1944-08-23 15:46' },
   { year: 1944, month: 9, solarTerm: '백로', timestamp: '1944-09-08 03:56' },
-  { year: 1944, month: 9, solarTerm: '추분', timestamp: '1944-09-23 13:02' },
+  { year: 1944, month: 9, solarTerm: '추��', timestamp: '1944-09-23 13:02' },
   { year: 1944, month: 10, solarTerm: '한로', timestamp: '1944-10-08 19:09' },
   { year: 1944, month: 10, solarTerm: '상강', timestamp: '1944-10-23 21:56' },
   { year: 1944, month: 11, solarTerm: '입동', timestamp: '1944-11-07 21:55' },

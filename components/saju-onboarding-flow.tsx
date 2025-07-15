@@ -26,7 +26,7 @@ interface BirthInfo {
   birthPlaceId: string
   birthDate: string
   birthTime: string
-  isLunar: boolean
+  timeUnknown: boolean
   concerns: string[]
 }
 
@@ -56,7 +56,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     birthPlaceId: DEFAULT_CITY_ID,
     birthDate: "",
     birthTime: "",
-    isLunar: false,
+    timeUnknown: false,
     concerns: [],
   })
   const [citySearchResults, setCitySearchResults] = useState<CityTimezoneData[]>([])
@@ -99,6 +99,14 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         : prev.concerns.length < 3
           ? [...prev.concerns, concernId]
           : prev.concerns,
+    }))
+  }
+
+  const handleTimeUnknownToggle = (checked: boolean) => {
+    setBirthInfo((prev) => ({
+      ...prev,
+      timeUnknown: checked,
+      birthTime: checked ? "" : prev.birthTime, // Clear time when unknown is checked
     }))
   }
 
@@ -168,12 +176,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
           solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
           solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-          solarHour: parseTime(birthInfo.birthTime).hour,
-          solarMinute: parseTime(birthInfo.birthTime).minute,
+          solarHour: birthInfo.timeUnknown ? 12 : parseTime(birthInfo.birthTime).hour,
+          solarMinute: birthInfo.timeUnknown ? 0 : parseTime(birthInfo.birthTime).minute,
           lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
           lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
           lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-          timeUnknown: false,
+          timeUnknown: birthInfo.timeUnknown,
           birthCityId: birthInfo.birthPlaceId,
           timeStandard: getTimeStandardFromCity(),
         },
@@ -244,10 +252,20 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   }
 
   const handleSubmit = async () => {
-    if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlace || !birthInfo.birthDate || !birthInfo.birthTime) {
+    if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlace || !birthInfo.birthDate) {
       toast({
         title: "필수 정보를 입력해주세요",
         description: "모든 정보를 입력해주세요.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Check time requirement only if time is not unknown
+    if (!birthInfo.timeUnknown && !birthInfo.birthTime) {
+      toast({
+        title: "태어난 시간을 입력해주세요",
+        description: "시간을 모르시면 '태어난 시간 모름'을 체크해주세요.",
         variant: "destructive",
       })
       return
@@ -257,7 +275,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
     try {
       const parsedDate = parseDate(birthInfo.birthDate)
-      const parsedTime = parseTime(birthInfo.birthTime)
+      const parsedTime = birthInfo.timeUnknown ? { hour: 12, minute: 0 } : parseTime(birthInfo.birthTime)
 
       if (!parsedDate) {
         toast({
@@ -320,7 +338,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         Number.parseInt(day),
         birthInfo.gender,
         birthInfo.name,
-        false,
+        birthInfo.timeUnknown, // Pass timeUnknown flag
         lunarData.isLeapMonth,
         lunarData.monthStem,
         lunarData.monthBranch,
@@ -339,7 +357,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         birthInfo.gender,
         hour,
         minute,
-        false,
+        birthInfo.timeUnknown, // Pass timeUnknown flag
       )
 
       sajuResult.daeun = daeunData
@@ -354,7 +372,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         day: Number.parseInt(day),
         hour,
         minute,
-        timeUnknown: false,
+        timeUnknown: birthInfo.timeUnknown,
         timeStandard,
         birthCityId,
         lunarYear: Number.parseInt(lunarData.year),
@@ -406,7 +424,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             isLeapMonth: lunarData.isLeapMonth,
           },
           birthCityId: birthCityId,
-          timeUnknown: false,
+          timeUnknown: birthInfo.timeUnknown,
           timeStandard: timeStandard,
         },
         daeun: daeunData, // Store daeun data separately
@@ -467,7 +485,9 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       case 3:
         return birthInfo.birthPlace.trim().length > 0
       case 4:
-        return birthInfo.birthDate.trim().length >= 8 && birthInfo.birthTime.trim().length >= 3
+        return (
+          birthInfo.birthDate.trim().length >= 8 && (birthInfo.timeUnknown || birthInfo.birthTime.trim().length >= 3)
+        )
       case 5:
         return birthInfo.concerns.length > 0
       default:
@@ -689,7 +709,11 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 value={birthInfo.birthTime}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthTime: e.target.value })}
                 placeholder="0930"
-                className="flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500"
+                disabled={birthInfo.timeUnknown}
+                className={cn(
+                  "flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500",
+                  birthInfo.timeUnknown && "opacity-50 cursor-not-allowed",
+                )}
               />
             </div>
 
@@ -703,12 +727,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             <div className="flex items-center gap-2 mb-12">
               <input
                 type="checkbox"
-                id="isLunar"
-                checked={birthInfo.isLunar}
-                onChange={(e) => setBirthInfo({ ...birthInfo, isLunar: e.target.checked })}
+                id="timeUnknown"
+                checked={birthInfo.timeUnknown}
+                onChange={(e) => handleTimeUnknownToggle(e.target.checked)}
                 className="rounded"
               />
-              <label htmlFor="isLunar" className="text-gray-600">
+              <label htmlFor="timeUnknown" className="text-gray-600">
                 태어난 시간 모름
               </label>
             </div>
