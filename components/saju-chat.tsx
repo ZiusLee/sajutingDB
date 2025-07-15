@@ -49,6 +49,7 @@ const useHideHeaderAndFooter = () => {
   }, [])
 }
 
+
 interface SajuChatProps {
   saju: any
   name: string
@@ -905,7 +906,7 @@ export default function SajuChat({
   }, [setInput])
 
   useHideHeaderAndFooter()
-
+  
   if (!initState.isReady || !immutableDataRef.current) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
@@ -1019,21 +1020,14 @@ export default function SajuChat({
 
         {/* Chat Messages - No bubbles, clean text blocks */}
         <div
-          className="flex-1 overflow-y-auto bg-gradient-to-b from-stone-50/30 to-amber-50/20 relative"
-          style={{
-            paddingBottom: "140px",
-            height: "calc(100dvh - 60px)",
-            maxHeight: "calc(100dvh - 60px)",
-            backgroundImage: `
-    radial-gradient(circle at 25% 25%, rgba(139, 69, 19, 0.02) 0%, transparent 50%),
-    radial-gradient(circle at 75% 75%, rgba(160, 82, 45, 0.015) 0%, transparent 50%),
-    linear-gradient(45deg, transparent 49%, rgba(222, 184, 135, 0.01) 50%, transparent 51%),
-    linear-gradient(-45deg, transparent 49%, rgba(210, 180, 140, 0.008) 50%, transparent 51%)
-  `,
-            backgroundSize: "200px 200px, 150px 150px, 3px 3px, 3px 3px",
-            backgroundPosition: "0 0, 100px 100px, 0 0, 1.5px 1.5px",
-          }}
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto bg-white"
           onScroll={handleScroll}
+          style={{
+            paddingBottom: "140px", // Increased padding for mobile
+            height: "calc(100dvh - 60px)", // Account for header height
+            maxHeight: "calc(100dvh - 60px)",
+          }}
         >
           <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
             {messages.map((message, index) => (

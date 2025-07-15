@@ -161,11 +161,7 @@ export default function LandingPageClient() {
                 <br />
                 자신에게 집중해보세요.
               </h2>
-              <p className="text-base text-gray-600">
-                사주를 바탕으로 나와 대화하는
-                <br />
-                AI 불안에게 물어봐, 사주핑
-              </p>
+              <p className="text-base text-gray-600">사주를 바탕으로 나와 대화하는 AI 불안케어 플랫폼, 사주핑</p>
             </div>
 
             <Button
