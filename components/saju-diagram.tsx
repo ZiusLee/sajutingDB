@@ -1,7 +1,10 @@
+"use client"
+
 import type { Saju } from "@/lib/saju"
 import { InfoIcon, ChevronDown } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
+import { useTheme } from "next-themes"
 
 interface SajuDiagramProps {
   saju: Saju
@@ -38,24 +41,27 @@ export default function SajuDiagram({
   location,
   variant = "chat",
 }: SajuDiagramProps) {
-  // 정확한 오행 색상 매핑
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
+
+  // Theme-aware element colors for backgrounds
   const elementColors = {
-    wood: "bg-green-500", // 목 - 녹색
-    fire: "bg-red-500", // 화 - 빨간색
-    earth: "bg-yellow-500", // 토 - 노란색
-    metal: "bg-gray-400", // 금 - 회색
-    water: "bg-blue-500", // 수 - 파란색
-    unknown: "bg-gray-300",
+    wood: isDark ? "bg-green-600" : "bg-green-500", // 목 - 녹색
+    fire: isDark ? "bg-orange-600" : "bg-red-500", // 화 - 다크에서는 오렌지, 라이트에서는 빨간색
+    earth: isDark ? "bg-amber-700" : "bg-yellow-500", // 토 - 다크에서는 앰버, 라이트에서는 노란색
+    metal: isDark ? "bg-slate-500" : "bg-gray-400", // 금 - 회색
+    water: isDark ? "bg-blue-600" : "bg-blue-500", // 수 - 파란색
+    unknown: isDark ? "bg-gray-600" : "bg-gray-300",
   }
 
-  // 사이드바용 텍스트 색상 매핑
+  // Theme-aware text colors for sidebar
   const elementTextColors = {
-    wood: "text-green-600", // 목 - 녹색
-    fire: "text-red-600", // 화 - 빨간색
-    earth: "text-yellow-600", // 토 - 노란색
-    metal: "text-gray-600", // 금 - 회색
-    water: "text-blue-600", // 수 - 파란색
-    unknown: "text-gray-400",
+    wood: isDark ? "text-green-400" : "text-green-600", // 목 - 녹색
+    fire: isDark ? "text-orange-400" : "text-red-600", // 화 - 다크에서는 오렌지, 라이트에서는 빨간색
+    earth: isDark ? "text-amber-400" : "text-yellow-600", // 토 - 다크에서는 앰버, 라이트에서는 노란색
+    metal: isDark ? "text-slate-400" : "text-gray-600", // 금 - 회색
+    water: isDark ? "text-blue-400" : "text-blue-600", // 수 - 파란색
+    unknown: isDark ? "text-gray-400" : "text-gray-400",
   }
 
   // 간의 오행 매핑
@@ -159,9 +165,9 @@ export default function SajuDiagram({
   // Card layout for mobile chat
   if (variant === "card") {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+      <div className="bg-background rounded-2xl border border-border p-4 shadow-sm">
         <div className="text-center mb-4">
-          <h3 className="text-lg font-bold text-gray-800">
+          <h3 className="text-lg font-bold text-foreground">
             {displayName}님의 사주: {dayMasterInfo.ilju}일주
           </h3>
         </div>
@@ -169,7 +175,7 @@ export default function SajuDiagram({
         {/* 4-pillar grid */}
         <div className="space-y-3">
           {/* Headers */}
-          <div className="grid grid-cols-4 gap-2 text-center text-sm text-gray-600 mb-2">
+          <div className="grid grid-cols-4 gap-2 text-center text-sm text-muted-foreground mb-2">
             <div>시주</div>
             <div>일주</div>
             <div>월주</div>
@@ -179,7 +185,7 @@ export default function SajuDiagram({
           {/* Stems */}
           <div className="grid grid-cols-4 gap-2">
             <div
-              className={`${timeUnknown ? "bg-gray-300" : getStemColor(saju.hourStem)} text-white rounded-lg p-3 text-center shadow-sm`}
+              className={`${timeUnknown ? elementColors.unknown : getStemColor(saju.hourStem)} text-white rounded-lg p-3 text-center shadow-sm`}
             >
               <div className="text-xl font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
               <div className="text-xs">{timeUnknown ? "" : saju.hourStemHanja}</div>
@@ -199,21 +205,21 @@ export default function SajuDiagram({
           </div>
 
           {/* Sibseong for stems - increased height */}
-          <div className="grid grid-cols-4 gap-2 text-center text-xs text-gray-500">
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">
+          <div className="grid grid-cols-4 gap-2 text-center text-xs text-muted-foreground">
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">
               {timeUnknown ? "" : saju.hourStemSibseong}
             </div>
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">
               {saju.dayStemSibseong || "본원"}
             </div>
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">{saju.monthStemSibseong}</div>
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">{saju.yearStemSibseong}</div>
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">{saju.monthStemSibseong}</div>
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">{saju.yearStemSibseong}</div>
           </div>
 
           {/* Branches */}
           <div className="grid grid-cols-4 gap-2">
             <div
-              className={`${timeUnknown ? "bg-gray-300" : getBranchColor(saju.hourBranch)} text-white rounded-lg p-3 text-center shadow-sm`}
+              className={`${timeUnknown ? elementColors.unknown : getBranchColor(saju.hourBranch)} text-white rounded-lg p-3 text-center shadow-sm`}
             >
               <div className="text-xl font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
               <div className="text-xs">{timeUnknown ? "" : saju.hourBranchHanja}</div>
@@ -233,17 +239,13 @@ export default function SajuDiagram({
           </div>
 
           {/* Sibseong for branches - increased height */}
-          <div className="grid grid-cols-4 gap-2 text-center text-xs text-gray-500">
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">
+          <div className="grid grid-cols-4 gap-2 text-center text-xs text-muted-foreground">
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">
               {timeUnknown ? "" : saju.hourBranchSibseong}
             </div>
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">{saju.dayBranchSibseong}</div>
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">
-              {saju.monthBranchSibseong}
-            </div>
-            <div className="bg-gray-100 rounded p-2 h-8 flex items-center justify-center">
-              {saju.yearBranchSibseong}
-            </div>
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">{saju.dayBranchSibseong}</div>
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">{saju.monthBranchSibseong}</div>
+            <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">{saju.yearBranchSibseong}</div>
           </div>
         </div>
       </div>
@@ -255,13 +257,13 @@ export default function SajuDiagram({
     return (
       <div className="p-4 space-y-4">
         {/* Profile Header */}
-        <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-          <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center">
+        <div className="flex items-center gap-2 pb-2 border-b border-border">
+          <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
             <span className="text-xs">👤</span>
           </div>
           <div className="flex-1">
-            <span className="text-sm text-gray-600">사주 프로필</span>
-            <ChevronDown className="w-4 h-4 text-gray-400 float-right" />
+            <span className="text-sm text-muted-foreground">사주 프로필</span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground float-right" />
           </div>
         </div>
 
@@ -272,7 +274,7 @@ export default function SajuDiagram({
               {displayName.charAt(0)}
             </div>
             <div>
-              <h3 className="font-bold text-gray-800">{displayName}의 사주 ⭐</h3>
+              <h3 className="font-bold text-foreground">{displayName}의 사주 ⭐</h3>
               <p className="text-sm text-red-500">
                 {dayMasterInfo.ilju}일주 ({dayMasterInfo.elementName}) {dayMasterInfo.colorName}
                 {dayMasterInfo.animalName}
@@ -281,7 +283,7 @@ export default function SajuDiagram({
           </div>
 
           {/* Birth Info */}
-          <div className="space-y-1 text-sm text-gray-600">
+          <div className="space-y-1 text-sm text-muted-foreground">
             <div className="flex justify-start gap-2">
               <span>생일</span>
               <span>
@@ -304,13 +306,13 @@ export default function SajuDiagram({
         {/* Saju Chart Header */}
         <div className="flex items-center gap-2 pt-2">
           <span className="text-sm font-medium">사주팔자 상세</span>
-          <InfoIcon className="w-4 h-4 text-gray-400" />
+          <InfoIcon className="w-4 h-4 text-muted-foreground" />
         </div>
 
         {/* Compact 4-pillar chart with text colors */}
         <div className="space-y-2">
           {/* Headers */}
-          <div className="grid grid-cols-4 gap-1 text-center text-xs text-gray-600">
+          <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
             <div>시주</div>
             <div>일주</div>
             <div>월주</div>
@@ -320,39 +322,37 @@ export default function SajuDiagram({
           {/* Stems with text colors */}
           <div className="grid grid-cols-4 gap-1">
             <div
-              className={`${timeUnknown ? "text-gray-400" : getStemColor(saju.hourStem, true)} bg-gray-50 rounded p-2 text-center font-bold border`}
+              className={`${timeUnknown ? "text-muted-foreground" : getStemColor(saju.hourStem, true)} bg-muted rounded p-2 text-center font-bold border`}
             >
               <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
-              <div className="text-xs text-gray-500">{timeUnknown ? "" : saju.hourStemHanja}</div>
+              <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourStemHanja}</div>
             </div>
-            <div className={`${getStemColor(saju.dayStem, true)} bg-gray-50 rounded p-2 text-center font-bold border`}>
+            <div className={`${getStemColor(saju.dayStem, true)} bg-muted rounded p-2 text-center font-bold border`}>
               <div className="text-sm font-bold">{saju.dayStem}</div>
-              <div className="text-xs text-gray-500">{saju.dayStemHanja}</div>
+              <div className="text-xs text-muted-foreground">{saju.dayStemHanja}</div>
             </div>
-            <div
-              className={`${getStemColor(saju.monthStem, true)} bg-gray-50 rounded p-2 text-center font-bold border`}
-            >
+            <div className={`${getStemColor(saju.monthStem, true)} bg-muted rounded p-2 text-center font-bold border`}>
               <div className="text-sm font-bold">{saju.monthStem}</div>
-              <div className="text-xs text-gray-500">{saju.monthStemHanja}</div>
+              <div className="text-xs text-muted-foreground">{saju.monthStemHanja}</div>
             </div>
-            <div className={`${getStemColor(saju.yearStem, true)} bg-gray-50 rounded p-2 text-center font-bold border`}>
+            <div className={`${getStemColor(saju.yearStem, true)} bg-muted rounded p-2 text-center font-bold border`}>
               <div className="text-sm font-bold">{saju.yearStem}</div>
-              <div className="text-xs text-gray-500">{saju.yearStemHanja}</div>
+              <div className="text-xs text-muted-foreground">{saju.yearStemHanja}</div>
             </div>
           </div>
 
           {/* Sibseong for stems - increased height */}
-          <div className="grid grid-cols-4 gap-1 text-center text-xs text-gray-500">
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+          <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {timeUnknown ? "" : saju.hourStemSibseong}
             </div>
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.dayStemSibseong || "본원"}
             </div>
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.monthStemSibseong}
             </div>
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.yearStemSibseong}
             </div>
           </div>
@@ -360,43 +360,43 @@ export default function SajuDiagram({
           {/* Branches with text colors */}
           <div className="grid grid-cols-4 gap-1">
             <div
-              className={`${timeUnknown ? "text-gray-400" : getBranchColor(saju.hourBranch, true)} bg-gray-50 rounded p-2 text-center font-bold border`}
+              className={`${timeUnknown ? "text-muted-foreground" : getBranchColor(saju.hourBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
             >
               <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
-              <div className="text-xs text-gray-500">{timeUnknown ? "" : saju.hourBranchHanja}</div>
+              <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourBranchHanja}</div>
             </div>
             <div
-              className={`${getBranchColor(saju.dayBranch, true)} bg-gray-50 rounded p-2 text-center font-bold border`}
+              className={`${getBranchColor(saju.dayBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
             >
               <div className="text-sm font-bold">{saju.dayBranch}</div>
-              <div className="text-xs text-gray-500">{saju.dayBranchHanja}</div>
+              <div className="text-xs text-muted-foreground">{saju.dayBranchHanja}</div>
             </div>
             <div
-              className={`${getBranchColor(saju.monthBranch, true)} bg-gray-50 rounded p-2 text-center font-bold border`}
+              className={`${getBranchColor(saju.monthBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
             >
               <div className="text-sm font-bold">{saju.monthBranch}</div>
-              <div className="text-xs text-gray-500">{saju.monthBranchHanja}</div>
+              <div className="text-xs text-muted-foreground">{saju.monthBranchHanja}</div>
             </div>
             <div
-              className={`${getBranchColor(saju.yearBranch, true)} bg-gray-50 rounded p-2 text-center font-bold border`}
+              className={`${getBranchColor(saju.yearBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
             >
               <div className="text-sm font-bold">{saju.yearBranch}</div>
-              <div className="text-xs text-gray-500">{saju.yearBranchHanja}</div>
+              <div className="text-xs text-muted-foreground">{saju.yearBranchHanja}</div>
             </div>
           </div>
 
           {/* Sibseong for branches - increased height */}
-          <div className="grid grid-cols-4 gap-1 text-center text-xs text-gray-500">
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+          <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {timeUnknown ? "" : saju.hourBranchSibseong}
             </div>
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.dayBranchSibseong}
             </div>
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.monthBranchSibseong}
             </div>
-            <div className="bg-gray-100 rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.yearBranchSibseong}
             </div>
           </div>
@@ -409,14 +409,14 @@ export default function SajuDiagram({
   return (
     <div className="space-y-4">
       {/* Profile section */}
-      <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg shadow-sm">
+      <div className="flex items-center gap-4 p-4 bg-muted rounded-lg shadow-sm">
         <div className="w-16 h-16 rounded-xl bg-red-400 flex items-center justify-center text-white text-2xl font-bold shadow-sm">
           {displayName.charAt(0)}
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold">{displayName}의 사주</h2>
-            <span className="text-gray-400">⭐</span>
+            <span className="text-muted-foreground">⭐</span>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
@@ -441,7 +441,7 @@ export default function SajuDiagram({
       </div>
 
       {/* Birth info */}
-      <div className="space-y-2 text-sm text-gray-600">
+      <div className="space-y-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <span className="font-medium">생일</span>
           <span>
@@ -463,20 +463,20 @@ export default function SajuDiagram({
       {/* Saju chart header */}
       <div className="flex items-center gap-2">
         <h3 className="font-medium">사주팔자 상세</h3>
-        <InfoIcon className="h-4 w-4 text-gray-400" />
+        <InfoIcon className="h-4 w-4 text-muted-foreground" />
       </div>
 
       {/* 4-pillar chart with background colors and shadows */}
       <div className="grid grid-cols-4 gap-3">
         {/* Headers */}
-        <div className="text-center text-sm text-gray-600">시주</div>
-        <div className="text-center text-sm text-gray-600">일주</div>
-        <div className="text-center text-sm text-gray-600">월주</div>
-        <div className="text-center text-sm text-gray-600">년주</div>
+        <div className="text-center text-sm text-muted-foreground">시주</div>
+        <div className="text-center text-sm text-muted-foreground">일주</div>
+        <div className="text-center text-sm text-muted-foreground">월주</div>
+        <div className="text-center text-sm text-muted-foreground">년주</div>
 
         {/* Stems with background colors */}
         <div
-          className={`${timeUnknown ? "bg-gray-300" : getStemColor(saju.hourStem)} text-white rounded-lg p-4 text-center shadow-md`}
+          className={`${timeUnknown ? elementColors.unknown : getStemColor(saju.hourStem)} text-white rounded-lg p-4 text-center shadow-md`}
         >
           <div className="text-2xl font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
           <div className="text-sm">{timeUnknown ? "" : saju.hourStemHanja}</div>
@@ -495,22 +495,22 @@ export default function SajuDiagram({
         </div>
 
         {/* Sibseong for stems - increased height */}
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {timeUnknown ? "" : saju.hourStemSibseong}
         </div>
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.dayStemSibseong || "본원"}
         </div>
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.monthStemSibseong}
         </div>
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.yearStemSibseong}
         </div>
 
         {/* Branches with background colors */}
         <div
-          className={`${timeUnknown ? "bg-gray-300" : getBranchColor(saju.hourBranch)} text-white rounded-lg p-4 text-center shadow-md`}
+          className={`${timeUnknown ? elementColors.unknown : getBranchColor(saju.hourBranch)} text-white rounded-lg p-4 text-center shadow-md`}
         >
           <div className="text-2xl font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
           <div className="text-sm">{timeUnknown ? "" : saju.hourBranchHanja}</div>
@@ -529,16 +529,16 @@ export default function SajuDiagram({
         </div>
 
         {/* Sibseong for branches - increased height */}
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {timeUnknown ? "" : saju.hourBranchSibseong}
         </div>
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.dayBranchSibseong}
         </div>
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.monthBranchSibseong}
         </div>
-        <div className="text-center text-sm text-gray-500 bg-gray-100 rounded p-3 h-12 flex items-center justify-center shadow-sm">
+        <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.yearBranchSibseong}
         </div>
       </div>

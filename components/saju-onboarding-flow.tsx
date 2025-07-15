@@ -33,17 +33,17 @@ interface BirthInfo {
 const concernOptions = [
   { id: "love", label: "짝사랑", icon: "💕" },
   { id: "breakup", label: "이별", icon: "💔" },
-  { id: "health", label: "건강", icon: "🔄" },
-  { id: "marriage", label: "결혼", icon: "📞" },
+  { id: "health", label: "건강", icon: "🏥" },
+  { id: "marriage", label: "결혼", icon: "💍" },
   { id: "money", label: "금전", icon: "💰" },
   { id: "work", label: "학업", icon: "📚" },
   { id: "relationship", label: "연인과의 관계", icon: "💖" },
   { id: "career", label: "커리어 고민", icon: "👔" },
-  { id: "job", label: "취업 준비", icon: "📋" },
-  { id: "future", label: "나의 가치관", icon: "👤" },
+  { id: "job", label: "취업 준비", icon: "💼" },
+  { id: "future", label: "나의 가치관", icon: "🤔" },
   { id: "workplace", label: "직장 내 관계", icon: "🏢" },
-  { id: "friend", label: "친구 관계", icon: "😊" },
-  { id: "family", label: "가족 관계", icon: "🏠" },
+  { id: "friend", label: "친구 관계", icon: "👥" },
+  { id: "family", label: "가족 관계", icon: "👨‍👩‍👧‍👦" },
 ]
 
 export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
@@ -542,7 +542,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-full"
+              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
             >
               다음으로 <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
@@ -572,7 +572,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 className={cn(
                   "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium w-full",
                   birthInfo.gender === "male"
-                    ? "bg-gray-800 text-white border-gray-800"
+                    ? "bg-gray-950 text-white border-gray-950"
                     : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
                 )}
               >
@@ -583,7 +583,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 className={cn(
                   "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium w-full",
                   birthInfo.gender === "female"
-                    ? "bg-gray-800 text-white border-gray-800"
+                    ? "bg-gray-950 text-white border-gray-950"
                     : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
                 )}
               >
@@ -594,7 +594,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-full"
+              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
             >
               다음으로 <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
@@ -673,7 +673,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-full"
+              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
             >
               다음으로 <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
@@ -740,7 +740,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-full"
+              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
             >
               다음으로 <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
@@ -772,7 +772,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-full border transition-all",
                     birthInfo.concerns.includes(concern.id)
-                      ? "bg-blue-100 border-blue-300 text-blue-700"
+                      ? "bg-gray-900 border-gray-900 text-white"
                       : "bg-white/80 border-gray-200 text-gray-700 hover:bg-gray-50",
                   )}
                 >
@@ -787,7 +787,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             <Button
               onClick={handleSubmit}
               disabled={!canProceed() || isLoading}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-full"
+              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
             >
               {isLoading ? "생성 중..." : "완료하기"} <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
@@ -820,7 +820,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-6 right-6 z-10 bg-gray-800 text-white px-4 py-2 rounded-full text-sm hover:bg-gray-700 transition-colors"
+        className="absolute top-6 right-6 z-10 bg-gray-950 text-white px-4 py-2 rounded-full text-sm hover:bg-gray-800 transition-colors"
       >
         로그인
       </button>
