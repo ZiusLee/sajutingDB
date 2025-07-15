@@ -1044,7 +1044,7 @@ export default function SajuChat({
             maxHeight: "calc(100dvh - 60px)",
           }}
         >
-          <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+          <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
             {messages.map((message, index) => (
               <div key={message.id || index} className="space-y-4">
                 {message.role === "assistant" && (
@@ -1082,49 +1082,105 @@ export default function SajuChat({
                       </ReactMarkdown>
                     </div>
 
-                    {/* Show Saju Diagram for first message */}
+                    {/* Show Saju Diagram and Daeun Diagram for first message */}
                     {index === 0 && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">🔮</span>
-                          <span className="text-sm font-medium text-gray-700">{name}님의 사주 프로필</span>
-                        </div>
-                        <div className="w-full overflow-x-auto">
-                          <div className="min-w-0 w-full">
-                            <SajuDiagram
-                              saju={saju}
-                              name={name}
-                              gender={gender}
-                              variant="card"
-                              solarYear={stableBirthInfo?.solarYear?.toString()}
-                              solarMonth={stableBirthInfo?.solarMonth?.toString()}
-                              solarDay={stableBirthInfo?.solarDay?.toString()}
-                              hour={stableBirthInfo?.solarHour?.toString()}
-                              minute={stableBirthInfo?.solarMinute?.toString()}
-                              location={stableBirthInfo?.location}
-                              timeUnknown={stableBirthInfo?.timeUnknown}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                      <div className="space-y-6">
+                        {/* Desktop: Side by side layout */}
+                        <div className="hidden lg:block">
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            {/* Saju Diagram */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">🔮</span>
+                                <span className="text-sm font-medium text-gray-700">{name}님의 사주 프로필</span>
+                              </div>
+                              <div className="w-full overflow-x-auto">
+                                <div className="min-w-0 w-full">
+                                  <SajuDiagram
+                                    saju={saju}
+                                    name={name}
+                                    gender={gender}
+                                    variant="card"
+                                    solarYear={stableBirthInfo?.solarYear?.toString()}
+                                    solarMonth={stableBirthInfo?.solarMonth?.toString()}
+                                    solarDay={stableBirthInfo?.solarDay?.toString()}
+                                    hour={stableBirthInfo?.solarHour?.toString()}
+                                    minute={stableBirthInfo?.solarMinute?.toString()}
+                                    location={stableBirthInfo?.location}
+                                    timeUnknown={stableBirthInfo?.timeUnknown}
+                                  />
+                                </div>
+                              </div>
+                            </div>
 
-                    {/* Show current Daeun info */}
-                    {index === 0 && calculatedDaeun && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">📅</span>
-                          <span className="text-sm font-medium text-gray-700">{name}님의 현재 대운</span>
-                        </div>
-                        <div className="w-full overflow-x-auto">
-                          <div className="min-w-0 w-full">
-                            <DaeunDiagram
-                              daeun={calculatedDaeun.pillars || []}
-                              birthInfo={stableBirthInfo}
-                              name={name}
-                              gender={gender}
-                            />
+                            {/* Daeun Diagram */}
+                            {calculatedDaeun && (
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">📅</span>
+                                  <span className="text-sm font-medium text-gray-700">{name}님의 현재 대운</span>
+                                </div>
+                                <div className="w-full overflow-x-auto">
+                                  <div className="min-w-0 w-full">
+                                    <DaeunDiagram
+                                      daeun={calculatedDaeun.pillars || []}
+                                      birthInfo={stableBirthInfo}
+                                      name={name}
+                                      gender={gender}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
+                        </div>
+
+                        {/* Mobile/Tablet: Stacked layout */}
+                        <div className="lg:hidden space-y-6">
+                          {/* Saju Diagram */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">🔮</span>
+                              <span className="text-sm font-medium text-gray-700">{name}님의 사주 프로필</span>
+                            </div>
+                            <div className="w-full overflow-x-auto">
+                              <div className="min-w-0 w-full">
+                                <SajuDiagram
+                                  saju={saju}
+                                  name={name}
+                                  gender={gender}
+                                  variant="card"
+                                  solarYear={stableBirthInfo?.solarYear?.toString()}
+                                  solarMonth={stableBirthInfo?.solarMonth?.toString()}
+                                  solarDay={stableBirthInfo?.solarDay?.toString()}
+                                  hour={stableBirthInfo?.solarHour?.toString()}
+                                  minute={stableBirthInfo?.solarMinute?.toString()}
+                                  location={stableBirthInfo?.location}
+                                  timeUnknown={stableBirthInfo?.timeUnknown}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Daeun Diagram */}
+                          {calculatedDaeun && (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">📅</span>
+                                <span className="text-sm font-medium text-gray-700">{name}님의 현재 대운</span>
+                              </div>
+                              <div className="w-full overflow-x-auto">
+                                <div className="min-w-0 w-full">
+                                  <DaeunDiagram
+                                    daeun={calculatedDaeun.pillars || []}
+                                    birthInfo={stableBirthInfo}
+                                    name={name}
+                                    gender={gender}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1169,7 +1225,7 @@ export default function SajuChat({
             className="px-4 py-3 border-t border-gray-100 absolute left-0 right-0 bg-white"
             style={{ bottom: "100px" }}
           >
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-4xl mx-auto">
               <div className="flex flex-wrap gap-2">
                 {suggestedQuestions.slice(0, 3).map((question, index) => (
                   <Button
@@ -1195,7 +1251,7 @@ export default function SajuChat({
             minHeight: "80px", // Ensure minimum height for mobile
           }}
         >
-          <div className="max-w-2xl mx-auto w-full">
+          <div className="max-w-4xl mx-auto w-full">
             <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3 items-end w-full">
               <div className="flex-1 relative min-w-0">
                 <div className="flex items-center border border-gray-300 rounded-full bg-white pr-2 w-full">
