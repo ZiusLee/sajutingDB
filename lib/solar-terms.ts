@@ -1151,7 +1151,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1967, month: 6, solarTerm: '망종', timestamp: '1967-06-06 18:36' },
   { year: 1967, month: 6, solarTerm: '하지', timestamp: '1967-06-22 11:23' },
   { year: 1967, month: 7, solarTerm: '소서', timestamp: '1967-07-08 04:53' },
-  { year: 1967, month: 7, solarTerm: '대서', timestamp: '1967-07-23 22:16' },
+  { year: 1967, month: 7, solarTerm: '대���', timestamp: '1967-07-23 22:16' },
   { year: 1967, month: 8, solarTerm: '입추', timestamp: '1967-08-08 08:14' },
   { year: 1967, month: 8, solarTerm: '처서', timestamp: '1967-08-24 00:46' },
   { year: 1967, month: 9, solarTerm: '백로', timestamp: '1967-09-08 17:18' },

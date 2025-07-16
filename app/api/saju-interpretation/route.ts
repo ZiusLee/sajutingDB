@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 - 오류 내용: ${error instanceof Error ? error.message : "알 수 없는 오류"}
 
 ## 문제 해결 방법:
-1. 페이지를 새로고침하고 다시 �����도해보세요.
+1. 페이지를 새로고침하고 ��시 �����도해보세요.
 2. 인터넷 연결을 확인해보세요.
 3. 잠시 후 다시 시도해보세요.
 `
