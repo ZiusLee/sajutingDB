@@ -1,68 +1,114 @@
 // API client functions for making requests to the backend
 
 export async function fetchLunarDate(year: string, month: string, day: string) {
-  const response = await fetch("/api/lunar-date", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ year, month, day }),
-  })
+  try {
+    const response = await fetch(`/api/lunar-date?year=${year}&month=${month}&day=${day}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch lunar date")
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const contentType = response.headers.get("content-type")
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Response is not JSON")
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error fetching lunar date:", error)
+    throw error
   }
+}
 
-  return response.json()
+export async function saveSajuData(sajuData: any) {
+  try {
+    const response = await fetch("/api/save-saju-data", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sajuData),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error saving saju data:", error)
+    throw error
+  }
+}
+
+export async function getUserProfiles(authUserId: string) {
+  try {
+    const response = await fetch(`/api/users?authUserId=${authUserId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error fetching user profiles:", error)
+    throw error
+  }
 }
 
 export async function fetchSajuInterpretation(sajuData: any) {
-  const response = await fetch("/api/saju-interpretation", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(sajuData),
-  })
+  try {
+    const response = await fetch("/api/saju-interpretation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sajuData),
+    })
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch saju interpretation")
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error getting saju interpretation:", error)
+    throw error
   }
-
-  return response.json()
 }
 
-// Export with alternative name for compatibility
-export const getSajuInterpretation = fetchSajuInterpretation
+export async function getSajuInterpretation(sajuData: any) {
+  try {
+    const response = await fetch("/api/saju-interpretation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sajuData),
+    })
 
-export async function saveSajuData(sajuData: any) {
-  const response = await fetch("/api/save-saju-data", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(sajuData),
-  })
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
-  if (!response.ok) {
-    throw new Error("Failed to save saju data")
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error getting saju interpretation:", error)
+    throw error
   }
-
-  return response.json()
-}
-
-export async function fetchCompatibility(userData1: any, userData2: any) {
-  const response = await fetch("/api/compatibility", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ userData1, userData2 }),
-  })
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch compatibility")
-  }
-
-  return response.json()
 }

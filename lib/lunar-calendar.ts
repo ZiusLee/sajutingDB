@@ -33,9 +33,6 @@ export function getJulianDayToSolar(julianDay: number): { year: number; month: n
 }
 
 // 음력 데이터 (1900-2050)
-// 각 연도별 음력 정보를 담은 배열
-// 각 연도는 12(또는 윤달이 있는 경우 13)개의 값을 가짐
-// 각 값은 해당 달의 일수(29 또는 30)와 윤달 여부를 나타냄
 const LUNAR_DATA = [
   0x4bd8,
   0x4ae0,
