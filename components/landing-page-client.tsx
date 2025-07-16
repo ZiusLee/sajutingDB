@@ -82,9 +82,9 @@ export default function LandingPageClient() {
       />
 
       {/* Floating Navigation */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4">
+      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4">
         <button onClick={handleLogoClick} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center">
             <span className="text-white font-bold text-sm">S</span>
           </div>
           <span className="text-xl font-bold text-black">SAJUPING</span>
@@ -92,14 +92,14 @@ export default function LandingPageClient() {
         <Button
           onClick={handleLoginClick}
           variant="default"
-          className="bg-gray-950 hover:bg-gray-800 text-white px-6 py-2 rounded-lg"
+          className="bg-gray-950 hover:bg-gray-800 text-white px-6 py-2 rounded-xl"
         >
           로그인
         </Button>
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-8 text-center">
         {/* Main Question */}
         <div className="mb-12">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight mb-6">
@@ -112,10 +112,10 @@ export default function LandingPageClient() {
 
         {/* Scrolling Question Chips */}
         <div className="mb-12 w-full relative">
-          {/* Left fade overlay */}
-          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
-          {/* Right fade overlay */}
-          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent z-20 pointer-events-none" />
+          {/* Left fade overlay - smaller on mobile */}
+          <div className="absolute left-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
+          {/* Right fade overlay - smaller on mobile */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-l from-white to-transparent z-20 pointer-events-none" />
 
           <div className="space-y-2">
             {/* First row - scrolling right */}
@@ -135,11 +135,11 @@ export default function LandingPageClient() {
                 scrollerClassName="flex items-center h-16"
                 numCopies={10}
               >
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
                   {questionChips.slice(0, 14).map((chip, index) => (
                     <div
                       key={index}
-                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-full shadow-sm flex items-center space-x-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-xl shadow-sm flex items-center space-x-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
                     >
                       <span className="text-lg">{chip.icon}</span>
                       <span>{chip.text}</span>
@@ -166,11 +166,11 @@ export default function LandingPageClient() {
                 scrollerClassName="flex items-center h-16"
                 numCopies={10}
               >
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
                   {questionChips.slice(14).map((chip, index) => (
                     <div
                       key={index + 14}
-                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-full shadow-sm flex items-center space-x-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-xl shadow-sm flex items-center space-x-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
                     >
                       <span className="text-lg">{chip.icon}</span>
                       <span>{chip.text}</span>
@@ -186,7 +186,7 @@ export default function LandingPageClient() {
         <div className="space-y-6 max-w-md w-full relative z-20">
           <Button
             onClick={handleStartSaju}
-            className="w-full bg-gray-950 hover:bg-gray-800 text-white px-8 py-4 rounded-full text-lg font-medium flex items-center justify-center space-x-2 shadow-lg transform hover:scale-105 transition-all duration-200"
+            className="w-[200px] h-[46px] mx-auto bg-gray-950 hover:bg-gray-800 text-white rounded-xl text-lg font-medium flex items-center justify-center gap-2 shadow-lg transform hover:scale-105 transition-all duration-200"
           >
             <span>사주 프로필 생성하기</span>
             <span className="text-xl">→</span>
@@ -204,10 +204,13 @@ export default function LandingPageClient() {
         </div>
       </div>
 
+      {/* Smooth transition fade out before wave pattern */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-amber-50/20 via-white/50 to-transparent z-15" />
+
       {/* Oriental Wave Pattern at Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-48 md:h-64 lg:h-80 z-0">
+      <div className="absolute bottom-0 left-0 right-0 h-48 md:h-64 lg:h-80 z-10">
         <div
-          className="w-full h-full opacity-15"
+          className="w-full h-full opacity-10"
           style={{
             backgroundImage: `url('/images/oriental-wave-pattern.png')`,
             backgroundSize: "400px 200px",
@@ -216,13 +219,13 @@ export default function LandingPageClient() {
           }}
         />
         {/* Gradient overlay to blend with background */}
-        <div className="absolute inset-0 bg-gradient-to-t from-amber-50/30 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-amber-50/20 via-transparent to-transparent" />
       </div>
 
       {/* Additional subtle pattern overlay for depth */}
       <div className="absolute bottom-0 left-0 right-0 h-32 md:h-40 z-5">
         <div
-          className="w-full h-full opacity-8"
+          className="w-full h-full opacity-5"
           style={{
             backgroundImage: `url('/images/oriental-wave-pattern.png')`,
             backgroundSize: "300px 150px",
