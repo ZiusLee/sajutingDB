@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "saju-calculator",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,7 +12,7 @@
     "@ai-sdk/deepseek": "latest",
     "@ai-sdk/openai": "latest",
     "@emotion/is-prop-valid": "latest",
-    "@hookform/resolvers": "^3.9.1",
+    "@neondatabase/serverless": "^0.10.1",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",
@@ -41,18 +41,20 @@
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
+    "@supabase/ssr": "^0.5.1",
     "@supabase/storage-js": "latest",
     "@supabase/supabase-js": "latest",
-    "@tosspayments/payment-widget-sdk": "^0.12.0",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
     "@vercel/postgres": "latest",
     "ai": "latest",
-    "autoprefixer": "^10.4.20",
     "bcryptjs": "latest",
     "canvas-confetti": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "latest",
-    "date-fns": "^3.3.1",
+    "date-fns": "^4.1.0",
     "embla-carousel-react": "latest",
     "fast-xml-parser": "latest",
     "framer-motion": "latest",
@@ -75,17 +77,21 @@
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5",
     "uuid": "latest",
     "vaul": "latest",
     "ws": "latest",
-    "zod": "^3.24.1"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/eslint": "^9",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^8",
+    "eslint-config-next": "15.0.3",
     "postcss": "^8.5",
-    "tailwindcss": "^3.4.17",
+    "tailwindcss": "^3.4.1",
     "typescript": "^5"
   }
 }
