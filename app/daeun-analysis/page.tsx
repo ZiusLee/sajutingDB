@@ -141,7 +141,7 @@ export default async function DaeunAnalysisPage({
     }
   }
 
-  // 사주 파라미터가 있는 경우 (채팅 목록에서 돌아온 경우 또는 마이페이지에서 직접 전달된 경���)
+  // 사주 파라미터가 있는 경우 (채팅 목록에서 돌아온 경우 또는 마이페이지에서 직접 전달된 ������)
   if (sajuParam) {
     try {
       const sajuData = JSON.parse(decodeURIComponent(sajuParam))

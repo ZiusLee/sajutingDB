@@ -110,14 +110,13 @@ export default function LandingPageClient() {
             <br />
             궁금하세요?
           </h1>
-          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나와 대화하는 
-AI Companion, 사주핑</p>
+          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
         </div>
 
         {/* Scrolling Question Chips */}
         <div className="mb-12 w-full relative">
           {/* Left fade overlay - smaller on mobile */}
-          <div className="absolute left-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-4 md:w-20 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
           {/* Right fade overlay - smaller on mobile */}
           <div className="absolute right-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-l from-white to-transparent z-20 pointer-events-none" />
 
@@ -143,9 +142,9 @@ AI Companion, 사주핑</p>
                   {questionChips.slice(0, 14).map((chip, index) => (
                     <div
                       key={index}
-                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-full shadow-sm flex items-center gap-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      className="bg-white text-black border-2 border-gray-200 px-3 py-2 md:px-4 md:py-3 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
                     >
-                      <span className="text-lg">{chip.icon}</span>
+                      <span className="text-base md:text-lg">{chip.icon}</span>
                       <span>{chip.text}</span>
                     </div>
                   ))}
@@ -174,9 +173,9 @@ AI Companion, 사주핑</p>
                   {questionChips.slice(14).map((chip, index) => (
                     <div
                       key={index + 14}
-                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-full shadow-sm flex items-center gap-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      className="bg-white text-black border-2 border-gray-200 px-3 py-2 md:px-4 md:py-3 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
                     >
-                      <span className="text-lg">{chip.icon}</span>
+                      <span className="text-base md:text-lg">{chip.icon}</span>
                       <span>{chip.text}</span>
                     </div>
                   ))}

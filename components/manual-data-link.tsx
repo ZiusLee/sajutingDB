@@ -21,7 +21,7 @@ export default function ManualDataLink({ onSuccess }: ManualDataLinkProps) {
     if (!sessionId.trim()) {
       toast({
         title: "세션 ID 필요",
-        description: "연결할 세션 ID를 입력해주세요.",
+        description: "연결할 세션 ID�� 입력해주세요.",
         variant: "destructive",
       })
       return

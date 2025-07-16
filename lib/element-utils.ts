@@ -30,7 +30,7 @@ export const elementColors: Record<Element, string> = {
   water: "bg-blue-500",
 }
 
-// 오행 텍스트 색상 매핑 (Tailwind 클래스)
+// 오행 텍스트 색상 매�� (Tailwind 클래스)
 export const elementTextColors: Record<Element, string> = {
   wood: "text-green-500",
   fire: "text-red-500",

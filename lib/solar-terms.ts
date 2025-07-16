@@ -2821,7 +2821,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 2037, month: 1, solarTerm: '소한', timestamp: '2037-01-05 09:33' },
   { year: 2037, month: 1, solarTerm: '대한', timestamp: '2037-01-20 02:52' },
   { year: 2037, month: 2, solarTerm: '입춘', timestamp: '2037-02-03 21:10' },
-  { year: 2037, month: 2, solarTerm: '우수', timestamp: '2037-02-18 16:57' },
+  { year: 2037, month: 2, solarTerm: '���수', timestamp: '2037-02-18 16:57' },
   { year: 2037, month: 3, solarTerm: '경칩', timestamp: '2037-03-05 15:05' },
   { year: 2037, month: 3, solarTerm: '춘분', timestamp: '2037-03-20 15:49' },
   { year: 2037, month: 4, solarTerm: '청명', timestamp: '2037-04-04 19:43' },
