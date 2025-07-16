@@ -69,6 +69,16 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     }
   }
 
+  const handleHomeClick = () => {
+    console.log("Home clicked")
+    router.push("/")
+  }
+
+  const handleLoginClick = () => {
+    console.log("Login clicked")
+    router.push("/login")
+  }
+
   const handleCitySearch = (value: string) => {
     setBirthInfo({ ...birthInfo, birthPlace: value })
     if (value.trim()) {
@@ -810,17 +820,17 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       />
 
       {/* Logo */}
-      <div className="absolute top-6 left-6 z-10">
+      <button onClick={handleHomeClick} className="absolute top-6 left-6 z-50 cursor-pointer">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-black rounded-lg"></div>
           <span className="font-bold text-lg">SAJUPING</span>
         </div>
-      </div>
+      </button>
 
       {/* Close Button */}
       <button
-        onClick={onClose}
-        className="absolute top-6 right-6 z-10 bg-gray-950 text-white px-4 py-2 rounded-full text-sm hover:bg-gray-800 transition-colors"
+        onClick={handleLoginClick}
+        className="absolute top-6 right-6 z-50 bg-gray-950 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800 transition-colors cursor-pointer"
       >
         로그인
       </button>

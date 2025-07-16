@@ -45,6 +45,7 @@ export default function LandingPageClient() {
   const router = useRouter()
 
   const handleStartSaju = () => {
+    console.log("사주 프로필 생성하기 버튼 클릭됨")
     setShowOnboarding(true)
   }
 
@@ -57,10 +58,12 @@ export default function LandingPageClient() {
   }
 
   const handleLoginClick = () => {
+    console.log("로그인 버튼 클릭됨")
     router.push("/login")
   }
 
   const handleRegisterClick = () => {
+    console.log("회원가입 버튼 클릭됨")
     router.push("/register")
   }
 
@@ -82,9 +85,9 @@ export default function LandingPageClient() {
       />
 
       {/* Floating Navigation */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4">
+      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4">
         <button onClick={handleLogoClick} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center">
+          <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">S</span>
           </div>
           <span className="text-xl font-bold text-black">SAJUPING</span>
@@ -92,14 +95,14 @@ export default function LandingPageClient() {
         <Button
           onClick={handleLoginClick}
           variant="default"
-          className="bg-gray-950 hover:bg-gray-800 text-white px-6 py-2 rounded-xl"
+          className="bg-gray-950 hover:bg-gray-800 text-white px-6 py-2 rounded-lg z-50"
         >
           로그인
         </Button>
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-8 text-center">
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
         {/* Main Question */}
         <div className="mb-12">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight mb-6">
@@ -107,7 +110,8 @@ export default function LandingPageClient() {
             <br />
             궁금하세요?
           </h1>
-          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
+          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나와 대화하는 
+AI Companion, 사주핑</p>
         </div>
 
         {/* Scrolling Question Chips */}
@@ -139,7 +143,7 @@ export default function LandingPageClient() {
                   {questionChips.slice(0, 14).map((chip, index) => (
                     <div
                       key={index}
-                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-xl shadow-sm flex items-center space-x-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-full shadow-sm flex items-center gap-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
                     >
                       <span className="text-lg">{chip.icon}</span>
                       <span>{chip.text}</span>
@@ -170,7 +174,7 @@ export default function LandingPageClient() {
                   {questionChips.slice(14).map((chip, index) => (
                     <div
                       key={index + 14}
-                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-xl shadow-sm flex items-center space-x-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      className="bg-white text-black border-2 border-gray-200 px-4 py-3 rounded-full shadow-sm flex items-center gap-2 text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
                     >
                       <span className="text-lg">{chip.icon}</span>
                       <span>{chip.text}</span>
@@ -183,20 +187,20 @@ export default function LandingPageClient() {
         </div>
 
         {/* CTA Section */}
-        <div className="space-y-6 max-w-md w-full relative z-20">
-          <Button
+        <div className="space-y-6 max-w-md w-full relative z-50">
+          <button
             onClick={handleStartSaju}
-            className="w-[200px] h-[46px] mx-auto bg-gray-950 hover:bg-gray-800 text-white rounded-xl text-lg font-medium flex items-center justify-center gap-2 shadow-lg transform hover:scale-105 transition-all duration-200"
+            className="w-[200px] h-[46px] mx-auto bg-gray-950 hover:bg-gray-800 text-white rounded-xl text-lg font-medium flex items-center justify-center gap-2 shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer"
           >
             <span>사주 프로필 생성하기</span>
             <span className="text-xl">→</span>
-          </Button>
+          </button>
 
           <div className="flex items-center justify-center space-x-2 text-sm">
             <span className="text-gray-500">계정이 없으신가요?</span>
             <button
               onClick={handleRegisterClick}
-              className="text-black hover:underline font-medium hover:text-gray-700 transition-colors"
+              className="text-black hover:underline font-medium hover:text-gray-700 transition-colors cursor-pointer z-50"
             >
               회원가입
             </button>
@@ -205,10 +209,10 @@ export default function LandingPageClient() {
       </div>
 
       {/* Smooth transition fade out before wave pattern */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-amber-50/20 via-white/50 to-transparent z-15" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-amber-50/20 via-white/50 to-transparent z-5" />
 
       {/* Oriental Wave Pattern at Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-48 md:h-64 lg:h-80 z-10">
+      <div className="absolute bottom-0 left-0 right-0 h-48 md:h-64 lg:h-80 z-1">
         <div
           className="w-full h-full opacity-10"
           style={{
@@ -223,7 +227,7 @@ export default function LandingPageClient() {
       </div>
 
       {/* Additional subtle pattern overlay for depth */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 md:h-40 z-5">
+      <div className="absolute bottom-0 left-0 right-0 h-32 md:h-40 z-0">
         <div
           className="w-full h-full opacity-5"
           style={{
