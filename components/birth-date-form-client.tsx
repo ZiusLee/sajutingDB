@@ -15,7 +15,7 @@ import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
 import { syncLocalStorageToDatabase } from "@/lib/data-sync"
 import { useToast } from "@/components/ui/use-toast"
-import { getSupabase } from "@/lib/supabase-client"
+import { supabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
 import { CitySearch } from "@/components/city-search"
 import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
@@ -54,10 +54,9 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
     const checkAuthAndLinkData = async () => {
       try {
         console.log("Checking authentication status...")
-        const supabaseClient = getSupabase()
         const {
           data: { session },
-        } = await supabaseClient.auth.getSession()
+        } = await supabase.auth.getSession()
 
         if (session && session.user) {
           console.log("User is authenticated with Supabase:", session.user.id)
@@ -274,10 +273,9 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         console.log("Attempting to save saju data to database...")
 
         // Get authenticated user ID
-        const supabaseClient = getSupabase()
         const {
           data: { session },
-        } = await supabaseClient.auth.getSession()
+        } = await supabase.auth.getSession()
         const authUserId = session?.user?.id || null
 
         userId = await syncLocalStorageToDatabase(authUserId)
@@ -463,14 +461,19 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
   const updateUserAuthId = async (sessionId: string) => {
     try {
       // Check if user is authenticated with Supabase Auth
-      const supabaseClient = getSupabase()
       const {
         data: { session },
-      } = await supabaseClient.auth.getSession()
+      } = await supabase.auth.getSession()
 
       if (session && session.user) {
         const authUserId = session.user.id
         console.log("Updating saju session auth_user_id:", sessionId, "with auth user ID:", authUserId)
+
+        // Validate that we have valid string values
+        if (typeof sessionId !== "string" || typeof authUserId !== "string") {
+          console.error("Invalid sessionId or authUserId type:", { sessionId, authUserId })
+          return
+        }
 
         // Update the saju_sessions record with the auth_user_id
         const success = await updateAuthUserId(sessionId, authUserId)
@@ -484,7 +487,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
           })
 
           // Verify the update was successful by checking the database
-          const { data, error } = await supabaseClient
+          const { data, error } = await supabase
             .from("saju_sessions")
             .select("auth_user_id")
             .eq("id", sessionId)

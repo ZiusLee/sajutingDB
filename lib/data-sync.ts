@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase-client"
+import { supabase } from "./supabase-client"
 
 export interface PartnerInfo {
   id?: string
@@ -15,40 +15,30 @@ export interface PartnerInfo {
   saju?: any
 }
 
-export async function syncLocalStorageToDatabase() {
+export async function syncLocalStorageToDatabase(authUserId?: string | null): Promise<string | null> {
   try {
     console.log("Starting data sync to database...")
 
     // Get stored saju data from localStorage
-    const storedData = localStorage.getItem("sajuData")
+    const storedData = localStorage.getItem("tempSajuData")
     if (!storedData) {
-      console.log("No saju data found in localStorage")
-      return { success: false, error: "No data to sync" }
+      console.log("No temp saju data found in localStorage")
+      return null
     }
 
     const sajuData = JSON.parse(storedData)
     console.log("Saju data from localStorage:", sajuData)
 
-    // Get session ID from localStorage
-    const sessionId = localStorage.getItem("sessionId")
-    if (!sessionId) {
-      console.log("No session ID found in local storage.")
-      return { success: false, error: "No session ID" }
+    // Use provided authUserId or get from current session
+    let userId = authUserId
+    if (!userId) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      userId = session?.user?.id || null
     }
 
-    const supabase = createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-    if (userError || !user) {
-      console.log("Failed to get user ID when saving saju data")
-      return { success: false, error: "User not authenticated" }
-    }
-
-    console.log("User authenticated:", user.id)
+    console.log("Auth user ID:", userId)
 
     // Prepare time data for database storage
     const timeData = {
@@ -58,106 +48,143 @@ export async function syncLocalStorageToDatabase() {
     }
 
     console.log("Storing saju data with time info:", {
-      originalInput: sajuData.originalTimeInput,
       parsedHour: sajuData.hour,
       parsedMinute: sajuData.minute,
       timeUnknown: sajuData.timeUnknown,
     })
 
-    // Insert birth info into database
-    const birthInfoData = {
-      auth_user_id: user.id,
+    // Create a new saju session
+    const sessionData = {
       name: sajuData.name,
       gender: sajuData.gender,
-      relationship_status: sajuData.relationshipStatus,
+      auth_user_id: userId, // This can be null for anonymous users
+    }
+
+    const { data: sessionResult, error: sessionError } = await supabase
+      .from("saju_sessions")
+      .insert(sessionData)
+      .select("id")
+      .single()
+
+    if (sessionError) {
+      console.error("Error creating saju session:", sessionError)
+      return null
+    }
+
+    const sessionId = sessionResult.id
+    console.log("Created saju session:", sessionId)
+
+    // Insert birth info into database
+    const birthInfoData = {
+      user_id: sessionId, // Use session ID as user_id
       solar_year: sajuData.year,
       solar_month: sajuData.month,
       solar_day: sajuData.day,
       ...timeData,
-      time_standard: sajuData.timeStandard || "동경135도",
-      birth_city_id: sajuData.birthCityId,
       lunar_year: sajuData.lunarYear,
       lunar_month: sajuData.lunarMonth,
       lunar_day: sajuData.lunarDay,
       is_leap_month: sajuData.isLeapMonth || false,
-      year_stem: sajuData.yearStem,
-      year_branch: sajuData.yearBranch,
-      month_stem: sajuData.monthStem,
-      month_branch: sajuData.monthBranch,
-      day_stem: sajuData.dayStem,
-      day_branch: sajuData.dayBranch,
-      hour_stem: sajuData.hourStem,
-      hour_branch: sajuData.hourBranch,
-      day_master: sajuData.dayMaster,
-      year_animal: sajuData.yearAnimal,
-      elements_wood: sajuData.elements?.wood || 0,
-      elements_fire: sajuData.elements?.fire || 0,
-      elements_earth: sajuData.elements?.earth || 0,
-      elements_metal: sajuData.elements?.metal || 0,
-      elements_water: sajuData.elements?.water || 0,
-      interpretation: sajuData.interpretation,
-      session_id: sessionId,
     }
-
-    console.log("Inserting birth info with time data:", {
-      solar_hour: birthInfoData.solar_hour,
-      solar_minute: birthInfoData.solar_minute,
-      time_unknown: birthInfoData.time_unknown,
-    })
 
     const { data: birthInfo, error: birthError } = await supabase
       .from("birth_info")
       .insert(birthInfoData)
-      .select()
+      .select("id")
       .single()
 
     if (birthError) {
       console.error("Error inserting birth info:", birthError)
-      return { success: false, error: birthError.message }
+      return null
     }
 
     console.log("Birth info inserted successfully:", birthInfo.id)
 
-    // Store daeun data if available
-    if (sajuData.daeun && sajuData.daeun.pillars) {
-      const daeunData = sajuData.daeun.pillars.map((pillar: any, index: number) => ({
-        birth_info_id: birthInfo.id,
-        cycle_number: index + 1,
-        period: pillar.period,
-        ages: pillar.ages,
-        start_date: pillar.start,
-        stem: pillar.stem,
-        branch: pillar.branch,
-        start_age: pillar.startAge,
-        end_age: pillar.endAge,
-      }))
-
-      const { error: daeunError } = await supabase.from("daeun_cycles").insert(daeunData)
-
-      if (daeunError) {
-        console.error("Error inserting daeun data:", daeunError)
-        return { success: false, error: daeunError.message }
-      }
-
-      console.log("Daeun data inserted successfully")
+    // Insert saju info into database
+    const sajuInfoData = {
+      user_id: sessionId,
+      year_stem: sajuData.yearStem,
+      year_branch: sajuData.yearBranch,
+      year_stem_hanja: sajuData.yearStemHanja,
+      year_branch_hanja: sajuData.yearBranchHanja,
+      month_stem: sajuData.monthStem,
+      month_branch: sajuData.monthBranch,
+      month_stem_hanja: sajuData.monthStemHanja,
+      month_branch_hanja: sajuData.monthBranchHanja,
+      day_stem: sajuData.dayStem,
+      day_branch: sajuData.dayBranch,
+      day_stem_hanja: sajuData.dayStemHanja,
+      day_branch_hanja: sajuData.dayBranchHanja,
+      hour_stem: sajuData.hourStem,
+      hour_branch: sajuData.hourBranch,
+      hour_stem_hanja: sajuData.hourStemHanja,
+      hour_branch_hanja: sajuData.hourBranchHanja,
+      day_master: sajuData.dayMaster,
+      day_master_hanja: sajuData.dayMasterHanja,
+      year_animal: sajuData.yearAnimal,
     }
 
-    // Clear localStorage after successful sync
-    localStorage.removeItem("sajuData")
-    localStorage.removeItem("sessionId")
+    const { data: sajuInfo, error: sajuError } = await supabase
+      .from("saju_info")
+      .insert(sajuInfoData)
+      .select("id")
+      .single()
+
+    if (sajuError) {
+      console.error("Error inserting saju info:", sajuError)
+      return null
+    }
+
+    console.log("Saju info inserted successfully:", sajuInfo.id)
+
+    // Insert elements into database
+    if (sajuData.elements) {
+      const elementsData = {
+        saju_id: sajuInfo.id,
+        wood: sajuData.elements.wood || 0,
+        fire: sajuData.elements.fire || 0,
+        earth: sajuData.elements.earth || 0,
+        metal: sajuData.elements.metal || 0,
+        water: sajuData.elements.water || 0,
+      }
+
+      const { error: elementsError } = await supabase.from("elements").insert(elementsData)
+
+      if (elementsError) {
+        console.error("Error inserting elements:", elementsError)
+      } else {
+        console.log("Elements inserted successfully")
+      }
+    }
+
+    // Insert interpretation if available
+    if (sajuData.interpretation) {
+      const interpretationData = {
+        user_id: sessionId,
+        basic_interpretation: sajuData.interpretation,
+        model_used: "local",
+        response_time: "0ms",
+      }
+
+      const { error: interpretationError } = await supabase.from("interpretations").insert(interpretationData)
+
+      if (interpretationError) {
+        console.error("Error inserting interpretation:", interpretationError)
+      } else {
+        console.log("Interpretation inserted successfully")
+      }
+    }
 
     console.log("Data sync completed successfully")
-    return { success: true, birthInfoId: birthInfo.id }
+    return sessionId
   } catch (error) {
     console.error("Error in syncLocalStorageToDatabase:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+    return null
   }
 }
 
 export async function getUserSajuData(userId: string) {
   try {
-    const supabase = createClient()
-
     const { data, error } = await supabase
       .from("birth_info")
       .select(`
@@ -254,7 +281,6 @@ export async function clearTempData() {
 
 export async function updateSessionWithAuthUser(sessionId: string, authUserId: string): Promise<boolean> {
   try {
-    const supabase = createClient()
     const { error } = await supabase.from("saju_sessions").update({ auth_user_id: authUserId }).eq("id", sessionId)
 
     if (error) {
