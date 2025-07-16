@@ -49,7 +49,6 @@ const useHideHeaderAndFooter = () => {
   }, [])
 }
 
-
 interface SajuChatProps {
   saju: any
   name: string
@@ -906,7 +905,7 @@ export default function SajuChat({
   }, [setInput])
 
   useHideHeaderAndFooter()
-  
+
   if (!initState.isReady || !immutableDataRef.current) {
     return (
       <div className="flex h-screen bg-gray-900 text-white">
@@ -1171,12 +1170,14 @@ export default function SajuChat({
                     )}
 
                     {/* Message feedback buttons */}
-                    <MessageFeedbackButtons
-                      messageId={message.id || `msg-${index}`}
-                      messageContent={message.content}
-                      sessionId={initState.sessionId || ""}
-                      onRetry={handleRetry}
-                    />
+                    <div className="mb-10">
+                      <MessageFeedbackButtons
+                        messageId={message.id || `msg-${index}`}
+                        messageContent={message.content}
+                        sessionId={initState.sessionId || ""}
+                        onRetry={handleRetry}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -1205,24 +1206,28 @@ export default function SajuChat({
         </div>
 
         {/* Suggested Questions */}
-        {messages.length <= 1 && !isLoading && (
+        {!isLoading && (
           <div
-            className="px-4 py-3 border-t border-gray-100 absolute left-0 right-0 bg-white"
-            style={{ bottom: "100px" }}
+            className="px-4 py-2 border-t border-gray-100 absolute left-0 right-0 bg-white z-10"
+            style={{
+              bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`, // Increased space above input area
+            }}
           >
             <div className="max-w-4xl mx-auto">
-              <div className="flex flex-wrap gap-2">
-                {suggestedQuestions.slice(0, 3).map((question, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs sm:text-sm bg-white border-gray-200 text-gray-600 hover:bg-gray-50 px-2 py-1 sm:px-3 sm:py-2"
-                    onClick={() => handleSuggestedQuestionClick(question)}
-                  >
-                    {question}
-                  </Button>
-                ))}
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+                <div className="flex gap-2 flex-nowrap">
+                  {suggestedQuestions.slice(0, 3).map((question, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs sm:text-sm bg-white border-gray-200 text-gray-600 hover:bg-gray-50 px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap flex-shrink-0"
+                      onClick={() => handleSuggestedQuestionClick(question)}
+                    >
+                      {question}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

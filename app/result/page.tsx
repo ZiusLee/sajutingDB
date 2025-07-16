@@ -326,7 +326,7 @@ export default async function ResultPage({
                 <BetaSignupForm />
               </div>
 
-              {/* 마이페이지로 돌아가기 버튼 */}
+              {/* 마이페이지�� 돌아가기 버튼 */}
               <div className="flex justify-center">
                 <Button variant="outline" asChild>
                   <Link href="/mypage">마이페이지로 돌아가기</Link>
