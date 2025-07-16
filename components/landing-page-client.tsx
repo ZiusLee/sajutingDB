@@ -84,8 +84,7 @@ export default function LandingPageClient() {
             <br />
             궁금하세요?
           </h1>
-          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나를 이해하는 
-AI 불안케어 플랫폼</p>
+          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
         </div>
 
         {/* Scrolling Question Chips */}
