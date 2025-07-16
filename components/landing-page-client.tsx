@@ -111,8 +111,13 @@ export default function LandingPageClient() {
         </div>
 
         {/* Scrolling Question Chips */}
-        <div className="mb-12 w-full">
-          <div className="space-y-4">
+        <div className="mb-12 w-full relative">
+          {/* Left fade overlay */}
+          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
+          {/* Right fade overlay */}
+          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent z-20 pointer-events-none" />
+
+          <div className="space-y-2">
             {/* First row - scrolling right */}
             <div className="h-16 overflow-hidden">
               <ScrollVelocity
