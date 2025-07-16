@@ -1210,7 +1210,7 @@ export default function SajuChat({
           <div
             className="px-4 py-2 border-t border-gray-100 absolute left-0 right-0 bg-white z-10"
             style={{
-              bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`, // Increased space above input area
+              bottom: `calc(80px + env(safe-area-inset-bottom, 0px))`, // Increased space above input area
             }}
           >
             <div className="max-w-4xl mx-auto">
