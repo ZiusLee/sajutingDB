@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Send, ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, RefreshCw } from "lucide-react"
+import { Send, ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, RefreshCw, Settings } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { SajuLogo } from "@/components/saju-logo"
+import { SettingsDialog } from "@/components/settings-dialog"
 
 interface SajuChatProps {
   saju: any
@@ -349,9 +350,11 @@ export default function SajuChat({
         {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between p-3 sm:p-4 border-b bg-white">
           <SajuLogo onClick={() => setSidebarOpen(true)} />
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <SettingsDialog>
+            <Button variant="ghost" size="icon">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </SettingsDialog>
         </div>
 
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
