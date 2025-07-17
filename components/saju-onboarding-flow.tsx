@@ -373,14 +373,21 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
               placeholder="홍길동"
               className="h-12 text-center text-lg bg-white border-gray-300 rounded-lg w-full mb-4"
             />
-            <p className="text-muted-foreground text-sm">TIP: 이름은 본명으로 작성하는 것을 추천해요.</p>
+            <p className="text-muted-foreground text-sm mb-8">TIP: 이름은 본명으로 작성하는 것을 추천해요.</p>
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+            >
+              다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
           </div>
         )
       case 2:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">성별을 알려주세요.</h1>
-            <div className="flex gap-4 w-full">
+            <div className="flex gap-4 w-full mb-8">
               <Button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "male" })}
                 variant={birthInfo.gender === "male" ? "default" : "outline"}
@@ -396,13 +403,20 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 여성
               </Button>
             </div>
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+            >
+              다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
           </div>
         )
       case 3:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">태어난 도시를 알려주세요.</h1>
-            <div className="w-full relative">
+            <div className="w-full relative mb-4">
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
                 <Input
@@ -437,14 +451,21 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 </div>
               )}
             </div>
-            <p className="text-muted-foreground text-sm mt-4">정확한 시간 계산에 활용돼요.</p>
+            <p className="text-muted-foreground text-sm mb-8">정확한 시간 계산에 활용돼요.</p>
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+            >
+              다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
           </div>
         )
       case 4:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">태어난 일시를 알려주세요.</h1>
-            <div className="flex flex-col gap-4 w-full">
+            <div className="flex flex-col gap-4 w-full mb-4">
               <Input
                 value={birthInfo.birthDate}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthDate: e.target.value })}
@@ -462,7 +483,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 )}
               />
             </div>
-            <div className="flex items-center gap-2 mt-4 self-start">
+            <div className="flex items-center gap-2 mb-8 self-start">
               <input
                 type="checkbox"
                 id="timeUnknown"
@@ -474,6 +495,13 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 태어난 시간 모름
               </label>
             </div>
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+            >
+              다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
           </div>
         )
       case 5:
@@ -530,7 +558,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-24">
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
         <div className="flex justify-center mb-8">
           {[1, 2, 3, 4, 5].map((step) => (
             <div
@@ -544,20 +572,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
         {renderStepContent()}
       </main>
-
-      {currentStep < 5 && (
-        <footer className="sticky bottom-0 p-6 w-full flex justify-center bg-white/80 backdrop-blur-sm">
-          <div className="w-full max-w-xs">
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
-            >
-              다음으로 <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          </div>
-        </footer>
-      )}
     </div>
   )
 }
