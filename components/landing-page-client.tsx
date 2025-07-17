@@ -83,22 +83,7 @@ export default function LandingPageClient() {
         }}
       />
 
-      {/* Floating Navigation */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4">
-        <button onClick={handleLogoClick} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">S</span>
-          </div>
-          <span className="text-xl font-bold text-black">SAJUPING</span>
-        </button>
-        <Button
-          onClick={handleLoginClick}
-          variant="default"
-          className="bg-gray-950 hover:bg-gray-800 text-white px-6 py-2 rounded-lg z-50"
-        >
-          로그인
-        </Button>
-      </div>
+  
 
       {/* Main Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
