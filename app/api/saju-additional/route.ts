@@ -156,7 +156,7 @@ ${relationshipContext}
 - 상대방과의 관계에서 나타나는 사주적 특징
 
 ### 2. 2025년 을사년의 연애 기운 분석
-- 을사년의 천간/지지가 썸 관계에 미치는 영향
+- 을사년의 천간/지지가 썸 관계에 미치는 영���
 - 연애로 발전할 수 있는 시기와 기회
 
 ### 3. 썸에서 연애로 발전시키기 위한 전략
@@ -348,7 +348,7 @@ ${relationshipContext}
       }
 - 년주: ${yearStem}${yearBranch}
 - 월주: ${monthStem}${monthBranch}
-- 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})
+- 일주: ${dayStem}${dayBranch} (일���: ${dayMaster})
 - 시주: ${hourStem}${hourBranch}
 - 띠: ${yearAnimal}
 - 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
@@ -558,7 +558,7 @@ ${relationshipContext}
 - 오류 시간: ${new Date().toISOString()}
 - 오류 내용: ${errorMessage}
 
-## 문제 해결 방법:
+## 문��� 해결 ���법:
 1. 페이지를 새로고침하고 다시 시도해보세요.
 2. 잠시 후 다시 시도해보세요.
         `,

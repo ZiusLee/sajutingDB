@@ -6,11 +6,16 @@ interface SajuLogoProps {
 export function SajuLogo({ className = "", size = "md" }: SajuLogoProps) {
   const sizeClasses = {
     sm: "text-lg",
-    md: "text-2xl",
-    lg: "text-4xl",
+    md: "text-xl",
+    lg: "text-2xl",
   }
 
-  return <div className={`font-bold text-purple-600 ${sizeClasses[size]} ${className}`}>🔮 사주핑</div>
+  return (
+    <div className={`flex items-center space-x-2 ${className}`}>
+      <div className="w-8 h-8 bg-gray-900 rounded-lg flex-shrink-0" />
+      <span className={`font-bold text-gray-900 ${sizeClasses[size]}`}>SAJUPING</span>
+    </div>
+  )
 }
 
 export default SajuLogo

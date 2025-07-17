@@ -29,6 +29,10 @@ export async function getSessionMessages(sessionId: string): Promise<Message[]> 
     const response = await fetch(`/api/messages?sessionId=${sessionId}`)
 
     if (!response.ok) {
+      if (response.status === 404) {
+        // No messages found for this session, return empty array
+        return []
+      }
       throw new Error(`Failed to fetch messages: ${response.statusText}`)
     }
 

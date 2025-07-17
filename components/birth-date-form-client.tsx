@@ -392,7 +392,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
     }
   }
 
-  // 시간 입력값 파싱 함수
+  // 시간 입력값 파��� 함수
   const parseTimeInput = (input: string): { hour: number; minute: number } => {
     // 기본값
     let hour = 0

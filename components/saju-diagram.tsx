@@ -545,3 +545,6 @@ export default function SajuDiagram({
     </div>
   )
 }
+
+// Add named export
+export { SajuDiagram }

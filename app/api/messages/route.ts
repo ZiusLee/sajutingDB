@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = createRouteHandlerClient({ cookies })
 
+    // Get messages for the session
     const { data: messages, error } = await supabase
       .from("messages")
       .select(`
@@ -24,7 +25,12 @@ export async function GET(request: NextRequest) {
         room_type,
         model_used,
         response_time_ms,
-        created_at
+        created_at,
+        message_feedback (
+          id,
+          feedback_type,
+          created_at
+        )
       `)
       .eq("session_id", sessionId)
       .order("message_order", { ascending: true })
@@ -34,17 +40,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 })
     }
 
-    return NextResponse.json({ messages: messages || [] })
+    // Transform the data to match the expected format
+    const transformedMessages =
+      messages?.map((msg) => ({
+        id: msg.id,
+        sessionId: msg.session_id,
+        role: msg.role,
+        content: msg.content,
+        messageOrder: msg.message_order,
+        roomType: msg.room_type,
+        modelUsed: msg.model_used,
+        responseTimeMs: msg.response_time_ms,
+        createdAt: msg.created_at,
+        feedback: msg.message_feedback || [],
+      })) || []
+
+    return NextResponse.json({ messages: transformedMessages })
   } catch (error) {
-    console.error("Error in GET /api/messages:", error)
+    console.error("Error in messages API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { sessionId, messages, roomType, sajuData } = body
+    const { sessionId, messages, roomType } = await request.json()
 
     if (!sessionId || !messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Invalid request data" }, { status: 400 })
@@ -52,53 +72,29 @@ export async function POST(request: NextRequest) {
 
     const supabase = createRouteHandlerClient({ cookies })
 
-    // Get existing message count for proper ordering
-    const { data: existingMessages, error: countError } = await supabase
-      .from("messages")
-      .select("message_order")
-      .eq("session_id", sessionId)
-      .order("message_order", { ascending: false })
-      .limit(1)
-
-    if (countError) {
-      console.error("Error getting message count:", countError)
-      return NextResponse.json({ error: "Failed to get message count" }, { status: 500 })
-    }
-
-    const lastOrder = existingMessages && existingMessages.length > 0 ? existingMessages[0].message_order : 0
-
-    // Prepare messages for insertion
-    const messagesToInsert = messages.map((message, index) => ({
+    // Save messages to database
+    const messagesToInsert = messages.map((msg, index) => ({
       session_id: sessionId,
-      role: message.role,
-      content: message.content,
-      message_order: lastOrder + index + 1,
-      room_type: roomType || "general",
-      model_used: message.model_used || null,
-      response_time_ms: message.response_time_ms || null,
-      created_at: new Date().toISOString(),
+      role: msg.role,
+      content: msg.content,
+      message_order: index,
+      room_type: roomType || "sajuping",
+      model_used: msg.model || "gpt-4",
+      response_time_ms: msg.responseTime || null,
     }))
 
-    // Insert messages
-    const { data: insertedMessages, error: insertError } = await supabase
-      .from("messages")
-      .insert(messagesToInsert)
-      .select("id")
+    const { data, error } = await supabase.from("messages").insert(messagesToInsert).select("id")
 
-    if (insertError) {
-      console.error("Error inserting messages:", insertError)
+    if (error) {
+      console.error("Error saving messages:", error)
       return NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
     }
 
-    const messageIds = insertedMessages?.map((msg) => msg.id) || []
+    const messageIds = data?.map((item) => item.id) || []
 
-    return NextResponse.json({
-      success: true,
-      messageIds,
-      count: messageIds.length,
-    })
+    return NextResponse.json({ messageIds })
   } catch (error) {
-    console.error("Error in POST /api/messages:", error)
+    console.error("Error in messages POST API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

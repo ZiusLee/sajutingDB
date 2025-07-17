@@ -56,7 +56,7 @@ export default function SajuChatPage() {
       setLoading(false)
 
       // 로그인 상태 확인
-      // 실제 구현에서는 세션이나 토큰을 확인하는 로직으로 대체
+      // 실제 구현에서는 세션이나 토큰을 ��인하는 로직으로 대체
       const userToken = localStorage.getItem("user_token")
       setIsLoggedIn(!!userToken)
     } catch (error) {

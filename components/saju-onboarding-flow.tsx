@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowRight, Check, MapPin } from "lucide-react"
+import { ArrowRight, Check, MapPin, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { calculateSaju, type TimeStandard } from "@/lib/saju"
@@ -14,6 +14,7 @@ import { getSupabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
 import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } from "@/lib/city-timezone-data"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
+import { SajuLogo } from "./saju-logo"
 
 interface SajuOnboardingFlowProps {
   onClose: () => void
@@ -59,6 +60,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     timeUnknown: false,
     concerns: [],
   })
+  const [citySearchQuery, setCitySearchQuery] = useState("")
   const [citySearchResults, setCitySearchResults] = useState<CityTimezoneData[]>([])
   const [showCityDropdown, setShowCityDropdown] = useState(false)
   const router = useRouter()
@@ -69,18 +71,8 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     }
   }
 
-  const handleHomeClick = () => {
-    console.log("Home clicked")
-    router.push("/")
-  }
-
-  const handleLoginClick = () => {
-    console.log("Login clicked")
-    router.push("/login")
-  }
-
   const handleCitySearch = (value: string) => {
-    setBirthInfo({ ...birthInfo, birthPlace: value })
+    setCitySearchQuery(value)
     if (value.trim()) {
       const filtered = searchCities(value)
       setCitySearchResults(filtered)
@@ -97,6 +89,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       birthPlace: `${city.city}, ${city.country}`,
       birthPlaceId: city.id,
     })
+    setCitySearchQuery(`${city.city}, ${city.country}`)
     setShowCityDropdown(false)
     setCitySearchResults([])
   }
@@ -116,7 +109,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     setBirthInfo((prev) => ({
       ...prev,
       timeUnknown: checked,
-      birthTime: checked ? "" : prev.birthTime, // Clear time when unknown is checked
+      birthTime: checked ? "" : prev.birthTime,
     }))
   }
 
@@ -126,7 +119,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   }
 
   const parseDate = (dateStr: string) => {
-    // Handle various date formats: YYYYMMDD, YYYY-MM-DD, YYYY.MM.DD, etc.
     const cleaned = dateStr.replace(/[^\d]/g, "")
     if (cleaned.length === 8) {
       const year = cleaned.substring(0, 4)
@@ -138,7 +130,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   }
 
   const parseTime = (timeStr: string) => {
-    // Handle various time formats: HHMM, HH:MM, etc.
     const cleaned = timeStr.replace(/[^\d]/g, "")
     if (cleaned.length >= 3) {
       const hour = Number.parseInt(cleaned.substring(0, 2), 10)
@@ -169,9 +160,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
   const navigateToChat = async (sajuResult: any, daeunData: any) => {
     try {
-      console.log("Starting navigation to chat...")
-
-      // Store current saju data for chat
       const chatSajuData = {
         saju: sajuResult,
         name: birthInfo.name,
@@ -198,59 +186,8 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       }
 
       localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
-      console.log("Stored current_saju data for chat")
-
-      // Wait a bit to ensure localStorage is written
       await new Promise((resolve) => setTimeout(resolve, 100))
-
-      // Use Next.js router for navigation with error handling
-      console.log("Attempting navigation with Next.js router...")
-
-      try {
-        await router.push("/saju-chat/sajuping")
-        console.log("Navigation successful with router.push")
-      } catch (routerError) {
-        console.error("Router.push failed, trying alternative methods:", routerError)
-
-        // Fallback 1: Try router.replace
-        try {
-          await router.replace("/saju-chat/sajuping")
-          console.log("Navigation successful with router.replace")
-        } catch (replaceError) {
-          console.error("Router.replace failed, using window.location:", replaceError)
-
-          // Fallback 2: Use window.location with better error handling
-          try {
-            // For mobile browsers, sometimes a small delay helps
-            await new Promise((resolve) => setTimeout(resolve, 200))
-            window.location.href = "/saju-chat/sajuping"
-          } catch (locationError) {
-            console.error("All navigation methods failed:", locationError)
-
-            // Final fallback: Show error and manual navigation option
-            toast({
-              title: "페이지 이동 중 오류가 발생했습니다",
-              description: "잠시 후 다시 시도해주세요.",
-              variant: "destructive",
-            })
-
-            // Try one more time after a longer delay
-            setTimeout(() => {
-              try {
-                window.location.assign("/saju-chat/sajuping")
-              } catch (finalError) {
-                console.error("Final navigation attempt failed:", finalError)
-                // At this point, we should show a manual link or reload the page
-                toast({
-                  title: "자동 이동에 실패했습니다",
-                  description: "페이지를 새로고침하거나 직접 채팅 페이지로 이동해주세요.",
-                  variant: "destructive",
-                })
-              }
-            }, 1000)
-          }
-        }
-      }
+      router.push("/saju-chat/sajuping")
     } catch (error) {
       console.error("Navigation error:", error)
       toast({
@@ -262,22 +199,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   }
 
   const handleSubmit = async () => {
-    if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlace || !birthInfo.birthDate) {
-      toast({
-        title: "필수 정보를 입력해주세요",
-        description: "모든 정보를 입력해주세요.",
-        variant: "destructive",
-      })
+    if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlaceId || !birthInfo.birthDate) {
+      toast({ title: "필수 정보를 입력해주세요", variant: "destructive" })
       return
     }
-
-    // Check time requirement only if time is not unknown
     if (!birthInfo.timeUnknown && !birthInfo.birthTime) {
-      toast({
-        title: "태어난 시간을 입력해주세요",
-        description: "시간을 모르시면 '태어난 시간 모름'을 체크해주세요.",
-        variant: "destructive",
-      })
+      toast({ title: "태어난 시간을 입력해주세요", variant: "destructive" })
       return
     }
 
@@ -288,53 +215,22 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       const parsedTime = birthInfo.timeUnknown ? { hour: 12, minute: 0 } : parseTime(birthInfo.birthTime)
 
       if (!parsedDate) {
-        toast({
-          title: "날짜 형식이 올바르지 않습니다",
-          description: "YYYYMMDD 형식으로 입력해주세요 (예: 19950505)",
-          variant: "destructive",
-        })
+        toast({ title: "날짜 형식이 올바르지 않습니다", variant: "destructive" })
         setIsLoading(false)
         return
       }
 
       const { year, month, day } = parsedDate
       const { hour, minute } = parsedTime
-
       const timeStandard = getTimeStandardFromCity()
-      const birthCityId = birthInfo.birthPlaceId
-
-      let lunarData: any = null
-
-      try {
-        const response = await fetch("/api/lunar-date", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ year, month, day }),
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-
-        const contentType = response.headers.get("content-type")
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Response is not JSON")
-        }
-
-        lunarData = await response.json()
-      } catch (apiError) {
-        console.error("API error, falling back to local calculation:", apiError)
-        const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
-        lunarData = {
-          year: localLunarDate.year.toString(),
-          month: localLunarDate.month.toString().padStart(2, "0"),
-          day: localLunarDate.day.toString().padStart(2, "0"),
-          isLeapMonth: localLunarDate.isLeapMonth,
-          monthStem: localLunarDate.monthStem,
-          monthBranch: localLunarDate.monthBranch,
-        }
+      const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
+      const lunarData = {
+        year: localLunarDate.year.toString(),
+        month: localLunarDate.month.toString().padStart(2, "0"),
+        day: localLunarDate.day.toString().padStart(2, "0"),
+        isLeapMonth: localLunarDate.isLeapMonth,
+        monthStem: localLunarDate.monthStem,
+        monthBranch: localLunarDate.monthBranch,
       }
 
       const sajuResult = calculateSaju(
@@ -348,7 +244,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         Number.parseInt(day),
         birthInfo.gender,
         birthInfo.name,
-        birthInfo.timeUnknown, // Pass timeUnknown flag
+        birthInfo.timeUnknown,
         lunarData.isLeapMonth,
         lunarData.monthStem,
         lunarData.monthBranch,
@@ -356,23 +252,17 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       )
 
       const daeunData = calculateDaeunInfo(
-        {
-          yearStem: sajuResult.yearStem,
-          monthStem: sajuResult.monthStem,
-          monthBranch: sajuResult.monthBranch,
-        },
+        { yearStem: sajuResult.yearStem, monthStem: sajuResult.monthStem, monthBranch: sajuResult.monthBranch },
         Number.parseInt(year),
         Number.parseInt(month),
         Number.parseInt(day),
         birthInfo.gender,
         hour,
         minute,
-        birthInfo.timeUnknown, // Pass timeUnknown flag
+        birthInfo.timeUnknown,
       )
-
       sajuResult.daeun = daeunData
 
-      // Store data with the correct structure including birthInfo
       const sajuDataToStore = {
         name: birthInfo.name,
         gender: birthInfo.gender,
@@ -384,61 +274,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         minute,
         timeUnknown: birthInfo.timeUnknown,
         timeStandard,
-        birthCityId,
+        birthCityId: birthInfo.birthPlaceId,
         lunarYear: Number.parseInt(lunarData.year),
         lunarMonth: Number.parseInt(lunarData.month),
         lunarDay: Number.parseInt(lunarData.day),
         isLeapMonth: lunarData.isLeapMonth,
-        // Store saju data with the correct structure
-        yearStem: sajuResult.yearStem,
-        yearBranch: sajuResult.yearBranch,
-        yearStemHanja: sajuResult.yearStemHanja,
-        yearBranchHanja: sajuResult.yearBranchHanja,
-        monthStem: sajuResult.monthStem,
-        monthBranch: sajuResult.monthBranch,
-        monthStemHanja: sajuResult.monthStemHanja,
-        monthBranchHanja: sajuResult.monthBranchHanja,
-        dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.dayBranch,
-        dayStemHanja: sajuResult.dayStemHanja,
-        dayBranchHanja: sajuResult.dayBranchHanja,
-        hourStem: sajuResult.hourStem,
-        hourBranch: sajuResult.hourBranch,
-        hourStemHanja: sajuResult.hourStemHanja,
-        hourBranchHanja: sajuResult.hourBranchHanja,
-        dayMaster: sajuResult.dayMaster,
-        dayMasterHanja: sajuResult.dayMasterHanja,
-        yearAnimal: sajuResult.yearAnimal,
-        elements: sajuResult.elements,
-        yearStemSibseong: sajuResult.yearStemSibseong,
-        monthStemSibseong: sajuResult.monthStemSibseong,
-        dayStemSibseong: "본원",
-        hourStemSibseong: sajuResult.hourStemSibseong,
-        yearBranchSibseong: sajuResult.yearBranchSibseong,
-        monthBranchSibseong: sajuResult.monthBranchSibseong,
-        dayBranchSibseong: sajuResult.dayBranchSibseong,
-        hourBranchSibseong: sajuResult.hourBranchSibseong,
-        // Add birthInfo structure
-        birthInfo: {
-          solar: {
-            year: Number.parseInt(year),
-            month: Number.parseInt(month),
-            day: Number.parseInt(day),
-            hour: hour,
-            minute: minute,
-          },
-          lunar: {
-            year: Number.parseInt(lunarData.year),
-            month: Number.parseInt(lunarData.month),
-            day: Number.parseInt(lunarData.day),
-            isLeapMonth: lunarData.isLeapMonth,
-          },
-          birthCityId: birthCityId,
-          timeUnknown: birthInfo.timeUnknown,
-          timeStandard: timeStandard,
-        },
-        daeun: daeunData, // Store daeun data separately
-        interpretation: sajuResult.interpretation,
+        ...sajuResult,
         concerns: birthInfo.concerns,
       }
 
@@ -446,41 +287,26 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       window.sajuInfo = sajuResult
       window.sajuFullData = sajuDataToStore
 
-      let userId: string | null = null
+      const supabaseClient = getSupabase()
+      const {
+        data: { session },
+      } = await supabaseClient.auth.getSession()
+      const authUserId = session?.user?.id || null
+      const userId = await syncLocalStorageToDatabase(authUserId)
 
-      try {
-        const supabaseClient = getSupabase()
-        const {
-          data: { session },
-        } = await supabaseClient.auth.getSession()
-        const authUserId = session?.user?.id || null
-
-        userId = await syncLocalStorageToDatabase(authUserId)
-
-        if (userId) {
-          const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-          storedData.userId = userId
-          storedData.sessionId = userId
-          localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-          localStorage.setItem("user_id", userId)
-
-          // Update auth user ID
-          await updateUserAuthId(userId)
-        }
-      } catch (dbError) {
-        console.error("Failed to save saju data to database:", dbError)
-        // Continue even if database save fails
+      if (userId) {
+        const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
+        storedData.userId = userId
+        storedData.sessionId = userId
+        localStorage.setItem("tempSajuData", JSON.stringify(storedData))
+        localStorage.setItem("user_id", userId)
+        await updateUserAuthId(userId)
       }
 
-      // Navigate to chat with improved error handling
       await navigateToChat(sajuResult, daeunData)
     } catch (error) {
       console.error("Error in saju calculation:", error)
-      toast({
-        title: "오류가 발생했습니다",
-        description: "사주 계산 중 오류가 발생했습니다. 다시 시도해주세요.",
-        variant: "destructive",
-      })
+      toast({ title: "사주 계산 중 오류가 발생했습니다.", variant: "destructive" })
     } finally {
       setIsLoading(false)
     }
@@ -493,10 +319,11 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       case 2:
         return birthInfo.gender !== ""
       case 3:
-        return birthInfo.birthPlace.trim().length > 0
+        return birthInfo.birthPlaceId.trim().length > 0
       case 4:
         return (
-          birthInfo.birthDate.trim().length >= 8 && (birthInfo.timeUnknown || birthInfo.birthTime.trim().length >= 3)
+          birthInfo.birthDate.replace(/[^\d]/g, "").length === 8 &&
+          (birthInfo.timeUnknown || birthInfo.birthTime.replace(/[^\d]/g, "").length >= 3)
         )
       case 5:
         return birthInfo.concerns.length > 0
@@ -505,168 +332,74 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     }
   }
 
-  const getSelectedCityInfo = () => {
-    const cityData = getCityById(birthInfo.birthPlaceId)
-    if (cityData) {
-      return `현재 선택: ${cityData.city}, ${cityData.country} (UTC${cityData.utcOffset >= 0 ? "+" : ""}${cityData.utcOffset})`
-    }
-    return ""
-  }
-
-  const renderStep = () => {
+  const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
-            <div className="flex justify-center mb-8">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div
-                  key={step}
-                  className={cn(
-                    "w-2 h-2 rounded-full mx-1",
-                    step === currentStep ? "bg-blue-500" : step < currentStep ? "bg-blue-300" : "bg-gray-300",
-                  )}
-                />
-              ))}
-            </div>
-
-            <h1 className="text-3xl font-bold text-blue-600 mb-12">이름을 알려주세요.</h1>
-
-            <div className="w-full max-w-md mb-4 relative">
-              <Input
-                value={birthInfo.name}
-                onChange={(e) => setBirthInfo({ ...birthInfo, name: e.target.value })}
-                placeholder="홍길동"
-                className="text-center text-lg py-4 border-2 border-dashed border-blue-300 bg-white/90 backdrop-blur-sm text-gray-800 placeholder:text-gray-500"
-                style={{ borderStyle: "dotted" }}
-              />
-              {birthInfo.name && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <Check className="w-5 h-5 text-green-500" />
-                </div>
-              )}
-            </div>
-
-            <p className="text-gray-500 text-sm mb-12">TIP 이름은 본명으로 작성하는 것을 추천해요.</p>
-
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
-            >
-              다음으로 <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
+          <div className="w-full max-w-md flex flex-col items-center">
+            <h1 className="text-3xl font-bold text-foreground mb-8">이름을 알려주세요.</h1>
+            <Input
+              value={birthInfo.name}
+              onChange={(e) => setBirthInfo({ ...birthInfo, name: e.target.value })}
+              placeholder="홍길동"
+              className="h-12 text-center text-lg bg-white border-gray-300 rounded-lg w-full mb-4"
+            />
+            <p className="text-muted-foreground text-sm">TIP: 이름은 본명으로 작성하는 것을 추천해요.</p>
           </div>
         )
-
       case 2:
         return (
-          <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
-            <div className="flex justify-center mb-8">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div
-                  key={step}
-                  className={cn(
-                    "w-2 h-2 rounded-full mx-1",
-                    step === currentStep ? "bg-blue-500" : step < currentStep ? "bg-blue-300" : "bg-gray-300",
-                  )}
-                />
-              ))}
-            </div>
-
-            <h1 className="text-3xl font-bold text-blue-600 mb-12">성별을 알려주세요.</h1>
-
-            <div className="flex flex-col md:flex-row gap-4 mb-12 w-full max-w-md">
-              <button
+          <div className="w-full max-w-md flex flex-col items-center">
+            <h1 className="text-3xl font-bold text-foreground mb-8">성별을 알려주세요.</h1>
+            <div className="flex gap-4 w-full">
+              <Button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "male" })}
-                className={cn(
-                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium w-full",
-                  birthInfo.gender === "male"
-                    ? "bg-gray-950 text-white border-gray-950"
-                    : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
-                )}
+                variant={birthInfo.gender === "male" ? "default" : "outline"}
+                className="w-full h-12 text-lg rounded-lg"
               >
                 남성
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "female" })}
-                className={cn(
-                  "px-8 py-4 rounded-lg border-2 transition-all text-lg font-medium w-full",
-                  birthInfo.gender === "female"
-                    ? "bg-gray-950 text-white border-gray-950"
-                    : "bg-white/80 text-gray-700 border-gray-200 hover:bg-gray-50",
-                )}
+                variant={birthInfo.gender === "female" ? "default" : "outline"}
+                className="w-full h-12 text-lg rounded-lg"
               >
                 여성
-              </button>
+              </Button>
             </div>
-
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
-            >
-              다음으로 <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
           </div>
         )
-
       case 3:
         return (
-          <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
-            <div className="flex justify-center mb-8">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div
-                  key={step}
-                  className={cn(
-                    "w-2 h-2 rounded-full mx-1",
-                    step === currentStep ? "bg-blue-500" : step < currentStep ? "bg-blue-300" : "bg-gray-300",
-                  )}
-                />
-              ))}
-            </div>
-
-            <h1 className="text-3xl font-bold text-blue-600 mb-12">태어난 도시를 알려주세요.</h1>
-
-            <div className="w-full max-w-md mb-4 relative">
+          <div className="w-full max-w-md flex flex-col items-center">
+            <h1 className="text-3xl font-bold text-foreground mb-8">태어난 도시를 알려주세요.</h1>
+            <div className="w-full relative">
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
                 <Input
-                  value={birthInfo.birthPlace ? birthInfo.birthPlace : ""}
+                  value={citySearchQuery}
                   onChange={(e) => handleCitySearch(e.target.value)}
-                  onFocus={() => {
-                    if (birthInfo.birthPlace.trim()) {
-                      const filtered = searchCities(birthInfo.birthPlace)
-                      setCitySearchResults(filtered)
-                      setShowCityDropdown(true)
-                    }
-                  }}
-                  onBlur={() => {
-                    // Delay hiding dropdown to allow for clicks
-                    setTimeout(() => setShowCityDropdown(false), 200)
-                  }}
+                  onFocus={() => setShowCityDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
                   placeholder="ex: 서울"
-                  className="text-left text-lg py-4 pl-10 pr-10 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full text-gray-800 placeholder:text-gray-500"
+                  className="h-12 text-left pl-10 pr-10 bg-white border-gray-300 rounded-lg w-full"
                 />
-                {birthInfo.birthPlace && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <Check className="w-5 h-5 text-green-500" />
-                  </div>
+                {birthInfo.birthPlaceId && (
+                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
                 )}
               </div>
-
               {showCityDropdown && citySearchResults.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border max-h-60 overflow-y-auto z-10">
                   {citySearchResults.map((city) => (
                     <button
                       key={city.id}
                       onClick={() => selectCity(city)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0"
+                      className="w-full px-4 py-3 text-left hover:bg-gray-100"
                     >
-                      <div className="font-medium text-gray-800">
+                      <div className="font-medium">
                         {city.city}, {city.country}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-muted-foreground">
                         UTC{city.utcOffset >= 0 ? "+" : ""}
                         {city.utcOffset}
                       </div>
@@ -675,168 +408,126 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 </div>
               )}
             </div>
-
-            {birthInfo.birthPlace && <p className="text-gray-500 text-sm mb-8">{getSelectedCityInfo()}</p>}
-
-            <p className="text-gray-500 text-sm mb-12">이거는 시간 조정에 활용됩니다</p>
-
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
-            >
-              다음으로 <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
+            <p className="text-muted-foreground text-sm mt-4">정확한 시간 계산에 활용돼요.</p>
           </div>
         )
-
       case 4:
         return (
-          <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
-            <div className="flex justify-center mb-8">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div
-                  key={step}
-                  className={cn(
-                    "w-2 h-2 rounded-full mx-1",
-                    step === currentStep ? "bg-blue-500" : step < currentStep ? "bg-blue-300" : "bg-gray-300",
-                  )}
-                />
-              ))}
-            </div>
-
-            <h1 className="text-3xl font-bold text-blue-600 mb-12">태어난 일시를 알려주세요.</h1>
-
-            <div className="flex flex-col md:flex-row gap-4 mb-4 max-w-md w-full">
+          <div className="w-full max-w-md flex flex-col items-center">
+            <h1 className="text-3xl font-bold text-foreground mb-8">태어난 일시를 알려주세요.</h1>
+            <div className="flex flex-col gap-4 w-full">
               <Input
                 value={birthInfo.birthDate}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthDate: e.target.value })}
-                placeholder="19950505"
-                className="flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500"
+                placeholder="생년월일 (예: 19950505)"
+                className="h-12 text-center bg-white border-gray-300 rounded-lg"
               />
-
               <Input
                 value={birthInfo.birthTime}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthTime: e.target.value })}
-                placeholder="0930"
+                placeholder="태어난 시간 (예: 0930)"
                 disabled={birthInfo.timeUnknown}
                 className={cn(
-                  "flex-1 text-center bg-white/90 backdrop-blur-sm rounded-full py-4 text-gray-800 placeholder:text-gray-500",
-                  birthInfo.timeUnknown && "opacity-50 cursor-not-allowed",
+                  "h-12 text-center bg-white border-gray-300 rounded-lg",
+                  birthInfo.timeUnknown && "opacity-50",
                 )}
               />
             </div>
-
-            <div className="text-xs text-gray-500 mb-8 max-w-md">
-              <div className="flex flex-col md:flex-row gap-2 md:gap-8 justify-center">
-                <span>생년월일: YYYYMMDD</span>
-                <span>시간: HHMM</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mb-12">
+            <div className="flex items-center gap-2 mt-4 self-start">
               <input
                 type="checkbox"
                 id="timeUnknown"
                 checked={birthInfo.timeUnknown}
                 onChange={(e) => handleTimeUnknownToggle(e.target.checked)}
-                className="rounded"
+                className="h-4 w-4 rounded border-gray-300"
               />
-              <label htmlFor="timeUnknown" className="text-gray-600">
+              <label htmlFor="timeUnknown" className="text-muted-foreground text-sm">
                 태어난 시간 모름
               </label>
             </div>
-
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
-            >
-              다음으로 <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
           </div>
         )
-
       case 5:
         return (
-          <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
-            <div className="flex justify-center mb-8">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div
-                  key={step}
-                  className={cn(
-                    "w-2 h-2 rounded-full mx-1",
-                    step === currentStep ? "bg-blue-500" : step < currentStep ? "bg-blue-300" : "bg-gray-300",
-                  )}
-                />
-              ))}
-            </div>
-
-            <h1 className="text-3xl font-bold text-blue-600 mb-4">마지막으로, 최근 가장 큰 고민을 알려주세요</h1>
-
-            <div className="flex flex-wrap justify-center gap-3 mb-12 max-w-4xl">
-              {concernOptions.map((concern) => (
-                <button
-                  key={concern.id}
-                  onClick={() => handleConcernToggle(concern.id)}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-full border transition-all",
-                    birthInfo.concerns.includes(concern.id)
-                      ? "bg-gray-900 border-gray-900 text-white"
-                      : "bg-white/80 border-gray-200 text-gray-700 hover:bg-gray-50",
-                  )}
+          <div className="w-full max-w-lg flex flex-col items-center">
+            <h1 className="text-3xl font-bold text-foreground mb-4">마지막으로, 최근 가장 큰 고민을 알려주세요.</h1>
+            <p className="text-muted-foreground text-sm mb-8">최대 3개까지 고를 수 있어요.</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {concernOptions.map((c) => (
+                <Button
+                  key={c.id}
+                  onClick={() => handleConcernToggle(c.id)}
+                  variant={birthInfo.concerns.includes(c.id) ? "default" : "outline"}
+                  className="rounded-full"
                 >
-                  <span>{concern.icon}</span>
-                  <span>{concern.label}</span>
-                </button>
+                  <span className="mr-2">{c.icon}</span>
+                  {c.label}
+                </Button>
               ))}
             </div>
-
-            <p className="text-gray-500 text-sm mb-12">TIP 최대 3개까지 고를 수 있어요.</p>
-
-            <Button
-              onClick={handleSubmit}
-              disabled={!canProceed() || isLoading}
-              className="bg-gray-950 hover:bg-gray-800 text-white px-8 py-3 rounded-full"
-            >
-              {isLoading ? "생성 중..." : "완료하기"} <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
           </div>
         )
-
       default:
         return null
     }
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Gradient Background */}
-      <div
-        className="absolute inset-0 bg-gradient-to-br from-purple-200 via-pink-200 via-blue-200 to-green-200"
-        style={{
-          background: "linear-gradient(135deg, #e0c3fc 0%, #9bb5ff 25%, #a8edea 50%, #fed6e3 75%, #d299c2 100%)",
-        }}
-      />
-
-      {/* Logo */}
-      <button onClick={handleHomeClick} className="absolute top-6 left-6 z-50 cursor-pointer">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-black rounded-lg"></div>
-          <span className="font-bold text-lg">SAJUPING</span>
+    <div
+      className="fixed inset-0 bg-cover bg-center bg-no-repeat z-50 flex flex-col"
+      style={{ backgroundImage: "url(/images/gradient-background.jpeg)" }}
+    >
+      <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
+        <SajuLogo size="md" />
+        <div className="flex items-center gap-4">
+          <Button
+            className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 py-2 text-sm font-medium"
+            onClick={() => router.push("/login")}
+          >
+            로그인
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-6 w-6" />
+          </Button>
         </div>
-      </button>
+      </header>
 
-      {/* Close Button */}
-      <button
-        onClick={handleLoginClick}
-        className="absolute top-6 right-6 z-50 bg-gray-950 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800 transition-colors cursor-pointer"
-      >
-        로그인
-      </button>
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-4">
+        <div className="flex justify-center mb-8">
+          {[1, 2, 3, 4, 5].map((step) => (
+            <div
+              key={step}
+              className={cn(
+                "w-2 h-2 rounded-full mx-1 transition-colors",
+                step === currentStep ? "bg-gray-800" : step < currentStep ? "bg-gray-600" : "bg-gray-300",
+              )}
+            />
+          ))}
+        </div>
+        {renderStepContent()}
+      </main>
 
-      {/* Content */}
-      <div className="relative z-10">{renderStep()}</div>
+      <footer className="p-4 sm:p-6 w-full flex justify-center">
+        <div className="w-full max-w-md">
+          {currentStep < 5 ? (
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+            >
+              다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              disabled={!canProceed() || isLoading}
+              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+            >
+              {isLoading ? "생성 중..." : "완료하기"} <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
+          )}
+        </div>
+      </footer>
     </div>
   )
 }

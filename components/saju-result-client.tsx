@@ -422,7 +422,7 @@ ${interpretation}
                 </div>
                 <div className="text-center space-y-1">
                   <p className="font-medium text-primary">{loadingStage}</p>
-                  <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
+                  <p className="text-sm text-muted-foreground">AI가 사��를 심층 분석하고 있습니다.</p>
                 </div>
                 <div className="w-full max-w-xs mt-1">
                   <Progress value={loadingProgress} className="h-1.5" />

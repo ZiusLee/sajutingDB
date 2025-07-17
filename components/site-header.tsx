@@ -11,40 +11,27 @@ export function SiteHeader() {
   const router = useRouter()
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <SajuLogo size="sm" />
+    <header className="fixed top-0 z-50 w-full">
+      <div className="container flex h-16 lg:h-20 items-center justify-between px-4 sm:px-6 lg:px-8">
+        {/* Logo */}
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center space-x-2">
+            <SajuLogo size="md" />
           </Link>
         </div>
 
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <nav className="flex items-center space-x-6">
-            <Link href="/about" className="text-sm font-medium transition-colors hover:text-primary">
-              소개
-            </Link>
-            {isAuthenticated && (
-              <Link href="/mypage" className="text-sm font-medium transition-colors hover:text-primary">
-                마이페이지
-              </Link>
-            )}
-          </nav>
-
-          <div className="flex items-center space-x-2">
-            {isAuthenticated ? (
-              <UserProfileDropdown user={user} />
-            ) : (
-              <div className="flex items-center space-x-2">
-                <Button variant="ghost" size="sm" onClick={() => router.push("/login")}>
-                  로그인
-                </Button>
-                <Button size="sm" onClick={() => router.push("/register")}>
-                  회원가입
-                </Button>
-              </div>
-            )}
-          </div>
+        {/* Right side - Login/Profile */}
+        <div className="flex items-center">
+          {isAuthenticated ? (
+            <UserProfileDropdown user={user} />
+          ) : (
+            <Button
+              className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 lg:px-6 py-2 text-sm lg:text-base font-medium"
+              onClick={() => router.push("/login")}
+            >
+              로그인
+            </Button>
+          )}
         </div>
       </div>
     </header>

@@ -83,7 +83,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
     country: "미국",
     timezone: "America/Los_Angeles",
     utcOffset: -8,
-    timeStandard: "서머타임",
+    timeStandard: "��머타임",
     useDST: true,
   },
   {
@@ -823,7 +823,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   // UTC+4.5
   {
     id: "kabul",
-    city: "카불",
+    city: "카���",
     country: "아프가니스��",
     timezone: "Asia/Kabul",
     utcOffset: 4.5,

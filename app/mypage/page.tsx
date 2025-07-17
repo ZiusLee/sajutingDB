@@ -335,9 +335,9 @@ export default function MyPage() {
 
         localStorage.setItem("current_saju", JSON.stringify(finalSajuData))
         sessionStorage.setItem("from_mypage", "true")
-        setTimeout(() => {
-          window.location.href = "/saju-chat/sajuping"
-        }, 100)
+
+        // Use router.push instead of window.location.href for better navigation
+        router.push("/saju-chat/sajuping")
       } catch (error) {
         console.error("Error preparing chat data:", error)
         toast({ title: "오류 발생", description: "채팅 준비 중 오류가 발생했습니다.", variant: "destructive" })

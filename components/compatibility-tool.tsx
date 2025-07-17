@@ -400,7 +400,7 @@ export default function CompatibilityTool({
           },
         }
         localStorage.setItem(`compatibility_latest`, JSON.stringify(compatibilityData))
-        console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
+        console.log("궁합 ��석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
       } catch (error) {
         console.error("Error saving compatibility data to localStorage:", error)
       }
