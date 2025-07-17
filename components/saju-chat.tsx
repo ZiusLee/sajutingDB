@@ -347,7 +347,7 @@ export default function SajuChat({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-0 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-40 sm:pb-32">
+          <div className="px-2 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-40 sm:pb-32">
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "assistant" ? (
@@ -399,7 +399,7 @@ export default function SajuChat({
         </div>
 
         <div className="fixed bottom-0 left-0 right-0 p-2 bg-white/95 backdrop-blur-sm border-t lg:relative lg:bottom-auto">
-          <div className="max-w-4xl mx-auto space-y-2 sm:space-y-0">
+          <div className="space-y-2 sm:space-y-0">
             {!isLoading && messages.length >= 1 && (
               <div className="flex gap-2 sm:gap-2 overflow-x-auto pb-3 sm:pb-3 scrollbar-hide px-0">
                 {suggestedQuestions.map((q, i) => (
