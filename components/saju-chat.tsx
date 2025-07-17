@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
-import { getSessionMessages } from "@/lib/message-service"
+import { getSessionMessages, saveMessages } from "@/lib/message-service"
 
 interface SajuChatProps {
   saju: any
@@ -82,6 +82,15 @@ const getInitialMessage = (name: string, roomType: string): string => {
   return `안녕하세요, ${userName}님! 무엇을 도와드릴까요?`
 }
 
+// Generate a simple UUID v4
+function generateUUID() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === "x" ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export default function SajuChat({
   saju,
   name,
@@ -96,6 +105,7 @@ export default function SajuChat({
   const { user, isAuthenticated } = useAuth()
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
 
   const [calculatedDaeun, setCalculatedDaeun] = useState<any>(null)
   const [stableBirthInfo, setStableBirthInfo] = useState<any>(null)
@@ -169,6 +179,7 @@ export default function SajuChat({
             }))
 
           console.log("Loaded past messages:", pastMessages.length)
+          setLastSavedMessageCount(pastMessages.length)
         }
       } catch (error) {
         console.error("Error loading past messages:", error)
@@ -178,7 +189,7 @@ export default function SajuChat({
       const initialMessages =
         pastMessages.length > 0
           ? pastMessages
-          : [{ id: "welcome", role: "assistant" as const, content: getInitialMessage(name, roomType) }]
+          : [{ id: generateUUID(), role: "assistant" as const, content: getInitialMessage(name, roomType) }]
 
       const aiChatBody = {
         name,
@@ -207,12 +218,23 @@ export default function SajuChat({
       const savedSaju = localStorage.getItem("current_saju")
       if (savedSaju) {
         const parsedSaju = JSON.parse(savedSaju)
-        return parsedSaju.sessionId || `${sessionKey}-${roomType}`
+        // Use the actual sessionId from the stored data
+        if (parsedSaju.sessionId) {
+          return parsedSaju.sessionId
+        }
+      }
+
+      // Fallback to user_id from localStorage if available
+      const userId = localStorage.getItem("user_id")
+      if (userId) {
+        return userId
       }
     } catch (error) {
       console.error("Error getting session ID:", error)
     }
-    return `${sessionKey}-${roomType}`
+
+    // Last resort fallback - but this should rarely be used now
+    return `fallback-${Date.now()}`
   }
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
@@ -225,6 +247,41 @@ export default function SajuChat({
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
     },
   })
+
+  // Save messages to database when new messages are added
+  useEffect(() => {
+    const saveNewMessages = async () => {
+      if (messages.length <= lastSavedMessageCount) {
+        return // No new messages to save
+      }
+
+      const sessionId = getSessionId()
+      const newMessages = messages.slice(lastSavedMessageCount)
+
+      // Convert messages to the format expected by the database
+      const messagesToSave = newMessages.map((msg, index) => ({
+        id: generateUUID(), // Generate new UUID for database
+        role: msg.role,
+        content: msg.content,
+        createdAt: msg.createdAt || new Date().toISOString(),
+        messageOrder: lastSavedMessageCount + index,
+      }))
+
+      try {
+        console.log(`Saving ${messagesToSave.length} new messages for session ${sessionId}`)
+        await saveMessages(sessionId, messagesToSave, roomType)
+        setLastSavedMessageCount(messages.length)
+        console.log(`Successfully saved messages. Total count: ${messages.length}`)
+      } catch (error) {
+        console.error("Error saving messages:", error)
+      }
+    }
+
+    // Only save if we have new messages and the chat is not loading
+    if (messages.length > 0 && !isLoading) {
+      saveNewMessages()
+    }
+  }, [messages, lastSavedMessageCount, isLoading, roomType])
 
   useEffect(() => {
     if (chatContainerRef.current) {

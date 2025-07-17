@@ -297,9 +297,38 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       if (userId) {
         const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
         storedData.userId = userId
-        storedData.sessionId = userId
+        storedData.sessionId = userId // Use the actual database session ID
         localStorage.setItem("tempSajuData", JSON.stringify(storedData))
         localStorage.setItem("user_id", userId)
+
+        // Update the chatSajuData with the real session ID
+        const chatSajuData = {
+          saju: sajuResult,
+          name: birthInfo.name,
+          gender: birthInfo.gender,
+          interpretation: "",
+          returnPath: "/",
+          timeStandard: getTimeStandardFromCity(),
+          birthCityId: birthInfo.birthPlaceId,
+          daeun: daeunData,
+          concerns: birthInfo.concerns,
+          sessionId: userId, // Add the real session ID here
+          birthInfo: {
+            solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
+            solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
+            solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
+            solarHour: birthInfo.timeUnknown ? 12 : parseTime(birthInfo.birthTime).hour,
+            solarMinute: birthInfo.timeUnknown ? 0 : parseTime(birthInfo.birthTime).minute,
+            lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
+            lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
+            lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
+            timeUnknown: birthInfo.timeUnknown,
+            birthCityId: birthInfo.birthPlaceId,
+            timeStandard: getTimeStandardFromCity(),
+          },
+        }
+
+        localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
         await updateUserAuthId(userId)
       }
 

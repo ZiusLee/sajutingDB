@@ -45,10 +45,28 @@ export async function getSessionMessages(sessionId: string): Promise<Message[]> 
 }
 
 /**
- * Save messages to database
+ * Save messages to database - don't include ID to let database generate UUIDs
  */
 export async function saveMessages(sessionId: string, messages: any[], roomType: string): Promise<string[]> {
   try {
+    // Filter out messages that don't have content or are invalid
+    const validMessages = messages.filter(
+      (msg) => msg && msg.content && msg.content.trim() !== "" && (msg.role === "user" || msg.role === "assistant"),
+    )
+
+    if (validMessages.length === 0) {
+      console.log("No valid messages to save")
+      return []
+    }
+
+    // Remove any ID field to let database generate UUIDs
+    const messagesToSave = validMessages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt || new Date().toISOString(),
+      messageOrder: msg.messageOrder || 0,
+    }))
+
     const response = await fetch("/api/messages", {
       method: "POST",
       headers: {
@@ -56,20 +74,51 @@ export async function saveMessages(sessionId: string, messages: any[], roomType:
       },
       body: JSON.stringify({
         sessionId,
-        messages,
+        messages: messagesToSave,
         roomType,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to save messages: ${response.statusText}`)
+      const errorText = await response.text()
+      throw new Error(`Failed to save messages: ${response.statusText} - ${errorText}`)
     }
 
     const data = await response.json()
+    console.log(`Successfully saved ${data.savedCount} messages for session ${sessionId}`)
     return data.messageIds || []
   } catch (error) {
     console.error("Error saving messages:", error)
     return []
+  }
+}
+
+/**
+ * Save a single message immediately
+ */
+export async function saveSingleMessage(
+  sessionId: string,
+  message: any,
+  roomType: string,
+  messageOrder?: number,
+): Promise<string | null> {
+  try {
+    if (!message || !message.content || message.content.trim() === "") {
+      return null
+    }
+
+    const messageToSave = {
+      role: message.role,
+      content: message.content,
+      createdAt: message.createdAt || new Date().toISOString(),
+      messageOrder: messageOrder ?? Date.now(),
+    }
+
+    const messageIds = await saveMessages(sessionId, [messageToSave], roomType)
+    return messageIds[0] || null
+  } catch (error) {
+    console.error("Error saving single message:", error)
+    return null
   }
 }
 
@@ -90,7 +139,7 @@ export async function saveMessageFeedback(
       body: JSON.stringify({
         messageId,
         feedbackType,
-        sessionId, // Use sessionId instead of userId
+        sessionId,
       }),
     })
 

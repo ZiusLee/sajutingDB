@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/use-toast"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { MessageCircle, LogOut, Plus, Star, ChevronDown, ChevronUp, Calendar } from "lucide-react"
+import { MessageCircle, Plus, Star, ChevronDown, ChevronUp, Calendar } from "lucide-react"
 import { getUserSajuProfiles } from "@/lib/saju-session-service"
 import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
@@ -15,6 +16,7 @@ import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession
 import BirthDateFormClient from "@/components/birth-date-form-client"
 import type { Saju } from "@/lib/saju" // Import Saju type
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
+import { SajuLogo } from "@/components/saju-logo"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -392,13 +394,18 @@ export default function MyPage() {
 
   return (
     <div className="container mx-auto pb-20">
-      <div className="flex justify-between items-center pt-4 px-4">
-        <h1 className="text-xl font-bold">내 사주</h1>
-        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500">
-          <LogOut className="h-4 w-4 mr-2" />
+      {/* 마이페이지 전용 헤더 */}
+      <header className="flex items-center justify-between pt-4 px-4 pb-2">
+        <Link href="/" className="flex items-center space-x-2">
+          <SajuLogo size="md" />
+        </Link>
+        <Button
+          className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 lg:px-6 py-2 text-sm lg:text-base font-medium"
+          onClick={handleLogout}
+        >
           로그아웃
         </Button>
-      </div>
+      </header>
 
       {defaultProfile && (
         <div className="px-4 pt-4 pb-6">

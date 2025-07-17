@@ -72,17 +72,28 @@ export async function POST(request: NextRequest) {
 
     const supabase = createRouteHandlerClient({ cookies })
 
-    // Save messages to database
-    const messagesToInsert = messages.map((msg, index) => ({
+    // Filter out invalid messages and prepare for insertion
+    const validMessages = messages.filter(
+      (msg) => msg && msg.content && msg.content.trim() !== "" && (msg.role === "user" || msg.role === "assistant"),
+    )
+
+    if (validMessages.length === 0) {
+      return NextResponse.json({ messageIds: [], savedCount: 0 })
+    }
+
+    // Prepare messages for insertion
+    const messagesToInsert = validMessages.map((msg, index) => ({
       session_id: sessionId,
       role: msg.role,
       content: msg.content,
-      message_order: index,
+      message_order: msg.messageOrder || index,
       room_type: roomType || "sajuping",
       model_used: msg.model || "gpt-4",
       response_time_ms: msg.responseTime || null,
+      created_at: msg.createdAt || new Date().toISOString(),
     }))
 
+    // Insert messages (let database generate UUIDs)
     const { data, error } = await supabase.from("messages").insert(messagesToInsert).select("id")
 
     if (error) {
@@ -92,7 +103,10 @@ export async function POST(request: NextRequest) {
 
     const messageIds = data?.map((item) => item.id) || []
 
-    return NextResponse.json({ messageIds })
+    return NextResponse.json({
+      messageIds,
+      savedCount: messagesToInsert.length,
+    })
   } catch (error) {
     console.error("Error in messages POST API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
