@@ -521,7 +521,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-4">
+      <main className="flex-1 flex flex-col items-center justify-start text-center px-4 pt-20 pb-8">
         <div className="flex justify-center mb-8">
           {[1, 2, 3, 4, 5].map((step) => (
             <div
@@ -536,7 +536,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         {renderStepContent()}
       </main>
 
-      <footer className="p-4 sm:p-6 w-full flex justify-center">
+      <footer className="p-4 sm:p-6 w-full flex justify-center sticky bottom-0 bg-gradient-to-t from-black/10 to-transparent backdrop-blur-sm">
         <div className="w-full max-w-md">
           {currentStep < 5 ? (
             <Button
