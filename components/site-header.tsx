@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { SajuLogo } from "@/components/saju-logo"
 import { useAuth } from "@/hooks/use-auth"
 import { SettingsDialog } from "@/components/settings-dialog"
+import { useState } from "react"
+import { User } from "lucide-react"
 
 export function SiteHeader() {
   const { user, isAuthenticated } = useAuth()
@@ -14,6 +16,7 @@ export function SiteHeader() {
   // Check if we're in saju chat or mypage
   const isSajuChat = pathname?.includes("/saju-chat/")
   //const isMyPage = pathname === "/mypage"
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const handleLogoClick = () => {
     if (isSajuChat) {
@@ -53,7 +56,19 @@ export function SiteHeader() {
         {/* Right side */}
         <div className="flex items-center gap-2">
           {/* Settings button for logged-in users */}
-          {isAuthenticated && <SettingsDialog />}
+          {isAuthenticated && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 lg:h-10 lg:w-10 bg-black hover:bg-gray-800 text-white"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <User className="h-4 w-4 lg:h-5 lg:w-5" />
+              </Button>
+              <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+            </>
+          )}
 
           {/* Login button for non-logged-in users */}
           {!isAuthenticated && (

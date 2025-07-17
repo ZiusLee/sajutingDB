@@ -2,23 +2,20 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Settings, LogOut, User, Bell, Shield, HelpCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { LogOut, User, Bell, Shield, HelpCircle } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { toast } from "@/hooks/use-toast"
 
-export function SettingsDialog() {
-  const [open, setOpen] = useState(false)
+interface SettingsDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [notifications, setNotifications] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
   const { logout } = useAuth()
@@ -27,7 +24,7 @@ export function SettingsDialog() {
   const handleLogout = async () => {
     try {
       await logout()
-      setOpen(false)
+      onOpenChange(false)
       router.push("/")
       toast({
         title: "로그아웃 완료",
@@ -44,12 +41,7 @@ export function SettingsDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <Settings className="h-5 w-5" />
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>설정</DialogTitle>
