@@ -4,7 +4,6 @@ import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { SajuLogo } from "@/components/saju-logo"
 import { useAuth } from "@/hooks/use-auth"
-import { User } from "lucide-react"
 import { SettingsDialog } from "@/components/settings-dialog"
 
 export function SiteHeader() {
@@ -54,17 +53,7 @@ export function SiteHeader() {
         {/* Right side */}
         <div className="flex items-center gap-2">
           {/* Settings button for logged-in users */}
-          {isAuthenticated && (
-            <SettingsDialog>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 lg:h-10 lg:w-10 bg-black hover:bg-gray-800 text-white"
-              >
-                <User className="h-4 w-4 lg:h-5 lg:w-5" />
-              </Button>
-            </SettingsDialog>
-          )}
+          {isAuthenticated && <SettingsDialog />}
 
           {/* Login button for non-logged-in users */}
           {!isAuthenticated && (
