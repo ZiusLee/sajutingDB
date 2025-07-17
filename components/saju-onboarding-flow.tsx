@@ -481,7 +481,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-4">마지막으로, 최근 가장 큰 고민을 알려주세요.</h1>
             <p className="text-muted-foreground text-sm mb-8">최대 3개까지 고를 수 있어요.</p>
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap justify-center gap-3 mb-8">
               {concernOptions.map((c) => (
                 <Button
                   key={c.id}
@@ -493,6 +493,15 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                   {c.label}
                 </Button>
               ))}
+            </div>
+            <div className="w-full max-w-xs">
+              <Button
+                onClick={handleSubmit}
+                disabled={!canProceed() || isLoading}
+                className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+              >
+                {isLoading ? "생성 중..." : "완료하기"} <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
             </div>
           </div>
         )
@@ -521,7 +530,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-40">
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-8">
         <div className="flex justify-center mb-8">
           {[1, 2, 3, 4, 5].map((step) => (
             <div
@@ -536,9 +545,9 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         {renderStepContent()}
       </main>
 
-      <div className="absolute bottom-32 left-6 right-6 flex justify-center">
-        <div className="w-full max-w-xs">
-          {currentStep < 5 ? (
+      {currentStep < 5 && (
+        <footer className="p-6 w-full flex justify-center">
+          <div className="w-full max-w-xs">
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
@@ -546,17 +555,9 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             >
               다음으로 <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={!canProceed() || isLoading}
-              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
-            >
-              {isLoading ? "생성 중..." : "완료하기"} <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          )}
-        </div>
-      </div>
+          </div>
+        </footer>
+      )}
     </div>
   )
 }
