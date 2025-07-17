@@ -352,14 +352,14 @@ export default function SajuChat({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-0 sm:px-4 py-2 sm:py-6 space-y-3 sm:space-y-8 pb-32 sm:pb-6">
+          <div className="max-w-4xl mx-auto px-0 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-40 sm:pb-6">
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "assistant" ? (
-                  <div className="flex items-start gap-2 sm:gap-3 px-3 sm:px-0">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-xs sm:text-lg shrink-0 mt-0.5" />
-                    <div className="flex-1 space-y-2 sm:space-y-4 min-w-0">
-                      <div className="text-foreground text-base leading-tight sm:leading-relaxed prose prose-sm max-w-none break-words [&>p]:mb-2 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base [&>ul]:mb-2 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2">
+                  <div className="flex items-start gap-3 sm:gap-3 px-4 sm:px-0">
+                    <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-lg sm:text-lg shrink-0 mt-1" />
+                    <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
+                      <div className="text-foreground text-lg leading-relaxed sm:leading-relaxed prose prose-lg max-w-none break-words [&>p]:mb-4 sm:[&>p]:mb-4 [&>h1]:text-xl sm:[&>h1]:text-xl [&>h2]:text-lg sm:[&>h2]:text-lg [&>h3]:text-lg [&>ul]:mb-4 sm:[&>ul]:mb-4 [&>li]:mb-2 sm:[&>li]:mb-2 [&>ul]:pl-4 [&>li]:text-lg">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                       </div>
                       {index === 0 && (
@@ -405,8 +405,8 @@ export default function SajuChat({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-end px-3 sm:px-0">
-                    <div className="bg-gray-900 text-white px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl rounded-br-md max-w-[80%] sm:max-w-md text-xs sm:text-base">
+                  <div className="flex justify-end px-4 sm:px-0">
+                    <div className="bg-gray-900 text-white px-4 py-3 sm:px-4 sm:py-2 rounded-2xl rounded-br-md max-w-[80%] sm:max-w-md text-base sm:text-base leading-relaxed">
                       {message.content}
                     </div>
                   </div>
@@ -414,12 +414,12 @@ export default function SajuChat({
               </div>
             ))}
             {isLoading && (
-              <div className="flex items-start gap-2 sm:gap-3 px-3 sm:px-0">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-xs sm:text-lg shrink-0 mt-0.5" />
-                <div className="flex items-center gap-1 sm:gap-2 pt-1">
-                  <div className="animate-bounce h-1 w-1 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
-                  <div className="animate-bounce h-1 w-1 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
-                  <div className="animate-bounce h-1 w-1 sm:h-2 sm:w-2 bg-muted-foreground rounded-full"></div>
+              <div className="flex items-start gap-3 sm:gap-3 px-4 sm:px-0">
+                <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-lg sm:text-lg shrink-0 mt-1" />
+                <div className="flex items-center gap-2 sm:gap-2 pt-2">
+                  <div className="animate-bounce h-2 w-2 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
+                  <div className="animate-bounce h-2 w-2 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
+                  <div className="animate-bounce h-2 w-2 sm:h-2 sm:w-2 bg-muted-foreground rounded-full"></div>
                 </div>
               </div>
             )}
@@ -429,13 +429,13 @@ export default function SajuChat({
         <div className="fixed bottom-0 left-0 right-0 p-2 sm:p-4 bg-white/95 backdrop-blur-sm border-t lg:relative lg:bottom-auto">
           <div className="max-w-4xl mx-auto space-y-2 sm:space-y-0">
             {!isLoading && messages.length >= 1 && (
-              <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 sm:pb-3 scrollbar-hide">
+              <div className="flex gap-2 sm:gap-2 overflow-x-auto pb-3 sm:pb-3 scrollbar-hide px-1">
                 {suggestedQuestions.map((q, i) => (
                   <Button
                     key={i}
                     variant="outline"
                     size="sm"
-                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs px-2.5 py-1 sm:text-sm sm:px-4 sm:py-2 min-w-fit h-7 sm:h-auto"
+                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-sm px-4 py-2.5 sm:text-sm sm:px-4 sm:py-2 min-w-fit h-10 sm:h-auto leading-tight"
                     onClick={() => handleSuggestedQuestionClick(q)}
                   >
                     {q}
@@ -443,13 +443,13 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+            <form onSubmit={handleSubmit} className="flex gap-3 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
-                  className="h-9 sm:h-12 rounded-full pl-3 pr-16 sm:pl-5 sm:pr-12 bg-gray-100 border-gray-200 focus:ring-gray-900 text-sm"
+                  className="h-12 sm:h-12 rounded-full pl-5 pr-20 sm:pl-5 sm:pr-12 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
                   disabled={isLoading}
                 />
                 <Popover>
