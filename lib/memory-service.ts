@@ -303,7 +303,7 @@ class MemoryService {
               label: "거주지",
               value: location,
             })
-            console.log(`🏠 거주지 정보 저장: ${location}`)
+            console.log(`🏠 거주지 정�� 저장: ${location}`)
             break
           }
         }

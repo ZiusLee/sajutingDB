@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Send, ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, RefreshCw, Settings } from "lucide-react"
+import { Send, ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, RefreshCw } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -17,8 +17,6 @@ import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
-import { SajuLogo } from "@/components/saju-logo"
-import { SettingsDialog } from "@/components/settings-dialog"
 
 interface SajuChatProps {
   saju: any
@@ -31,6 +29,8 @@ interface SajuChatProps {
   sessionKey: string
   birthInfo?: BirthInfo
   concerns?: string[]
+  isSidebarOpen?: boolean
+  onSidebarToggle?: () => void
 }
 
 const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): string[] => {
@@ -102,10 +102,14 @@ export default function SajuChat({
   sessionKey,
   birthInfo,
   concerns,
+  isSidebarOpen: externalSidebarOpen,
+  onSidebarToggle: externalSidebarToggle,
 }: SajuChatProps) {
   const router = useRouter()
   const { user, isAuthenticated } = useAuth()
-  const [isSidebarOpen, setSidebarOpen] = useState(false)
+  const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
+  const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
+  const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false) // To prevent race conditions while saving
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
@@ -346,17 +350,7 @@ export default function SajuChat({
       </Sheet>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col relative">
-        {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-3 sm:p-4 border-b bg-white">
-          <SajuLogo onClick={() => setSidebarOpen(true)} />
-          <SettingsDialog>
-            <Button variant="ghost" size="icon">
-              <Settings className="h-5 w-5" />
-            </Button>
-          </SettingsDialog>
-        </div>
-
+      <div className="flex-1 flex flex-col">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-0 sm:px-4 py-2 sm:py-6 space-y-3 sm:space-y-8 pb-32 sm:pb-6">
             {messages.map((message, index) => (

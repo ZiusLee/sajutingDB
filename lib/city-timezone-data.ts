@@ -1419,7 +1419,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   // UTC+14
   {
     id: "kiribati",
-    city: "크리스마스 섬",
+    city: "크리스마��� 섬",
     country: "키리바시",
     timezone: "Pacific/Kiritimati",
     utcOffset: 14,

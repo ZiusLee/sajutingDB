@@ -188,7 +188,7 @@ export default function SajuResultClient({
           setLoadingStage("결과 정리 중")
         }
 
-        // 주기적으로 메시지 추가
+        // 주기적���로 메시지 추가
         const now = Date.now()
         if (now - lastMessageTime > messageInterval) {
           lastMessageTime = now
