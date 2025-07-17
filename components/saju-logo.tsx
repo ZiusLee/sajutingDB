@@ -1,21 +1,31 @@
+"use client"
+
+import { cn } from "@/lib/utils"
+
 interface SajuLogoProps {
-  className?: string
   size?: "sm" | "md" | "lg"
+  className?: string
+  onClick?: () => void
 }
 
-export function SajuLogo({ className = "", size = "md" }: SajuLogoProps) {
-  const sizeClasses = {
-    sm: "text-lg",
-    md: "text-xl",
-    lg: "text-2xl",
-  }
+const sizeClasses = {
+  sm: "h-6 w-6",
+  md: "h-8 w-8",
+  lg: "h-10 w-10",
+}
 
+export function SajuLogo({ size = "md", className, onClick }: SajuLogoProps) {
   return (
-    <div className={`flex items-center space-x-2 ${className}`}>
-      <div className="w-8 h-8 bg-gray-900 rounded-lg flex-shrink-0" />
-      <span className={`font-bold text-gray-900 ${sizeClasses[size]}`}>SAJUPING</span>
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-lg bg-gray-900 text-white",
+        onClick && "cursor-pointer hover:bg-gray-800 transition-colors",
+        sizeClasses[size],
+        className,
+      )}
+      onClick={onClick}
+    >
+      S
     </div>
   )
 }
-
-export default SajuLogo

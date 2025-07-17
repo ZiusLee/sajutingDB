@@ -16,7 +16,8 @@ export function SiteHeader() {
         {/* Logo */}
         <div className="flex items-center">
           <Link href="/" className="flex items-center space-x-2">
-            <SajuLogo size="md" />
+            <SajuLogo className="lg:hidden" />
+            <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
           </Link>
         </div>
 
