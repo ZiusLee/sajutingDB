@@ -530,7 +530,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-8">
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-24">
         <div className="flex justify-center mb-8">
           {[1, 2, 3, 4, 5].map((step) => (
             <div
@@ -546,7 +546,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       </main>
 
       {currentStep < 5 && (
-        <footer className="p-6 w-full flex justify-center">
+        <footer className="sticky bottom-0 p-6 w-full flex justify-center bg-white/80 backdrop-blur-sm">
           <div className="w-full max-w-xs">
             <Button
               onClick={handleNext}
