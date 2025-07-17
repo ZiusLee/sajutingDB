@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { User, LogOut, Bell, Shield, HelpCircle, ChevronRight, LogIn } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
+import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -21,9 +21,13 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const [open, setOpen] = useState(false)
 
   const handleLogout = async () => {
-    await logout()
-    setOpen(false)
-    router.push("/")
+    try {
+      await logout()
+      setOpen(false)
+      router.push("/")
+    } catch (error) {
+      console.error("로그아웃 오류:", error)
+    }
   }
 
   const handleLogin = () => {

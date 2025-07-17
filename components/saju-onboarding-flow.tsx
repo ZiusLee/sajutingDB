@@ -365,7 +365,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     switch (currentStep) {
       case 1:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">이름을 알려주세요.</h1>
             <Input
               value={birthInfo.name}
@@ -374,11 +374,20 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
               className="h-12 text-center text-lg bg-white border-gray-300 rounded-lg w-full mb-4"
             />
             <p className="text-muted-foreground text-sm">TIP: 이름은 본명으로 작성하는 것을 추천해요.</p>
+            <div className="w-full max-w-xs mt-8">
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+              >
+                다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </div>
           </div>
         )
       case 2:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">성별을 알려주세요.</h1>
             <div className="flex gap-4 w-full">
               <Button
@@ -396,11 +405,20 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 여성
               </Button>
             </div>
+            <div className="w-full max-w-xs mt-8">
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+              >
+                다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </div>
           </div>
         )
       case 3:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">태어난 도시를 알려주세요.</h1>
             <div className="w-full relative">
               <div className="relative">
@@ -438,11 +456,20 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
               )}
             </div>
             <p className="text-muted-foreground text-sm mt-4">정확한 시간 계산에 활용돼요.</p>
+            <div className="w-full max-w-xs mt-8">
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+              >
+                다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </div>
           </div>
         )
       case 4:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">태어난 일시를 알려주세요.</h1>
             <div className="flex flex-col gap-4 w-full">
               <Input
@@ -474,14 +501,23 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 태어난 시간 모름
               </label>
             </div>
+            <div className="w-full max-w-xs mt-8">
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+              >
+                다음으로 <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </div>
           </div>
         )
       case 5:
         return (
-          <div className="w-full max-w-lg flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-4">마지막으로, 최근 가장 큰 고민을 알려주세요.</h1>
             <p className="text-muted-foreground text-sm mb-8">최대 3개까지 고를 수 있어요.</p>
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap justify-center gap-3 mb-8">
               {concernOptions.map((c) => (
                 <Button
                   key={c.id}
@@ -493,6 +529,15 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                   {c.label}
                 </Button>
               ))}
+            </div>
+            <div className="w-full max-w-xs">
+              <Button
+                onClick={handleSubmit}
+                disabled={!canProceed() || isLoading}
+                className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
+              >
+                {isLoading ? "생성 중..." : "완료하기"} <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
             </div>
           </div>
         )
@@ -521,7 +566,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-4">
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20">
         <div className="flex justify-center mb-8">
           {[1, 2, 3, 4, 5].map((step) => (
             <div
@@ -535,28 +580,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
         {renderStepContent()}
       </main>
-
-      <footer className="p-4 sm:p-6 w-full flex justify-center">
-        <div className="w-full max-w-md">
-          {currentStep < 5 ? (
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
-            >
-              다음으로 <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={!canProceed() || isLoading}
-              className="w-full h-12 text-lg rounded-full bg-gray-800 hover:bg-gray-700 text-white"
-            >
-              {isLoading ? "생성 중..." : "완료하기"} <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          )}
-        </div>
-      </footer>
     </div>
   )
 }
