@@ -394,18 +394,6 @@ export default function MyPage() {
 
   return (
     <div className="container mx-auto pb-20">
-      {/* 마이페이지 전용 헤더 */}
-      <header className="flex items-center justify-between pt-4 px-4 pb-2">
-        <Link href="/" className="flex items-center space-x-2">
-          <SajuLogo size="md" />
-        </Link>
-        <Button
-          className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 lg:px-6 py-2 text-sm lg:text-base font-medium"
-          onClick={handleLogout}
-        >
-          로그아웃
-        </Button>
-      </header>
 
       {defaultProfile && (
         <div className="px-4 pt-4 pb-6">
