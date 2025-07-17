@@ -347,7 +347,7 @@ export default function SajuChat({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-2 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-40 sm:pb-32">
+          <div className="max-w-4xl mx-auto px-0 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-40 sm:pb-32">
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "assistant" ? (
