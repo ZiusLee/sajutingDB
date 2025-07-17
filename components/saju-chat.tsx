@@ -345,9 +345,9 @@ export default function SajuChat({
       </Sheet>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col relative pb-safe">
+      <div className="flex-1 flex flex-col relative">
         {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 border-b bg-white">
+        <div className="lg:hidden flex items-center justify-between p-3 sm:p-4 border-b bg-white">
           <SajuLogo onClick={() => setSidebarOpen(true)} />
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="h-5 w-5" />
@@ -355,18 +355,18 @@ export default function SajuChat({
         </div>
 
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-20 sm:pb-6">
+          <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-6 space-y-3 sm:space-y-8 pb-32 sm:pb-6">
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "assistant" ? (
                   <div className="flex items-start gap-2 sm:gap-3">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-sm sm:text-lg shrink-0" />
-                    <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
-                      <div className="text-foreground text-sm sm:text-base leading-relaxed prose prose-sm max-w-none break-words">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-xs sm:text-lg shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-2 sm:space-y-4 min-w-0">
+                      <div className="text-foreground text-xs sm:text-base leading-tight sm:leading-relaxed prose prose-xs sm:prose-sm max-w-none break-words [&>p]:mb-2 sm:[&>p]:mb-4 [&>h1]:text-sm sm:[&>h1]:text-xl [&>h2]:text-xs sm:[&>h2]:text-lg [&>h3]:text-xs sm:[&>h3]:text-base [&>ul]:mb-2 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                       </div>
                       {index === 0 && (
-                        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:gap-6 lg:grid-cols-2">
                           <SajuDiagram saju={saju} name={name} gender={gender} variant="card" {...stableBirthInfo} />
                           {calculatedDaeun && (
                             <DaeunDiagram
@@ -379,16 +379,16 @@ export default function SajuChat({
                         </div>
                       )}
                       <div className="flex items-center gap-1 sm:gap-2">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground">
                           <ThumbsUp className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground">
                           <ThumbsDown className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
+                          className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground"
                           onClick={() => {
                             navigator.clipboard.writeText(message.content)
                             toast.success("메시지가 복사되었습니다.")
@@ -399,7 +399,7 @@ export default function SajuChat({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
+                          className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground"
                           onClick={() => reload()}
                         >
                           <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -409,7 +409,7 @@ export default function SajuChat({
                   </div>
                 ) : (
                   <div className="flex justify-end">
-                    <div className="bg-gray-900 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base">
+                    <div className="bg-gray-900 text-white px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl rounded-br-md max-w-[80%] sm:max-w-md text-xs sm:text-base">
                       {message.content}
                     </div>
                   </div>
@@ -418,27 +418,27 @@ export default function SajuChat({
             ))}
             {isLoading && (
               <div className="flex items-start gap-2 sm:gap-3">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-sm sm:text-lg shrink-0" />
-                <div className="flex items-center gap-1 sm:gap-2 pt-2">
-                  <div className="animate-bounce h-1.5 w-1.5 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
-                  <div className="animate-bounce h-1.5 w-1.5 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
-                  <div className="animate-bounce h-1.5 w-1.5 sm:h-2 sm:w-2 bg-muted-foreground rounded-full"></div>
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-xs sm:text-lg shrink-0 mt-0.5" />
+                <div className="flex items-center gap-1 sm:gap-2 pt-1">
+                  <div className="animate-bounce h-1 w-1 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
+                  <div className="animate-bounce h-1 w-1 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
+                  <div className="animate-bounce h-1 w-1 sm:h-2 sm:w-2 bg-muted-foreground rounded-full"></div>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 bg-white/80 backdrop-blur-sm border-t">
-          <div className="max-w-4xl mx-auto space-y-3 sm:space-y-0">
+        <div className="fixed bottom-0 left-0 right-0 p-2 sm:p-4 bg-white/95 backdrop-blur-sm border-t lg:relative lg:bottom-auto">
+          <div className="max-w-4xl mx-auto space-y-2 sm:space-y-0">
             {!isLoading && messages.length >= 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-hide">
+              <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 sm:pb-3 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
                     key={i}
                     variant="outline"
                     size="sm"
-                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 min-w-fit"
+                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs px-2.5 py-1 sm:text-sm sm:px-4 sm:py-2 min-w-fit h-7 sm:h-auto"
                     onClick={() => handleSuggestedQuestionClick(q)}
                   >
                     {q}
@@ -446,13 +446,13 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3 items-center">
+            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
-                  className="h-10 sm:h-12 rounded-full pl-4 pr-20 sm:pl-5 sm:pr-12 bg-gray-100 border-gray-200 focus:ring-gray-900 text-sm sm:text-base"
+                  className="h-9 sm:h-12 rounded-full pl-3 pr-16 sm:pl-5 sm:pr-12 bg-gray-100 border-gray-200 focus:ring-gray-900 text-sm"
                   disabled={isLoading}
                 />
                 <Popover>
@@ -461,9 +461,9 @@ export default function SajuChat({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-10 sm:right-12 top-1/2 -translate-y-1/2 h-8 w-8 sm:h-10 sm:w-10 rounded-full"
+                      className="absolute right-8 sm:right-12 top-1/2 -translate-y-1/2 h-7 w-7 sm:h-10 sm:w-10 rounded-full"
                     >
-                      <MoreHorizontal className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <MoreHorizontal className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-56 p-2 mb-2" align="end">
@@ -479,10 +479,10 @@ export default function SajuChat({
               <Button
                 type="submit"
                 size="icon"
-                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
+                className="h-9 w-9 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
                 disabled={!input.trim() || isLoading}
               >
-                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Send className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
               </Button>
             </form>
           </div>
