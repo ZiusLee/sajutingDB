@@ -365,7 +365,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     switch (currentStep) {
       case 1:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">이름을 알려주세요.</h1>
             <Input
               value={birthInfo.name}
@@ -378,7 +378,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         )
       case 2:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">성별을 알려주세요.</h1>
             <div className="flex gap-4 w-full">
               <Button
@@ -400,7 +400,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         )
       case 3:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">태어난 도시를 알려주세요.</h1>
             <div className="w-full relative">
               <div className="relative">
@@ -442,7 +442,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         )
       case 4:
         return (
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-8">태어난 일시를 알려주세요.</h1>
             <div className="flex flex-col gap-4 w-full">
               <Input
@@ -478,7 +478,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         )
       case 5:
         return (
-          <div className="w-full max-w-lg flex flex-col items-center">
+          <div className="w-full max-w-sm flex flex-col items-center">
             <h1 className="text-3xl font-bold text-foreground mb-4">마지막으로, 최근 가장 큰 고민을 알려주세요.</h1>
             <p className="text-muted-foreground text-sm mb-8">최대 3개까지 고를 수 있어요.</p>
             <div className="flex flex-wrap justify-center gap-3">
@@ -521,7 +521,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-4 pt-20 pb-32">
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-40">
         <div className="flex justify-center mb-8">
           {[1, 2, 3, 4, 5].map((step) => (
             <div
@@ -536,8 +536,8 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         {renderStepContent()}
       </main>
 
-      <div className="absolute bottom-20 left-4 right-4 flex justify-center">
-        <div className="w-full max-w-md">
+      <div className="absolute bottom-32 left-6 right-6 flex justify-center">
+        <div className="w-full max-w-xs">
           {currentStep < 5 ? (
             <Button
               onClick={handleNext}
