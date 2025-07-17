@@ -351,9 +351,8 @@ export default function SajuChat({
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "assistant" ? (
-                  <div className="flex items-start gap-3 sm:gap-3 px-0">
-                    <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-lg sm:text-lg shrink-0 mt-1" />
-                    <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
+                  <div className="px-2">
+                    <div className="space-y-3 sm:space-y-4">
                       <div className="text-foreground text-lg leading-relaxed sm:leading-relaxed prose prose-lg max-w-none break-words [&>p]:mb-4 sm:[&>p]:mb-4 [&>h1]:text-xl sm:[&>h1]:text-xl [&>h2]:text-lg sm:[&>h2]:text-lg [&>h3]:text-lg [&>ul]:mb-4 sm:[&>ul]:mb-4 [&>li]:mb-2 sm:[&>li]:mb-2 [&>ul]:pl-4 [&>li]:text-lg">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                       </div>
@@ -388,8 +387,7 @@ export default function SajuChat({
               </div>
             ))}
             {isLoading && (
-              <div className="flex items-start gap-3 sm:gap-3 px-2">
-                <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-lg bg-gray-900 flex items-center justify-center text-lg sm:text-lg shrink-0 mt-1" />
+              <div className="px-2">
                 <div className="flex items-center gap-2 sm:gap-2 pt-2">
                   <div className="animate-bounce h-2 w-2 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
                   <div className="animate-bounce h-2 w-2 sm:h-2 sm:w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
