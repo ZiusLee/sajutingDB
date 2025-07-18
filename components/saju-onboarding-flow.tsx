@@ -190,15 +190,10 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     console.log("Authentication successful, linking session to user...")
 
     try {
-      // Wait a bit for the auth state to fully settle
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
       const supabaseClient = getSupabase()
       const {
         data: { session },
       } = await supabaseClient.auth.getSession()
-
-      console.log("Current session after auth:", session?.user?.id)
 
       if (session && session.user && sajuSessionId) {
         const authUserId = session.user.id
@@ -212,7 +207,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           // Update localStorage with the authenticated user info
           localStorage.setItem("user_id", sajuSessionId)
           localStorage.setItem("auth_user_id", authUserId)
-          localStorage.setItem("user_authenticated", "true")
 
           // Close the sign-in modal
           setShowSignInModal(false)
@@ -229,17 +223,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             variant: "destructive",
           })
         }
-      } else {
-        console.error("Missing session or sajuSessionId:", {
-          hasSession: !!session,
-          hasUser: !!session?.user,
-          sajuSessionId,
-        })
-        toast({
-          title: "인증 정보 오류",
-          description: "인증 정보를 확인할 수 없습니다.",
-          variant: "destructive",
-        })
       }
     } catch (error) {
       console.error("Error in handleAuthSuccess:", error)
