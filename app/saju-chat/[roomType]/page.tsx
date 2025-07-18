@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useState, useEffect, useMemo } from "react"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
 import SajuChat from "@/components/saju-chat"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
@@ -11,12 +11,17 @@ import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 export default function SajuChatPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const [saju, setSaju] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [sessionKey, setSessionKey] = useState<string>("")
   const [isSidebarOpen, setSidebarOpen] = useState(false)
+
+  // Stabilize roomId to prevent infinite re-renders
+  const roomId = useMemo(() => searchParams.get("roomId"), [searchParams])
+  const roomType = useMemo(() => params.roomType as string, [params.roomType])
 
   useEffect(() => {
     // Store sidebar toggle function globally for site header to access
@@ -32,57 +37,76 @@ export default function SajuChatPage() {
   }, [])
 
   useEffect(() => {
-    try {
-      // 로컬 스토리지에서 사주 데이터 가져오기
-      const savedSaju = localStorage.getItem("current_saju")
+    let isMounted = true
 
-      if (!savedSaju) {
-        toast({
-          title: "사주 정보가 없습니다",
-          description: "먼저 사주를 입력해주세요.",
-          variant: "destructive",
-        })
-        router.push("/")
-        return
+    const initializePage = async () => {
+      try {
+        console.log("🔄 Initializing saju chat page for room:", roomId)
+
+        // 로컬 스토리지에서 사주 데이터 가져오기
+        const savedSaju = localStorage.getItem("current_saju")
+
+        if (!savedSaju) {
+          if (isMounted) {
+            toast({
+              title: "사주 정보가 없습니다",
+              description: "먼저 사주를 입력해주세요.",
+              variant: "destructive",
+            })
+            router.push("/")
+          }
+          return
+        }
+
+        const parsedSaju = JSON.parse(savedSaju)
+
+        if (isMounted) {
+          setSaju(parsedSaju)
+
+          // Generate a unique session key for this chat room
+          const generatedKey = `chat_${parsedSaju.name || "user"}_${roomType}`
+          setSessionKey(generatedKey)
+
+          // 원래 경로 저장 (있는 경우)
+          const lastChatData = loadSajuFromLocalStorage("last_chat_saju_data")
+          if (lastChatData && lastChatData.returnPath) {
+            localStorage.setItem("chat_return_path", lastChatData.returnPath)
+          }
+
+          // 마이페이지에서 왔는지 확인 (한 번만 체크하고 플래그 제거)
+          const fromMyPage = sessionStorage.getItem("from_mypage")
+          if (fromMyPage === "true") {
+            console.log("✅ Chat opened from mypage - flag confirmed")
+            // 플래그 제거하여 무한 로그 방지
+            sessionStorage.removeItem("from_mypage")
+          }
+
+          // 로그인 상태 확인
+          const userToken = localStorage.getItem("user_token")
+          setIsLoggedIn(!!userToken)
+
+          setLoading(false)
+          console.log("✅ Page initialization completed")
+        }
+      } catch (error) {
+        console.error("❌ Error loading saju data:", error)
+        if (isMounted) {
+          toast({
+            title: "데이터 로딩 오류",
+            description: "사주 데이터를 불러오는 중 오류가 발생했습니다.",
+            variant: "destructive",
+          })
+          router.push("/")
+        }
       }
-
-      const parsedSaju = JSON.parse(savedSaju)
-      setSaju(parsedSaju)
-
-      // Generate a unique session key for this chat room
-      const generatedKey = `chat_${parsedSaju.name || "user"}_${params.roomType}`
-      setSessionKey(generatedKey)
-
-      // 원래 경로 저장 (있는 경우)
-      const lastChatData = loadSajuFromLocalStorage("last_chat_saju_data")
-      if (lastChatData && lastChatData.returnPath) {
-        localStorage.setItem("chat_return_path", lastChatData.returnPath)
-      }
-
-      // 마이페이지에서 왔는지 확인 (더 안전하게)
-      const fromMyPage = sessionStorage.getItem("from_mypage")
-      console.log("from_mypage flag:", fromMyPage)
-      if (fromMyPage === "true") {
-        console.log("Chat opened from mypage - flag confirmed")
-        // 플래그는 saju-chat 컴포넌트에서 처리하므로 여기서는 제거하지 않음
-      }
-
-      setLoading(false)
-
-      // 로그인 상태 확인
-      // 실제 구현에서는 세션이나 토큰을 인하는 로직으로 대체
-      const userToken = localStorage.getItem("user_token")
-      setIsLoggedIn(!!userToken)
-    } catch (error) {
-      console.error("Error loading saju data:", error)
-      toast({
-        title: "데이터 로딩 오류",
-        description: "사주 데이터를 불러오는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-      router.push("/")
     }
-  }, [router, toast, params.roomType])
+
+    initializePage()
+
+    return () => {
+      isMounted = false
+    }
+  }, [router, toast, roomType, roomId]) // Removed searchParams, using stable roomId instead
 
   const handleBack = () => {
     try {
@@ -130,7 +154,7 @@ export default function SajuChatPage() {
         name={saju.name || "사용자"}
         gender={saju.gender || "남"}
         initialInterpretation={saju.interpretation || ""}
-        roomType={params.roomType as string}
+        roomType={roomType}
         onBack={handleBack}
         isLoggedIn={isLoggedIn}
         sessionKey={sessionKey}
@@ -138,6 +162,7 @@ export default function SajuChatPage() {
         concerns={saju.concerns || []}
         isSidebarOpen={isSidebarOpen}
         onSidebarToggle={() => setSidebarOpen((prev) => !prev)}
+        currentChatRoomId={roomId || undefined}
       />
     </div>
   )

@@ -1,39 +1,46 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabase-client"
 
 export interface Message {
-  id: string
+  id?: string
   sessionId: string
-  role: "user" | "assistant"
+  chatRoomId?: string
+  role: "user" | "assistant" | "system"
   content: string
-  messageOrder: number
+  messageOrder?: number
   roomType?: string
   modelUsed?: string
   responseTimeMs?: number
-  createdAt: string
+  createdAt?: string
   feedback?: MessageFeedback[]
 }
 
 export interface MessageFeedback {
   id: string
   messageId: string
-  feedbackType: "like" | "dislike" | "retry" | "copy"
+  feedbackType: "like" | "dislike"
   userId?: string
   createdAt: string
 }
 
-/**
- * Get all messages for a session
- */
-export async function getSessionMessages(sessionId: string): Promise<Message[]> {
-  try {
-    const response = await fetch(`/api/messages?sessionId=${sessionId}`)
+export interface MessageStats {
+  totalMessages: number
+  userMessages: number
+  assistantMessages: number
+  averageResponseTime?: number
+  lastMessageAt?: string
+}
 
+// Get messages for a session, optionally filtered by chat room
+export async function getSessionMessages(sessionId: string, chatRoomId?: string): Promise<Message[]> {
+  try {
+    const params = new URLSearchParams({ sessionId })
+    if (chatRoomId) {
+      params.append("chatRoomId", chatRoomId)
+    }
+
+    const response = await fetch(`/api/messages?${params}`)
     if (!response.ok) {
-      if (response.status === 404) {
-        // No messages found for this session, return empty array
-        return []
-      }
-      throw new Error(`Failed to fetch messages: ${response.statusText}`)
+      throw new Error("Failed to fetch messages")
     }
 
     const data = await response.json()
@@ -44,29 +51,71 @@ export async function getSessionMessages(sessionId: string): Promise<Message[]> 
   }
 }
 
-/**
- * Save messages to database - don't include ID to let database generate UUIDs
- */
-export async function saveMessages(sessionId: string, messages: any[], roomType: string): Promise<string[]> {
+// Get messages for a specific chat room only
+export async function getChatRoomMessages(chatRoomId: string): Promise<Message[]> {
   try {
-    // Filter out messages that don't have content or are invalid
-    const validMessages = messages.filter(
-      (msg) => msg && msg.content && msg.content.trim() !== "" && (msg.role === "user" || msg.role === "assistant"),
+    const { data: messages, error } = await supabase
+      .from("messages")
+      .select(`
+        id,
+        session_id,
+        chat_room_id,
+        role,
+        content,
+        message_order,
+        room_type,
+        model_used,
+        response_time_ms,
+        created_at,
+        message_feedback (
+          id,
+          message_id,
+          feedback_type,
+          user_id,
+          created_at
+        )
+      `)
+      .eq("chat_room_id", chatRoomId)
+      .order("message_order", { ascending: true })
+
+    if (error) throw error
+
+    return (
+      messages?.map((msg) => ({
+        id: msg.id,
+        sessionId: msg.session_id,
+        chatRoomId: msg.chat_room_id,
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+        messageOrder: msg.message_order,
+        roomType: msg.room_type,
+        modelUsed: msg.model_used,
+        responseTimeMs: msg.response_time_ms,
+        createdAt: msg.created_at,
+        feedback:
+          msg.message_feedback?.map((f: any) => ({
+            id: f.id,
+            messageId: f.message_id,
+            feedbackType: f.feedback_type,
+            userId: f.user_id,
+            createdAt: f.created_at,
+          })) || [],
+      })) || []
     )
+  } catch (error) {
+    console.error("Error fetching chat room messages:", error)
+    return []
+  }
+}
 
-    if (validMessages.length === 0) {
-      console.log("No valid messages to save")
-      return []
-    }
-
-    // Remove any ID field to let database generate UUIDs
-    const messagesToSave = validMessages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-      createdAt: msg.createdAt || new Date().toISOString(),
-      messageOrder: msg.messageOrder || 0,
-    }))
-
+// Save multiple messages
+export async function saveMessages(
+  sessionId: string,
+  messages: Message[],
+  roomType = "sajuping",
+  chatRoomId?: string,
+): Promise<{ savedCount: number; messageIds: string[] }> {
+  try {
     const response = await fetch("/api/messages", {
       method: "POST",
       headers: {
@@ -74,61 +123,159 @@ export async function saveMessages(sessionId: string, messages: any[], roomType:
       },
       body: JSON.stringify({
         sessionId,
-        messages: messagesToSave,
+        messages,
         roomType,
+        chatRoomId,
       }),
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Failed to save messages: ${response.statusText} - ${errorText}`)
+      throw new Error("Failed to save messages")
     }
 
     const data = await response.json()
-    console.log(`Successfully saved ${data.savedCount} messages for session ${sessionId}`)
-    return data.messageIds || []
+    return {
+      savedCount: data.savedCount || 0,
+      messageIds: data.messageIds || [],
+    }
   } catch (error) {
     console.error("Error saving messages:", error)
-    return []
+    return { savedCount: 0, messageIds: [] }
   }
 }
 
-/**
- * Save a single message immediately
- */
+// Save a single message
 export async function saveSingleMessage(
   sessionId: string,
-  message: any,
-  roomType: string,
+  message: Message,
+  roomType = "sajuping",
   messageOrder?: number,
+  chatRoomId?: string,
 ): Promise<string | null> {
   try {
-    if (!message || !message.content || message.content.trim() === "") {
-      return null
+    let finalMessageOrder = messageOrder
+
+    // messageOrder가 제공되지 않은 경우, 자동으로 순서 번호 생성
+    if (!finalMessageOrder) {
+      if (chatRoomId) {
+        // 채팅룸별 메시지 순서 계산
+        const { data: existingMessages, error } = await supabase
+          .from("messages")
+          .select("message_order")
+          .eq("chat_room_id", chatRoomId)
+          .order("message_order", { ascending: false })
+          .limit(1)
+
+        if (error) {
+          console.error("Error fetching existing messages:", error)
+          finalMessageOrder = 1
+        } else {
+          const lastOrder = existingMessages?.[0]?.message_order || 0
+          finalMessageOrder = lastOrder + 1
+        }
+      } else {
+        // 세션별 메시지 순서 계산
+        const { data: existingMessages, error } = await supabase
+          .from("messages")
+          .select("message_order")
+          .eq("session_id", sessionId)
+          .order("message_order", { ascending: false })
+          .limit(1)
+
+        if (error) {
+          console.error("Error fetching existing messages:", error)
+          finalMessageOrder = 1
+        } else {
+          const lastOrder = existingMessages?.[0]?.message_order || 0
+          finalMessageOrder = lastOrder + 1
+        }
+      }
     }
 
     const messageToSave = {
-      role: message.role,
-      content: message.content,
-      createdAt: message.createdAt || new Date().toISOString(),
-      messageOrder: messageOrder ?? Date.now(),
+      ...message,
+      messageOrder: finalMessageOrder,
+      chatRoomId,
     }
 
-    const messageIds = await saveMessages(sessionId, [messageToSave], roomType)
-    return messageIds[0] || null
+    const result = await saveMessages(sessionId, [messageToSave], roomType, chatRoomId)
+    return result.messageIds[0] || null
   } catch (error) {
     console.error("Error saving single message:", error)
     return null
   }
 }
 
-/**
- * Save message feedback
- */
+// Delete messages from a chat room
+export async function deleteChatRoomMessages(chatRoomId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/messages?chatRoomId=${chatRoomId}`, {
+      method: "DELETE",
+    })
+
+    return response.ok
+  } catch (error) {
+    console.error("Error deleting chat room messages:", error)
+    return false
+  }
+}
+
+// Update message's chat room (for migration purposes)
+export async function updateMessageChatRoom(messageId: string, chatRoomId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("messages").update({ chat_room_id: chatRoomId }).eq("id", messageId)
+
+    return !error
+  } catch (error) {
+    console.error("Error updating message chat room:", error)
+    return false
+  }
+}
+
+// Get recent messages for a session (across all chat rooms)
+export async function getRecentSessionMessages(sessionId: string, limit = 10): Promise<Message[]> {
+  try {
+    const { data: messages, error } = await supabase
+      .from("messages")
+      .select(`
+        id,
+        session_id,
+        chat_room_id,
+        role,
+        content,
+        message_order,
+        room_type,
+        created_at
+      `)
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+
+    if (error) throw error
+
+    return (
+      messages?.map((msg) => ({
+        id: msg.id,
+        sessionId: msg.session_id,
+        chatRoomId: msg.chat_room_id,
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+        messageOrder: msg.message_order,
+        roomType: msg.room_type,
+        createdAt: msg.created_at,
+      })) || []
+    )
+  } catch (error) {
+    console.error("Error fetching recent session messages:", error)
+    return []
+  }
+}
+
+// Save message feedback
 export async function saveMessageFeedback(
   messageId: string,
-  feedbackType: "like" | "dislike" | "retry" | "copy",
-  sessionId?: string,
+  feedbackType: "like" | "dislike",
+  userId?: string,
 ): Promise<boolean> {
   try {
     const response = await fetch("/api/message-feedback", {
@@ -139,109 +286,83 @@ export async function saveMessageFeedback(
       body: JSON.stringify({
         messageId,
         feedbackType,
-        sessionId,
+        userId,
       }),
     })
 
-    if (!response.ok) {
-      throw new Error(`Failed to save feedback: ${response.statusText}`)
-    }
-
-    return true
+    return response.ok
   } catch (error) {
     console.error("Error saving message feedback:", error)
     return false
   }
 }
 
-/**
- * Get feedback for a message
- */
+// Get message feedback
 export async function getMessageFeedback(messageId: string): Promise<MessageFeedback[]> {
   try {
-    const response = await fetch(`/api/message-feedback?messageId=${messageId}`)
+    const { data: feedback, error } = await supabase
+      .from("message_feedback")
+      .select("*")
+      .eq("message_id", messageId)
+      .order("created_at", { ascending: false })
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch feedback: ${response.statusText}`)
-    }
+    if (error) throw error
 
-    const data = await response.json()
-    return data.feedback || []
+    return (
+      feedback?.map((f) => ({
+        id: f.id,
+        messageId: f.message_id,
+        feedbackType: f.feedback_type,
+        userId: f.user_id,
+        createdAt: f.created_at,
+      })) || []
+    )
   } catch (error) {
     console.error("Error fetching message feedback:", error)
     return []
   }
 }
 
-/**
- * Get message statistics for analytics
- */
-export async function getMessageStats(sessionId?: string) {
+// Get message statistics
+export async function getMessageStats(sessionId?: string, chatRoomId?: string): Promise<MessageStats> {
   try {
-    const supabase = createClientComponentClient()
+    let query = supabase.from("messages").select("role, response_time_ms, created_at")
 
-    let query = supabase.from("messages").select(`
-        id,
-        role,
-        room_type,
-        created_at,
-        message_feedback (
-          feedback_type
-        )
-      `)
-
-    if (sessionId) {
+    if (chatRoomId) {
+      query = query.eq("chat_room_id", chatRoomId)
+    } else if (sessionId) {
       query = query.eq("session_id", sessionId)
+    } else {
+      throw new Error("Either sessionId or chatRoomId must be provided")
     }
 
     const { data: messages, error } = await query
 
-    if (error) {
-      throw error
+    if (error) throw error
+
+    const totalMessages = messages?.length || 0
+    const userMessages = messages?.filter((m) => m.role === "user").length || 0
+    const assistantMessages = messages?.filter((m) => m.role === "assistant").length || 0
+
+    const responseTimes = messages?.filter((m) => m.response_time_ms).map((m) => m.response_time_ms) || []
+    const averageResponseTime =
+      responseTimes.length > 0 ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length : undefined
+
+    const lastMessageAt = messages?.length > 0 ? messages[messages.length - 1].created_at : undefined
+
+    return {
+      totalMessages,
+      userMessages,
+      assistantMessages,
+      averageResponseTime,
+      lastMessageAt,
     }
-
-    // Calculate statistics
-    const stats = {
-      totalMessages: messages?.length || 0,
-      userMessages: messages?.filter((m) => m.role === "user").length || 0,
-      assistantMessages: messages?.filter((m) => m.role === "assistant").length || 0,
-      feedbackStats: {
-        likes: 0,
-        dislikes: 0,
-        copies: 0,
-        retries: 0,
-      },
-      roomTypeStats: {} as Record<string, number>,
-    }
-
-    messages?.forEach((message) => {
-      // Count room types
-      if (message.room_type) {
-        stats.roomTypeStats[message.room_type] = (stats.roomTypeStats[message.room_type] || 0) + 1
-      }
-
-      // Count feedback
-      message.message_feedback?.forEach((feedback: any) => {
-        switch (feedback.feedback_type) {
-          case "like":
-            stats.feedbackStats.likes++
-            break
-          case "dislike":
-            stats.feedbackStats.dislikes++
-            break
-          case "copy":
-            stats.feedbackStats.copies++
-            break
-          case "retry":
-            stats.feedbackStats.retries++
-            break
-        }
-      })
-    })
-
-    return stats
   } catch (error) {
     console.error("Error getting message stats:", error)
-    return null
+    return {
+      totalMessages: 0,
+      userMessages: 0,
+      assistantMessages: 0,
+    }
   }
 }
