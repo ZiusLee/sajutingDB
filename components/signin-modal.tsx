@@ -25,36 +25,72 @@ export function SignInModal({
   const [isKakaoLoading, setIsKakaoLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState("")
+  const [isProcessingAuth, setIsProcessingAuth] = useState(false)
   const supabase = getSupabase()
 
   // Listen for auth state changes
   useEffect(() => {
     if (!isOpen) return
 
+    console.log("Setting up auth listener in SignInModal")
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state change in SignInModal:", event, session?.user?.id)
 
-      if (event === "SIGNED_IN" && session?.user) {
+      if (event === "SIGNED_IN" && session?.user && !isProcessingAuth) {
         console.log("User signed in successfully:", session.user.id)
+        setIsProcessingAuth(true)
 
-        // Call the success callback if provided
-        if (onAuthSuccess) {
-          await onAuthSuccess()
+        try {
+          // Store user info in localStorage for compatibility
+          localStorage.setItem("user_authenticated", "true")
+          localStorage.setItem("user_id", session.user.id)
+          localStorage.setItem("user_email", session.user.email || "")
+
+          // Extract name from metadata if available
+          const userName =
+            session.user.user_metadata?.name ||
+            session.user.user_metadata?.full_name ||
+            session.user.email?.split("@")[0] ||
+            "User"
+          localStorage.setItem("user_name", userName)
+
+          // Call the success callback if provided
+          if (onAuthSuccess) {
+            console.log("Calling onAuthSuccess callback")
+            await onAuthSuccess()
+          }
+
+          // Reset loading states
+          setIsKakaoLoading(false)
+          setIsGoogleLoading(false)
+          setError("")
+        } catch (error) {
+          console.error("Error in auth success handler:", error)
+          setError("인증 처리 중 오류가 발생했습니다.")
+        } finally {
+          setIsProcessingAuth(false)
         }
-
-        // Reset loading states
-        setIsKakaoLoading(false)
-        setIsGoogleLoading(false)
-        setError("")
       }
     })
 
     return () => {
+      console.log("Cleaning up auth listener")
       subscription.unsubscribe()
     }
-  }, [isOpen, onAuthSuccess, supabase.auth])
+  }, [isOpen, onAuthSuccess, supabase.auth, isProcessingAuth])
+
+  // Reset states when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setError("")
+      setIsKakaoLoading(false)
+      setIsGoogleLoading(false)
+      setIsProcessingAuth(false)
+    }
+  }, [isOpen])
 
   // Handle Kakao login
   const handleKakaoLogin = async () => {
@@ -137,6 +173,16 @@ export function SignInModal({
             </div>
           )}
 
+          {/* Processing message */}
+          {isProcessingAuth && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-600 flex items-center">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                로그인 처리 중...
+              </p>
+            </div>
+          )}
+
           {/* SNS LOGIN Section */}
           <div className="text-center mb-8">
             <div className="relative">
@@ -154,7 +200,7 @@ export function SignInModal({
             {/* Kakao Login */}
             <button
               onClick={handleKakaoLogin}
-              disabled={isKakaoLoading || isGoogleLoading}
+              disabled={isKakaoLoading || isGoogleLoading || isProcessingAuth}
               className="w-16 h-16 rounded-full bg-[#FEE500] flex items-center justify-center hover:bg-[#E6CF00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
               {isKakaoLoading ? (
@@ -172,7 +218,7 @@ export function SignInModal({
             {/* Google Login */}
             <button
               onClick={handleGoogleLogin}
-              disabled={isKakaoLoading || isGoogleLoading}
+              disabled={isKakaoLoading || isGoogleLoading || isProcessingAuth}
               className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
               {isGoogleLoading ? (
@@ -202,7 +248,7 @@ export function SignInModal({
             {/* Email Login */}
             <button
               onClick={handleEmailLogin}
-              disabled={isKakaoLoading || isGoogleLoading}
+              disabled={isKakaoLoading || isGoogleLoading || isProcessingAuth}
               className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
               <Mail className="w-7 h-7 text-white" />
