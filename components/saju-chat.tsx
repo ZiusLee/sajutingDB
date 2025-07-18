@@ -1,10 +1,9 @@
 "use client"
-import { useState, useRef, useEffect, useMemo, useCallback } from "react"
-import type React from "react"
-
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
+import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
@@ -15,9 +14,9 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useAuth } from "@/hooks/use-auth"
-import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
-import { getSessionMessages } from "@/lib/message-service"
+import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 
 interface SajuChatProps {
@@ -113,7 +112,6 @@ export default function SajuChat({
   const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
   const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
   const chatContainerRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const savingRef = useRef(false) // To prevent race conditions while saving
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
 
@@ -122,33 +120,6 @@ export default function SajuChat({
   const [initialMessages, setInitialMessages] = useState<any[]>([])
   const [aiChatBody, setAiChatBody] = useState<any>({})
   const [isInitialized, setIsInitialized] = useState(false) // Flag to prevent re-initialization
-
-  const adjustTextareaHeight = useCallback(() => {
-    const textarea = textareaRef.current
-    if (textarea) {
-      textarea.style.height = "auto"
-      const scrollHeight = textarea.scrollHeight
-      const maxHeight = 120 // 최대 높이 (약 5줄)
-      textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`
-    }
-  }, [])
-
-  const [input, setInput] = useState("")
-  const [messages, setMessages] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    adjustTextareaHeight()
-  }, [input, adjustTextareaHeight])
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      if (input.trim() && !isLoading) {
-        handleSubmit(e as any)
-      }
-    }
-  }
 
   useEffect(() => {
     const initializeChatData = async () => {
@@ -270,55 +241,50 @@ export default function SajuChat({
     return `fallback-${Date.now()}`
   }
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault()
-    setIsLoading(true)
-    const sessionId = getSessionId()
-    const newMessage = {
-      id: generateUUID(),
-      role: "user" as const,
-      content: input,
-      createdAt: new Date().toISOString(),
-    }
-    setMessages([...messages, newMessage])
-    setInput("")
-
-    try {
-      const response = await fetch("/api/saju-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: sessionId,
-          messages: [...messages, newMessage],
-          body: aiChatBody,
-        }),
-      })
-
-      const data = await response.json()
-      const assistantMessage = {
-        id: generateUUID(),
-        role: "assistant" as const,
-        content: data.content,
-        createdAt: new Date().toISOString(),
-      }
-      setMessages([...messages, newMessage, assistantMessage])
-    } catch (error) {
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
+    api: "/api/saju-chat",
+    id: getSessionId(),
+    initialMessages,
+    body: aiChatBody,
+    onError: (error) => {
       console.error("채팅 오류:", error)
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
-    } finally {
-      setIsLoading(false)
+    },
+  })
+
+  // Save messages to database when new messages are added
+  useEffect(() => {
+    const saveNewMessages = async () => {
+      if (savingRef.current || messages.length <= lastSavedMessageCount) {
+        return
+      }
+
+      savingRef.current = true
+      const sessionId = getSessionId()
+      const newMessages = messages.slice(lastSavedMessageCount)
+
+      const messagesToSave = newMessages.map((msg, index) => ({
+        id: generateUUID(),
+        role: msg.role,
+        content: msg.content,
+        createdAt: msg.createdAt || new Date().toISOString(),
+        messageOrder: lastSavedMessageCount + index,
+      }))
+
+      try {
+        await saveMessages(sessionId, messagesToSave, roomType)
+        setLastSavedMessageCount(messages.length)
+      } catch (error) {
+        console.error("Error saving messages:", error)
+      } finally {
+        savingRef.current = false
+      }
     }
-  }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value)
-  }
-
-  const reload = () => {
-    // Placeholder for reload functionality
-  }
+    if (isInitialized && messages.length > 0 && !isLoading) {
+      saveNewMessages()
+    }
+  }, [messages, lastSavedMessageCount, isLoading, roomType, isInitialized])
 
   const handleSuggestedQuestionClick = (question: string) => {
     if (isLoading) return
@@ -330,7 +296,22 @@ export default function SajuChat({
 
   const renderSidebarContent = () => (
     <div className="p-4 space-y-6 overflow-y-auto h-full bg-gray-50">
-      <SajuDiagram saju={saju} name={name} gender={gender} variant="sidebar" {...stableBirthInfo} />
+      <SajuDiagram
+        saju={saju}
+        name={name}
+        gender={gender}
+        variant="sidebar"
+        timeUnknown={saju?.timeUnknown || false}
+        solarYear={stableBirthInfo?.solarYear?.toString()}
+        solarMonth={stableBirthInfo?.solarMonth?.toString()}
+        solarDay={stableBirthInfo?.solarDay?.toString()}
+        hour={stableBirthInfo?.solarHour?.toString()}
+        minute={stableBirthInfo?.solarMinute?.toString()}
+        lunarYear={stableBirthInfo?.lunarYear?.toString()}
+        lunarMonth={stableBirthInfo?.lunarMonth?.toString()}
+        lunarDay={stableBirthInfo?.lunarDay?.toString()}
+        location={stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
+      />
       {calculatedDaeun && (
         <DaeunDiagram daeun={calculatedDaeun.pillars || []} birthInfo={stableBirthInfo} name={name} gender={gender} />
       )}
@@ -432,7 +413,22 @@ export default function SajuChat({
                       </div>
                       {index === 0 && (
                         <div className="grid grid-cols-1 gap-3 sm:gap-6 lg:grid-cols-2">
-                          <SajuDiagram saju={saju} name={name} gender={gender} variant="card" {...stableBirthInfo} />
+                          <SajuDiagram
+                            saju={saju}
+                            name={name}
+                            gender={gender}
+                            variant="card"
+                            timeUnknown={saju?.timeUnknown || false}
+                            solarYear={stableBirthInfo?.solarYear?.toString()}
+                            solarMonth={stableBirthInfo?.solarMonth?.toString()}
+                            solarDay={stableBirthInfo?.solarDay?.toString()}
+                            hour={stableBirthInfo?.solarHour?.toString()}
+                            minute={stableBirthInfo?.solarMinute?.toString()}
+                            lunarYear={stableBirthInfo?.lunarYear?.toString()}
+                            lunarMonth={stableBirthInfo?.lunarMonth?.toString()}
+                            lunarDay={stableBirthInfo?.lunarDay?.toString()}
+                            location={stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
+                          />
                           {calculatedDaeun && (
                             <DaeunDiagram
                               daeun={calculatedDaeun.pillars || []}
@@ -501,15 +497,12 @@ export default function SajuChat({
             )}
             <form onSubmit={handleSubmit} className="flex gap-3 items-center">
               <div className="flex-1 relative">
-                <Textarea
-                  ref={textareaRef}
+                <Input
                   value={input}
                   onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
                   placeholder="무엇이든 물어보세요"
-                  className="min-h-12 max-h-[120px] rounded-full pl-5 pr-20 sm:pl-5 sm:pr-12 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base resize-none overflow-y-auto py-3"
+                  className="h-12 sm:h-12 rounded-full pl-5 pr-20 sm:pl-5 sm:pr-12 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
                   disabled={isLoading}
-                  rows={1}
                 />
                 <Popover>
                   <PopoverTrigger asChild>
