@@ -1,220 +1,233 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { Loader2, Mail } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getSupabase } from "@/lib/supabase-client"
+import { createClient } from "@/lib/supabase-client"
 
 interface SignInModalProps {
   isOpen: boolean
   onClose: () => void
+  onAuthSuccess?: () => void
   title?: string
   description?: string
-  onAuthSuccess?: () => void
 }
 
 export function SignInModal({
   isOpen,
   onClose,
-  title = "지금 계정을 연동하고",
-  description = "3초만에 사주 분석을 받아보세요.",
   onAuthSuccess,
+  title = "로그인",
+  description = "계속하려면 로그인해주세요.",
 }: SignInModalProps) {
   const router = useRouter()
-  const [isKakaoLoading, setIsKakaoLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [error, setError] = useState("")
-  const supabase = getSupabase()
+  const { isAuthenticated } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [isProcessingAuth, setIsProcessingAuth] = useState(false)
 
-  // Listen for auth state changes
+  const supabase = createClient()
+
+  // 인증 상태 변경 감지
   useEffect(() => {
-    if (!isOpen) return
+    if (isAuthenticated && !isProcessingAuth) {
+      console.log("🔐 Authentication detected, calling success callback")
+      setIsProcessingAuth(true)
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change in SignInModal:", event, session?.user?.id)
-
-      if (event === "SIGNED_IN" && session?.user) {
-        console.log("User signed in successfully:", session.user.id)
-
-        // Call the success callback if provided
-        if (onAuthSuccess) {
-          await onAuthSuccess()
-        }
-
-        // Reset loading states
-        setIsKakaoLoading(false)
-        setIsGoogleLoading(false)
-        setError("")
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
+      // 약간의 지연을 두어 인증 상태가 완전히 안정화되도록 함
+      setTimeout(() => {
+        onAuthSuccess?.()
+        onClose()
+        setIsProcessingAuth(false)
+      }, 1000)
     }
-  }, [isOpen, onAuthSuccess, supabase.auth])
+  }, [isAuthenticated, onAuthSuccess, onClose, isProcessingAuth])
 
-  // Handle Kakao login
-  const handleKakaoLogin = async () => {
-    setIsKakaoLoading(true)
-    setError("")
+  const handleSocialLogin = async (provider: "google" | "kakao") => {
+    if (isLoading) return
 
+    setIsLoading(true)
     try {
-      console.log("Starting Kakao login...")
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "kakao",
+      console.log(`🔐 Starting ${provider} login`)
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       })
 
       if (error) {
-        console.error("Kakao login error:", error)
-        throw error
+        console.error(`❌ ${provider} login error:`, error)
+        toast.error(`${provider === "google" ? "구글" : "카카오"} 로그인에 실패했습니다.`)
       }
-
-      console.log("Kakao login initiated, waiting for redirect...")
-      // The redirect will be handled by Supabase
-    } catch (err) {
-      console.error("카카오 로그인 오류:", err)
-      setError(err instanceof Error ? err.message : "카카오 로그인 중 오류가 발생했습니다.")
-      setIsKakaoLoading(false)
+    } catch (error) {
+      console.error(`❌ ${provider} login error:`, error)
+      toast.error("로그인 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // Handle Google login
-  const handleGoogleLogin = async () => {
-    setIsGoogleLoading(true)
-    setError("")
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isLoading || !email || !password) return
 
+    setIsLoading(true)
     try {
-      console.log("Starting Google login...")
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
+      console.log(`🔐 Starting email ${isSignUp ? "signup" : "login"}`)
 
-      if (error) {
-        console.error("Google login error:", error)
-        throw error
+      let result
+      if (isSignUp) {
+        result = await supabase.auth.signUp({
+          email,
+          password,
+        })
+      } else {
+        result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
       }
 
-      console.log("Google login initiated, waiting for redirect...")
-      // The redirect will be handled by Supabase
-    } catch (err) {
-      console.error("구글 로그인 오류:", err)
-      setError(err instanceof Error ? err.message : "구글 로그인 중 오류가 발생했습니다.")
-      setIsGoogleLoading(false)
+      if (result.error) {
+        console.error(`❌ Email ${isSignUp ? "signup" : "login"} error:`, result.error)
+        toast.error(result.error.message)
+      } else if (isSignUp && !result.data.user?.email_confirmed_at) {
+        toast.success("회원가입이 완료되었습니다. 이메일을 확인해주세요.")
+        setShowEmailForm(false)
+      } else {
+        console.log(`✅ Email ${isSignUp ? "signup" : "login"} successful`)
+        toast.success(`${isSignUp ? "회원가입" : "로그인"}이 완료되었습니다.`)
+      }
+    } catch (error) {
+      console.error(`❌ Email ${isSignUp ? "signup" : "login"} error:`, error)
+      toast.error("인증 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // Handle Email login - redirect to login page
-  const handleEmailLogin = () => {
-    onClose()
+  const handleEmailButtonClick = () => {
     router.push("/login?mode=email")
   }
 
+  const resetForm = () => {
+    setEmail("")
+    setPassword("")
+    setIsSignUp(false)
+    setShowEmailForm(false)
+  }
+
+  const handleClose = () => {
+    resetForm()
+    onClose()
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-white rounded-3xl border-0 shadow-2xl">
-        <DialogHeader className="text-center space-y-4 pt-6 pb-2">
-          <DialogTitle className="text-2xl font-bold text-gray-900 leading-tight">
-            {title}
-            <br />
-            {description}
-          </DialogTitle>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 pb-8">
-          {/* Error message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
+        <div className="space-y-4">
+          {!showEmailForm ? (
+            <>
+              {/* 소셜 로그인 버튼들 */}
+              <div className="space-y-3">
+                <Button
+                  onClick={() => handleSocialLogin("kakao")}
+                  disabled={isLoading}
+                  className="w-full bg-yellow-400 hover:bg-yellow-500 text-black"
+                >
+                  {isLoading ? "로그인 중..." : "카카오로 로그인"}
+                </Button>
+
+                <Button
+                  onClick={() => handleSocialLogin("google")}
+                  disabled={isLoading}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {isLoading ? "로그인 중..." : "구글로 로그인"}
+                </Button>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">또는</span>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleEmailButtonClick}
+                variant="outline"
+                className="w-full bg-transparent"
+                disabled={isLoading}
+              >
+                이메일로 로그인
+              </Button>
+            </>
+          ) : (
+            <>
+              {/* 이메일 로그인 폼 */}
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">이메일</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="이메일을 입력하세요"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">비밀번호</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="비밀번호를 입력하세요"
+                    required
+                  />
+                </div>
+
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "처리 중..." : isSignUp ? "회원가입" : "로그인"}
+                </Button>
+              </form>
+
+              <div className="text-center">
+                <Button variant="link" onClick={() => setIsSignUp(!isSignUp)} disabled={isLoading}>
+                  {isSignUp ? "이미 계정이 있으신가요? 로그인" : "계정이 없으신가요? 회원가입"}
+                </Button>
+              </div>
+
+              <Button variant="outline" onClick={() => setShowEmailForm(false)} className="w-full" disabled={isLoading}>
+                소셜 로그인으로 돌아가기
+              </Button>
+            </>
           )}
-
-          {/* SNS LOGIN Section */}
-          <div className="text-center mb-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500 font-medium">SNS LOGIN</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Social Login Buttons */}
-          <div className="flex justify-center items-center space-x-6">
-            {/* Kakao Login */}
-            <button
-              onClick={handleKakaoLogin}
-              disabled={isKakaoLoading || isGoogleLoading}
-              className="w-16 h-16 rounded-full bg-[#FEE500] flex items-center justify-center hover:bg-[#E6CF00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-              {isKakaoLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin text-black" />
-              ) : (
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M12 3C6.48 3 2 6.48 2 10.8C2 13.8 3.92 16.44 6.76 17.88L5.6 21.48C5.52 21.72 5.76 21.96 6 21.84L10.32 19.2C10.88 19.28 11.44 19.32 12 19.32C17.52 19.32 22 15.84 22 10.8C22 6.48 17.52 3 12 3Z"
-                    fill="black"
-                  />
-                </svg>
-              )}
-            </button>
-
-            {/* Google Login */}
-            <button
-              onClick={handleGoogleLogin}
-              disabled={isKakaoLoading || isGoogleLoading}
-              className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-              {isGoogleLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
-              ) : (
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    fill="#4285F4"
-                  />
-                  <path
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    fill="#34A853"
-                  />
-                  <path
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    fill="#FBBC05"
-                  />
-                  <path
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    fill="#EA4335"
-                  />
-                </svg>
-              )}
-            </button>
-
-            {/* Email Login */}
-            <button
-              onClick={handleEmailLogin}
-              disabled={isKakaoLoading || isGoogleLoading}
-              className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-              <Mail className="w-7 h-7 text-white" />
-            </button>
-          </div>
-
-          {/* Login method labels */}
-          <div className="flex justify-center items-center space-x-6 mt-3">
-            <span className="w-16 text-xs text-gray-500 text-center">카카오</span>
-            <span className="w-16 text-xs text-gray-500 text-center">구글</span>
-            <span className="w-16 text-xs text-gray-500 text-center">이메일</span>
-          </div>
         </div>
       </DialogContent>
     </Dialog>
