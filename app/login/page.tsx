@@ -28,6 +28,14 @@ export default function LoginPage() {
   // Use our singleton Supabase instance
   const supabase = getSupabase()
 
+  // Check for mode parameter to show email form directly
+  useEffect(() => {
+    const mode = searchParams.get("mode")
+    if (mode === "email") {
+      setShowEmailForm(true)
+    }
+  }, [searchParams])
+
   // Check for error params
   useEffect(() => {
     const errorParam = searchParams.get("error")
