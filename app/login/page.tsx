@@ -2,89 +2,75 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { SajuLogo } from "@/components/saju-logo"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Loader2, ArrowLeft } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 import { getSupabase } from "@/lib/supabase-client"
+import Link from "next/link"
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const mode = searchParams.get("mode")
+
   const [isLoading, setIsLoading] = useState(false)
+  const [isKakaoLoading, setIsKakaoLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [showEmailForm, setShowEmailForm] = useState(mode === "email")
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  })
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showEmailForm, setShowEmailForm] = useState(false)
-  const [isResetMode, setIsResetMode] = useState(false)
-  // Use our singleton Supabase instance
   const supabase = getSupabase()
 
-  // Check for mode parameter to show email form directly
+  // Auto-show email form if mode=email in URL
   useEffect(() => {
-    const mode = searchParams.get("mode")
     if (mode === "email") {
       setShowEmailForm(true)
     }
-  }, [searchParams])
+  }, [mode])
 
-  // Check for error params
-  useEffect(() => {
-    const errorParam = searchParams.get("error")
-    if (errorParam) {
-      switch (errorParam) {
-        case "callback_error":
-          setError("로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.")
-          break
-        case "no_user":
-          setError("사용자 정보를 찾을 수 없습니다. 다시 시도해주세요.")
-          break
-        case "no_code":
-          setError("인증 코드가 없습니다. 다시 시도해주세요.")
-          break
-        default:
-          setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.")
+  // Handle email login
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (error) {
+        throw error
       }
-    }
-  }, [searchParams])
 
-  // Check if user is already logged in
-  useEffect(() => {
-    const checkUser = async () => {
-      try {
-        console.log("Checking if user is already logged in...")
-        const { data, error } = await supabase.auth.getSession()
-
-        if (error) {
-          console.error("Error checking session:", error)
-          return
-        }
-
-        if (data.session) {
-          console.log("User already logged in, redirecting...")
-          router.push("/mypage")
-        } else {
-          console.log("No active session found")
-        }
-      } catch (err) {
-        console.error("Error checking user:", err)
+      if (data.user) {
+        toast({
+          title: "로그인 성공",
+          description: "환영합니다!",
+        })
+        router.push("/mypage")
       }
+    } catch (err: any) {
+      console.error("이메일 로그인 오류:", err)
+      setError(err.message || "로그인 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
     }
-
-    checkUser()
-  }, [router, supabase.auth])
+  }
 
   // Handle Kakao login
   const handleKakaoLogin = async () => {
-    setIsLoading(true)
+    setIsKakaoLoading(true)
     setError("")
 
     try {
@@ -102,11 +88,10 @@ export default function LoginPage() {
       }
 
       console.log("Kakao login initiated, waiting for redirect...")
-      // The redirect will be handled by Supabase
     } catch (err) {
       console.error("카카오 로그인 오류:", err)
       setError(err instanceof Error ? err.message : "카카오 로그인 중 오류가 발생했습니다.")
-      setIsLoading(false)
+      setIsKakaoLoading(false)
     }
   }
 
@@ -130,7 +115,6 @@ export default function LoginPage() {
       }
 
       console.log("Google login initiated, waiting for redirect...")
-      // The redirect will be handled by Supabase
     } catch (err) {
       console.error("구글 로그인 오류:", err)
       setError(err instanceof Error ? err.message : "구글 로그인 중 오류가 발생했습니다.")
@@ -138,317 +122,157 @@ export default function LoginPage() {
     }
   }
 
-  // Handle Email login
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
-
-    if (!email) {
-      setError("이메일을 입력해주세요.")
-      setIsLoading(false)
-      return
-    }
-
-    if (!password) {
-      setError("비밀번호를 입력해주세요.")
-      setIsLoading(false)
-      return
-    }
-
-    try {
-      console.log("Starting email login...")
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        console.error("Email login error:", error)
-        throw error
-      }
-
-      console.log("Email login successful:", data.user?.id)
-      // Store user info in localStorage for compatibility with existing code
-      if (data.user) {
-        localStorage.setItem("user_authenticated", "true")
-        localStorage.setItem("user_id", data.user.id)
-        localStorage.setItem("user_email", data.user.email || "")
-        // Extract name from metadata if available
-        const userName = data.user.user_metadata?.name || data.user.email?.split("@")[0] || "User"
-        localStorage.setItem("user_name", userName)
-      }
-
-      router.push("/mypage")
-    } catch (err) {
-      console.error("이메일 로그인 오류:", err)
-      setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다. 이메일과 비밀번호를 확인해주세요.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Handle password reset request
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
-    setSuccess("")
-
-    if (!email) {
-      setError("이메일을 입력해주세요.")
-      setIsLoading(false)
-      return
-    }
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
-
-      if (error) throw error
-
-      setSuccess("비밀번호 재설정 링크가 이메일로 전송되었습니다. 이메일을 확인해주세요.")
-    } catch (err) {
-      console.error("비밀번호 재설정 오류:", err)
-      setError(err instanceof Error ? err.message : "비밀번호 재설정 요청 중 오류가 발생했습니다.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      {/* 컨텐츠 */}
-      <div className="flex flex-col items-center justify-center flex-1 p-4 md:p-8">
-        <div className="w-full max-w-md mx-auto">
-          {/* 로고 */}
-          <div className="flex justify-center items-center mb-8">
-            <SajuLogo size="lg" showText={false} />
-          </div>
-
-          {/* 에러 메시지 */}
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* 성공 메시지 */}
-          {success && (
-            <Alert className="mb-6 bg-green-50 border-green-200">
-              <AlertDescription className="text-green-800">{success}</AlertDescription>
-            </Alert>
-          )}
-
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              {!showEmailForm ? (
-                <>
-                  {/* 카카오 로그인 버튼 */}
-                  <Button
-                    className="w-full py-5 bg-[#FEE500] text-black hover:bg-[#E6CF00] flex items-center justify-center"
-                    onClick={handleKakaoLogin}
-                    disabled={isLoading || isGoogleLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="mr-2"
-                      >
-                        <path
-                          d="M12 3C6.48 3 2 6.48 2 10.8C2 13.8 3.92 16.44 6.76 17.88L5.6 21.48C5.52 21.72 5.76 21.96 6 21.84L10.32 19.2C10.88 19.28 11.44 19.32 12 19.32C17.52 19.32 22 15.84 22 10.8C22 6.48 17.52 3 12 3Z"
-                          fill="black"
-                        />
-                      </svg>
-                    )}
-                    카카오톡으로 로그인
-                  </Button>
-
-                  {/* 구글 로그인 버튼 */}
-                  <Button
-                    className="w-full py-5 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 flex items-center justify-center"
-                    onClick={handleGoogleLogin}
-                    disabled={isLoading || isGoogleLoading}
-                  >
-                    {isGoogleLoading ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="mr-2"
-                      >
-                        <path
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          fill="#4285F4"
-                        />
-                        <path
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          fill="#34A853"
-                        />
-                        <path
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          fill="#FBBC05"
-                        />
-                        <path
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          fill="#EA4335"
-                        />
-                      </svg>
-                    )}
-                    Google로 로그인
-                  </Button>
-
-                  {/* 구분선과 "또는" 텍스트 */}
-                  <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center">
-                      <Separator className="w-full" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">또는</span>
-                    </div>
-                  </div>
-
-                  {/* 이메일 로그인 버튼 */}
-                  <Button
-                    variant="outline"
-                    className="w-full py-5 bg-transparent"
-                    onClick={() => setShowEmailForm(true)}
-                    disabled={isLoading || isGoogleLoading}
-                  >
-                    이메일로 로그인
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {isResetMode ? (
-                    // 비밀번호 재설정 폼
-                    <form onSubmit={handlePasswordReset} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reset-email">이메일</Label>
-                        <Input
-                          id="reset-email"
-                          type="email"
-                          placeholder="example@example.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="py-5"
-                        />
-                      </div>
-
-                      <div className="flex flex-col space-y-2">
-                        <Button type="submit" className="w-full py-5" disabled={isLoading}>
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              처리 중...
-                            </>
-                          ) : (
-                            "비밀번호 재설정 링크 받기"
-                          )}
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="text-sm text-muted-foreground"
-                          onClick={() => {
-                            setIsResetMode(false)
-                            setSuccess("")
-                          }}
-                        >
-                          로그인으로 돌아가기
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    // 이메일 로그인 폼
-                    <form onSubmit={handleEmailLogin} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">이메일</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="example@example.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="py-5"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="password">비밀번호</Label>
-                          <Button
-                            variant="link"
-                            className="p-0 h-auto text-sm"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              setIsResetMode(true)
-                            }}
-                          >
-                            비밀번호 찾기
-                          </Button>
-                        </div>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="비밀번호"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="py-5"
-                        />
-                      </div>
-
-                      <div className="flex flex-col space-y-2">
-                        <Button type="submit" className="w-full py-5" disabled={isLoading}>
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              로그인 중...
-                            </>
-                          ) : (
-                            "로그인"
-                          )}
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="text-sm text-muted-foreground"
-                          onClick={() => setShowEmailForm(false)}
-                        >
-                          다른 방법으로 로그인
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 회원가입 링크 */}
-          <div className="mt-8 text-center">
-            <p className="text-center text-sm text-muted-foreground">
-              계정이 없으신가요?{" "}
-              <Button variant="link" className="p-0 h-auto font-normal" onClick={() => router.push("/register")}>
-                회원가입
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <div className="flex items-center gap-2">
+            {showEmailForm && (
+              <Button variant="ghost" size="icon" onClick={() => setShowEmailForm(false)} className="h-8 w-8">
+                <ArrowLeft className="h-4 w-4" />
               </Button>
-            </p>
+            )}
+            <div>
+              <CardTitle className="text-2xl font-bold">{showEmailForm ? "이메일 로그인" : "로그인"}</CardTitle>
+              <CardDescription>
+                {showEmailForm ? "이메일과 비밀번호를 입력해주세요" : "계정에 로그인하여 사주핑을 이용해보세요"}
+              </CardDescription>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          {showEmailForm ? (
+            // Email Login Form
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">이메일</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">비밀번호</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="비밀번호를 입력하세요"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    로그인 중...
+                  </>
+                ) : (
+                  "로그인"
+                )}
+              </Button>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  계정이 없으신가요?{" "}
+                  <Link href="/register" className="text-primary hover:underline">
+                    회원가입
+                  </Link>
+                </p>
+              </div>
+            </form>
+          ) : (
+            // Social Login Options
+            <div className="space-y-4">
+              <Button
+                onClick={handleKakaoLogin}
+                disabled={isKakaoLoading || isGoogleLoading}
+                className="w-full bg-[#FEE500] hover:bg-[#E6CF00] text-black"
+              >
+                {isKakaoLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 3C6.48 3 2 6.48 2 10.8C2 13.8 3.92 16.44 6.76 17.88L5.6 21.48C5.52 21.72 5.76 21.96 6 21.84L10.32 19.2C10.88 19.28 11.44 19.32 12 19.32C17.52 19.32 22 15.84 22 10.8C22 6.48 17.52 3 12 3Z" />
+                  </svg>
+                )}
+                카카오로 로그인
+              </Button>
+
+              <Button
+                onClick={handleGoogleLogin}
+                disabled={isKakaoLoading || isGoogleLoading}
+                variant="outline"
+                className="w-full bg-transparent"
+              >
+                {isGoogleLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
+                  </svg>
+                )}
+                구글로 로그인
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">또는</span>
+                </div>
+              </div>
+
+              <Button onClick={() => setShowEmailForm(true)} variant="outline" className="w-full">
+                이메일로 로그인
+              </Button>
+
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  계정이 없으신가요?{" "}
+                  <Link href="/register" className="text-primary hover:underline">
+                    회원가입
+                  </Link>
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

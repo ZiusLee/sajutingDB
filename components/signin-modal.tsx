@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, Mail } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -11,6 +11,7 @@ interface SignInModalProps {
   onClose: () => void
   title?: string
   description?: string
+  onAuthSuccess?: () => void
 }
 
 export function SignInModal({
@@ -18,12 +19,42 @@ export function SignInModal({
   onClose,
   title = "지금 계정을 연동하고",
   description = "3초만에 사주 분석을 받아보세요.",
+  onAuthSuccess,
 }: SignInModalProps) {
   const router = useRouter()
   const [isKakaoLoading, setIsKakaoLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState("")
   const supabase = getSupabase()
+
+  // Listen for auth state changes
+  useEffect(() => {
+    if (!isOpen) return
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state change in SignInModal:", event, session?.user?.id)
+
+      if (event === "SIGNED_IN" && session?.user) {
+        console.log("User signed in successfully:", session.user.id)
+
+        // Call the success callback if provided
+        if (onAuthSuccess) {
+          await onAuthSuccess()
+        }
+
+        // Reset loading states
+        setIsKakaoLoading(false)
+        setIsGoogleLoading(false)
+        setError("")
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [isOpen, onAuthSuccess, supabase.auth])
 
   // Handle Kakao login
   const handleKakaoLogin = async () => {
@@ -35,7 +66,7 @@ export function SignInModal({
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       })
 
@@ -63,7 +94,7 @@ export function SignInModal({
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       })
 
