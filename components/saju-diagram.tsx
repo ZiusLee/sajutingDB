@@ -293,7 +293,9 @@ export default function SajuDiagram({
             <div className="flex justify-start gap-2">
               <span>생시</span>
               <span>
-                오전 {hour}시 {minute}분, {location || "서울특별시"}
+                {hour && minute !== undefined
+                  ? `${Number(hour) < 12 ? "오전" : "오후"} ${Number(hour) === 0 ? 12 : Number(hour) > 12 ? Number(hour) - 12 : Number(hour)}시 ${String(minute).padStart(2, "0")}분, ${location || "서울특별시"}`
+                  : `시간 미상, ${location || "서울특별시"}`}
               </span>
             </div>
             <div className="flex justify-start gap-2">
@@ -451,7 +453,9 @@ export default function SajuDiagram({
         <div className="flex items-center gap-2">
           <span className="font-medium">생시</span>
           <span>
-            오전 {hour}시 {minute}분, {location || "서울특별시"}
+            {hour && minute !== undefined
+              ? `${Number(hour) < 12 ? "오전" : "오후"} ${Number(hour) === 0 ? 12 : Number(hour) > 12 ? Number(hour) - 12 : Number(hour)}시 ${String(minute).padStart(2, "0")}분, ${location || "서울특별시"}`
+              : `시간 미상, ${location || "서울특별시"}`}
           </span>
         </div>
         <div className="flex items-center gap-2">
