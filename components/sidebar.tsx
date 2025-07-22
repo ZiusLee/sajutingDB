@@ -162,7 +162,22 @@ export default function Sidebar({
             </CollapsibleTrigger>
 
             <CollapsibleContent className="space-y-4 mt-4">
-              <SajuDiagram saju={saju} name={name} gender={gender} variant="sidebar" {...birthInfo} />
+              <SajuDiagram
+                saju={saju}
+                name={name}
+                gender={gender}
+                variant="sidebar"
+                solarYear={birthInfo?.solarYear}
+                solarMonth={birthInfo?.solarMonth}
+                solarDay={birthInfo?.solarDay}
+                hour={birthInfo?.solarHour}
+                minute={birthInfo?.solarMinute}
+                lunarYear={birthInfo?.lunarYear}
+                lunarMonth={birthInfo?.lunarMonth}
+                lunarDay={birthInfo?.lunarDay}
+                timeUnknown={birthInfo?.timeUnknown}
+                location="서울특별시"
+              />
             </CollapsibleContent>
           </div>
         </Collapsible>
