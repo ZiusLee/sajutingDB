@@ -67,7 +67,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
       "오늘의 타로 카드 뽑아줘",
       "연애운 타로 봐줘",
       "직업운 타로 리딩해줘",
-      "오��� 주의할 점은?",
+      "오늘 주의할 점은?",
       "이번 주 운세는?",
       "중요한 결정을 앞두고 있어요",
     ],
@@ -596,7 +596,7 @@ export default function SajuChat({
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
-                  className="h-12 rounded-full pl-4 pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-sm"
+                  className="h-12 rounded-full pl-4 pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
                   disabled={isLoading}
                 />
                 <Popover>
