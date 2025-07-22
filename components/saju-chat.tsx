@@ -469,9 +469,9 @@ export default function SajuChat({
         />
       </div>
 
-      {/* Mobile Sidebar Sheet */}
+      {/* Mobile Sidebar Sheet - 2/3 width */}
       <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-96 p-0">
+        <SheetContent side="left" className="w-[66.67vw] max-w-sm p-0">
           <Sidebar
             saju={stableSaju}
             name={name}
@@ -488,13 +488,20 @@ export default function SajuChat({
       </Sheet>
 
       {/* Main Chat Area - Flexible width */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Chat Messages Container - Reduced padding */}
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-          <div className="px-4 py-6 space-y-8 pb-40">
+      <div className="flex-1 flex flex-col min-w-0 h-screen">
+        {/* Chat Messages Container - Mobile optimized */}
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto"
+          style={{
+            height: "calc(100vh - 140px)", // Reserve space for input area
+            minHeight: 0,
+          }}
+        >
+          <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {/* Show temporary room indicator */}
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
-              <div className="text-center text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
@@ -502,12 +509,12 @@ export default function SajuChat({
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "assistant" ? (
-                  <div className="space-y-4">
-                    <div className="text-foreground text-lg leading-relaxed prose prose-lg max-w-none break-words [&>p]:mb-4 [&>h1]:text-xl [&>h2]:text-lg [&>h3]:text-lg [&>ul]:mb-4 [&>li]:mb-2 [&>ul]:pl-4 [&>li]:text-lg">
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="text-foreground text-base sm:text-lg leading-relaxed prose prose-sm sm:prose-lg max-w-none break-words [&>p]:mb-3 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base sm:[&>h3]:text-lg [&>ul]:mb-3 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2 [&>ul]:pl-3 sm:[&>ul]:pl-4 [&>li]:text-base sm:[&>li]:text-lg">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                     </div>
                     {index === 0 && (
-                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
                         <SajuDiagram
                           saju={stableSaju}
                           name={name}
@@ -543,7 +550,7 @@ export default function SajuChat({
                   </div>
                 ) : (
                   <div className="flex justify-end">
-                    <div className="bg-gray-900 text-white px-4 py-2 rounded-2xl rounded-br-md max-w-md text-base leading-relaxed">
+                    <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base leading-relaxed">
                       {message.content}
                     </div>
                   </div>
@@ -560,14 +567,14 @@ export default function SajuChat({
           </div>
         </div>
 
-        {/* Input Area - Fixed at bottom with reduced padding */}
-        <div className="border-t bg-white p-4">
+        {/* Input Area - Fixed at bottom with mobile optimization */}
+        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
               variant="outline"
               size="sm"
-              className="absolute right-6 bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
+              className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
@@ -581,7 +588,7 @@ export default function SajuChat({
                     key={i}
                     variant="outline"
                     size="sm"
-                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-sm px-4 py-2 min-w-fit"
+                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 min-w-fit"
                     onClick={() => handleSuggestedQuestionClick(q)}
                   >
                     {q}
@@ -596,7 +603,7 @@ export default function SajuChat({
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
-                  className="h-12 rounded-full pl-4 pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
+                  className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
                   disabled={isLoading}
                 />
                 <Popover>
@@ -605,17 +612,17 @@ export default function SajuChat({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-10 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full"
+                      className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
                     >
-                      <MoreHorizontal className="h-4 w-4" />
+                      <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-56 p-2 mb-2" align="end">
-                    <Button variant="ghost" className="w-full justify-start text-sm">
-                      <span className="mr-3 text-base">💕</span>궁합 보기
+                  <PopoverContent className="w-48 sm:w-56 p-2 mb-2" align="end">
+                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
+                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">💕</span>궁합 보기
                     </Button>
-                    <Button variant="ghost" className="w-full justify-start text-sm">
-                      <span className="mr-3 text-base">👥</span>다른 사람 사주 봐주기
+                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
+                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">👥</span>다른 사람 사주 봐주기
                     </Button>
                   </PopoverContent>
                 </Popover>
@@ -623,10 +630,10 @@ export default function SajuChat({
               <Button
                 type="submit"
                 size="icon"
-                className="h-12 w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
                 disabled={!input.trim() || isLoading}
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </form>
           </div>
