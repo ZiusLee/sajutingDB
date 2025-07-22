@@ -83,7 +83,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 const getInitialMessage = (name: string, roomType: string): string => {
   const userName = name || "사용자"
   if (roomType === "sajuping") {
-    return `안녕하세요, ${userName}님! 저는 사주핑이에요. ${userName}님의 사주를 바탕으로 인생의 모든 영역에 대해 ��담해드릴게요. 나에 사주에 대한 설명, 나의 오행 특징, 사주적 성향, 올해의 연애운, 재물운등 나의 사주에 대해 채팅창에 물어보세요`
+    return `안녕하세요, ${userName}님! 저는 사주핑이에요. ${userName}님의 사주를 바탕으로 인생의 모든 영역에 대해 상담해드릴게요. 나에 사주에 대한 설명, 나의 오행 특징, 사주적 성향, 올해의 연애운, 재물운등 나의 사주에 대해 채팅창에 물어보세요`
   }
   return `안녕하세요, ${userName}님! 무엇을 도와드릴까요?`
 }
