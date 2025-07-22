@@ -45,7 +45,7 @@ export default function MemoryDashboardPage() {
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+          <Button variant="ghost" onClick={() => router.push("/mypage")} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             뒤로가기
           </Button>
