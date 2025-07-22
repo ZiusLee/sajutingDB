@@ -161,6 +161,8 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
   const navigateToChat = async (sajuResult: any, daeunData: any) => {
     try {
+      const parsedTime = birthInfo.timeUnknown ? { hour: 12, minute: 0 } : parseTime(birthInfo.birthTime)
+
       const chatSajuData = {
         saju: sajuResult,
         name: birthInfo.name,
@@ -175,8 +177,8 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
           solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
           solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-          solarHour: birthInfo.timeUnknown ? 12 : parseTime(birthInfo.birthTime).hour,
-          solarMinute: birthInfo.timeUnknown ? 0 : parseTime(birthInfo.birthTime).minute,
+          solarHour: parsedTime.hour,
+          solarMinute: parsedTime.minute,
           lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
           lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
           lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
@@ -313,13 +315,13 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           birthCityId: birthInfo.birthPlaceId,
           daeun: daeunData,
           concerns: birthInfo.concerns,
-          sessionId: userId, // Add the real session ID here
+          sessionId: userId,
           birthInfo: {
             solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
             solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
             solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-            solarHour: birthInfo.timeUnknown ? 12 : parseTime(birthInfo.birthTime).hour,
-            solarMinute: birthInfo.timeUnknown ? 0 : parseTime(birthInfo.birthTime).minute,
+            solarHour: hour,
+            solarMinute: minute,
             lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
             lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
             lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
@@ -367,9 +369,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       case 1:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
-            <h1 className="text-3xl font-bold text-foreground mb-8">
-              <span className="text-[#2563eb]">이름</span>을 알려주세요.
-            </h1>
+            <h1 className="text-3xl font-bold text-foreground mb-8">이름을 알려주세요.</h1>
             <Input
               value={birthInfo.name}
               onChange={(e) => setBirthInfo({ ...birthInfo, name: e.target.value })}
@@ -391,9 +391,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       case 2:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
-            <h1 className="text-3xl font-bold text-foreground mb-8">
-              <span className="text-[#2563eb]">성별</span>을 알려주세요.
-            </h1>
+            <h1 className="text-3xl font-bold text-foreground mb-8">성별을 알려주세요.</h1>
             <div className="flex gap-4 w-full">
               <Button
                 onClick={() => setBirthInfo({ ...birthInfo, gender: "male" })}
@@ -424,9 +422,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       case 3:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
-            <h1 className="text-3xl font-bold text-foreground mb-8">
-              <span className="text-[#2563eb]">태어난 도시</span>를 알려주세요.
-            </h1>
+            <h1 className="text-3xl font-bold text-foreground mb-8">태어난 도시를 알려주세요.</h1>
             <div className="w-full relative">
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
@@ -477,39 +473,35 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       case 4:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
-            <h1 className="text-3xl font-bold text-foreground mb-8">
-              <span className="text-[#2563eb]">태어난 일시</span>를 알려주세요.
-            </h1>
-            <div className="flex flex-col gap-4 w-full mb-6">
+            <h1 className="text-3xl font-bold text-foreground mb-8">태어난 일시를 알려주세요.</h1>
+            <div className="flex flex-col sm:flex-row gap-4 w-full">
               <Input
                 value={birthInfo.birthDate}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthDate: e.target.value })}
-                placeholder="생년월일: ex: 19950505"
-                className="h-12 text-left px-4 bg-white border-gray-300 rounded-lg text-gray-600"
+                placeholder="생년월일 (ex: 19950505)"
+                className="h-12 text-center bg-white border-gray-300 rounded-lg"
               />
               <Input
                 value={birthInfo.birthTime}
                 onChange={(e) => setBirthInfo({ ...birthInfo, birthTime: e.target.value })}
-                placeholder="태어난 시간: ex: 0930"
+                placeholder="태어난 시간 (ex: 0930)"
                 disabled={birthInfo.timeUnknown}
                 className={cn(
-                  "h-12 text-left px-4 bg-white border-gray-300 rounded-lg text-gray-600",
-                  birthInfo.timeUnknown && "opacity-50 bg-gray-100",
+                  "h-12 text-center bg-white border-gray-300 rounded-lg",
+                  birthInfo.timeUnknown && "opacity-50 cursor-not-allowed",
                 )}
               />
             </div>
-            <div className="flex items-center gap-3 mb-8 self-center">
-              <Checkbox
-                id="timeUnknown"
-                checked={birthInfo.timeUnknown}
-                onCheckedChange={(checked) => handleTimeUnknownToggle(checked as boolean)}
-                className="w-5 h-5"
-              />
-              <label htmlFor="timeUnknown" className="text-gray-600 text-base cursor-pointer">
+            <div className="flex items-center space-x-2 mt-6">
+              <Checkbox id="timeUnknown" checked={birthInfo.timeUnknown} onCheckedChange={handleTimeUnknownToggle} />
+              <label
+                htmlFor="timeUnknown"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground cursor-pointer"
+              >
                 태어난 시간 모름
               </label>
             </div>
-            <div className="w-full max-w-xs">
+            <div className="w-full max-w-xs mt-8">
               <Button
                 onClick={handleNext}
                 disabled={!canProceed()}
@@ -523,9 +515,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       case 5:
         return (
           <div className="w-full max-w-sm flex flex-col items-center">
-            <h1 className="text-3xl font-bold text-foreground mb-4">
-              마지막으로, <span className="text-[#2563eb]">최근 가장 큰 고민</span>을 알려주세요.
-            </h1>
+            <h1 className="text-3xl font-bold text-foreground mb-4">마지막으로, 최근 가장 큰 고민을 알려주세요.</h1>
             <p className="text-muted-foreground text-sm mb-8">최대 3개까지 고를 수 있어요.</p>
             <div className="flex flex-wrap justify-center gap-3 mb-8">
               {concernOptions.map((c) => (
@@ -565,7 +555,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         <SajuLogo size="md" />
         <div className="flex items-center gap-4">
           <Button
-            className="bg-[#3c425c] text-white hover:bg-[#292e45] rounded-lg px-4 py-2 text-sm font-medium"
+            className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 py-2 text-sm font-medium"
             onClick={() => router.push("/login")}
           >
             로그인
@@ -583,7 +573,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
               key={step}
               className={cn(
                 "w-2 h-2 rounded-full mx-1 transition-colors",
-                step === currentStep ? "bg-[#3c425c]" : step < currentStep ? "bg-[#64758b]" : "bg-[#dce5ea]",
+                step === currentStep ? "bg-gray-800" : step < currentStep ? "bg-gray-600" : "bg-gray-300",
               )}
             />
           ))}

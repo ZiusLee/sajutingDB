@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { User, LogOut, Bell, Shield, HelpCircle, ChevronRight, LogIn } from "lucide-react"
+import { User, LogOut, Bell, Shield, HelpCircle, ChevronRight, LogIn, Brain } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -38,6 +38,11 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const handleMyPage = () => {
     setOpen(false)
     router.push("/mypage")
+  }
+
+  const handleMemoryBank = () => {
+    setOpen(false)
+    router.push("/memory-dashboard")
   }
 
   if (!isAuthenticated) {
@@ -74,11 +79,19 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
             </Button>
           </div>
 
-          {/* Settings Options */}
+          {/* Account Section */}
           <div className="space-y-1">
+            <p className="text-sm font-medium text-gray-500 px-4 mb-2">계정</p>
+
             <Button variant="ghost" className="w-full justify-start h-12 px-4" onClick={handleMyPage}>
               <User className="h-5 w-5 mr-3" />
               <span className="flex-1 text-left">내 정보</span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+
+            <Button variant="ghost" className="w-full justify-start h-12 px-4" onClick={handleMemoryBank}>
+              <Brain className="h-5 w-5 mr-3" />
+              <span className="flex-1 text-left">메모리뱅크</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
 
@@ -87,16 +100,23 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
               <span className="flex-1 text-left">알림 설정</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
+          </div>
+
+          <Separator />
+
+          {/* Information Section */}
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-gray-500 px-4 mb-2">정보</p>
 
             <Button variant="ghost" className="w-full justify-start h-12 px-4" disabled>
-              <Shield className="h-5 w-5 mr-3" />
-              <span className="flex-1 text-left">개인정보 보호</span>
+              <HelpCircle className="h-5 w-5 mr-3" />
+              <span className="flex-1 text-left">도움말 센터</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
 
             <Button variant="ghost" className="w-full justify-start h-12 px-4" disabled>
-              <HelpCircle className="h-5 w-5 mr-3" />
-              <span className="flex-1 text-left">도움말</span>
+              <Shield className="h-5 w-5 mr-3" />
+              <span className="flex-1 text-left">개인정보 보호 정책</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

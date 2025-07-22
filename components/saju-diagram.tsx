@@ -12,14 +12,14 @@ interface SajuDiagramProps {
   size?: "sm" | "md" | "lg"
   name?: string
   gender?: string
-  solarYear?: string
-  solarMonth?: string
-  solarDay?: string
-  hour?: string
-  minute?: string
-  lunarYear?: string
-  lunarMonth?: string
-  lunarDay?: string
+  solarYear?: string | number
+  solarMonth?: string | number
+  solarDay?: string | number
+  hour?: string | number
+  minute?: string | number
+  lunarYear?: string | number
+  lunarMonth?: string | number
+  lunarDay?: string | number
   location?: string
   variant?: "chat" | "sidebar" | "card"
 }
@@ -43,17 +43,6 @@ export default function SajuDiagram({
 }: SajuDiagramProps) {
   const { theme } = useTheme()
   const isDark = theme === "dark"
-
-  // 실제 timeUnknown 값 확인 - saju 객체에서 가져오거나 prop 사용
-  const isTimeUnknown = saju?.timeUnknown ?? timeUnknown
-
-  console.log("SajuDiagram - timeUnknown 값 확인:", {
-    sajuTimeUnknown: saju?.timeUnknown,
-    propTimeUnknown: timeUnknown,
-    finalTimeUnknown: isTimeUnknown,
-    hourStem: saju?.hourStem,
-    hourBranch: saju?.hourBranch,
-  })
 
   // Theme-aware element colors for backgrounds
   const elementColors = {
@@ -144,6 +133,26 @@ export default function SajuDiagram({
     water: "수(水)",
   }
 
+  // Fixed formatTime function to properly handle time display
+  const formatTime = (h: string | number, m: string | number) => {
+    // Handle the case where timeUnknown is true
+    if (timeUnknown) {
+      return "시간 모름"
+    }
+
+    // Convert to numbers and validate
+    const hourNum = typeof h === "string" ? Number.parseInt(h, 10) : h
+    const minuteNum = typeof m === "string" ? Number.parseInt(m, 10) : m
+
+    // Check if we have valid numbers
+    if (isNaN(hourNum) || isNaN(minuteNum)) {
+      return "시간 정보 없음"
+    }
+
+    // Format with leading zeros
+    return `${hourNum.toString().padStart(2, "0")}시 ${minuteNum.toString().padStart(2, "0")}분`
+  }
+
   // 색상 가져오기 함수들
   const getStemColor = (stem: string, isText = false) => {
     if (stem === "?" || !stem) return isText ? elementTextColors.unknown : elementColors.unknown
@@ -196,10 +205,10 @@ export default function SajuDiagram({
           {/* Stems */}
           <div className="grid grid-cols-4 gap-2">
             <div
-              className={`${isTimeUnknown ? elementColors.unknown : getStemColor(saju.hourStem)} text-white rounded-lg p-3 text-center shadow-sm`}
+              className={`${timeUnknown ? elementColors.unknown : getStemColor(saju.hourStem)} text-white rounded-lg p-3 text-center shadow-sm`}
             >
-              <div className="text-xl font-bold">{isTimeUnknown ? "?" : saju.hourStem}</div>
-              <div className="text-xs">{isTimeUnknown ? "" : saju.hourStemHanja}</div>
+              <div className="text-xl font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
+              <div className="text-xs">{timeUnknown ? "" : saju.hourStemHanja}</div>
             </div>
             <div className={`${getStemColor(saju.dayStem)} text-white rounded-lg p-3 text-center shadow-sm`}>
               <div className="text-xl font-bold">{saju.dayStem}</div>
@@ -218,7 +227,7 @@ export default function SajuDiagram({
           {/* Sibseong for stems - increased height */}
           <div className="grid grid-cols-4 gap-2 text-center text-xs text-muted-foreground">
             <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">
-              {isTimeUnknown ? "" : saju.hourStemSibseong}
+              {timeUnknown ? "" : saju.hourStemSibseong}
             </div>
             <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">
               {saju.dayStemSibseong || "본원"}
@@ -230,10 +239,10 @@ export default function SajuDiagram({
           {/* Branches */}
           <div className="grid grid-cols-4 gap-2">
             <div
-              className={`${isTimeUnknown ? elementColors.unknown : getBranchColor(saju.hourBranch)} text-white rounded-lg p-3 text-center shadow-sm`}
+              className={`${timeUnknown ? elementColors.unknown : getBranchColor(saju.hourBranch)} text-white rounded-lg p-3 text-center shadow-sm`}
             >
-              <div className="text-xl font-bold">{isTimeUnknown ? "?" : saju.hourBranch}</div>
-              <div className="text-xs">{isTimeUnknown ? "" : saju.hourBranchHanja}</div>
+              <div className="text-xl font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
+              <div className="text-xs">{timeUnknown ? "" : saju.hourBranchHanja}</div>
             </div>
             <div className={`${getBranchColor(saju.dayBranch)} text-white rounded-lg p-3 text-center shadow-sm`}>
               <div className="text-xl font-bold">{saju.dayBranch}</div>
@@ -252,7 +261,7 @@ export default function SajuDiagram({
           {/* Sibseong for branches - increased height */}
           <div className="grid grid-cols-4 gap-2 text-center text-xs text-muted-foreground">
             <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">
-              {isTimeUnknown ? "" : saju.hourBranchSibseong}
+              {timeUnknown ? "" : saju.hourBranchSibseong}
             </div>
             <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">{saju.dayBranchSibseong}</div>
             <div className="bg-muted rounded p-2 h-8 flex items-center justify-center">{saju.monthBranchSibseong}</div>
@@ -293,7 +302,7 @@ export default function SajuDiagram({
             </div>
           </div>
 
-          {/* Birth Info */}
+          {/* Birth Info - Fixed time display */}
           <div className="space-y-1 text-sm text-muted-foreground">
             <div className="flex justify-start gap-2">
               <span>생일</span>
@@ -304,11 +313,7 @@ export default function SajuDiagram({
             <div className="flex justify-start gap-2">
               <span>생시</span>
               <span>
-                {isTimeUnknown
-                  ? `시간 미상, ${location || "서울특별시"}`
-                  : hour && minute !== undefined
-                    ? `${Number(hour) < 12 ? "오전" : "오후"} ${Number(hour) === 0 ? 12 : Number(hour) > 12 ? Number(hour) - 12 : Number(hour)}시 ${String(minute).padStart(2, "0")}분, ${location || "서울특별시"}`
-                    : `시간 미상, ${location || "서울특별시"}`}
+                {formatTime(hour, minute)}, {location || "서울특별시"}
               </span>
             </div>
             <div className="flex justify-start gap-2">
@@ -337,10 +342,10 @@ export default function SajuDiagram({
           {/* Stems with text colors */}
           <div className="grid grid-cols-4 gap-1">
             <div
-              className={`${isTimeUnknown ? "text-muted-foreground" : getStemColor(saju.hourStem, true)} bg-muted rounded p-2 text-center font-bold border`}
+              className={`${timeUnknown ? "text-muted-foreground" : getStemColor(saju.hourStem, true)} bg-muted rounded p-2 text-center font-bold border`}
             >
-              <div className="text-sm font-bold">{isTimeUnknown ? "?" : saju.hourStem}</div>
-              <div className="text-xs text-muted-foreground">{isTimeUnknown ? "" : saju.hourStemHanja}</div>
+              <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
+              <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourStemHanja}</div>
             </div>
             <div className={`${getStemColor(saju.dayStem, true)} bg-muted rounded p-2 text-center font-bold border`}>
               <div className="text-sm font-bold">{saju.dayStem}</div>
@@ -359,7 +364,7 @@ export default function SajuDiagram({
           {/* Sibseong for stems - increased height */}
           <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
             <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
-              {isTimeUnknown ? "" : saju.hourStemSibseong}
+              {timeUnknown ? "" : saju.hourStemSibseong}
             </div>
             <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.dayStemSibseong || "본원"}
@@ -375,10 +380,10 @@ export default function SajuDiagram({
           {/* Branches with text colors */}
           <div className="grid grid-cols-4 gap-1">
             <div
-              className={`${isTimeUnknown ? "text-muted-foreground" : getBranchColor(saju.hourBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
+              className={`${timeUnknown ? "text-muted-foreground" : getBranchColor(saju.hourBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
             >
-              <div className="text-sm font-bold">{isTimeUnknown ? "?" : saju.hourBranch}</div>
-              <div className="text-xs text-muted-foreground">{isTimeUnknown ? "" : saju.hourBranchHanja}</div>
+              <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
+              <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourBranchHanja}</div>
             </div>
             <div
               className={`${getBranchColor(saju.dayBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
@@ -403,7 +408,7 @@ export default function SajuDiagram({
           {/* Sibseong for branches - increased height */}
           <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
             <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
-              {isTimeUnknown ? "" : saju.hourBranchSibseong}
+              {timeUnknown ? "" : saju.hourBranchSibseong}
             </div>
             <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
               {saju.dayBranchSibseong}
@@ -455,7 +460,7 @@ export default function SajuDiagram({
         </div>
       </div>
 
-      {/* Birth info */}
+      {/* Birth info - Fixed time display */}
       <div className="space-y-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <span className="font-medium">생일</span>
@@ -466,11 +471,7 @@ export default function SajuDiagram({
         <div className="flex items-center gap-2">
           <span className="font-medium">생시</span>
           <span>
-            {isTimeUnknown
-              ? `시간 미상, ${location || "서울특별시"}`
-              : hour && minute !== undefined
-                ? `${Number(hour) < 12 ? "오전" : "오후"} ${Number(hour) === 0 ? 12 : Number(hour) > 12 ? Number(hour) - 12 : Number(hour)}시 ${String(minute).padStart(2, "0")}분, ${location || "서울특별시"}`
-                : `시간 미상, ${location || "서울특별시"}`}
+            {formatTime(hour, minute)}, {location || "서울특별시"}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -495,10 +496,10 @@ export default function SajuDiagram({
 
         {/* Stems with background colors */}
         <div
-          className={`${isTimeUnknown ? elementColors.unknown : getStemColor(saju.hourStem)} text-white rounded-lg p-4 text-center shadow-md`}
+          className={`${timeUnknown ? elementColors.unknown : getStemColor(saju.hourStem)} text-white rounded-lg p-4 text-center shadow-md`}
         >
-          <div className="text-2xl font-bold">{isTimeUnknown ? "?" : saju.hourStem}</div>
-          <div className="text-sm">{isTimeUnknown ? "" : saju.hourStemHanja}</div>
+          <div className="text-2xl font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
+          <div className="text-sm">{timeUnknown ? "" : saju.hourStemHanja}</div>
         </div>
         <div className={`${getStemColor(saju.dayStem)} text-white rounded-lg p-4 text-center shadow-md`}>
           <div className="text-2xl font-bold">{saju.dayStem}</div>
@@ -515,7 +516,7 @@ export default function SajuDiagram({
 
         {/* Sibseong for stems - increased height */}
         <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
-          {isTimeUnknown ? "" : saju.hourStemSibseong}
+          {timeUnknown ? "" : saju.hourStemSibseong}
         </div>
         <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.dayStemSibseong || "본원"}
@@ -529,10 +530,10 @@ export default function SajuDiagram({
 
         {/* Branches with background colors */}
         <div
-          className={`${isTimeUnknown ? elementColors.unknown : getBranchColor(saju.hourBranch)} text-white rounded-lg p-4 text-center shadow-md`}
+          className={`${timeUnknown ? elementColors.unknown : getBranchColor(saju.hourBranch)} text-white rounded-lg p-4 text-center shadow-md`}
         >
-          <div className="text-2xl font-bold">{isTimeUnknown ? "?" : saju.hourBranch}</div>
-          <div className="text-sm">{isTimeUnknown ? "" : saju.hourBranchHanja}</div>
+          <div className="text-2xl font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
+          <div className="text-sm">{timeUnknown ? "" : saju.hourBranchHanja}</div>
         </div>
         <div className={`${getBranchColor(saju.dayBranch)} text-white rounded-lg p-4 text-center shadow-md`}>
           <div className="text-2xl font-bold">{saju.dayBranch}</div>
@@ -549,7 +550,7 @@ export default function SajuDiagram({
 
         {/* Sibseong for branches - increased height */}
         <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
-          {isTimeUnknown ? "" : saju.hourBranchSibseong}
+          {timeUnknown ? "" : saju.hourBranchSibseong}
         </div>
         <div className="text-center text-sm text-muted-foreground bg-muted rounded p-3 h-12 flex items-center justify-center shadow-sm">
           {saju.dayBranchSibseong}
