@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { SajuOnboardingFlow } from "@/components/saju-onboarding-flow"
 import { useRouter } from "next/navigation"
 import ScrollVelocity from "@/components/ScrollVelocity"
+import { useAuth } from "@/contexts/auth-context"
 
 const questionChips = [
   // 기존 질문들
@@ -42,6 +42,7 @@ const questionChips = [
 export default function LandingPageClient() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const router = useRouter()
+  const { isAuthenticated } = useAuth()
 
   const handleStartSaju = () => {
     console.log("사주 프로필 생성하기 버튼 클릭됨")
@@ -82,8 +83,6 @@ export default function LandingPageClient() {
           filter: "grayscale(100%) contrast(200%)",
         }}
       />
-
-  
 
       {/* Main Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
@@ -179,15 +178,17 @@ export default function LandingPageClient() {
             <span className="text-xl">→</span>
           </button>
 
-          <div className="flex items-center justify-center space-x-2 text-sm">
-            <span className="text-gray-500">계정이 없으신가요?</span>
-            <button
-              onClick={handleRegisterClick}
-              className="text-black hover:underline font-medium hover:text-gray-700 transition-colors cursor-pointer z-50"
-            >
-              회원가입
-            </button>
-          </div>
+          {!isAuthenticated && (
+            <div className="flex items-center justify-center space-x-2 text-sm">
+              <span className="text-gray-500">계정이 없으신가요?</span>
+              <button
+                onClick={handleRegisterClick}
+                className="text-black hover:underline font-medium hover:text-gray-700 transition-colors cursor-pointer z-50"
+              >
+                회원가입
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
