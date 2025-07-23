@@ -10,8 +10,8 @@ import { smartMemoryService } from "@/lib/smart-memory-service"
 export const runtime = "edge"
 export const maxDuration = 300 // 5분으로 최대 연장
 
-// 🚀 로그 레벨 설정 - production에서도 메모리 로그 확인 가능
-const LOG_LEVEL = process.env.LOG_LEVEL || (process.env.NODE_ENV === "development" ? "DEBUG" : "INFO")
+// 🚀 로그 레벨 설정 - production에서도 메모리 로그 표시
+const LOG_LEVEL = process.env.LOG_LEVEL || "DEBUG" // 기본값을 DEBUG로 변경
 const shouldLog = (level: string) => {
   if (LOG_LEVEL === "ERROR") return level === "ERROR"
   if (LOG_LEVEL === "INFO") return ["ERROR", "INFO"].includes(level)
@@ -23,6 +23,14 @@ const ENABLE_GPT_PARSING = process.env.ENABLE_GPT_PARSING !== "false" // 기본�
 
 // 🚀 스마트 메모리 설정
 const ENABLE_SMART_MEMORY = process.env.ENABLE_SMART_MEMORY !== "false" // 기본값: true
+
+// 🚀 메모리 디버깅 로그 추가
+console.log("🔧 Environment Settings:", {
+  NODE_ENV: process.env.NODE_ENV,
+  LOG_LEVEL: LOG_LEVEL,
+  ENABLE_SMART_MEMORY: ENABLE_SMART_MEMORY,
+  ENABLE_GPT_PARSING: ENABLE_GPT_PARSING,
+})
 
 // 🚀 로그 최적화: 현재 날짜 정보를 가져오는 함수
 function getCurrentDateInfo() {
@@ -67,7 +75,7 @@ function getCurrentDateInfo() {
     }
   } catch (error) {
     if (shouldLog("ERROR")) {
-      console.error("날짜 계산 실패")
+      console.error("날짜 계산 실패:", error)
     }
     return {
       year,
@@ -176,31 +184,44 @@ async function createSimpleSummary(messages: any[], roomType: string) {
   }
 }
 
-// 🚀 스마트 메모리 통합 함수
+// 🚀 스마트 메모리 통합 함수 - 강화된 로깅
 async function getMemoryContext(userId: string, userMessage: string, roomType: string): Promise<string> {
-  if (!ENABLE_SMART_MEMORY || !userId) {
-    console.log("🧠 Smart memory disabled or no user ID", { ENABLE_SMART_MEMORY, userId: !!userId })
+  // 🔧 항상 로그 출력 (production 디버깅용)
+  console.log("🧠 [MEMORY] Starting getMemoryContext:", {
+    userId: userId || "NO_USER_ID",
+    hasUserId: !!userId,
+    enableSmartMemory: ENABLE_SMART_MEMORY,
+    messageLength: userMessage?.length || 0,
+  })
+
+  if (!ENABLE_SMART_MEMORY) {
+    console.log("🧠 [MEMORY] Smart memory disabled by environment variable")
+    return ""
+  }
+
+  if (!userId) {
+    console.log("🧠 [MEMORY] No user ID provided - cannot fetch memory context")
     return ""
   }
 
   try {
-    console.log("🧠 [INFO] Getting memory context for user:", userId)
+    console.log("🧠 [MEMORY] Calling smartMemoryService.getRelevantMemories...")
     const memoryContext = await smartMemoryService.getRelevantMemories(userId, userMessage)
 
-    console.log("🧠 [INFO] Memory context retrieved:", {
+    console.log("🧠 [MEMORY] Memory context result:", {
       hasContext: !!memoryContext,
-      contextLength: memoryContext.length,
-      preview: memoryContext.substring(0, 100),
+      contextLength: memoryContext?.length || 0,
+      preview: memoryContext?.substring(0, 100) || "empty",
     })
 
     return memoryContext
   } catch (error) {
-    console.error("🧠 [ERROR] Memory context generation failed:", error)
+    console.error("🧠 [MEMORY] Failed to get memory context:", error)
     return ""
   }
 }
 
-// 🚀 비동기 메모리 처리 함수
+// 🚀 비동기 메모리 처리 함수 - 강화된 로깅
 async function processMemoryAsync(
   userId: string,
   sessionId: string,
@@ -208,50 +229,49 @@ async function processMemoryAsync(
   assistantResponse: string,
   existingContext?: string,
 ) {
-  if (!ENABLE_SMART_MEMORY || !userId) {
-    console.log("🧠 [INFO] Smart memory disabled or no user ID - skipping memory processing", {
-      ENABLE_SMART_MEMORY,
-      userId: !!userId,
-    })
+  // 🔧 항상 로그 출력 (production 디버깅용)
+  console.log("🧠 [MEMORY] Starting processMemoryAsync:", {
+    userId: userId || "NO_USER_ID",
+    sessionId: sessionId || "NO_SESSION_ID",
+    hasUserId: !!userId,
+    enableSmartMemory: ENABLE_SMART_MEMORY,
+    userMessageLength: userMessage?.length || 0,
+    assistantResponseLength: assistantResponse?.length || 0,
+  })
+
+  if (!ENABLE_SMART_MEMORY) {
+    console.log("🧠 [MEMORY] Smart memory disabled by environment variable - skipping memory processing")
     return
   }
 
-  console.log("🧠 [INFO] Starting async memory processing...", {
-    userId,
-    sessionId,
-    userMessageLength: userMessage.length,
-    assistantResponseLength: assistantResponse.length,
-  })
+  if (!userId) {
+    console.log("🧠 [MEMORY] No user ID provided - skipping memory processing")
+    return
+  }
+
+  console.log("🧠 [MEMORY] Starting async memory processing in 100ms...")
 
   // 비동기로 실행하여 응답 속도에 영향 없음
   setTimeout(async () => {
     try {
-      console.log("🧠 [INFO] Processing memory for user:", userId)
+      console.log("🧠 [MEMORY] Executing memory processing for user:", userId)
       const result = await smartMemoryService.processConversation(userId, sessionId, userMessage, assistantResponse)
 
-      console.log("🧠 [INFO] Memory processing result:", {
-        shouldSave: result?.shouldSave,
+      console.log("🧠 [MEMORY] Memory processing result:", {
+        shouldSave: result?.shouldSave || false,
         memoriesCount: result?.memories?.length || 0,
-        reasoning: result?.reasoning,
+        savedMemoriesCount: result?.savedMemories?.length || 0,
       })
 
       if (result && result.shouldSave) {
-        console.log(`✅ [INFO] Memory processing completed: ${result.memories.length} memories processed`)
-        if (result.savedMemories) {
-          console.log(
-            "💾 [INFO] Saved memories details:",
-            result.savedMemories.map((m) => ({
-              type: m.type,
-              content: m.content?.substring(0, 50),
-              action: m.action,
-            })),
-          )
-        }
+        console.log(
+          `✅ [MEMORY] Memory processing completed: ${result.memories?.length || 0} memories processed, ${result.savedMemories?.length || 0} saved`,
+        )
       } else {
-        console.log("ℹ️ [INFO] No memorable information found in this conversation")
+        console.log("ℹ️ [MEMORY] No memorable information found in this conversation")
       }
     } catch (error) {
-      console.error("🧠 [ERROR] Async memory processing failed:", error)
+      console.error("❌ [MEMORY] Async memory processing failed:", error)
       // 메모리 처리 실패는 채팅에 영향을 주지 않음
     }
   }, 100) // 100ms 후 실행
@@ -272,11 +292,13 @@ export async function POST(req: Request) {
       chatRoomId,
     } = await req.json()
 
-    console.log("🚀 [INFO] Saju Chat API called", {
-      userId: userId || "no-user",
-      roomType,
-      enableSmartMemory: ENABLE_SMART_MEMORY,
-      messageCount: messages?.length || 0,
+    // 🔧 항상 로그 출력 (production 디버깅용)
+    console.log("🚀 [API] Saju Chat API called:", {
+      userId: userId || "NO_USER_ID",
+      roomType: roomType || "NO_ROOM_TYPE",
+      messagesCount: messages?.length || 0,
+      hasCompressedSaju: !!compressedSaju,
+      chatRoomId: chatRoomId || "NO_CHAT_ROOM_ID",
     })
 
     const dateInfo = getCurrentDateInfo()
@@ -336,7 +358,7 @@ export async function POST(req: Request) {
     const recentMessages = messages.slice(-5) // 최근 5개 메시지 확인
     for (const msg of recentMessages) {
       if (msg.role === "assistant" && msg.content.includes("상대방 사주 정보")) {
-        const partnerMatch = msg.content.match(/🔮 \*\*상대방 사주 정보[\s\S]*?(?=\n\n|\n|$)/)
+        const partnerMatch = msg.content.match(/🔮 \*\*상대방 사주 정보[\s\S]*?(?=\n\n|\n�|$)/)
         if (partnerMatch) {
           existingPartnerContext = partnerMatch[0]
           console.log("🔍 기존 파트너 컨텍스트 발견")
@@ -601,29 +623,24 @@ ${index + 1}. **${person.name}**
         messages: apiMessages,
         model: openai("gpt-4o"),
         temperature: 1.0,
-        maxTokens: 4096,
+        maxTokens: 4096, // 토큰 수 증가
         topP: 1.0,
       })
 
-      // 🚀 스트리밍 응답과 함께 메모리 처리
+      // 🚀 스트리밍 응답과 함께 메모리 처리 - 강화된 로깅
       result.text
         .then((completeText) => {
-          console.log("🧠 [INFO] Starting memory processing with complete response", {
-            userId: userId || "no-user",
-            chatRoomId: chatRoomId || "unknown",
-            responseLength: completeText.length,
-          })
+          console.log("🧠 [MEMORY] Got complete response, starting memory processing...")
+          console.log("🧠 [MEMORY] Response preview:", completeText.substring(0, 200))
           processMemoryAsync(userId, chatRoomId || "unknown", userMessage, completeText, memoryContext)
         })
         .catch((error) => {
-          console.error("🧠 [ERROR] Failed to get complete text for memory processing:", error)
+          console.error("❌ [MEMORY] Failed to get complete text for memory processing:", error)
         })
 
       return result.toDataStreamResponse()
     } catch (streamError) {
-      if (shouldLog("ERROR")) {
-        console.error("StreamText error")
-      }
+      console.error("StreamText error:", streamError)
 
       return new Response(
         JSON.stringify({
@@ -638,9 +655,7 @@ ${index + 1}. **${person.name}**
       )
     }
   } catch (error) {
-    if (shouldLog("ERROR")) {
-      console.error("API error")
-    }
+    console.error("API error:", error)
 
     return new Response(
       JSON.stringify({
