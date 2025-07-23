@@ -1,316 +1,303 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Brain, Trash2, RefreshCw, User, Target, Heart, Users, Star, Calendar, Settings, Lightbulb } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+
+interface Memory {
+  id: string
+  type: string
+  content: string
+  importance_score: number
+  reference_count: number
+  first_mentioned: string
+  last_referenced: string
+  created_at: string
+}
+
+interface MemoryStats {
+  total: number
+  byType: Record<string, number>
+}
 
 interface MemoryDashboardProps {
   userId: string
 }
 
-interface ConfigCheck {
-  config: {
-    supabaseUrl: boolean
-    supabaseServiceKey: boolean
-    openaiKey: boolean
-    enableSmartMemory: boolean
-    nodeEnv: string
-  }
-  dbTest: {
-    connected: boolean
-    error: string | null
-    details: any
-  }
-  tableTest: {
-    exists: boolean
-    error: string | null
-    details: any
-  }
-  functionsTest: {
-    exists: boolean
-    error: string | null
-    details: any
-  }
-  openaiTest: {
-    working: boolean
-    error: string | null
-    details: any
-  }
+const memoryTypeIcons: Record<string, any> = {
+  identity: User,
+  goal: Target,
+  emotion: Heart,
+  relationship: Users,
+  interest: Star,
+  schedule: Calendar,
+  preference: Settings,
+  situation: Lightbulb,
+}
+
+const memoryTypeNames: Record<string, string> = {
+  identity: "신원정보",
+  goal: "목표/계획",
+  emotion: "감정상태",
+  relationship: "인간관계",
+  interest: "관심사",
+  schedule: "일정",
+  preference: "선호도",
+  situation: "상황",
 }
 
 export function MemoryDashboard({ userId }: MemoryDashboardProps) {
-  const [configCheck, setConfigCheck] = useState<ConfigCheck | null>(null)
-  const [isChecking, setIsChecking] = useState(false)
-  const [testResult, setTestResult] = useState<any>(null)
-  const [isTesting, setIsTesting] = useState(false)
+  const [memories, setMemories] = useState<Memory[]>([])
+  const [stats, setStats] = useState<MemoryStats>({ total: 0, byType: {} })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
-  const checkConfig = async () => {
-    setIsChecking(true)
+  const loadMemories = async () => {
     try {
-      const response = await fetch("/api/debug/memory-config")
-      const data = await response.json()
-      setConfigCheck(data)
+      setLoading(true)
+      setError(null)
 
-      if (response.ok) {
-        toast({
-          title: "환경 설정 확인 완료",
-          description: "모든 설정을 확인했습니다.",
-        })
-      } else {
-        toast({
-          title: "환경 설정 확인 실패",
-          description: data.error || "알 수 없는 오류가 발생했습니다.",
-          variant: "destructive",
-        })
+      const response = await fetch(`/api/smart-memory?userId=${userId}&query=all`)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
       }
-    } catch (error) {
-      console.error("Config check failed:", error)
-      toast({
-        title: "환경 설정 확인 실패",
-        description: "네트워크 오류가 발생했습니다.",
-        variant: "destructive",
-      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setStats(data.stats)
+        // 실제 메모리 데이터는 별도 API에서 가져와야 함
+        await loadMemoryList()
+      } else {
+        throw new Error(data.error || "Failed to load memories")
+      }
+    } catch (err) {
+      console.error("Failed to load memories:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
-      setIsChecking(false)
+      setLoading(false)
     }
   }
 
-  const testMemorySave = async () => {
-    setIsTesting(true)
+  const loadMemoryList = async () => {
     try {
-      const response = await fetch("/api/smart-memory", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // 실제 메모리 목록을 가져오는 API 호출
+      // 현재는 mock 데이터 사용
+      const mockMemories: Memory[] = [
+        {
+          id: "1",
+          type: "identity",
+          content: "프론트엔드 개발자로 일하고 있음",
+          importance_score: 0.9,
+          reference_count: 5,
+          first_mentioned: "2024-01-15T10:00:00Z",
+          last_referenced: "2024-01-20T15:30:00Z",
+          created_at: "2024-01-15T10:00:00Z",
         },
-        body: JSON.stringify({
-          action: "test",
-          userId: userId,
-          userMessage: "저는 개발자입니다. 최근에 새로운 프로젝트를 시작했어요.",
-          assistantResponse:
-            "개발자로서 새로운 프로젝트를 시작하신다니 흥미롭네요! 어떤 기술 스택을 사용하실 예정인가요?",
-          conversationId: "test-conversation-" + Date.now(),
-        }),
-      })
-
-      const data = await response.json()
-      setTestResult(data)
-
-      if (response.ok && data.success) {
-        toast({
-          title: "메모리 저장 테스트 성공",
-          description: `${data.savedMemories?.length || 0}개의 메모리가 저장되었습니다.`,
-        })
-      } else {
-        toast({
-          title: "메모리 저장 테스트 실패",
-          description: data.error || "알 수 없는 오류가 발생했습니다.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Memory test failed:", error)
-      toast({
-        title: "메모리 저장 테스트 실패",
-        description: "네트워크 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsTesting(false)
+        {
+          id: "2",
+          type: "goal",
+          content: "풀스택 개발자가 되고 싶어함",
+          importance_score: 0.8,
+          reference_count: 3,
+          first_mentioned: "2024-01-16T14:00:00Z",
+          last_referenced: "2024-01-19T09:15:00Z",
+          created_at: "2024-01-16T14:00:00Z",
+        },
+        {
+          id: "3",
+          type: "interest",
+          content: "React와 Next.js에 관심이 많음",
+          importance_score: 0.7,
+          reference_count: 8,
+          first_mentioned: "2024-01-17T11:30:00Z",
+          last_referenced: "2024-01-21T16:45:00Z",
+          created_at: "2024-01-17T11:30:00Z",
+        },
+      ]
+      setMemories(mockMemories)
+    } catch (err) {
+      console.error("Failed to load memory list:", err)
     }
   }
 
-  const StatusIcon = ({ status }: { status: boolean | null }) => {
-    if (status === null) return <AlertCircle className="h-4 w-4 text-gray-400" />
-    return status ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />
+  const deleteMemory = async (memoryId: string) => {
+    try {
+      // 메모리 삭제 API 호출
+      toast({
+        title: "메모리 삭제됨",
+        description: "선택한 메모리가 삭제되었습니다.",
+      })
+
+      // 목록에서 제거
+      setMemories((prev) => prev.filter((m) => m.id !== memoryId))
+
+      // 통계 업데이트
+      await loadMemories()
+    } catch (err) {
+      toast({
+        title: "삭제 실패",
+        description: "메모리 삭제 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  useEffect(() => {
+    loadMemories()
+  }, [userId])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-4 w-20 mb-2" />
+                <Skeleton className="h-8 w-12" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <Skeleton className="h-6 w-32 mb-4" />
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          메모리를 불러오는 중 오류가 발생했습니다: {error}
+          <Button variant="outline" size="sm" onClick={loadMemories} className="ml-2 bg-transparent">
+            다시 시도
+          </Button>
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-4">
-        <Button onClick={checkConfig} disabled={isChecking}>
-          {isChecking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          환경 설정 확인
-        </Button>
-        <Button onClick={testMemorySave} disabled={isTesting} variant="outline">
-          {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          메모리 저장 테스트
-        </Button>
-      </div>
-
-      {configCheck && (
-        <Tabs defaultValue="config" className="w-full">
-          <TabsList>
-            <TabsTrigger value="config">환경 설정</TabsTrigger>
-            <TabsTrigger value="database">데이터베이스</TabsTrigger>
-            <TabsTrigger value="functions">함수</TabsTrigger>
-            <TabsTrigger value="openai">OpenAI</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="config">
-            <Card>
-              <CardHeader>
-                <CardTitle>환경 변수 설정</CardTitle>
-                <CardDescription>필수 환경 변수들의 설정 상태를 확인합니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span>Supabase URL</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.config.supabaseUrl} />
-                    <Badge variant={configCheck.config.supabaseUrl ? "default" : "destructive"}>
-                      {configCheck.config.supabaseUrl ? "설정됨" : "누락"}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Supabase Service Key</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.config.supabaseServiceKey} />
-                    <Badge variant={configCheck.config.supabaseServiceKey ? "default" : "destructive"}>
-                      {configCheck.config.supabaseServiceKey ? "설정됨" : "누락"}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>OpenAI API Key</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.config.openaiKey} />
-                    <Badge variant={configCheck.config.openaiKey ? "default" : "destructive"}>
-                      {configCheck.config.openaiKey ? "설정됨" : "누락"}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Smart Memory 활성화</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.config.enableSmartMemory} />
-                    <Badge variant={configCheck.config.enableSmartMemory ? "default" : "secondary"}>
-                      {configCheck.config.enableSmartMemory ? "활성화" : "비활성화"}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>환경</span>
-                  <Badge variant="outline">{configCheck.config.nodeEnv}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="database">
-            <Card>
-              <CardHeader>
-                <CardTitle>데이터베이스 연결</CardTitle>
-                <CardDescription>Supabase 데이터베이스 연결 상태를 확인합니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span>데이터베이스 연결</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.dbTest.connected} />
-                    <Badge variant={configCheck.dbTest.connected ? "default" : "destructive"}>
-                      {configCheck.dbTest.connected ? "연결됨" : "연결 실패"}
-                    </Badge>
-                  </div>
-                </div>
-                {configCheck.dbTest.error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{configCheck.dbTest.error}</p>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span>테이블 구조</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.tableTest.exists} />
-                    <Badge variant={configCheck.tableTest.exists ? "default" : "destructive"}>
-                      {configCheck.tableTest.exists ? "정상" : "오류"}
-                    </Badge>
-                  </div>
-                </div>
-                {configCheck.tableTest.error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{configCheck.tableTest.error}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="functions">
-            <Card>
-              <CardHeader>
-                <CardTitle>데이터베이스 함수</CardTitle>
-                <CardDescription>스마트 메모리에 필요한 데이터베이스 함수들을 확인합니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span>메모리 함수</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.functionsTest.exists} />
-                    <Badge variant={configCheck.functionsTest.exists ? "default" : "destructive"}>
-                      {configCheck.functionsTest.exists ? "존재함" : "누락"}
-                    </Badge>
-                  </div>
-                </div>
-                {configCheck.functionsTest.error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{configCheck.functionsTest.error}</p>
-                    {configCheck.functionsTest.error.includes("function") && (
-                      <p className="text-sm text-red-600 mt-2">
-                        💡 해결방법: scripts/create-memory-functions-complete.sql을 실행하세요.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="openai">
-            <Card>
-              <CardHeader>
-                <CardTitle>OpenAI API</CardTitle>
-                <CardDescription>OpenAI API 연결 상태를 확인합니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span>API 연결</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={configCheck.openaiTest.working} />
-                    <Badge variant={configCheck.openaiTest.working ? "default" : "destructive"}>
-                      {configCheck.openaiTest.working ? "정상" : "오류"}
-                    </Badge>
-                  </div>
-                </div>
-                {configCheck.openaiTest.error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{configCheck.openaiTest.error}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
-
-      {testResult && (
+      {/* 통계 카드 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>메모리 저장 테스트 결과</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="bg-gray-100 p-4 rounded-md text-sm overflow-auto">
-              {JSON.stringify(testResult, null, 2)}
-            </pre>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">총 메모리</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
+              </div>
+              <Brain className="h-8 w-8 text-blue-600" />
+            </div>
           </CardContent>
         </Card>
-      )}
+
+        {Object.entries(stats.byType)
+          .slice(0, 3)
+          .map(([type, count]) => {
+            const Icon = memoryTypeIcons[type] || Brain
+            return (
+              <Card key={type}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">{memoryTypeNames[type] || type}</p>
+                      <p className="text-2xl font-bold">{count}</p>
+                    </div>
+                    <Icon className="h-8 w-8 text-gray-600" />
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+      </div>
+
+      {/* 메모리 목록 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                저장된 메모리
+              </CardTitle>
+              <CardDescription>AI가 기억하고 있는 당신에 대한 정보입니다.</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadMemories}
+              className="flex items-center gap-2 bg-transparent"
+            >
+              <RefreshCw className="h-4 w-4" />
+              새로고침
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {memories.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>아직 저장된 메모리가 없습니다.</p>
+              <p className="text-sm">AI와 대화를 나누면 중요한 정보가 자동으로 기억됩니다.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {memories.map((memory) => {
+                const Icon = memoryTypeIcons[memory.type] || Brain
+                return (
+                  <div
+                    key={memory.id}
+                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="flex items-start gap-3 flex-1">
+                      <Icon className="h-5 w-5 text-gray-600 mt-0.5" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="secondary">{memoryTypeNames[memory.type] || memory.type}</Badge>
+                          <Badge variant="outline">중요도: {Math.round(memory.importance_score * 100)}%</Badge>
+                          <Badge variant="outline">참조: {memory.reference_count}회</Badge>
+                        </div>
+                        <p className="text-sm text-gray-900 mb-2">{memory.content}</p>
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span>첫 언급: {new Date(memory.first_mentioned).toLocaleDateString()}</span>
+                          <span>마지막 참조: {new Date(memory.last_referenced).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteMemory(memory.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

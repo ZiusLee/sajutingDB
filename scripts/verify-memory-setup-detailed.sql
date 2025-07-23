@@ -1,92 +1,101 @@
--- 스마트 메모리 시스템 설정 상세 확인 스크립트
+-- 스마트 메모리 시스템 상세 검증 스크립트
 
 -- 1. 테이블 존재 확인
 SELECT 
   'Tables Check' as check_type,
-  table_name, 
-  table_type
-FROM information_schema.tables 
+  json_agg(
+    json_build_object(
+      'table_name', tablename,
+      'exists', true
+    )
+  ) as result
+FROM pg_tables 
+WHERE schemaname = 'public' 
+  AND tablename IN ('smart_contexts', 'conversation_memory_links');
+
+-- 2. 컬럼 구조 확인
+SELECT 
+  'Columns Check' as check_type,
+  json_agg(
+    json_build_object(
+      'table_name', table_name,
+      'column_name', column_name,
+      'data_type', data_type,
+      'is_nullable', is_nullable
+    )
+  ) as result
+FROM information_schema.columns 
 WHERE table_schema = 'public' 
-AND table_name IN ('smart_contexts', 'conversation_memory_links')
-ORDER BY table_name;
+  AND table_name IN ('smart_contexts', 'conversation_memory_links')
+ORDER BY table_name, ordinal_position;
 
--- 2. smart_contexts 테이블 구조 확인
+-- 3. 인덱스 확인
 SELECT 
-  'smart_contexts Structure' as check_type,
-  column_name, 
-  data_type, 
-  is_nullable,
-  column_default
-FROM information_schema.columns 
-WHERE table_name = 'smart_contexts' 
-ORDER BY ordinal_position;
-
--- 3. conversation_memory_links 테이블 구조 확인
-SELECT 
-  'conversation_memory_links Structure' as check_type,
-  column_name, 
-  data_type, 
-  is_nullable,
-  column_default
-FROM information_schema.columns 
-WHERE table_name = 'conversation_memory_links' 
-ORDER BY ordinal_position;
+  'Indexes Check' as check_type,
+  json_agg(
+    json_build_object(
+      'indexname', indexname,
+      'tablename', tablename,
+      'indexdef', indexdef
+    )
+  ) as result
+FROM pg_indexes 
+WHERE schemaname = 'public' 
+  AND tablename IN ('smart_contexts', 'conversation_memory_links');
 
 -- 4. 함수 존재 확인
 SELECT 
   'Functions Check' as check_type,
-  proname as function_name,
-  prokind as function_type,
-  proargnames as argument_names
+  json_agg(
+    json_build_object(
+      'function_name', proname,
+      'return_type', pg_get_function_result(oid),
+      'arguments', pg_get_function_arguments(oid)
+    )
+  ) as result
 FROM pg_proc 
-WHERE proname IN ('find_similar_memory', 'search_relevant_memories');
+WHERE proname IN ('find_similar_memory', 'search_relevant_memories')
+  AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
 
--- 5. 확장 기능 확인 (벡터 검색용)
+-- 5. 벡터 확장 확인
 SELECT 
   'Extensions Check' as check_type,
-  extname as extension_name,
-  extversion as version
+  json_agg(
+    json_build_object(
+      'extension_name', extname,
+      'version', extversion,
+      'installed', true
+    )
+  ) as result
 FROM pg_extension 
 WHERE extname = 'vector';
 
 -- 6. RLS 정책 확인
 SELECT 
   'RLS Policies Check' as check_type,
-  schemaname,
-  tablename,
-  policyname,
-  permissive,
-  roles,
-  cmd,
-  qual
+  json_agg(
+    json_build_object(
+      'table_name', tablename,
+      'policy_name', policyname,
+      'permissive', permissive,
+      'roles', roles,
+      'cmd', cmd,
+      'qual', qual
+    )
+  ) as result
 FROM pg_policies 
-WHERE tablename IN ('smart_contexts', 'conversation_memory_links');
+WHERE schemaname = 'public' 
+  AND tablename IN ('smart_contexts', 'conversation_memory_links');
 
--- 7. 테이블 데이터 샘플 확인
+-- 7. 샘플 데이터 확인
 SELECT 
-  'smart_contexts Sample' as check_type,
-  COUNT(*) as total_records,
-  COUNT(DISTINCT user_id) as unique_users,
-  MIN(created_at) as oldest_record,
-  MAX(created_at) as newest_record
-FROM smart_contexts;
-
--- 8. 벡터 컬럼 확인
-SELECT 
-  'Vector Column Check' as check_type,
-  column_name,
-  data_type,
-  character_maximum_length
-FROM information_schema.columns 
-WHERE table_name = 'smart_contexts' 
-AND column_name = 'relevance_embedding';
-
--- 9. 권한 확인
-SELECT 
-  'Table Permissions' as check_type,
-  grantee,
-  table_name,
-  privilege_type
-FROM information_schema.role_table_grants 
-WHERE table_name IN ('smart_contexts', 'conversation_memory_links')
-AND grantee != 'postgres';
+  'Sample Data Check' as check_type,
+  json_build_object(
+    'smart_contexts_count', (SELECT COUNT(*) FROM smart_contexts),
+    'conversation_memory_links_count', (SELECT COUNT(*) FROM conversation_memory_links),
+    'sample_user_ids', (
+      SELECT json_agg(DISTINCT user_id) 
+      FROM smart_contexts 
+      LIMIT 5
+    )
+  ) as result;
