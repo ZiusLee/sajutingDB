@@ -1,644 +1,277 @@
 "use client"
-import { useState, useRef, useEffect, useMemo } from "react"
+
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
-import { useChat as useAIChat } from "ai/react"
-import SajuDiagram from "@/components/saju-diagram"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
-import { calculateDaeunInfo } from "@/lib/daeun-calculator"
-import type { BirthInfo } from "@/types/birth-date"
-import { toast } from "sonner"
-import DaeunDiagram from "@/components/daeun-diagram"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
-import { compressSaju } from "@/lib/saju-compression"
-import { getSessionMessages, saveMessages } from "@/lib/message-service"
-import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
-import Sidebar from "@/components/sidebar"
+import { Card, CardContent } from "@/components/ui/card"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Loader2, Send, RotateCcw, Settings, Plus } from "lucide-react"
+import { useChat } from "ai/react"
+import { useAuth } from "@/hooks/use-auth"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { MessageFeedbackButtons } from "./message-feedback-buttons"
+import { AuthDebugPanel } from "./auth-debug-panel"
 
 interface SajuChatProps {
-  saju: any
-  name: string
-  gender: string
-  initialInterpretation: string
+  compressedSaju: any
   roomType: string
-  onBack: () => void
-  isLoggedIn?: boolean
-  sessionKey: string
-  birthInfo?: BirthInfo
-  concerns?: string[]
-  isSidebarOpen?: boolean
-  onSidebarToggle?: () => void
-  currentChatRoomId?: string
-  temporaryChatRoom?: any
-  onChatRoomPersisted?: (newChatRoomId: string) => void
+  initialMessages?: any[]
+  compatibilityData?: any
+  chatRoomId?: string
 }
 
-const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): string[] => {
-  const concernQuestionMap: Record<string, string[]> = {
-    love: ["몇 월달에 연애운이 좋을까요?", "연애운 알려주세요"],
-    breakup: ["이별 후 회복 시기는 언제인가요?", "새로운 만남은 언제쯤일까요?"],
-    health: ["건강운 알려주세요", "주의해야 할 건강 문제가 있나요?"],
-    marriage: ["결혼운은 어떤가요?", "결혼 적령기는 언제인가요?"],
-    money: ["재물운 알려주세요", "투자운은 어떤가요?"],
-    work: ["학업운은 어떤가요?", "시험운 알려주세요"],
-    relationship: ["연인과의 궁합은 어떤가요?", "관계 발전 방향은?"],
-    career: ["직업운 알려주세요", "커리어 전환 시기는?"],
-    job: ["취업운은 어떤가요?", "면접운 알려주세요"],
-    future: ["제 인생의 방향성은?", "앞으로의 운세는?"],
-    workplace: ["직장 내 인간관계는?", "승진운은 어떤가요?"],
-    friend: ["인간관계운 알려주세요", "새로운 인연은 언제?"],
-    family: ["가족운은 어떤가요?", "가족 간 화합 방법은?"],
-  }
-
-  const baseQuestions: Record<string, string[]> = {
-    sajuping: [
-      "직업운 알려줘",
-      "연애운 알려줘",
-      "건강운 알려줘",
-      "재물운 알려줘",
-      "올해 운세는 어떤가요?",
-      "제 성격과 기질은 어떤가요?",
-    ],
-    tarot: [
-      "오늘의 타로 카드 뽑아줘",
-      "연애운 타로 봐줘",
-      "직업운 타로 리딩해줘",
-      "오늘 주의할 점은?",
-      "이번 주 운세는?",
-      "중요한 결정을 앞두고 있어요",
-    ],
-    general: ["2025년 운세는 어떤가요?", "제 사주의 장단점은?", "가장 강한 기운은 무엇인가요?"],
-  }
-
-  const personalizedQuestions = concerns.flatMap((concern) => concernQuestionMap[concern] || [])
-  const baseQuestionsForType = baseQuestions[roomType] || baseQuestions.general
-  const allQuestions = [...new Set([...personalizedQuestions, ...baseQuestionsForType])]
-  return allQuestions.slice(0, 6)
-}
-
-const getInitialMessage = (name: string, roomType: string): string => {
-  const userName = name || "사용자"
-  if (roomType === "sajuping") {
-    return `안녕하세요, ${userName}님! 저는 사주핑이에요. ${userName}님의 사주를 바탕으로 인생의 모든 영역에 대해 상담해드릴게요. 나에 사주에 대한 설명, 나의 오행 특징, 사주적 성향, 올해의 연애운, 재물운등 나의 사주에 대해 채팅창에 물어보세요`
-  }
-  return `안녕하세요, ${userName}님! 무엇을 도와드릴까요?`
-}
-
-// Generate a simple UUID v4
-function generateUUID() {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    const v = c === "x" ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
-}
-
-export default function SajuChat({
-  saju,
-  name,
-  gender,
+export function SajuChat({
+  compressedSaju,
   roomType,
-  onBack,
-  sessionKey,
-  birthInfo,
-  concerns,
-  isSidebarOpen: externalSidebarOpen,
-  onSidebarToggle: externalSidebarToggle,
-  currentChatRoomId,
-  temporaryChatRoom,
-  onChatRoomPersisted,
+  initialMessages = [],
+  compatibilityData,
+  chatRoomId,
 }: SajuChatProps) {
-  const { user } = useAuth()
-  const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
-  const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
-  const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const savingRef = useRef(false)
-  const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
-  const [showScrollButton, setShowScrollButton] = useState(false)
-  const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
+  const { user, isAuthenticated } = useAuth()
+  const router = useRouter()
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
 
-  // Get sessionId from localStorage - memoized and stable
-  const sessionId = useMemo(() => {
-    try {
-      const savedSaju = localStorage.getItem("current_saju")
-      if (savedSaju) {
-        const parsedSaju = JSON.parse(savedSaju)
-        if (parsedSaju.sessionId) {
-          return parsedSaju.sessionId
-        }
-      }
-
-      const userId = localStorage.getItem("user_id")
-      if (userId) {
-        return userId
-      }
-    } catch (error) {
-      console.error("Error getting session ID:", error)
-    }
-
-    return `fallback-${Date.now()}`
-  }, [])
-
-  // Stable state that won't cause re-renders
-  const [chatData, setChatData] = useState<{
-    calculatedDaeun: any
-    stableBirthInfo: any
-    initialMessages: any[]
-    aiChatBody: any
-    isInitialized: boolean
-  }>({
-    calculatedDaeun: null,
-    stableBirthInfo: null,
-    initialMessages: [],
-    aiChatBody: {},
-    isInitialized: false,
-  })
-
-  // Stabilize all props to prevent infinite re-renders
-  const stableSaju = useMemo(() => {
-    if (!saju) return null
-    return JSON.parse(JSON.stringify(saju))
-  }, [JSON.stringify(saju)])
-
-  const stableBirthInfo = useMemo(() => {
-    if (!birthInfo) return null
-    return JSON.parse(JSON.stringify(birthInfo))
-  }, [JSON.stringify(birthInfo)])
-
-  const stableConcerns = useMemo(() => {
-    if (!concerns) return []
-    return [...concerns]
-  }, [JSON.stringify(concerns)])
-
-  const stableUserId = useMemo(() => user?.id || null, [user?.id])
-
-  // Get the effective chat room ID (persisted ID takes precedence)
-  const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
-
-  // Initialize chat data
-  useEffect(() => {
-    let isMounted = true
-
-    const initializeChatData = async () => {
-      if (!stableSaju) {
-        console.log("⏭️ No saju data, skipping initialization")
-        return
-      }
-
-      console.log("🔄 Initializing chat data for room:", effectiveChatRoomId)
-
-      try {
-        const compressedSajuObject =
-          stableSaju && stableBirthInfo
-            ? compressSaju(
-                stableSaju,
-                stableBirthInfo.solarYear?.toString(),
-                stableBirthInfo.solarMonth?.toString(),
-                stableBirthInfo.solarDay?.toString(),
-                stableBirthInfo.solarHour?.toString(),
-                stableBirthInfo.solarMinute?.toString(),
-                stableBirthInfo.timeUnknown,
-              )
-            : stableSaju
-
-        let calculatedDaeunData = null
-        if (stableSaju?.yearStem && stableBirthInfo?.solarYear && gender) {
-          try {
-            calculatedDaeunData = calculateDaeunInfo(
-              { yearStem: stableSaju.yearStem, monthStem: stableSaju.monthStem, monthBranch: stableSaju.monthBranch },
-              stableBirthInfo.solarYear,
-              stableBirthInfo.solarMonth,
-              stableBirthInfo.solarDay,
-              gender,
-              stableBirthInfo.solarHour,
-              stableBirthInfo.solarMinute,
-              stableBirthInfo.timeUnknown,
-            )
-          } catch (error) {
-            console.error("❌ 대운 계산 오류:", error)
-          }
-        }
-
-        let pastMessages: any[] = []
-        try {
-          if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
-            const messages = await getSessionMessages(sessionId, effectiveChatRoomId)
-
-            pastMessages = messages
-              .filter((msg) => msg.role === "user" || msg.role === "assistant")
-              .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
-              .map((msg) => ({
-                id: msg.id,
-                role: msg.role,
-                content: msg.content,
-                createdAt: msg.createdAt,
-              }))
-
-            console.log(`📨 Loaded ${pastMessages.length} messages for chat room ${effectiveChatRoomId}`)
-          }
-        } catch (error) {
-          console.error("❌ Error loading past messages:", error)
-        }
-
-        const initialChatMessages =
-          pastMessages.length > 0
-            ? pastMessages
-            : [{ id: generateUUID(), role: "assistant" as const, content: getInitialMessage(name, roomType) }]
-
-        const chatBody = {
-          name,
-          gender,
-          roomType,
-          userId: stableUserId,
-          currentYear: 2025,
-          yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-          birthInfo: stableBirthInfo,
-          compressedSaju: compressedSajuObject,
-          daeun: calculatedDaeunData,
-          chatRoomId: effectiveChatRoomId,
-        }
-
-        if (isMounted) {
-          setChatData({
-            calculatedDaeun: calculatedDaeunData,
-            stableBirthInfo: stableBirthInfo,
-            initialMessages: initialChatMessages,
-            aiChatBody: chatBody,
-            isInitialized: true,
-          })
-          setLastSavedMessageCount(pastMessages.length)
-          console.log("✅ Chat data initialized successfully")
-        }
-      } catch (error) {
-        console.error("❌ Error initializing chat data:", error)
-      }
-    }
-
-    setChatData((prev) => ({ ...prev, isInitialized: false }))
-    initializeChatData()
-
-    return () => {
-      isMounted = false
-    }
-  }, [stableSaju, name, gender, roomType, stableBirthInfo, stableUserId, effectiveChatRoomId, sessionId])
-
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, reload, setMessages } = useChat({
     api: "/api/saju-chat",
-    id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
-    initialMessages: chatData.initialMessages,
-    body: chatData.aiChatBody,
-    onError: (error) => {
-      console.error("❌ 채팅 오류:", error)
-      toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+    initialMessages,
+    body: {
+      compressedSaju,
+      name: compressedSaju?.name || "사용자",
+      gender: compressedSaju?.gender || "unknown",
+      roomType,
+      userId: user?.id,
+      compatibilityData,
+      chatRoomId,
     },
-    key: effectiveChatRoomId || "default",
+    onError: (error) => {
+      console.error("Chat error:", error)
+      toast.error("메시지 전송 중 오류가 발생했습니다.")
+    },
   })
 
-  // Save messages to database when new messages are added
-  useEffect(() => {
-    const saveNewMessages = async () => {
-      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) {
-        return
-      }
-
-      savingRef.current = true
-      const newMessages = messages.slice(lastSavedMessageCount)
-
-      const messagesToSave = newMessages.map((msg, index) => ({
-        id: generateUUID(),
-        role: msg.role,
-        content: msg.content,
-        createdAt: msg.createdAt || new Date().toISOString(),
-        messageOrder: lastSavedMessageCount + index,
-        chatRoomId: effectiveChatRoomId,
-      }))
-
-      try {
-        console.log("💾 Saving messages:", {
-          sessionId,
-          messageCount: messagesToSave.length,
-          chatRoomId: effectiveChatRoomId,
-          temporaryRoom: temporaryChatRoom?.isTemporary,
-        })
-
-        const result = await saveMessages(sessionId, messagesToSave, roomType, effectiveChatRoomId, temporaryChatRoom)
-
-        setLastSavedMessageCount(messages.length)
-
-        // If a temporary chat room was persisted, update our state
-        if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
-          setPersistedChatRoomId(result.persistedChatRoomId)
-          onChatRoomPersisted?.(result.persistedChatRoomId)
-          console.log(`✅ Chat room persisted: ${effectiveChatRoomId} -> ${result.persistedChatRoomId}`)
-        }
-      } catch (error) {
-        console.error("❌ Error saving messages:", error)
-        toast.error("메시지 저장 중 오류가 발생했습니다.")
-      } finally {
-        savingRef.current = false
-      }
-    }
-
-    if (messages.length > 0 && !isLoading) {
-      saveNewMessages()
-    }
-  }, [
-    messages,
-    lastSavedMessageCount,
-    isLoading,
-    roomType,
-    chatData.isInitialized,
-    effectiveChatRoomId,
-    sessionId,
-    temporaryChatRoom,
-    onChatRoomPersisted,
-  ])
-
-  const handleSuggestedQuestionClick = (question: string) => {
-    if (isLoading) return
-    setInput(question)
-    setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
-  }
-
-  const handleChatRoomSelect = (chatRoomId: string) => {
-    if (window.innerWidth < 1024) {
-      setSidebarOpen(false)
-    }
-    // Use window.location instead of router to avoid hook issues
-    window.location.href = `/saju-chat/${roomType}?roomId=${chatRoomId}`
-  }
-
-  const handleNewChat = () => {
-    // Navigate to a new chat without roomId to trigger auto-creation
-    window.location.href = `/saju-chat/${roomType}`
-  }
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      })
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (chatContainerRef.current) {
-      const container = chatContainerRef.current
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-
-      if (isNearBottom || messages.length === 1) {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: "smooth",
-        })
-      }
-    }
+    scrollToBottom()
   }, [messages])
 
-  // Handle scroll button visibility
-  useEffect(() => {
-    const container = chatContainerRef.current
-    if (!container) return
+  const handleContinueGeneration = async () => {
+    if (isLoading) return
 
-    const handleScroll = () => {
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-      setShowScrollButton(!isNearBottom && messages.length > 1)
+    try {
+      const response = await fetch("/api/saju-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages,
+          compressedSaju,
+          name: compressedSaju?.name || "사용자",
+          gender: compressedSaju?.gender || "unknown",
+          roomType,
+          userId: user?.id,
+          compatibilityData,
+          continueFromMessage: true,
+          chatRoomId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to continue generation")
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) return
+
+      let accumulatedContent = ""
+      const lastMessage = messages[messages.length - 1]
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = new TextDecoder().decode(value)
+        const lines = chunk.split("\n")
+
+        for (const line of lines) {
+          if (line.startsWith("0:")) {
+            try {
+              const content = JSON.parse(line.slice(2))
+              if (typeof content === "string") {
+                accumulatedContent += content
+
+                // 실시간으로 메시지 업데이트
+                setMessages((prev) => {
+                  const newMessages = [...prev]
+                  if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === "assistant") {
+                    newMessages[newMessages.length - 1] = {
+                      ...newMessages[newMessages.length - 1],
+                      content: lastMessage.content + accumulatedContent,
+                    }
+                  }
+                  return newMessages
+                })
+              }
+            } catch (e) {
+              // JSON 파싱 오류 무시
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Continue generation error:", error)
+      toast.error("계속 생성 중 오류가 발생했습니다.")
     }
-
-    container.addEventListener("scroll", handleScroll)
-    return () => container.removeEventListener("scroll", handleScroll)
-  }, [messages.length])
-
-  const suggestedQuestions = useMemo(
-    () => generateSuggestedQuestions(stableConcerns, roomType),
-    [stableConcerns, roomType],
-  )
-
-  // Loading and error states
-  if (!chatData.isInitialized) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          채팅을 불러오는 중...
-        </div>
-      </div>
-    )
   }
 
-  if (!stableSaju) {
+  const getRoomTypeTitle = () => {
+    switch (roomType) {
+      case "sajuping":
+        return "사주핑 상담"
+      case "compatibility":
+        return "궁합 분석"
+      case "daeun":
+        return "대운 분석"
+      case "daily":
+        return "오늘의 운세"
+      case "tarot":
+        return "타로 상담"
+      default:
+        return "AI 상담"
+    }
+  }
+
+  const getRoomTypeIcon = () => {
+    switch (roomType) {
+      case "sajuping":
+        return "🔮"
+      case "compatibility":
+        return "💕"
+      case "daeun":
+        return "📈"
+      case "daily":
+        return "🌅"
+      case "tarot":
+        return "🃏"
+      default:
+        return "💬"
+    }
+  }
+
+  if (!isAuthenticated) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background p-4 text-center">
-        <div>
-          <h2 className="text-xl font-semibold">오류</h2>
-          <p className="text-muted-foreground mt-2">
-            사주 정보를 불러오지 못했습니다.
-            <br />
-            이전 페이지로 돌아가 다시 시도해주세요.
-          </p>
-          <Button onClick={onBack} className="mt-4">
-            <ArrowLeft className="mr-2 h-4 w-4" /> 돌아가기
-          </Button>
-        </div>
-      </div>
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardContent className="p-6 text-center">
+          <p className="text-gray-600 mb-4">로그인이 필요한 서비스입니다.</p>
+          <Button onClick={() => router.push("/login")}>로그인하기</Button>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div className="flex h-screen bg-white">
-      {/* Desktop Sidebar - Fixed width */}
-      <div className="hidden lg:block w-96 flex-shrink-0">
-        <Sidebar
-          saju={stableSaju}
-          name={name}
-          gender={gender}
-          birthInfo={chatData.stableBirthInfo}
-          calculatedDaeun={chatData.calculatedDaeun}
-          sessionId={sessionId}
-          roomType={roomType}
-          currentChatRoomId={effectiveChatRoomId}
-          onChatRoomSelect={handleChatRoomSelect}
-          onNewChat={handleNewChat}
-        />
-      </div>
+    <div className="w-full max-w-4xl mx-auto">
+      <Card className="h-[600px] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{getRoomTypeIcon()}</span>
+            <h2 className="text-lg font-semibold">{getRoomTypeTitle()}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowDebugPanel(!showDebugPanel)}>
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => reload()} disabled={isLoading}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
-      {/* Mobile Sidebar Sheet - 2/3 width */}
-      <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-[66.67vw] max-w-sm p-0">
-          <Sidebar
-            saju={stableSaju}
-            name={name}
-            gender={gender}
-            birthInfo={chatData.stableBirthInfo}
-            calculatedDaeun={chatData.calculatedDaeun}
-            sessionId={sessionId}
-            roomType={roomType}
-            currentChatRoomId={effectiveChatRoomId}
-            onChatRoomSelect={handleChatRoomSelect}
-            onNewChat={handleNewChat}
-          />
-        </SheetContent>
-      </Sheet>
-
-      {/* Main Chat Area - Flexible width */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen">
-        {/* Chat Messages Container - Mobile optimized */}
-        <div
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto"
-          style={{
-            height: "calc(100vh - 140px)", // Reserve space for input area
-            minHeight: 0,
-          }}
-        >
-          <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
-            {/* Show temporary room indicator */}
-            {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
-              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
-                💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
-              </div>
-            )}
-
+        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+          <div className="space-y-4">
             {messages.map((message, index) => (
-              <div key={message.id || index}>
-                {message.role === "assistant" ? (
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="text-foreground text-base sm:text-lg leading-relaxed prose prose-sm sm:prose-lg max-w-none break-words [&>p]:mb-3 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base sm:[&>h3]:text-lg [&>ul]:mb-3 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2 [&>ul]:pl-3 sm:[&>ul]:pl-4 [&>li]:text-base sm:[&>li]:text-lg">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+              <div key={index} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                {message.role === "assistant" && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/images/sajuping_character.png" />
+                    <AvatarFallback>AI</AvatarFallback>
+                  </Avatar>
+                )}
+
+                <div
+                  className={`max-w-[80%] rounded-lg p-3 ${
+                    message.role === "user" ? "bg-blue-500 text-white ml-auto" : "bg-gray-100 text-gray-900"
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{message.content}</div>
+
+                  {message.role === "assistant" && (
+                    <div className="mt-2 flex gap-1">
+                      <MessageFeedbackButtons
+                        messageId={`${index}`}
+                        messageContent={message.content}
+                        onFeedback={(feedback) => {
+                          console.log("Feedback:", feedback)
+                        }}
+                      />
                     </div>
-                    {index === 0 && (
-                      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
-                        <SajuDiagram
-                          saju={stableSaju}
-                          name={name}
-                          gender={gender}
-                          variant="card"
-                          solarYear={chatData.stableBirthInfo?.solarYear}
-                          solarMonth={chatData.stableBirthInfo?.solarMonth}
-                          solarDay={chatData.stableBirthInfo?.solarDay}
-                          hour={chatData.stableBirthInfo?.solarHour}
-                          minute={chatData.stableBirthInfo?.solarMinute}
-                          timeUnknown={chatData.stableBirthInfo?.timeUnknown}
-                          lunarYear={chatData.stableBirthInfo?.lunarYear}
-                          lunarMonth={chatData.stableBirthInfo?.lunarMonth}
-                          lunarDay={chatData.stableBirthInfo?.lunarDay}
-                          location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
-                        />
-                        {chatData.calculatedDaeun && (
-                          <DaeunDiagram
-                            daeun={chatData.calculatedDaeun.pillars || []}
-                            birthInfo={chatData.stableBirthInfo}
-                            name={name}
-                            gender={gender}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <MessageFeedbackButtons
-                      messageId={message.id || `temp-${index}`}
-                      messageContent={message.content}
-                      sessionId={sessionId}
-                      onRetry={() => reload()}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex justify-end">
-                    <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base leading-relaxed">
-                      {message.content}
-                    </div>
-                  </div>
+                  )}
+                </div>
+
+                {message.role === "user" && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>{compressedSaju?.name?.charAt(0) || "U"}</AvatarFallback>
+                  </Avatar>
                 )}
               </div>
             ))}
+
             {isLoading && (
-              <div className="flex items-center gap-2 pt-2">
-                <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
-                <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
-                <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full"></div>
+              <div className="flex gap-3 justify-start">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="/images/sajuping_character.png" />
+                  <AvatarFallback>AI</AvatarFallback>
+                </Avatar>
+                <div className="bg-gray-100 rounded-lg p-3">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Input Area - Fixed at bottom with mobile optimization */}
-        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0">
-          {showScrollButton && (
-            <Button
-              onClick={scrollToBottom}
-              variant="outline"
-              size="sm"
-              className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
-            >
-              <ArrowDown className="h-4 w-4" />
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+
+        <div className="p-4 border-t">
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <Input
+              value={input}
+              onChange={handleInputChange}
+              placeholder="메시지를 입력하세요..."
+              disabled={isLoading}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={isLoading || !input.trim()}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
-          )}
-
-          <div className="space-y-2">
-            {!isLoading && messages.length >= 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                {suggestedQuestions.map((q, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 min-w-fit"
-                    onClick={() => handleSuggestedQuestionClick(q)}
-                  >
-                    {q}
-                  </Button>
-                ))}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
-              <div className="flex-1 relative">
-                <Input
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder="무엇이든 물어보세요"
-                  className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
-                  disabled={isLoading}
-                />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
-                    >
-                      <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 sm:w-56 p-2 mb-2" align="end">
-                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">💕</span>궁합 보기
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">👥</span>다른 사람 사주 봐주기
-                    </Button>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <Button
-                type="submit"
-                size="icon"
-                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading}
-              >
-                <Send className="h-3 w-3 sm:h-4 sm:w-4" />
+            {messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+              <Button type="button" variant="outline" onClick={handleContinueGeneration} disabled={isLoading}>
+                <Plus className="h-4 w-4" />
               </Button>
-            </form>
-          </div>
+            )}
+          </form>
         </div>
-      </div>
+      </Card>
+
+      {showDebugPanel && <AuthDebugPanel />}
     </div>
   )
 }

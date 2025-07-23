@@ -3,28 +3,64 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest) {
+  console.log("🔍 Smart Memory GET - Request received")
+  console.log("🔍 Request headers:", Object.fromEntries(request.headers.entries()))
+  console.log("🔍 Request URL:", request.url)
+  console.log("🔍 Request method:", request.method)
+
   try {
     const cookieStore = cookies()
+    const allCookies = cookieStore.getAll()
+    console.log(
+      "🔍 All cookies:",
+      allCookies.map((c) => ({ name: c.name, value: c.value.substring(0, 20) + "..." })),
+    )
+
     const supabase = createRouteHandlerClient({
       cookies: () => cookieStore,
     })
+
+    console.log("🔍 Supabase client created, attempting to get user...")
 
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
-    console.log("Smart Memory GET - User:", user?.id, "Auth Error:", authError)
+    console.log("🔍 Smart Memory GET - Auth result:", {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      authError: authError?.message,
+      authErrorCode: authError?.status,
+    })
 
     if (authError || !user) {
-      console.log("Smart Memory GET - Unauthorized:", { authError, hasUser: !!user })
+      console.log("❌ Smart Memory GET - Unauthorized:", {
+        authError: authError?.message,
+        hasUser: !!user,
+        cookieCount: allCookies.length,
+        origin: request.headers.get("origin"),
+        referer: request.headers.get("referer"),
+      })
+
       return NextResponse.json(
-        { error: "Unauthorized", details: authError?.message },
+        {
+          error: "Unauthorized",
+          details: authError?.message,
+          debug: {
+            hasUser: !!user,
+            cookieCount: allCookies.length,
+            authErrorCode: authError?.status,
+          },
+        },
         {
           status: 401,
           headers: {
             "Access-Control-Allow-Credentials": "true",
             "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
           },
         },
       )
@@ -32,6 +68,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search")
+
+    console.log("🔍 Querying smart_contexts for user:", user.id, "search:", search)
 
     let query = supabase
       .from("smart_contexts")
@@ -45,10 +83,23 @@ export async function GET(request: NextRequest) {
 
     const { data: memories, error } = await query
 
+    console.log("🔍 Query result:", {
+      memoriesCount: memories?.length || 0,
+      error: error?.message,
+      errorCode: error?.code,
+    })
+
     if (error) {
-      console.error("메모리 조회 오류:", error)
+      console.error("❌ 메모리 조회 오류:", error)
       return NextResponse.json(
-        { error: "Failed to fetch memories", details: error.message },
+        {
+          error: "Failed to fetch memories",
+          details: error.message,
+          debug: {
+            errorCode: error.code,
+            userId: user.id,
+          },
+        },
         {
           status: 500,
           headers: {
@@ -59,7 +110,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log("Smart Memory GET - Success:", memories?.length, "memories found")
+    console.log("✅ Smart Memory GET - Success:", memories?.length, "memories found")
     return NextResponse.json(
       { memories },
       {
@@ -70,9 +121,15 @@ export async function GET(request: NextRequest) {
       },
     )
   } catch (error) {
-    console.error("Smart Memory GET - API 오류:", error)
+    console.error("❌ Smart Memory GET - API 오류:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+        debug: {
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      },
       {
         status: 500,
         headers: {
@@ -85,8 +142,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log("🔍 Smart Memory POST - Request received")
+
   try {
     const cookieStore = cookies()
+    const allCookies = cookieStore.getAll()
+    console.log(
+      "🔍 POST cookies:",
+      allCookies.map((c) => ({ name: c.name, hasValue: !!c.value })),
+    )
+
     const supabase = createRouteHandlerClient({
       cookies: () => cookieStore,
     })
@@ -96,10 +161,14 @@ export async function POST(request: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser()
 
-    console.log("Smart Memory POST - User:", user?.id, "Auth Error:", authError)
+    console.log("🔍 Smart Memory POST - Auth result:", {
+      hasUser: !!user,
+      userId: user?.id,
+      authError: authError?.message,
+    })
 
     if (authError || !user) {
-      console.log("Smart Memory POST - Unauthorized:", { authError, hasUser: !!user })
+      console.log("❌ Smart Memory POST - Unauthorized:", { authError, hasUser: !!user })
       return NextResponse.json(
         { error: "Unauthorized", details: authError?.message },
         {
@@ -113,7 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    console.log("Smart Memory POST - Body:", body)
+    console.log("🔍 Smart Memory POST - Body:", body)
 
     const { content, type, keywords, importance, is_pinned } = body
 
@@ -129,6 +198,8 @@ export async function POST(request: NextRequest) {
         },
       )
     }
+
+    console.log("🔍 Inserting memory into smart_contexts...")
 
     const { data, error } = await supabase
       .from("smart_contexts")
@@ -146,9 +217,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("메모리 저장 오류:", error)
+      console.error("❌ 메모리 저장 오류:", error)
       return NextResponse.json(
-        { error: "Failed to save memory", details: error.message },
+        {
+          error: "Failed to save memory",
+          details: error.message,
+          debug: {
+            errorCode: error.code,
+            userId: user.id,
+          },
+        },
         {
           status: 500,
           headers: {
@@ -159,7 +237,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("Smart Memory POST - Success:", data)
+    console.log("✅ Smart Memory POST - Success:", data)
     return NextResponse.json(
       { memory: data },
       {
@@ -170,9 +248,15 @@ export async function POST(request: NextRequest) {
       },
     )
   } catch (error) {
-    console.error("Smart Memory POST - API 오류:", error)
+    console.error("❌ Smart Memory POST - API 오류:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+        debug: {
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      },
       {
         status: 500,
         headers: {
@@ -227,7 +311,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("메모리 업데이트 오류:", error)
+      console.error("❌ 메모리 업데이트 오류:", error)
       return NextResponse.json(
         { error: "Failed to update memory", details: error.message },
         {
@@ -250,7 +334,7 @@ export async function PUT(request: NextRequest) {
       },
     )
   } catch (error) {
-    console.error("Smart Memory PUT - API 오류:", error)
+    console.error("❌ Smart Memory PUT - API 오류:", error)
     return NextResponse.json(
       { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
       {
@@ -297,7 +381,7 @@ export async function DELETE(request: NextRequest) {
       const { error } = await supabase.from("smart_contexts").delete().eq("user_id", user.id)
 
       if (error) {
-        console.error("전체 메모리 삭제 오류:", error)
+        console.error("❌ 전체 메모리 삭제 오류:", error)
         return NextResponse.json(
           { error: "Failed to delete all memories", details: error.message },
           {
@@ -337,7 +421,7 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase.from("smart_contexts").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) {
-      console.error("메모리 삭제 오류:", error)
+      console.error("❌ 메모리 삭제 오류:", error)
       return NextResponse.json(
         { error: "Failed to delete memory", details: error.message },
         {
@@ -360,7 +444,7 @@ export async function DELETE(request: NextRequest) {
       },
     )
   } catch (error) {
-    console.error("Smart Memory DELETE - API 오류:", error)
+    console.error("❌ Smart Memory DELETE - API 오류:", error)
     return NextResponse.json(
       { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
       {
@@ -376,6 +460,7 @@ export async function DELETE(request: NextRequest) {
 
 // OPTIONS 메서드 추가 (CORS preflight 요청 처리)
 export async function OPTIONS(request: NextRequest) {
+  console.log("🔍 Smart Memory OPTIONS - CORS preflight request")
   return new NextResponse(null, {
     status: 200,
     headers: {
