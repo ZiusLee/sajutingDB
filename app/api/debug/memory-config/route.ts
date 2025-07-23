@@ -8,13 +8,12 @@ export async function POST(request: NextRequest) {
 
     const results = []
 
-    // 1. 환경변수 확인
+    // 1. 환경변수 확인 (ENABLE_SMART_MEMORY 제거)
     const envVars = {
       SUPABASE_URL: !!process.env.SUPABASE_URL,
       SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
       SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
       OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
-      ENABLE_SMART_MEMORY: process.env.ENABLE_SMART_MEMORY,
     }
 
     const missingEnvVars = Object.entries(envVars)
@@ -80,16 +79,19 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 4. 데이터베이스 함수 확인
+    // 4. 데이터베이스 함수 확인 (올바른 파라미터 사용)
     try {
       const supabase = await createClient()
 
-      // 함수 존재 여부 확인
+      // 테스트용 임베딩 벡터 생성
+      const testEmbedding = new Array(1536).fill(0.1)
+
+      // 올바른 파라미터로 함수 호출
       const { data: functions, error: funcError } = await supabase.rpc("find_similar_memory", {
-        query_text: "test",
-        user_id_param: userId || "test-user",
+        user_id: userId || "test-user",
+        content_embedding: testEmbedding,
+        memory_type: "test",
         similarity_threshold: 0.5,
-        max_results: 1,
       })
 
       results.push({

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/utils/supabase/server"
+import { smartMemoryService } from "@/lib/smart-memory-service"
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,23 +10,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
-    // 사용자의 메모리 조회
-    const { data: memories, error } = await supabase
+    // 사용자의 모든 메모리 조회
+    const { data: memories, error } = await smartMemoryService.supabase
       .from("smart_contexts")
       .select("*")
       .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
+      .order("last_referenced", { ascending: false })
 
     if (error) {
       console.error("Error fetching memories:", error)
       return NextResponse.json({ error: "Failed to fetch memories" }, { status: 500 })
     }
 
-    return NextResponse.json({ memories: memories || [] })
+    // 통계 계산
+    const stats = {
+      total: memories?.length || 0,
+      byType:
+        memories?.reduce((acc: Record<string, number>, memory: any) => {
+          acc[memory.type] = (acc[memory.type] || 0) + 1
+          return acc
+        }, {}) || {},
+    }
+
+    return NextResponse.json({
+      memories: memories || [],
+      stats,
+    })
   } catch (error) {
-    console.error("GET /api/smart-memory error:", error)
+    console.error("Smart memory API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -34,99 +45,49 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, memories } = body
+    const { userId, conversationId, userMessage, assistantResponse, memories } = body
 
-    if (!userId || !memories || !Array.isArray(memories)) {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
-    // 메모리 저장
-    const memoriesToInsert = memories.map((memory) => ({
-      user_id: userId,
-      content: memory.content,
-      type: memory.type || "general",
-      importance_score: memory.importance_score || 0.5,
-      metadata: memory.metadata || {},
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }))
-
-    const { data, error } = await supabase.from("smart_contexts").insert(memoriesToInsert).select()
-
-    if (error) {
-      console.error("Error saving memories:", error)
-      return NextResponse.json({ error: "Failed to save memories" }, { status: 500 })
-    }
-
-    console.log(`Successfully saved ${data?.length || 0} memories for user ${userId}`)
-
-    return NextResponse.json({
-      success: true,
-      saved: data?.length || 0,
-      memories: data,
-    })
-  } catch (error) {
-    console.error("POST /api/smart-memory error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { memoryId, content, type } = body
-
-    if (!memoryId || !content) {
-      return NextResponse.json({ error: "Memory ID and content are required" }, { status: 400 })
-    }
-
-    const supabase = await createClient()
-
-    const { data, error } = await supabase
-      .from("smart_contexts")
-      .update({
-        content,
-        type: type || "general",
-        updated_at: new Date().toISOString(),
+    // 직접 메모리 저장 (테스트용)
+    if (memories && Array.isArray(memories)) {
+      const savedMemories = await smartMemoryService.saveMemories(userId, memories, conversationId || "direct-save")
+      return NextResponse.json({
+        success: true,
+        savedMemories,
+        message: `${savedMemories.length}개의 메모리가 저장되었습니다.`,
       })
-      .eq("id", memoryId)
-      .select()
-
-    if (error) {
-      console.error("Error updating memory:", error)
-      return NextResponse.json({ error: "Failed to update memory" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, memory: data?.[0] })
+    // 대화 기반 메모리 처리
+    if (userMessage && assistantResponse) {
+      const result = await smartMemoryService.processConversation(
+        userId,
+        conversationId || `conversation-${Date.now()}`,
+        userMessage,
+        assistantResponse,
+      )
+
+      return NextResponse.json({
+        success: true,
+        result,
+        message: result.savedMemories
+          ? `${result.savedMemories.length}개의 메모리가 저장되었습니다.`
+          : "저장할 메모리가 없습니다.",
+      })
+    }
+
+    return NextResponse.json({ error: "Invalid request format" }, { status: 400 })
   } catch (error) {
-    console.error("PUT /api/smart-memory error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { memoryId } = body
-
-    if (!memoryId) {
-      return NextResponse.json({ error: "Memory ID is required" }, { status: 400 })
-    }
-
-    const supabase = await createClient()
-
-    const { error } = await supabase.from("smart_contexts").delete().eq("id", memoryId)
-
-    if (error) {
-      console.error("Error deleting memory:", error)
-      return NextResponse.json({ error: "Failed to delete memory" }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("DELETE /api/smart-memory error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Smart memory save error:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to process memory",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
