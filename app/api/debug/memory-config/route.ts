@@ -76,10 +76,12 @@ export async function GET() {
     try {
       console.log("🔍 [Debug] Testing functions...")
 
-      // 더미 데이터로 함수 테스트
+      // 올바른 UUID 형식으로 테스트
+      const testUserId = "00000000-0000-0000-0000-000000000000" // 유효한 UUID 형식
       const testEmbedding = new Array(1536).fill(0.1)
+
       const { data, error } = await smartMemoryService.supabase.rpc("find_similar_memory", {
-        user_id: "test-user-id",
+        user_id: testUserId,
         content_embedding: testEmbedding,
         memory_type: "test",
         similarity_threshold: 0.5,
