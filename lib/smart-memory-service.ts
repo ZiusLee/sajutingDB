@@ -43,6 +43,8 @@ class SmartMemoryService {
   // 임베딩 생성
   private async generateEmbedding(text: string): Promise<number[]> {
     try {
+      console.log("🧠 [DEBUG] Generating embedding for text:", text.substring(0, 50))
+
       const response = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
         headers: {
@@ -61,9 +63,10 @@ class SmartMemoryService {
       }
 
       const data = await response.json()
+      console.log("🧠 [DEBUG] Embedding generated successfully")
       return data.data[0].embedding
     } catch (error) {
-      console.error("임베딩 생성 실패:", error)
+      console.error("🧠 [ERROR] Embedding generation failed:", error)
       throw error
     }
   }
@@ -71,6 +74,7 @@ class SmartMemoryService {
   // 메모리 후보 추출
   async extractMemoryCandidate(userMessage: string, assistantResponse: string) {
     try {
+      console.log("🧠 [INFO] Extracting memory candidates from conversation")
       const conversation = `사용자: ${userMessage}\nAI: ${assistantResponse}`
 
       const result = await generateObject({
@@ -103,9 +107,15 @@ ${conversation}
 - 인사말, 감사 인사`,
       })
 
+      console.log("🧠 [INFO] Memory extraction result:", {
+        shouldSave: result.object.shouldSave,
+        memoriesCount: result.object.memories.length,
+        reasoning: result.object.reasoning,
+      })
+
       return result.object
     } catch (error) {
-      console.error("메모리 추출 실패:", error)
+      console.error("🧠 [ERROR] Memory extraction failed:", error)
       return {
         shouldSave: false,
         memories: [],
@@ -117,6 +127,8 @@ ${conversation}
   // 중복 메모리 확인
   private async findSimilarMemory(userId: string, content: string, type: string): Promise<any> {
     try {
+      console.log("🧠 [DEBUG] Finding similar memory for:", { userId, type, content: content.substring(0, 30) })
+
       const embedding = await this.generateEmbedding(content)
 
       const { data, error } = await supabase.rpc("find_similar_memory", {
@@ -127,33 +139,51 @@ ${conversation}
       })
 
       if (error) {
-        console.error("유사 메모리 검색 오류:", error)
+        console.error("🧠 [ERROR] Similar memory search error:", error)
         return null
       }
 
-      return data && data.length > 0 ? data[0] : null
+      const result = data && data.length > 0 ? data[0] : null
+      console.log("🧠 [DEBUG] Similar memory search result:", !!result)
+      return result
     } catch (error) {
-      console.error("유사 메모리 검색 실패:", error)
+      console.error("🧠 [ERROR] Similar memory search failed:", error)
       return null
     }
   }
 
   // 메모리 저장
   async saveMemories(userId: string, memories: any[], conversationId: string) {
+    console.log("🧠 [INFO] Starting to save memories:", {
+      userId,
+      memoriesCount: memories.length,
+      conversationId,
+    })
+
     const savedMemories = []
 
     for (const memory of memories) {
       try {
-        // 중요도 필터링 - 0.6 이상만 저장  
+        console.log("🧠 [DEBUG] Processing memory:", {
+          type: memory.type,
+          importance: memory.importance,
+          content: memory.content.substring(0, 50),
+        })
+
+        // 중요도 필터링 - 0.6 이상만 저장
         if (memory.importance < 0.6) {
-          console.log(`⏭️ Low importance score (${memory.importance}), skipping: ${memory.content.substring(0, 50)}`);
-          continue;
+          console.log(
+            `⏭️ [INFO] Low importance score (${memory.importance}), skipping: ${memory.content.substring(0, 50)}`,
+          )
+          continue
         }
 
         // 중복 확인
         const existingMemory = await this.findSimilarMemory(userId, memory.content, memory.type)
 
         if (existingMemory) {
+          console.log("🔄 [INFO] Updating existing memory:", existingMemory.id)
+
           // 기존 메모리 업데이트
           const { error: updateError } = await supabase
             .from("smart_contexts")
@@ -165,7 +195,7 @@ ${conversation}
             .eq("id", existingMemory.id)
 
           if (updateError) {
-            console.error("메모리 업데이트 실패:", updateError)
+            console.error("🧠 [ERROR] Memory update failed:", updateError)
             continue
           }
 
@@ -177,7 +207,10 @@ ${conversation}
           })
 
           savedMemories.push({ ...existingMemory, action: "updated" })
+          console.log("✅ [INFO] Memory updated successfully")
         } else {
+          console.log("💾 [INFO] Creating new memory")
+
           // 새 메모리 생성
           const embedding = await this.generateEmbedding(memory.content)
 
@@ -200,7 +233,7 @@ ${conversation}
             .single()
 
           if (insertError) {
-            console.error("메모리 저장 실패:", insertError)
+            console.error("🧠 [ERROR] Memory save failed:", insertError)
             continue
           }
 
@@ -212,12 +245,18 @@ ${conversation}
           })
 
           savedMemories.push({ ...newMemory, action: "created" })
+          console.log("✅ [INFO] New memory created successfully:", newMemory.id)
         }
       } catch (error) {
-        console.error("메모리 처리 실패:", error)
+        console.error("🧠 [ERROR] Memory processing failed:", error)
         continue
       }
     }
+
+    console.log("🧠 [INFO] Memory saving completed:", {
+      totalProcessed: memories.length,
+      totalSaved: savedMemories.length,
+    })
 
     return savedMemories
   }
@@ -225,6 +264,8 @@ ${conversation}
   // 관련 메모리 검색
   async getRelevantMemories(userId: string, query: string, limit = 5): Promise<string> {
     try {
+      console.log("🧠 [INFO] Searching relevant memories for user:", userId)
+
       const embedding = await this.generateEmbedding(query)
 
       const { data, error } = await supabase.rpc("search_relevant_memories", {
@@ -235,13 +276,16 @@ ${conversation}
       })
 
       if (error) {
-        console.error("관련 메모리 검색 오류:", error)
+        console.error("🧠 [ERROR] Relevant memory search error:", error)
         return ""
       }
 
       if (!data || data.length === 0) {
+        console.log("🧠 [INFO] No relevant memories found")
         return ""
       }
+
+      console.log("🧠 [INFO] Found relevant memories:", data.length)
 
       // 메모리를 타입별로 그룹화
       const memoryGroups: { [key: string]: any[] } = {}
@@ -276,9 +320,14 @@ ${conversation}
 
       context += "위 정보를 참고하여 개인화된 응답을 제공하세요.\n"
 
+      console.log("🧠 [INFO] Memory context generated:", {
+        contextLength: context.length,
+        memoryGroups: Object.keys(memoryGroups),
+      })
+
       return context
     } catch (error) {
-      console.error("관련 메모리 검색 실패:", error)
+      console.error("🧠 [ERROR] Relevant memory search failed:", error)
       return ""
     }
   }
@@ -286,28 +335,33 @@ ${conversation}
   // 대화 처리 (메인 함수)
   async processConversation(userId: string, conversationId: string, userMessage: string, assistantResponse: string) {
     try {
-      console.log("🧠 Processing conversation for user:", userId)
+      console.log("🧠 [INFO] Processing conversation for user:", {
+        userId,
+        conversationId,
+        userMessageLength: userMessage.length,
+        assistantResponseLength: assistantResponse.length,
+      })
 
       // 메모리 후보 추출
       const extraction = await this.extractMemoryCandidate(userMessage, assistantResponse)
 
       if (!extraction.shouldSave || extraction.memories.length === 0) {
-        console.log("🧠 No memorable information found")
+        console.log("🧠 [INFO] No memorable information found")
         return extraction
       }
 
       // 메모리 저장
-      console.log("🧠 Saving memories:", extraction.memories.length)
+      console.log("🧠 [INFO] Saving memories:", extraction.memories.length)
       const savedMemories = await this.saveMemories(userId, extraction.memories, conversationId)
 
-      console.log("🧠 Successfully saved memories:", savedMemories.length)
+      console.log("🧠 [INFO] Successfully saved memories:", savedMemories.length)
 
       return {
         ...extraction,
         savedMemories,
       }
     } catch (error) {
-      console.error("Memory save failed:", error)
+      console.error("🧠 [ERROR] Memory processing failed:", error)
       throw error
     }
   }
@@ -315,6 +369,8 @@ ${conversation}
   // 메모리 통계
   async getMemoryStats(userId: string) {
     try {
+      console.log("🧠 [DEBUG] Getting memory stats for user:", userId)
+
       const { data, error } = await supabase.from("smart_contexts").select("type").eq("user_id", userId)
 
       if (error) {
@@ -326,12 +382,14 @@ ${conversation}
         stats[memory.type] = (stats[memory.type] || 0) + 1
       })
 
+      console.log("🧠 [DEBUG] Memory stats:", { total: data.length, byType: stats })
+
       return {
         total: data.length,
         byType: stats,
       }
     } catch (error) {
-      console.error("메모리 통계 조회 실패:", error)
+      console.error("🧠 [ERROR] Memory stats query failed:", error)
       return { total: 0, byType: {} }
     }
   }
@@ -339,6 +397,8 @@ ${conversation}
   // 오래된 메모리 정리
   async cleanupOldMemories(userId: string, keepCount = 1000) {
     try {
+      console.log("🧠 [INFO] Cleaning up old memories for user:", userId)
+
       const { data: oldMemories, error } = await supabase
         .from("smart_contexts")
         .select("id")
@@ -347,6 +407,7 @@ ${conversation}
         .limit(Math.max(0, keepCount))
 
       if (error || !oldMemories || oldMemories.length <= keepCount) {
+        console.log("🧠 [INFO] No memories to cleanup")
         return 0
       }
 
@@ -358,9 +419,10 @@ ${conversation}
         throw deleteError
       }
 
+      console.log("🧠 [INFO] Cleaned up memories:", idsToDelete.length)
       return idsToDelete.length
     } catch (error) {
-      console.error("메모리 정리 실패:", error)
+      console.error("🧠 [ERROR] Memory cleanup failed:", error)
       return 0
     }
   }
