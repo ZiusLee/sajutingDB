@@ -33,7 +33,12 @@ export function useSmartMemory(userId?: string) {
         url.searchParams.set("search", search)
       }
 
-      const response = await fetch(url.toString())
+      const response = await fetch(url.toString(), {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
       const data = await response.json()
 
       if (!response.ok) {
@@ -58,6 +63,7 @@ export function useSmartMemory(userId?: string) {
     try {
       const response = await fetch("/api/smart-memory", {
         method: "PUT",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -93,6 +99,10 @@ export function useSmartMemory(userId?: string) {
     try {
       const response = await fetch(`/api/smart-memory?id=${id}`, {
         method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
 
       const data = await response.json()
@@ -122,6 +132,10 @@ export function useSmartMemory(userId?: string) {
     try {
       const response = await fetch("/api/smart-memory?deleteAll=true", {
         method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
 
       const data = await response.json()
