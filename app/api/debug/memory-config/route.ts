@@ -1,154 +1,153 @@
-import { NextResponse } from "next/server"
-import { smartMemoryService } from "@/lib/smart-memory-service"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/utils/supabase/server"
 
-export async function GET() {
+export async function POST(request: NextRequest) {
   try {
-    console.log("🔍 [Debug] Starting memory config check...")
+    const body = await request.json()
+    const { userId } = body
 
-    // 환경변수 확인
-    const config = {
-      supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      supabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      openaiKey: !!process.env.OPENAI_API_KEY,
-      enableSmartMemory: process.env.ENABLE_SMART_MEMORY !== "false",
-      nodeEnv: process.env.NODE_ENV,
-      urls: {
-        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "...",
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        hasOpenAI: !!process.env.OPENAI_API_KEY,
-      },
+    const results = []
+
+    // 1. 환경변수 확인
+    const envVars = {
+      SUPABASE_URL: !!process.env.SUPABASE_URL,
+      SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+      ENABLE_SMART_MEMORY: process.env.ENABLE_SMART_MEMORY,
     }
 
-    console.log("🔍 [Debug] Config check:", config)
+    const missingEnvVars = Object.entries(envVars)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key)
 
-    // 데이터베이스 연결 테스트
-    let dbTest = { connected: false, error: null, details: null }
+    results.push({
+      section: "환경변수",
+      status: missingEnvVars.length === 0 ? "success" : "error",
+      message:
+        missingEnvVars.length === 0
+          ? "모든 필수 환경변수가 설정되었습니다."
+          : `누락된 환경변수: ${missingEnvVars.join(", ")}`,
+      details: envVars,
+    })
+
+    // 2. 데이터베이스 연결 확인
     try {
-      console.log("🔍 [Debug] Testing database connection...")
-      const { data, error, count } = await smartMemoryService.supabase
+      const supabase = await createClient()
+
+      // 간단한 쿼리로 연결 테스트
+      const { data, error } = await supabase.from("smart_contexts").select("count").limit(1)
+
+      results.push({
+        section: "데이터베이스 연결",
+        status: error ? "error" : "success",
+        message: error ? `연결 실패: ${error.message}` : "데이터베이스 연결이 정상입니다.",
+        details: error ? { error: error.message } : { connected: true },
+      })
+    } catch (dbError) {
+      results.push({
+        section: "데이터베이스 연결",
+        status: "error",
+        message: `연결 오류: ${dbError instanceof Error ? dbError.message : "알 수 없는 오류"}`,
+        details: { error: dbError },
+      })
+    }
+
+    // 3. 테이블 구조 확인
+    try {
+      const supabase = await createClient()
+
+      const { data: tableData, error: tableError } = await supabase
         .from("smart_contexts")
-        .select("*", { count: "exact", head: true })
+        .select("*")
+        .eq("user_id", userId || "test-user")
         .limit(1)
 
-      if (error) {
-        console.error("🔍 [Debug] DB connection error:", error)
-        dbTest = { connected: false, error: error.message, details: error }
-      } else {
-        console.log("🔍 [Debug] DB connection success, count:", count)
-        dbTest = { connected: true, error: null, details: { count } }
-      }
-    } catch (err) {
-      console.error("🔍 [Debug] DB connection exception:", err)
-      dbTest = {
-        connected: false,
-        error: err instanceof Error ? err.message : "Unknown error",
-        details: err,
-      }
+      results.push({
+        section: "테이블 접근",
+        status: tableError ? "error" : "success",
+        message: tableError
+          ? `테이블 접근 실패: ${tableError.message}`
+          : "smart_contexts 테이블에 정상적으로 접근할 수 있습니다.",
+        details: tableError ? { error: tableError.message } : { accessible: true },
+      })
+    } catch (tableError) {
+      results.push({
+        section: "테이블 접근",
+        status: "error",
+        message: `테이블 오류: ${tableError instanceof Error ? tableError.message : "알 수 없는 오류"}`,
+        details: { error: tableError },
+      })
     }
 
-    // 테이블 구조 확인
-    let tableTest = { exists: false, error: null, details: null }
+    // 4. 데이터베이스 함수 확인
     try {
-      console.log("🔍 [Debug] Testing table structure...")
-      const { data, error } = await smartMemoryService.supabase
-        .from("smart_contexts")
-        .select("id, user_id, type, content, importance_score, relevance_embedding")
-        .limit(1)
+      const supabase = await createClient()
 
-      if (error) {
-        console.error("🔍 [Debug] Table structure error:", error)
-        tableTest = { exists: false, error: error.message, details: error }
-      } else {
-        console.log("🔍 [Debug] Table structure OK")
-        tableTest = { exists: true, error: null, details: { sampleCount: data?.length || 0 } }
-      }
-    } catch (err) {
-      console.error("🔍 [Debug] Table structure exception:", err)
-      tableTest = {
-        exists: false,
-        error: err instanceof Error ? err.message : "Unknown error",
-        details: err,
-      }
-    }
-
-    // 함수 존재 확인
-    let functionsTest = { exists: false, error: null, details: null }
-    try {
-      console.log("🔍 [Debug] Testing functions...")
-
-      // 올바른 UUID 형식으로 테스트
-      const testUserId = "00000000-0000-0000-0000-000000000000" // 유효한 UUID 형식
-      const testEmbedding = new Array(1536).fill(0.1)
-
-      const { data, error } = await smartMemoryService.supabase.rpc("find_similar_memory", {
-        user_id: testUserId,
-        content_embedding: testEmbedding,
-        memory_type: "test",
+      // 함수 존재 여부 확인
+      const { data: functions, error: funcError } = await supabase.rpc("find_similar_memory", {
+        query_text: "test",
+        user_id_param: userId || "test-user",
         similarity_threshold: 0.5,
+        max_results: 1,
       })
 
-      if (error) {
-        console.error("🔍 [Debug] Functions error:", error)
-        functionsTest = { exists: false, error: error.message, details: error }
-      } else {
-        console.log("🔍 [Debug] Functions OK")
-        functionsTest = { exists: true, error: null, details: { resultCount: data?.length || 0 } }
-      }
-    } catch (err) {
-      console.error("🔍 [Debug] Functions exception:", err)
-      functionsTest = {
-        exists: false,
-        error: err instanceof Error ? err.message : "Unknown error",
-        details: err,
-      }
+      results.push({
+        section: "데이터베이스 함수",
+        status: funcError ? "error" : "success",
+        message: funcError
+          ? `함수 호출 실패: ${funcError.message}`
+          : "find_similar_memory 함수가 정상적으로 작동합니다.",
+        details: funcError ? { error: funcError.message } : { functions_available: true },
+      })
+    } catch (funcError) {
+      results.push({
+        section: "데이터베이스 함수",
+        status: "error",
+        message: `함수 오류: ${funcError instanceof Error ? funcError.message : "알 수 없는 오류"}`,
+        details: { error: funcError },
+      })
     }
 
-    // OpenAI API 테스트
-    let openaiTest = { working: false, error: null, details: null }
+    // 5. OpenAI API 확인
     if (process.env.OPENAI_API_KEY) {
       try {
-        console.log("🔍 [Debug] Testing OpenAI API...")
         const response = await fetch("https://api.openai.com/v1/models", {
           headers: {
             Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           },
         })
 
-        if (response.ok) {
-          console.log("🔍 [Debug] OpenAI API OK")
-          openaiTest = { working: true, error: null, details: { status: response.status } }
-        } else {
-          console.error("🔍 [Debug] OpenAI API error:", response.status)
-          openaiTest = { working: false, error: `HTTP ${response.status}`, details: { status: response.status } }
-        }
-      } catch (err) {
-        console.error("🔍 [Debug] OpenAI API exception:", err)
-        openaiTest = {
-          working: false,
-          error: err instanceof Error ? err.message : "Unknown error",
-          details: err,
-        }
+        results.push({
+          section: "OpenAI API",
+          status: response.ok ? "success" : "error",
+          message: response.ok ? "OpenAI API 키가 유효합니다." : `API 키 오류: HTTP ${response.status}`,
+          details: { status: response.status },
+        })
+      } catch (apiError) {
+        results.push({
+          section: "OpenAI API",
+          status: "error",
+          message: `API 연결 오류: ${apiError instanceof Error ? apiError.message : "알 수 없는 오류"}`,
+          details: { error: apiError },
+        })
       }
+    } else {
+      results.push({
+        section: "OpenAI API",
+        status: "warning",
+        message: "OpenAI API 키가 설정되지 않았습니다.",
+        details: { api_key_missing: true },
+      })
     }
 
-    const result = {
-      config,
-      dbTest,
-      tableTest,
-      functionsTest,
-      openaiTest,
-      timestamp: new Date().toISOString(),
-    }
-
-    console.log("🔍 [Debug] Final result:", result)
-    return NextResponse.json(result)
+    return NextResponse.json({ results })
   } catch (error) {
-    console.error("🔍 [Debug] Overall error:", error)
+    console.error("Debug check error:", error)
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
-        details: error,
-        timestamp: new Date().toISOString(),
+        error: "Debug check failed",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
