@@ -4,21 +4,7 @@ import { generateObject } from "ai"
 import { z } from "zod"
 
 // Supabase 클라이언트 생성
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-console.log("🔧 [SmartMemoryService] 환경변수 확인:", {
-  supabaseUrl: supabaseUrl ? "SET" : "MISSING",
-  supabaseServiceKey: supabaseServiceKey ? "SET" : "MISSING",
-  openaiKey: process.env.OPENAI_API_KEY ? "SET" : "MISSING",
-})
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error("❌ [SmartMemoryService] 필수 환경변수 누락")
-  throw new Error("Missing required environment variables for Supabase")
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
@@ -154,32 +140,21 @@ ${conversation}
 
   // 메모리 저장
   async saveMemories(userId: string, memories: any[], conversationId: string) {
-    console.log(
-      `🧠 [saveMemories] 시작 - userId: ${userId}, memories: ${memories.length}, conversationId: ${conversationId}`,
-    )
-
     const savedMemories = []
 
     for (const memory of memories) {
       try {
-        console.log(
-          `🧠 [saveMemories] 처리 중 - type: ${memory.type}, importance: ${memory.importance}, content: ${memory.content.substring(0, 50)}...`,
-        )
-
-        // 중요도 필터링 - 0.6 이상만 저장
+        // 중요도 필터링 - 0.6 이상만 저장  
         if (memory.importance < 0.6) {
-          console.log(`⏭️ [saveMemories] 중요도 낮음 (${memory.importance}), 건너뜀: ${memory.content.substring(0, 50)}`)
-          continue
+          console.log(`⏭️ Low importance score (${memory.importance}), skipping: ${memory.content.substring(0, 50)}`);
+          continue;
         }
 
         // 중복 확인
-        console.log(`🔍 [saveMemories] 중복 확인 중...`)
         const existingMemory = await this.findSimilarMemory(userId, memory.content, memory.type)
-        console.log(`🔍 [saveMemories] 중복 확인 결과:`, existingMemory ? "Found existing" : "New memory")
 
         if (existingMemory) {
           // 기존 메모리 업데이트
-          console.log(`🔄 [saveMemories] 기존 메모리 업데이트 중... ID: ${existingMemory.id}`)
           const { error: updateError } = await supabase
             .from("smart_contexts")
             .update({
@@ -190,89 +165,60 @@ ${conversation}
             .eq("id", existingMemory.id)
 
           if (updateError) {
-            console.error("❌ [saveMemories] 메모리 업데이트 실패:", updateError)
+            console.error("메모리 업데이트 실패:", updateError)
             continue
           }
 
-          console.log(`✅ [saveMemories] 메모리 업데이트 성공`)
-
           // 메모리 링크 추가
-          const { error: linkError } = await supabase.from("conversation_memory_links").insert({
+          await supabase.from("conversation_memory_links").insert({
             conversation_id: conversationId,
             memory_id: existingMemory.id,
             usage_type: "referenced",
           })
 
-          if (linkError) {
-            console.error("❌ [saveMemories] 메모리 링크 생성 실패:", linkError)
-          } else {
-            console.log(`✅ [saveMemories] 메모리 링크 생성 성공`)
-          }
-
           savedMemories.push({ ...existingMemory, action: "updated" })
         } else {
           // 새 메모리 생성
-          console.log(`🆕 [saveMemories] 새 메모리 생성 중...`)
-
           const embedding = await this.generateEmbedding(memory.content)
-          console.log(`🔤 [saveMemories] 임베딩 생성 완료, 길이: ${embedding.length}`)
-
-          const insertData = {
-            user_id: userId,
-            type: memory.type,
-            content: memory.content,
-            source_context: memory.context || null,
-            importance_score: memory.importance,
-            relevance_embedding: embedding,
-            first_mentioned: new Date().toISOString(),
-            last_referenced: new Date().toISOString(),
-            reference_count: 1,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-
-          console.log(`💾 [saveMemories] 데이터베이스 삽입 시도:`, {
-            ...insertData,
-            relevance_embedding: `[${embedding.length} elements]`,
-          })
 
           const { data: newMemory, error: insertError } = await supabase
             .from("smart_contexts")
-            .insert(insertData)
+            .insert({
+              user_id: userId,
+              type: memory.type,
+              content: memory.content,
+              source_context: memory.context || null,
+              importance_score: memory.importance,
+              relevance_embedding: embedding,
+              first_mentioned: new Date().toISOString(),
+              last_referenced: new Date().toISOString(),
+              reference_count: 1,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
             .select()
             .single()
 
           if (insertError) {
-            console.error("❌ [saveMemories] 메모리 저장 실패:", insertError)
-            console.error("❌ [saveMemories] 삽입 데이터:", insertData)
+            console.error("메모리 저장 실패:", insertError)
             continue
           }
 
-          console.log(`✅ [saveMemories] 메모리 저장 성공, ID: ${newMemory.id}`)
-
           // 메모리 링크 추가
-          const { error: linkError } = await supabase.from("conversation_memory_links").insert({
+          await supabase.from("conversation_memory_links").insert({
             conversation_id: conversationId,
             memory_id: newMemory.id,
             usage_type: "created",
           })
 
-          if (linkError) {
-            console.error("❌ [saveMemories] 메모리 링크 생성 실패:", linkError)
-          } else {
-            console.log(`✅ [saveMemories] 메모리 링크 생성 성공`)
-          }
-
           savedMemories.push({ ...newMemory, action: "created" })
         }
       } catch (error) {
-        console.error("❌ [saveMemories] 메모리 처리 실패:", error)
-        console.error("❌ [saveMemories] 실패한 메모리:", memory)
+        console.error("메모리 처리 실패:", error)
         continue
       }
     }
 
-    console.log(`🎯 [saveMemories] 완료 - 총 ${savedMemories.length}개 메모리 처리됨`)
     return savedMemories
   }
 

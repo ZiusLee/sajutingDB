@@ -1,262 +1,231 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react"
+import { useSmartMemory } from "@/hooks/use-smart-memory"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/hooks/use-toast"
-import { Loader2, Search, Filter, Trash2, RefreshCw } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Brain, Search, Trash2, RefreshCw, X } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
 
-interface Memory {
+interface SmartMemory {
   id: string
-  type: string
+  user_id: string
   content: string
-  importance_score: number
-  reference_count: number
-  first_mentioned: string
-  last_referenced: string
+  type: string
+  keywords: string
+  importance: number
+  is_pinned: boolean
   created_at: string
+  updated_at: string
 }
 
 interface MemoryDashboardProps {
   userId: string
 }
 
-const memoryTypeLabels: Record<string, string> = {
-  identity: "신원정보",
-  goal: "목표/계획",
-  emotion: "감정상태",
-  relationship: "인간관계",
-  interest: "관심사",
-  schedule: "일정",
-  preference: "선호도",
-  situation: "상황",
-}
-
-const getImportanceColor = (score: number) => {
-  if (score >= 0.8) return "bg-red-100 text-red-800"
-  if (score >= 0.6) return "bg-yellow-100 text-yellow-800"
-  return "bg-green-100 text-green-800"
-}
-
-const getImportanceLabel = (score: number) => {
-  if (score >= 0.8) return "높음"
-  if (score >= 0.6) return "보통"
-  return "낮음"
-}
-
 export function MemoryDashboard({ userId }: MemoryDashboardProps) {
-  const [memories, setMemories] = useState<Memory[]>([])
-  const [filteredMemories, setFilteredMemories] = useState<Memory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [stats, setStats] = useState<any>(null)
+  const { memories, loading, error, fetchMemories, deleteMemory, deleteAllMemories, refetch } = useSmartMemory(userId)
 
-  useEffect(() => {
-    loadMemories()
-  }, [userId])
+  const [searchQuery, setSearchQuery] = useState("")
 
-  useEffect(() => {
-    filterMemories()
-  }, [memories, searchTerm, typeFilter])
-
-  const loadMemories = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/smart-memory?userId=${userId}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setMemories(data.memories || [])
-        setStats(data.stats || {})
-      } else {
-        toast({
-          title: "메모리 로드 실패",
-          description: "메모리를 불러오는데 실패했습니다.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("메모리 로드 오류:", error)
-      toast({
-        title: "오류 발생",
-        description: "메모리를 불러오는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
+  const handleSearch = () => {
+    fetchMemories(searchQuery)
   }
 
-  const filterMemories = () => {
-    let filtered = memories
-
-    if (searchTerm) {
-      filtered = filtered.filter((memory) => memory.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    }
-
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((memory) => memory.type === typeFilter)
-    }
-
-    // 중요도와 최근 참조 순으로 정렬
-    filtered.sort((a, b) => {
-      const importanceDiff = b.importance_score - a.importance_score
-      if (Math.abs(importanceDiff) > 0.1) return importanceDiff
-      return new Date(b.last_referenced).getTime() - new Date(a.last_referenced).getTime()
-    })
-
-    setFilteredMemories(filtered)
+  const handleDelete = async (id: string) => {
+    await deleteMemory(id)
   }
 
-  const deleteMemory = async (memoryId: string) => {
-    if (!confirm("이 메모리를 삭제하시겠습니까?")) return
-
-    try {
-      const response = await fetch(`/api/smart-memory/${memoryId}`, {
-        method: "DELETE",
-      })
-
-      if (response.ok) {
-        toast({
-          title: "메모리 삭제됨",
-          description: "메모리가 성공적으로 삭제되었습니다.",
-        })
-        loadMemories()
-      } else {
-        throw new Error("삭제 실패")
-      }
-    } catch (error) {
-      toast({
-        title: "삭제 실패",
-        description: "메모리 삭제에 실패했습니다.",
-        variant: "destructive",
-      })
-    }
+  const clearSearch = () => {
+    setSearchQuery("")
+    refetch()
   }
 
-  if (loading) {
+  if (loading && memories.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <Brain className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>메모리를 불러오는 중...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* 통계 카드 */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Brain className="h-6 w-6" />
+            저장된 메모리
+          </h1>
+          <Button onClick={refetch} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            새로고침
+          </Button>
+        </div>
+        <p className="text-gray-600 text-sm">
+          사주핑이 당신과의 대화에서 기억하고 있는 정보들입니다. 시간이 지나면서 일부 정보는 잊혀질 수 있지만, 저장된
+          메모리는 영구적으로 보관됩니다.
+        </p>
+      </div>
+
+      {/* Search */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input
+            placeholder="메모리 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+            className="pr-8"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+              onClick={clearSearch}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        <Button onClick={handleSearch} disabled={!searchQuery}>
+          <Search className="h-4 w-4 mr-2" />
+          검색
+        </Button>
+      </div>
+
+      {/* Memory List */}
+      <div className="space-y-4">
+        {memories.length === 0 ? (
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-sm text-muted-foreground">총 메모리</div>
+            <CardContent className="text-center py-12">
+              <Brain className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-600 mb-2">
+                {searchQuery ? "검색 결과가 없습니다." : "아직 저장된 메모리가 없습니다."}
+              </p>
+              <p className="text-sm text-gray-500">
+                {searchQuery ? "다른 키워드로 검색해보세요." : "사주핑과 대화하면서 메모리가 자동으로 생성됩니다."}
+              </p>
             </CardContent>
           </Card>
-          {Object.entries(stats.byType || {}).map(([type, count]) => (
-            <Card key={type}>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold">{count as number}</div>
-                <div className="text-sm text-muted-foreground">{memoryTypeLabels[type] || type}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+        ) : (
+          <>
+            {/* Memory Items */}
+            <div className="space-y-3">
+              {memories.map((memory) => (
+                <div
+                  key={memory.id}
+                  className="group bg-gray-50 hover:bg-gray-100 rounded-lg p-4 transition-colors relative"
+                >
+                  <div className="pr-10">
+                    <p className="text-sm leading-relaxed">{memory.content}</p>
+                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                      <span>
+                        {formatDistanceToNow(new Date(memory.created_at), {
+                          addSuffix: true,
+                          locale: ko,
+                        })}
+                      </span>
+                      {memory.importance > 7 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-orange-600 font-medium">중요</span>
+                        </>
+                      )}
+                      {memory.is_pinned && (
+                        <>
+                          <span>•</span>
+                          <span className="text-blue-600 font-medium">고정됨</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
 
-      {/* 필터 및 검색 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>메모리 목록</span>
-            <Button onClick={loadMemories} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              새로고침
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="메모리 내용 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-48">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">모든 타입</SelectItem>
-                {Object.entries(memoryTypeLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* 메모리 목록 */}
-          <div className="space-y-3">
-            {filteredMemories.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {memories.length === 0 ? "저장된 메모리가 없습니다." : "검색 결과가 없습니다."}
-              </div>
-            ) : (
-              filteredMemories.map((memory) => (
-                <Card key={memory.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline">{memoryTypeLabels[memory.type] || memory.type}</Badge>
-                          <Badge className={getImportanceColor(memory.importance_score)}>
-                            {getImportanceLabel(memory.importance_score)}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">참조 {memory.reference_count}회</span>
-                        </div>
-                        <p className="text-sm mb-2">{memory.content}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span>
-                            생성:{" "}
-                            {formatDistanceToNow(new Date(memory.first_mentioned), { addSuffix: true, locale: ko })}
-                          </span>
-                          <span>
-                            최근 참조:{" "}
-                            {formatDistanceToNow(new Date(memory.last_referenced), { addSuffix: true, locale: ko })}
-                          </span>
-                        </div>
-                      </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteMemory(memory.id)}
-                        className="text-red-600 hover:text-red-700"
+                        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>메모리 삭제</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          이 메모리를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(memory.id)}>삭제</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ))}
+            </div>
+
+            {/* Delete All Button */}
+            {memories.length > 0 && (
+              <div className="flex justify-center pt-4">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent"
+                    >
+                      모든 메모리 삭제
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>모든 메모리 삭제</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        정말로 모든 메모리를 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 사주핑이 당신에 대해 기억하고
+                        있던 모든 정보가 사라집니다.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>취소</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteAllMemories} className="bg-red-600 hover:bg-red-700">
+                        모두 삭제
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        )}
+      </div>
+
+      {/* Search Results Info */}
+      {searchQuery && memories.length > 0 && (
+        <div className="text-center text-sm text-gray-500">
+          "{searchQuery}" 검색 결과 {memories.length}개
+        </div>
+      )}
     </div>
   )
 }

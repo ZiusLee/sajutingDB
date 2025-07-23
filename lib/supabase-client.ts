@@ -13,7 +13,7 @@ export function getSupabase() {
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxcndrdHBteXlseHloZ3Nyd2xvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTEzNzA1NzYsImV4cCI6MjAyNjk0NjU3Nn0.Yd_6UO8X_XCZGjopPWbNxIEaW_yXONTkGPJlG_LBHV0",
       options: {
         auth: {
-          persistSession: false,
+          persistSession: true,
           storageKey: "sajuping-auth",
           autoRefreshToken: true,
           detectSessionInUrl: true,
