@@ -1,69 +1,85 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { MemoryDashboard } from "@/components/memory-dashboard"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { MemoryDebugPanel } from "@/components/memory-debug-panel"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 
 export default function MemoryDashboardPage() {
-  const { user, loading } = useAuth()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
-    setIsClient(true)
+    checkAuth()
   }, [])
 
-  useEffect(() => {
-    if (!loading && !user && isClient) {
-      console.log("🔄 [MemoryDashboard] 사용자 미인증, /auth로 리다이렉트")
+  const checkAuth = async () => {
+    try {
+      const response = await fetch("/api/auth/me")
+      if (response.ok) {
+        const userData = await response.json()
+        setUser(userData)
+      } else {
+        router.push("/auth")
+      }
+    } catch (error) {
+      console.error("Auth check failed:", error)
       router.push("/auth")
+    } finally {
+      setLoading(false)
     }
-  }, [user, loading, router, isClient])
+  }
 
-  if (!isClient || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Card className="w-96">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              로딩 중...
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">메모리 대시보드를 준비하고 있습니다.</p>
-          </CardContent>
-        </Card>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="w-96">
-          <CardHeader>
-            <CardTitle>인증 필요</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">로그인이 필요한 페이지입니다.</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return null
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">스마트 메모리 대시보드</h1>
-        <p className="text-muted-foreground mt-2">AI가 기억하는 당신에 대한 정보를 확인하고 관리하세요.</p>
+        <p className="text-muted-foreground mt-2">AI가 기억하는 당신에 대한 정보를 관리하세요</p>
       </div>
 
-      <MemoryDashboard userId={user.id} />
+      <Tabs defaultValue="memories" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="memories">메모리 목록</TabsTrigger>
+          <TabsTrigger value="debug">디버그</TabsTrigger>
+          <TabsTrigger value="stats">통계</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="memories">
+          <MemoryDashboard userId={user.id} />
+        </TabsContent>
+
+        <TabsContent value="debug">
+          <MemoryDebugPanel userId={user.id} />
+        </TabsContent>
+
+        <TabsContent value="stats">
+          <Card>
+            <CardHeader>
+              <CardTitle>메모리 통계</CardTitle>
+              <CardDescription>AI가 학습한 정보의 통계를 확인하세요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">통계 기능은 곧 추가될 예정입니다.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
