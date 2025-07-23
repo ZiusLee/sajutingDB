@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, ChevronRight, RefreshCw, TestTube, Database, Settings } from "lucide-react"
+import { ChevronDown, ChevronRight, RefreshCw, TestTube, Database, Settings, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface DebugResult {
   config?: any
@@ -20,11 +21,16 @@ interface DebugResult {
   timestamp?: string
 }
 
-export function MemoryDebugPanel({ userId }: { userId?: string }) {
+interface MemoryDebugPanelProps {
+  userId: string
+}
+
+export function MemoryDebugPanel({ userId }: MemoryDebugPanelProps) {
   const [result, setResult] = useState<DebugResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [testMessage, setTestMessage] = useState("안녕하세요, 저는 개발자로 일하고 있습니다.")
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
+  const { toast } = useToast()
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -89,6 +95,50 @@ export function MemoryDebugPanel({ userId }: { userId?: string }) {
     }
   }
 
+  const runDebugTest = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/smart-memory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "debug",
+          userId: userId,
+          userMessage: "디버그 테스트: 저는 프론트엔드 개발자입니다.",
+          assistantResponse: "프론트엔드 개발자시군요! 어떤 프레임워크를 주로 사용하시나요?",
+          conversationId: `debug-${Date.now()}`,
+        }),
+      })
+
+      const data = await response.json()
+      setResult(data)
+
+      if (data.success) {
+        toast({
+          title: "디버그 테스트 성공",
+          description: "메모리 시스템이 정상적으로 작동합니다.",
+        })
+      } else {
+        toast({
+          title: "디버그 테스트 실패",
+          description: data.error || "알 수 없는 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Debug test failed:", error)
+      toast({
+        title: "디버그 테스트 실패",
+        description: "네트워크 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const StatusBadge = ({ status, label }: { status: boolean | null; label: string }) => (
     <Badge variant={status === true ? "default" : status === false ? "destructive" : "secondary"}>
       {status === true ? "✅" : status === false ? "❌" : "⏳"} {label}
@@ -102,6 +152,7 @@ export function MemoryDebugPanel({ userId }: { userId?: string }) {
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />🧠 스마트 메모리 디버그 패널
           </CardTitle>
+          <CardDescription>스마트 메모리 시스템의 작동 상태를 테스트합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2 flex-wrap">
@@ -109,6 +160,10 @@ export function MemoryDebugPanel({ userId }: { userId?: string }) {
               <Database className="h-4 w-4" />
               {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
               환경 설정 확인
+            </Button>
+            <Button onClick={runDebugTest} disabled={loading} className="flex items-center gap-2">
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              디버그 테스트 실행
             </Button>
             {userId && (
               <Button onClick={runMemoryTest} disabled={loading} className="flex items-center gap-2">
@@ -328,6 +383,16 @@ export function MemoryDebugPanel({ userId }: { userId?: string }) {
                     </pre>
                   </CollapsibleContent>
                 </Collapsible>
+              )}
+
+              {/* 디버그 테스트 결과 */}
+              {result && (
+                <div className="mt-4">
+                  <h4 className="font-medium mb-2">디버그 테스트 결과:</h4>
+                  <pre className="bg-gray-100 p-4 rounded-md text-sm overflow-auto max-h-96">
+                    {JSON.stringify(result, null, 2)}
+                  </pre>
+                </div>
               )}
             </div>
           )}

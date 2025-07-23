@@ -1,336 +1,316 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import { Brain, Trash2, Pin, PinOff, RefreshCw } from "lucide-react"
-import { MemoryEditDialog } from "./memory-edit-dialog"
+import { useToast } from "@/hooks/use-toast"
+import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 
-interface Memory {
-  id: string
-  type: string
-  content: string
-  importance_score: number
-  reference_count: number
-  is_pinned: boolean
-  first_mentioned: string
-  last_referenced: string
-  created_at: string
-  updated_at: string
+interface MemoryDashboardProps {
+  userId: string
 }
 
-interface MemoryStats {
-  total: number
-  byType: Record<string, number>
+interface ConfigCheck {
+  config: {
+    supabaseUrl: boolean
+    supabaseServiceKey: boolean
+    openaiKey: boolean
+    enableSmartMemory: boolean
+    nodeEnv: string
+  }
+  dbTest: {
+    connected: boolean
+    error: string | null
+    details: any
+  }
+  tableTest: {
+    exists: boolean
+    error: string | null
+    details: any
+  }
+  functionsTest: {
+    exists: boolean
+    error: string | null
+    details: any
+  }
+  openaiTest: {
+    working: boolean
+    error: string | null
+    details: any
+  }
 }
 
-export function MemoryDashboard({ userId }: { userId: string }) {
-  const [memories, setMemories] = useState<Memory[]>([])
-  const [stats, setStats] = useState<MemoryStats>({ total: 0, byType: {} })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
-  const [editDialogOpen, setEditDialogOpen] = useState(false)
+export function MemoryDashboard({ userId }: MemoryDashboardProps) {
+  const [configCheck, setConfigCheck] = useState<ConfigCheck | null>(null)
+  const [isChecking, setIsChecking] = useState(false)
+  const [testResult, setTestResult] = useState<any>(null)
+  const [isTesting, setIsTesting] = useState(false)
+  const { toast } = useToast()
 
-  const typeNames: Record<string, string> = {
-    identity: "신원정보",
-    goal: "목표/계획",
-    emotion: "감정상태",
-    relationship: "인간관계",
-    interest: "관심사",
-    schedule: "일정",
-    preference: "선호도",
-    situation: "상황",
-  }
-
-  const typeColors: Record<string, string> = {
-    identity: "bg-blue-100 text-blue-800",
-    goal: "bg-green-100 text-green-800",
-    emotion: "bg-purple-100 text-purple-800",
-    relationship: "bg-pink-100 text-pink-800",
-    interest: "bg-yellow-100 text-yellow-800",
-    schedule: "bg-orange-100 text-orange-800",
-    preference: "bg-indigo-100 text-indigo-800",
-    situation: "bg-red-100 text-red-800",
-  }
-
-  const loadMemories = async () => {
+  const checkConfig = async () => {
+    setIsChecking(true)
     try {
-      setLoading(true)
-      setError(null)
+      const response = await fetch("/api/debug/memory-config")
+      const data = await response.json()
+      setConfigCheck(data)
 
-      // 메모리 목록 조회
-      const memoriesResponse = await fetch(`/api/smart-memory?userId=${userId}`)
-      if (!memoriesResponse.ok) {
-        throw new Error("메모리 조회 실패")
+      if (response.ok) {
+        toast({
+          title: "환경 설정 확인 완료",
+          description: "모든 설정을 확인했습니다.",
+        })
+      } else {
+        toast({
+          title: "환경 설정 확인 실패",
+          description: data.error || "알 수 없는 오류가 발생했습니다.",
+          variant: "destructive",
+        })
       }
-      const memoriesData = await memoriesResponse.json()
-      setMemories(memoriesData.memories || [])
-
-      // 통계 조회
-      const statsResponse = await fetch(`/api/smart-memory/stats?userId=${userId}`)
-      if (!statsResponse.ok) {
-        throw new Error("통계 조회 실패")
-      }
-      const statsData = await statsResponse.json()
-      setStats(statsData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "알 수 없는 오류")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const deleteMemory = async (memoryId: string) => {
-    try {
-      const response = await fetch(`/api/smart-memory/${memoryId}`, {
-        method: "DELETE",
+    } catch (error) {
+      console.error("Config check failed:", error)
+      toast({
+        title: "환경 설정 확인 실패",
+        description: "네트워크 오류가 발생했습니다.",
+        variant: "destructive",
       })
-
-      if (!response.ok) {
-        throw new Error("메모리 삭제 실패")
-      }
-
-      await loadMemories()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "삭제 실패")
+    } finally {
+      setIsChecking(false)
     }
   }
 
-  const togglePin = async (memoryId: string, isPinned: boolean) => {
+  const testMemorySave = async () => {
+    setIsTesting(true)
     try {
-      const response = await fetch(`/api/smart-memory/${memoryId}`, {
-        method: "PATCH",
+      const response = await fetch("/api/smart-memory", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          is_pinned: !isPinned,
+          action: "test",
+          userId: userId,
+          userMessage: "저는 개발자입니다. 최근에 새로운 프로젝트를 시작했어요.",
+          assistantResponse:
+            "개발자로서 새로운 프로젝트를 시작하신다니 흥미롭네요! 어떤 기술 스택을 사용하실 예정인가요?",
+          conversationId: "test-conversation-" + Date.now(),
         }),
       })
 
-      if (!response.ok) {
-        throw new Error("핀 설정 실패")
-      }
+      const data = await response.json()
+      setTestResult(data)
 
-      await loadMemories()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "핀 설정 실패")
+      if (response.ok && data.success) {
+        toast({
+          title: "메모리 저장 테스트 성공",
+          description: `${data.savedMemories?.length || 0}개의 메모리가 저장되었습니다.`,
+        })
+      } else {
+        toast({
+          title: "메모리 저장 테스트 실패",
+          description: data.error || "알 수 없는 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Memory test failed:", error)
+      toast({
+        title: "메모리 저장 테스트 실패",
+        description: "네트워크 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTesting(false)
     }
   }
 
-  useEffect(() => {
-    loadMemories()
-  }, [userId])
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-          메모리를 불러오는 중...
-        </CardContent>
-      </Card>
-    )
+  const StatusIcon = ({ status }: { status: boolean | null }) => {
+    if (status === null) return <AlertCircle className="h-4 w-4 text-gray-400" />
+    return status ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />
   }
-
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
-    )
-  }
-
-  const groupedMemories = memories.reduce(
-    (acc, memory) => {
-      if (!acc[memory.type]) {
-        acc[memory.type] = []
-      }
-      acc[memory.type].push(memory)
-      return acc
-    },
-    {} as Record<string, Memory[]>,
-  )
 
   return (
     <div className="space-y-6">
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Brain className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">총 메모리</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex gap-4">
+        <Button onClick={checkConfig} disabled={isChecking}>
+          {isChecking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          환경 설정 확인
+        </Button>
+        <Button onClick={testMemorySave} disabled={isTesting} variant="outline">
+          {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          메모리 저장 테스트
+        </Button>
+      </div>
 
-        {Object.entries(stats.byType)
-          .slice(0, 3)
-          .map(([type, count]) => (
-            <Card key={type}>
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">{typeNames[type] || type}</p>
-                  <p className="text-2xl font-bold">{count}</p>
-                  <Progress value={(count / stats.total) * 100} className="h-2" />
+      {configCheck && (
+        <Tabs defaultValue="config" className="w-full">
+          <TabsList>
+            <TabsTrigger value="config">환경 설정</TabsTrigger>
+            <TabsTrigger value="database">데이터베이스</TabsTrigger>
+            <TabsTrigger value="functions">함수</TabsTrigger>
+            <TabsTrigger value="openai">OpenAI</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="config">
+            <Card>
+              <CardHeader>
+                <CardTitle>환경 변수 설정</CardTitle>
+                <CardDescription>필수 환경 변수들의 설정 상태를 확인합니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>Supabase URL</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.config.supabaseUrl} />
+                    <Badge variant={configCheck.config.supabaseUrl ? "default" : "destructive"}>
+                      {configCheck.config.supabaseUrl ? "설정됨" : "누락"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Supabase Service Key</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.config.supabaseServiceKey} />
+                    <Badge variant={configCheck.config.supabaseServiceKey ? "default" : "destructive"}>
+                      {configCheck.config.supabaseServiceKey ? "설정됨" : "누락"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>OpenAI API Key</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.config.openaiKey} />
+                    <Badge variant={configCheck.config.openaiKey ? "default" : "destructive"}>
+                      {configCheck.config.openaiKey ? "설정됨" : "누락"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Smart Memory 활성화</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.config.enableSmartMemory} />
+                    <Badge variant={configCheck.config.enableSmartMemory ? "default" : "secondary"}>
+                      {configCheck.config.enableSmartMemory ? "활성화" : "비활성화"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>환경</span>
+                  <Badge variant="outline">{configCheck.config.nodeEnv}</Badge>
                 </div>
               </CardContent>
             </Card>
-          ))}
-      </div>
+          </TabsContent>
 
-      {/* 메모리 목록 */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>저장된 메모리</CardTitle>
-          <Button onClick={loadMemories} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            새로고침
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {memories.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>아직 저장된 메모리가 없습니다.</p>
-              <p className="text-sm">AI와 대화하면 자동으로 메모리가 생성됩니다.</p>
-            </div>
-          ) : (
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="all">전체 ({stats.total})</TabsTrigger>
-                {Object.entries(stats.byType)
-                  .slice(0, 4)
-                  .map(([type, count]) => (
-                    <TabsTrigger key={type} value={type}>
-                      {typeNames[type]} ({count})
-                    </TabsTrigger>
-                  ))}
-              </TabsList>
+          <TabsContent value="database">
+            <Card>
+              <CardHeader>
+                <CardTitle>데이터베이스 연결</CardTitle>
+                <CardDescription>Supabase 데이터베이스 연결 상태를 확인합니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>데이터베이스 연결</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.dbTest.connected} />
+                    <Badge variant={configCheck.dbTest.connected ? "default" : "destructive"}>
+                      {configCheck.dbTest.connected ? "연결됨" : "연결 실패"}
+                    </Badge>
+                  </div>
+                </div>
+                {configCheck.dbTest.error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-600">{configCheck.dbTest.error}</p>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span>테이블 구조</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.tableTest.exists} />
+                    <Badge variant={configCheck.tableTest.exists ? "default" : "destructive"}>
+                      {configCheck.tableTest.exists ? "정상" : "오류"}
+                    </Badge>
+                  </div>
+                </div>
+                {configCheck.tableTest.error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-600">{configCheck.tableTest.error}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              <TabsContent value="all" className="space-y-4">
-                {memories
-                  .sort((a, b) => {
-                    if (a.is_pinned !== b.is_pinned) {
-                      return a.is_pinned ? -1 : 1
-                    }
-                    return b.importance_score - a.importance_score
-                  })
-                  .map((memory) => (
-                    <MemoryCard
-                      key={memory.id}
-                      memory={memory}
-                      typeNames={typeNames}
-                      typeColors={typeColors}
-                      onEdit={() => {
-                        setSelectedMemory(memory)
-                        setEditDialogOpen(true)
-                      }}
-                      onDelete={() => deleteMemory(memory.id)}
-                      onTogglePin={() => togglePin(memory.id, memory.is_pinned)}
-                    />
-                  ))}
-              </TabsContent>
+          <TabsContent value="functions">
+            <Card>
+              <CardHeader>
+                <CardTitle>데이터베이스 함수</CardTitle>
+                <CardDescription>스마트 메모리에 필요한 데이터베이스 함수들을 확인합니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>메모리 함수</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.functionsTest.exists} />
+                    <Badge variant={configCheck.functionsTest.exists ? "default" : "destructive"}>
+                      {configCheck.functionsTest.exists ? "존재함" : "누락"}
+                    </Badge>
+                  </div>
+                </div>
+                {configCheck.functionsTest.error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-600">{configCheck.functionsTest.error}</p>
+                    {configCheck.functionsTest.error.includes("function") && (
+                      <p className="text-sm text-red-600 mt-2">
+                        💡 해결방법: scripts/create-memory-functions-complete.sql을 실행하세요.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              {Object.entries(groupedMemories).map(([type, typeMemories]) => (
-                <TabsContent key={type} value={type} className="space-y-4">
-                  {typeMemories
-                    .sort((a, b) => {
-                      if (a.is_pinned !== b.is_pinned) {
-                        return a.is_pinned ? -1 : 1
-                      }
-                      return b.importance_score - a.importance_score
-                    })
-                    .map((memory) => (
-                      <MemoryCard
-                        key={memory.id}
-                        memory={memory}
-                        typeNames={typeNames}
-                        typeColors={typeColors}
-                        onEdit={() => {
-                          setSelectedMemory(memory)
-                          setEditDialogOpen(true)
-                        }}
-                        onDelete={() => deleteMemory(memory.id)}
-                        onTogglePin={() => togglePin(memory.id, memory.is_pinned)}
-                      />
-                    ))}
-                </TabsContent>
-              ))}
-            </Tabs>
-          )}
-        </CardContent>
-      </Card>
+          <TabsContent value="openai">
+            <Card>
+              <CardHeader>
+                <CardTitle>OpenAI API</CardTitle>
+                <CardDescription>OpenAI API 연결 상태를 확인합니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>API 연결</span>
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={configCheck.openaiTest.working} />
+                    <Badge variant={configCheck.openaiTest.working ? "default" : "destructive"}>
+                      {configCheck.openaiTest.working ? "정상" : "오류"}
+                    </Badge>
+                  </div>
+                </div>
+                {configCheck.openaiTest.error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-600">{configCheck.openaiTest.error}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      )}
 
-      {/* 편집 다이얼로그 */}
-      {selectedMemory && (
-        <MemoryEditDialog
-          memory={selectedMemory}
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
-          onSave={loadMemories}
-        />
+      {testResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle>메모리 저장 테스트 결과</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="bg-gray-100 p-4 rounded-md text-sm overflow-auto">
+              {JSON.stringify(testResult, null, 2)}
+            </pre>
+          </CardContent>
+        </Card>
       )}
     </div>
-  )
-}
-
-function MemoryCard({
-  memory,
-  typeNames,
-  typeColors,
-  onEdit,
-  onDelete,
-  onTogglePin,
-}: {
-  memory: Memory
-  typeNames: Record<string, string>
-  typeColors: Record<string, string>
-  onEdit: () => void
-  onDelete: () => void
-  onTogglePin: () => void
-}) {
-  return (
-    <Card className={`${memory.is_pinned ? "ring-2 ring-yellow-400" : ""}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge className={typeColors[memory.type] || "bg-gray-100 text-gray-800"}>
-                {typeNames[memory.type] || memory.type}
-              </Badge>
-              <Badge variant="outline">중요도: {Math.round(memory.importance_score * 100)}%</Badge>
-              <Badge variant="outline">참조: {memory.reference_count}회</Badge>
-              {memory.is_pinned && <Pin className="h-4 w-4 text-yellow-500" />}
-            </div>
-            <p className="text-sm text-gray-900">{memory.content}</p>
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <span>생성: {new Date(memory.created_at).toLocaleDateString()}</span>
-              <span>최근 참조: {new Date(memory.last_referenced).toLocaleDateString()}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 ml-4">
-            <Button variant="ghost" size="sm" onClick={onTogglePin}>
-              {memory.is_pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onEdit}>
-              편집
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-600 hover:text-red-700">
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   )
 }

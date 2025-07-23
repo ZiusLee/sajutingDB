@@ -1,32 +1,39 @@
-import { redirect } from "next/navigation"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+"use client"
+
+import { useAuth } from "@/contexts/auth-context"
 import { MemoryDashboard } from "@/components/memory-dashboard"
-import { MemoryDebugPanel } from "@/components/memory-debug-panel"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
-export default async function MemoryDashboardPage() {
-  const supabase = createServerComponentClient({ cookies })
+export default function MemoryDashboardPage() {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/auth")
+    }
+  }, [user, isLoading, router])
 
-  if (!session) {
-    redirect("/auth")
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">🧠 스마트 메모리 대시보드</h1>
-        <p className="text-gray-600">AI가 기억하는 당신에 대한 정보를 관리하세요</p>
-      </div>
-
-      {/* 디버그 패널 */}
-      <MemoryDebugPanel userId={session.user.id} />
-
-      {/* 메모리 대시보드 */}
-      <MemoryDashboard userId={session.user.id} />
+    <div className="container mx-auto py-8">
+      <h1 className="text-2xl font-bold mb-6">스마트 메모리 대시보드</h1>
+      <MemoryDashboard userId={user.id} />
     </div>
   )
 }
