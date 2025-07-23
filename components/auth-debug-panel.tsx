@@ -3,130 +3,137 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { debugAuthState } from "@/lib/supabase-client"
-import { useAuth } from "@/contexts/auth-context"
+import { smartMemoryService } from "@/lib/smart-memory-service"
+import { useAuth } from "@/hooks/use-auth"
 
 export function AuthDebugPanel() {
   const [debugInfo, setDebugInfo] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const [testResult, setTestResult] = useState<any>(null)
+  const [testContent, setTestContent] = useState("테스트 메모리 내용")
+  const [loading, setLoading] = useState(false)
+  const { user } = useAuth()
 
-  const handleDebug = async () => {
-    setIsLoading(true)
+  const handleAuthDebug = async () => {
+    setLoading(true)
     try {
       const info = await debugAuthState()
       setDebugInfo(info)
     } catch (error) {
-      console.error("Debug error:", error)
-      setDebugInfo({ error: error instanceof Error ? error.message : "Unknown error" })
+      console.error("Debug failed:", error)
+      setDebugInfo({ error: error.message })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const testSmartMemoryAPI = async () => {
+  const handleSmartMemoryTest = async () => {
+    if (!user?.id) {
+      setTestResult({ error: "User not authenticated" })
+      return
+    }
+
+    setLoading(true)
     try {
-      console.log("🧪 Testing Smart Memory API...")
+      // API 테스트
+      const apiResponse = await fetch("/api/smart-memory")
+      const apiResult = await apiResponse.json()
 
-      // GET 테스트
-      const getResponse = await fetch("/api/smart-memory")
-      const getResult = await getResponse.json()
-      console.log("GET /api/smart-memory:", {
-        status: getResponse.status,
-        result: getResult,
+      // 직접 저장 테스트
+      const directSave = await smartMemoryService.testSaveMemory(user.id, testContent, "test")
+
+      // 메모리 통계 테스트
+      const stats = await smartMemoryService.getMemoryStats(user.id)
+
+      setTestResult({
+        apiTest: {
+          status: apiResponse.status,
+          result: apiResult,
+        },
+        directSave,
+        stats,
       })
-
-      // POST 테스트 (인증된 경우에만)
-      if (getResponse.status === 200) {
-        const postResponse = await fetch("/api/smart-memory", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            content: `테스트 메모리 - ${new Date().toISOString()}`,
-            type: "test",
-            keywords: ["test", "debug"],
-            importance: 1,
-            is_pinned: false,
-          }),
-        })
-        const postResult = await postResponse.json()
-        console.log("POST /api/smart-memory:", {
-          status: postResponse.status,
-          result: postResult,
-        })
-      }
     } catch (error) {
-      console.error("API Test Error:", error)
+      console.error("Smart Memory test failed:", error)
+      setTestResult({ error: error.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleProcessConversationTest = async () => {
+    if (!user?.id) {
+      setTestResult({ error: "User not authenticated" })
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await smartMemoryService.processConversation(
+        user.id,
+        "test-conversation-id",
+        "안녕하세요, 저는 개발자입니다.",
+        "안녕하세요! 개발자시군요. 어떤 분야에서 일하고 계신가요?",
+      )
+
+      setTestResult({ conversationTest: result })
+    } catch (error) {
+      console.error("Conversation test failed:", error)
+      setTestResult({ error: error.message })
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle>인증 상태 디버그 패널</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <Button onClick={handleDebug} disabled={isLoading}>
-            {isLoading ? "디버깅 중..." : "인증 상태 확인"}
-          </Button>
-          <Button onClick={testSmartMemoryAPI} variant="outline">
-            Smart Memory API 테스트
-          </Button>
-        </div>
+    <div className="fixed bottom-4 right-4 z-50">
+      <Card className="w-96 max-h-96 overflow-y-auto">
+        <CardHeader>
+          <CardTitle className="text-sm">🔧 Debug Panel</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Button onClick={handleAuthDebug} disabled={loading} size="sm" className="w-full">
+              인증 상태 확인
+            </Button>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h4 className="font-semibold mb-2">Auth Context</h4>
-            <div className="space-y-1 text-sm">
-              <div>
-                인증됨:{" "}
-                <Badge variant={isAuthenticated ? "default" : "destructive"}>{isAuthenticated ? "예" : "아니오"}</Badge>
-              </div>
-              <div>
-                로딩 중: <Badge variant={authLoading ? "secondary" : "outline"}>{authLoading ? "예" : "아니오"}</Badge>
-              </div>
-              <div>사용자 ID: {user?.id || "없음"}</div>
-              <div>이메일: {user?.email || "없음"}</div>
+            <div className="space-y-2">
+              <Input
+                placeholder="테스트 메모리 내용"
+                value={testContent}
+                onChange={(e) => setTestContent(e.target.value)}
+                className="text-xs"
+              />
+              <Button onClick={handleSmartMemoryTest} disabled={loading} size="sm" className="w-full">
+                Smart Memory API 테스트
+              </Button>
+              <Button onClick={handleProcessConversationTest} disabled={loading} size="sm" className="w-full">
+                대화 처리 테스트
+              </Button>
             </div>
           </div>
 
-          <div>
-            <h4 className="font-semibold mb-2">브라우저 정보</h4>
-            <div className="space-y-1 text-sm">
-              <div>현재 URL: {typeof window !== "undefined" ? window.location.href : "서버"}</div>
-              <div>쿠키 개수: {typeof document !== "undefined" ? document.cookie.split(";").length : "알 수 없음"}</div>
-              <div>
-                Supabase 쿠키:{" "}
-                <Badge
-                  variant={
-                    typeof document !== "undefined" && document.cookie.includes("sb-") ? "default" : "destructive"
-                  }
-                >
-                  {typeof document !== "undefined" && document.cookie.includes("sb-") ? "있음" : "없음"}
-                </Badge>
-              </div>
+          {debugInfo && (
+            <div className="text-xs bg-gray-100 p-2 rounded">
+              <strong>인증 정보:</strong>
+              <pre className="whitespace-pre-wrap overflow-x-auto">{JSON.stringify(debugInfo, null, 2)}</pre>
             </div>
-          </div>
-        </div>
+          )}
 
-        {debugInfo && (
-          <div className="mt-4">
-            <h4 className="font-semibold mb-2">디버그 정보</h4>
-            <pre className="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-60">
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </div>
-        )}
+          {testResult && (
+            <div className="text-xs bg-blue-50 p-2 rounded">
+              <strong>테스트 결과:</strong>
+              <pre className="whitespace-pre-wrap overflow-x-auto">{JSON.stringify(testResult, null, 2)}</pre>
+            </div>
+          )}
 
-        <div className="text-xs text-gray-500 mt-4">
-          <p>💡 브라우저 콘솔을 확인하여 추가 로그를 확인하세요.</p>
-          <p>🔧 Production 환경에서는 이 패널을 제거해야 합니다.</p>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="text-xs text-gray-500">
+            <p>현재 사용자: {user?.id || "없음"}</p>
+            <p>환경: {process.env.NODE_ENV}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
