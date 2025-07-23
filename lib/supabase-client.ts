@@ -6,7 +6,6 @@ let supabaseInstance: SupabaseClient | null = null
 
 export function getSupabase() {
   if (!supabaseInstance) {
-    // 세션 지속성을 'local'로 설정하되 persistSession을 false로 설정하여 중복 세션 방지
     supabaseInstance = createClientComponentClient({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://tqrwktpmyylxyhgsrwlo.supabase.co",
       supabaseKey:
@@ -14,7 +13,7 @@ export function getSupabase() {
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxcndrdHBteXlseHloZ3Nyd2xvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTEzNzA1NzYsImV4cCI6MjAyNjk0NjU3Nn0.Yd_6UO8X_XCZGjopPWbNxIEaW_yXONTkGPJlG_LBHV0",
       options: {
         auth: {
-          persistSession: false, // 중복 세션 방지
+          persistSession: false,
           storageKey: "sajuping-auth",
           autoRefreshToken: true,
           detectSessionInUrl: true,
@@ -23,6 +22,11 @@ export function getSupabase() {
     })
   }
   return supabaseInstance
+}
+
+// Export createClient function for compatibility
+export function createClient() {
+  return getSupabase()
 }
 
 // Initialize the Supabase client with environment variables
@@ -35,12 +39,10 @@ const supabaseAnonKey =
 const fileUrlCache: Record<string, string> = {}
 
 // Export the supabase client for backward compatibility
-// Use a getter to ensure we're always using the singleton
 export const supabase = getSupabase()
 
 // Function to get file URL from Supabase storage with caching
 export async function getFileUrl(bucket: string, path: string): Promise<string> {
-  // Check cache first
   const cacheKey = `${bucket}/${path}`
   if (fileUrlCache[cacheKey]) {
     return fileUrlCache[cacheKey]
@@ -55,7 +57,6 @@ export async function getFileUrl(bucket: string, path: string): Promise<string> 
       throw error
     }
 
-    // Cache the URL
     fileUrlCache[cacheKey] = data.publicUrl
     return data.publicUrl
   } catch (error) {
@@ -65,7 +66,6 @@ export async function getFileUrl(bucket: string, path: string): Promise<string> 
 }
 
 // Type definitions for our database tables
-// Update the User interface to reflect the new table name
 export interface User {
   id?: string
   name: string
@@ -76,7 +76,6 @@ export interface User {
   auth_user_id?: string
 }
 
-// Change to SajuSession interface to match the new table name
 export interface SajuSession {
   id?: string
   name: string
@@ -84,7 +83,7 @@ export interface SajuSession {
   gender: string
   relationship_status: string
   is_beta_applicant: boolean
-  auth_user_id?: string // Link to Supabase Auth user
+  auth_user_id?: string
 }
 
 export interface BirthInfo {

@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/use-toast"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { MessageCircle, LogOut, Plus, Star, ChevronDown, ChevronUp, Calendar } from "lucide-react"
+import { MessageCircle, Plus, Star, ChevronDown, ChevronUp, Calendar } from "lucide-react"
 import { getUserSajuProfiles } from "@/lib/saju-session-service"
 import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
@@ -15,6 +16,7 @@ import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession
 import BirthDateFormClient from "@/components/birth-date-form-client"
 import type { Saju } from "@/lib/saju" // Import Saju type
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
+import { SajuLogo } from "@/components/saju-logo"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -335,9 +337,9 @@ export default function MyPage() {
 
         localStorage.setItem("current_saju", JSON.stringify(finalSajuData))
         sessionStorage.setItem("from_mypage", "true")
-        setTimeout(() => {
-          window.location.href = "/saju-chat/sajuping"
-        }, 100)
+
+        // Use router.push instead of window.location.href for better navigation
+        router.push("/saju-chat/sajuping")
       } catch (error) {
         console.error("Error preparing chat data:", error)
         toast({ title: "오류 발생", description: "채팅 준비 중 오류가 발생했습니다.", variant: "destructive" })
@@ -392,13 +394,6 @@ export default function MyPage() {
 
   return (
     <div className="container mx-auto pb-20">
-      <div className="flex justify-between items-center pt-4 px-4">
-        <h1 className="text-xl font-bold">내 사주</h1>
-        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500">
-          <LogOut className="h-4 w-4 mr-2" />
-          로그아웃
-        </Button>
-      </div>
 
       {defaultProfile && (
         <div className="px-4 pt-4 pb-6">

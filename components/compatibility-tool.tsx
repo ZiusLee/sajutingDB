@@ -400,7 +400,7 @@ export default function CompatibilityTool({
           },
         }
         localStorage.setItem(`compatibility_latest`, JSON.stringify(compatibilityData))
-        console.log("궁합 분석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
+        console.log("궁합 ��석 데이터 로컬 스토리지 저장 완료:", compatibilityData)
       } catch (error) {
         console.error("Error saving compatibility data to localStorage:", error)
       }
@@ -410,7 +410,7 @@ export default function CompatibilityTool({
         onAnalyze(mainPerson, selectedPeople)
       }
 
-      // onCompatibilityAnalysis 콜백 호출 (새로운 방식)
+      // onCompatibilityAnalysis 콜백 호출 (새로운 방��)
       if (typeof onCompatibilityAnalysis === "function") {
         onCompatibilityAnalysis(compressedMainPerson, compressedSelectedPeople)
       }
@@ -730,7 +730,7 @@ export default function CompatibilityTool({
 
               <div className="flex space-x-2">
                 <Button onClick={handleAddPerson} disabled={isLoading} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                  {isLoading ? "계산 중..." : "추가"}
+                  {isLoading ? "��산 중..." : "추가"}
                 </Button>
                 <Button
                   variant="outline"

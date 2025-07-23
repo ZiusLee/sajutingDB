@@ -15,7 +15,7 @@ import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
 import { syncLocalStorageToDatabase } from "@/lib/data-sync"
 import { useToast } from "@/components/ui/use-toast"
-import { getSupabase } from "@/lib/supabase-client"
+import { supabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
 import { CitySearch } from "@/components/city-search"
 import { DEFAULT_CITY_ID, getCityById } from "@/lib/city-timezone-data"
@@ -54,10 +54,9 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
     const checkAuthAndLinkData = async () => {
       try {
         console.log("Checking authentication status...")
-        const supabaseClient = getSupabase()
         const {
           data: { session },
-        } = await supabaseClient.auth.getSession()
+        } = await supabase.auth.getSession()
 
         if (session && session.user) {
           console.log("User is authenticated with Supabase:", session.user.id)
@@ -122,13 +121,18 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         const parsedTime = parseTimeInput(time)
         hour = parsedTime.hour
         minute = parsedTime.minute
+        console.log("Time parsing result:", { input: time, parsed: { hour, minute } })
+      } else {
+        console.log("Time unknown, using default 00:00")
       }
 
+      // 음력 날짜 정보 가져오기 - API 호출 대신 로컬 계산 사용
       try {
-        // 음력 날짜 정보 가져오기 (API 호출)
+        console.log("Attempting to fetch lunar date via API...")
         lunarData = await fetchLunarDate(year, month, day)
+        console.log("Successfully fetched lunar date from API:", lunarData)
       } catch (apiError) {
-        console.error("API error, falling back to local calculation:", apiError)
+        console.log("API call failed, using local lunar calculation:", apiError)
 
         // API 호출 실패 시 로컬 계산으로 대체
         const localLunarDate = solarToLunar(Number.parseInt(year), Number.parseInt(month), Number.parseInt(day))
@@ -141,6 +145,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
           monthStem: localLunarDate.monthStem,
           monthBranch: localLunarDate.monthBranch,
         }
+        console.log("Local lunar calculation result:", lunarData)
       }
 
       setLunarDate(lunarData)
@@ -200,19 +205,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
       // 사주 결과에 대운 데이터 추가
       sajuResult.daeun = daeunData
 
-      // 대운 계산 추가
-      // const daeunData = calculateDaeunInfo(
-      //   sajuResult,
-      //   Number.parseInt(year),
-      //   Number.parseInt(month),
-      //   Number.parseInt(day),
-      //   gender,
-      //   timeUnknown ? undefined : hour,
-      //   timeUnknown ? undefined : minute,
-      // )
-
-      // console.log("Calculated daeun data:", daeunData)
-
       // Store calculation data in localStorage for later use
       const sajuDataToStore = {
         name,
@@ -239,11 +231,11 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         monthStemHanja: sajuResult.monthStemHanja,
         monthBranchHanja: sajuResult.monthBranchHanja,
         dayStem: sajuResult.dayStem,
-        dayBranch: sajuResult.dayBranchHanja,
+        dayBranch: sajuResult.dayBranch,
         dayStemHanja: sajuResult.dayStemHanja,
         dayBranchHanja: sajuResult.dayBranchHanja,
         hourStem: sajuResult.hourStem,
-        hourBranch: sajuResult.hourBranchHanja,
+        hourBranch: sajuResult.hourBranch,
         hourStemHanja: sajuResult.hourStemHanja,
         hourBranchHanja: sajuResult.hourBranchHanja,
         dayMaster: sajuResult.dayMaster,
@@ -262,6 +254,13 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         daeun: daeunData, // Include daeun data
       }
 
+      console.log("Storing saju data with time info:", {
+        originalInput: time,
+        parsedHour: hour,
+        parsedMinute: minute,
+        timeUnknown,
+      })
+
       console.log("Storing saju data to localStorage:", sajuDataToStore)
       localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
 
@@ -274,10 +273,9 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         console.log("Attempting to save saju data to database...")
 
         // Get authenticated user ID
-        const supabaseClient = getSupabase()
         const {
           data: { session },
-        } = await supabaseClient.auth.getSession()
+        } = await supabase.auth.getSession()
         const authUserId = session?.user?.id || null
 
         userId = await syncLocalStorageToDatabase(authUserId)
@@ -300,11 +298,6 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
             title: "사주 정보 저장 완료",
             description: `${name}님의 사주 정보가 저장되었습니다.`,
           })
-
-          // Reload the page to show the new saju
-          // window.location.reload()
-          // 사주 계산 완료 후 채팅으로 리디렉션
-          // router.push("/saju-chat/sajuping")
         } else {
           console.warn("Failed to get user ID when saving saju data")
         }
@@ -399,42 +392,68 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
     }
   }
 
-  // 시간 입력값 파싱 함수
+  // 시간 입력값 파��� 함수
   const parseTimeInput = (input: string): { hour: number; minute: number } => {
     // 기본값
     let hour = 0
     let minute = 0
+    const cleanedInput = input.trim()
+
+    console.log("Parsing time input:", cleanedInput)
 
     // 입력값이 없는 경우
-    if (!input.trim()) {
+    if (!cleanedInput) {
+      console.log("Empty input, returning default:", { hour, minute })
       return { hour, minute }
     }
 
-    // 콜론(:)이 포함된 경우 (예: "23:30")
-    if (input.includes(":")) {
-      const [hourStr, minuteStr] = input.split(":")
+    // 콜론(:)이 포함된 경우 (예: "23:30", "00:32")
+    if (cleanedInput.includes(":")) {
+      const [hourStr, minuteStr] = cleanedInput.split(":")
+      hour = Number.parseInt(hourStr, 10) || 0
+      minute = Number.parseInt(minuteStr, 10) || 0
+      console.log("Colon format parsed:", { hourStr, minuteStr, hour, minute })
+    }
+    // 4자리 숫자인 경우 (예: "2330", "0032")
+    else if (cleanedInput.length === 4 && /^\d{4}$/.test(cleanedInput)) {
+      const hourStr = cleanedInput.substring(0, 2)
+      const minuteStr = cleanedInput.substring(2, 4)
       hour = Number.parseInt(hourStr, 10)
       minute = Number.parseInt(minuteStr, 10)
+      console.log("4-digit format parsed:", { hourStr, minuteStr, hour, minute })
     }
-    // 4자리 숫자인 경우 (예: "2330")
-    else if (input.length === 4) {
-      hour = Number.parseInt(input.substring(0, 2), 10)
-      minute = Number.parseInt(input.substring(2), 10)
+    // 3자리 숫자인 경우 (예: "130" -> 1:30)
+    else if (cleanedInput.length === 3 && /^\d{3}$/.test(cleanedInput)) {
+      const hourStr = cleanedInput.substring(0, 1)
+      const minuteStr = cleanedInput.substring(1, 3)
+      hour = Number.parseInt(hourStr, 10)
+      minute = Number.parseInt(minuteStr, 10)
+      console.log("3-digit format parsed:", { hourStr, minuteStr, hour, minute })
     }
-    // 1-2자리 숫자인 경우 (예: "23")
+    // 1-2자리 숫자인 경우 (예: "23", "1")
+    else if (/^\d{1,2}$/.test(cleanedInput)) {
+      hour = Number.parseInt(cleanedInput, 10)
+      minute = 0
+      console.log("1-2 digit format parsed:", { hour, minute })
+    }
+    // 잘못된 형식
     else {
-      hour = Number.parseInt(input, 10)
+      console.warn("Invalid time format:", cleanedInput, "using default 00:00")
+      hour = 0
       minute = 0
     }
 
-    // 유효성 검사
-    if (isNaN(hour)) hour = 0
-    if (isNaN(minute)) minute = 0
+    // 유효성 검사 및 범위 제한
+    if (isNaN(hour) || hour < 0 || hour > 23) {
+      console.warn("Invalid hour:", hour, "setting to 0")
+      hour = 0
+    }
+    if (isNaN(minute) || minute < 0 || minute > 59) {
+      console.warn("Invalid minute:", minute, "setting to 0")
+      minute = 0
+    }
 
-    // 범위 제한
-    hour = Math.max(0, Math.min(23, hour))
-    minute = Math.max(0, Math.min(59, minute))
-
+    console.log("Final parsed time:", { hour, minute })
     return { hour, minute }
   }
 
@@ -442,14 +461,19 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
   const updateUserAuthId = async (sessionId: string) => {
     try {
       // Check if user is authenticated with Supabase Auth
-      const supabaseClient = getSupabase()
       const {
         data: { session },
-      } = await supabaseClient.auth.getSession()
+      } = await supabase.auth.getSession()
 
       if (session && session.user) {
         const authUserId = session.user.id
         console.log("Updating saju session auth_user_id:", sessionId, "with auth user ID:", authUserId)
+
+        // Validate that we have valid string values
+        if (typeof sessionId !== "string" || typeof authUserId !== "string") {
+          console.error("Invalid sessionId or authUserId type:", { sessionId, authUserId })
+          return
+        }
 
         // Update the saju_sessions record with the auth_user_id
         const success = await updateAuthUserId(sessionId, authUserId)
@@ -463,7 +487,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
           })
 
           // Verify the update was successful by checking the database
-          const { data, error } = await supabaseClient
+          const { data, error } = await supabase
             .from("saju_sessions")
             .select("auth_user_id")
             .eq("id", sessionId)
@@ -595,10 +619,13 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
             type="text"
             value={time}
             onChange={(e) => setTime(e.target.value)}
-            placeholder="2330 또는 23:30 형식으로 입력"
+            placeholder="0032 또는 00:32 형식으로 입력 (24시간제)"
             className="w-full"
             disabled={timeUnknown}
           />
+          <div className="text-xs text-muted-foreground">
+            예시: 자정 32분 → 0032 또는 00:32, 오후 11시 30분 → 2330 또는 23:30
+          </div>
         </div>
 
         <Button type="submit" className="w-full py-2.5 text-base" disabled={!birthdate || isSubmitting}>

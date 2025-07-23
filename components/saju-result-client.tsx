@@ -12,11 +12,10 @@ import SajuDiagram from "./saju-diagram"
 import { getSajuInterpretation } from "@/lib/api-client"
 import FeedbackButtons from "./feedback-buttons"
 import { Progress } from "@/components/ui/progress"
-import AdditionalQuestions from "./additional-questions"
-// 추가: useSearchParams 임포트
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import DaeunDiagram from "./daeun-diagram"
+import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 
 interface SajuResultClientProps {
   saju: Saju
@@ -63,7 +62,6 @@ export default function SajuResultClient({
   const [loadingMessages, setLoadingMessages] = useState<string[]>([])
   const loadingAnimationRef = useRef<NodeJS.Timeout | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  // 컴포넌트 내부에서 searchParams 사용
   const searchParams = useSearchParams()
   const router = useRouter()
   const [questionSet, setQuestionSet] = useState<string | null>(null)
@@ -82,10 +80,22 @@ export default function SajuResultClient({
   const sajuKey = `${saju.yearStem}${saju.yearBranch}${saju.monthStem}${saju.monthBranch}${saju.dayStem}${saju.dayBranch}${saju.hourStem || ""}${saju.hourBranch || ""}`
   const storageKey = `saju_interpretation_${sajuKey}`
 
+  // Calculate daeun info
+  const daeunInfo =
+    solarYear && solarMonth && solarDay
+      ? calculateDaeunInfo(
+          saju,
+          Number.parseInt(solarYear),
+          Number.parseInt(solarMonth),
+          Number.parseInt(solarDay),
+          normalizedGender,
+        )
+      : null
+
   // 모바일 감지
   useEffect(() => {
     const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 640)
+      setIsMobile(window.innerWidth < 1024)
     }
 
     checkIfMobile()
@@ -178,7 +188,7 @@ export default function SajuResultClient({
           setLoadingStage("결과 정리 중")
         }
 
-        // 주기적으로 메시지 추가
+        // 주기적���로 메시지 추가
         const now = Date.now()
         if (now - lastMessageTime > messageInterval) {
           lastMessageTime = now
@@ -276,12 +286,14 @@ ${interpretation}
       name: name || "사용자",
       gender: normalizedGender || "male",
       interpretation: interpretation || "",
-      year: solarYear,
-      month: solarMonth,
-      day: solarDay,
-      hour: hour,
-      minute: minute,
-      timeUnknown: timeUnknown,
+      birthInfo: {
+        solarYear: Number.parseInt(solarYear),
+        solarMonth: Number.parseInt(solarMonth),
+        solarDay: Number.parseInt(solarDay),
+        solarHour: Number.parseInt(hour || "12"),
+        solarMinute: Number.parseInt(minute || "0"),
+        timeUnknown: timeUnknown,
+      },
     }
 
     localStorage.setItem("current_saju", JSON.stringify(sajuData))
@@ -305,21 +317,79 @@ ${interpretation}
 
       <Card>
         <CardContent className="p-4">
-          <SajuDiagram
-            saju={saju}
-            timeUnknown={timeUnknown}
-            name={name}
-            gender={normalizedGender}
-            solarYear={solarYear}
-            solarMonth={solarMonth}
-            solarDay={solarDay}
-            hour={hour}
-            minute={minute}
-            lunarYear={lunarYear}
-            lunarMonth={lunarMonth}
-            lunarDay={lunarDay}
-            location={location}
-          />
+          {/* Desktop: Side by side layout */}
+          {!isMobile ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SajuDiagram
+                saju={saju}
+                timeUnknown={timeUnknown}
+                name={name}
+                gender={normalizedGender}
+                solarYear={solarYear}
+                solarMonth={solarMonth}
+                solarDay={solarDay}
+                hour={hour}
+                minute={minute}
+                lunarYear={lunarYear}
+                lunarMonth={lunarMonth}
+                lunarDay={lunarDay}
+                location={location}
+                variant="chat"
+              />
+
+              {daeunInfo && (
+                <DaeunDiagram
+                  daeun={daeunInfo.pillars}
+                  birthInfo={{
+                    solarYear: Number.parseInt(solarYear),
+                    solarMonth: Number.parseInt(solarMonth),
+                    solarDay: Number.parseInt(solarDay),
+                    solarHour: Number.parseInt(hour || "12"),
+                    solarMinute: Number.parseInt(minute || "0"),
+                    timeUnknown: timeUnknown,
+                  }}
+                  name={name}
+                  gender={normalizedGender}
+                />
+              )}
+            </div>
+          ) : (
+            /* Mobile: Stacked layout */
+            <div className="space-y-6">
+              <SajuDiagram
+                saju={saju}
+                timeUnknown={timeUnknown}
+                name={name}
+                gender={normalizedGender}
+                solarYear={solarYear}
+                solarMonth={solarMonth}
+                solarDay={solarDay}
+                hour={hour}
+                minute={minute}
+                lunarYear={lunarYear}
+                lunarMonth={lunarMonth}
+                lunarDay={lunarDay}
+                location={location}
+                variant="card"
+              />
+
+              {daeunInfo && (
+                <DaeunDiagram
+                  daeun={daeunInfo.pillars}
+                  birthInfo={{
+                    solarYear: Number.parseInt(solarYear),
+                    solarMonth: Number.parseInt(solarMonth),
+                    solarDay: Number.parseInt(solarDay),
+                    solarHour: Number.parseInt(hour || "12"),
+                    solarMinute: Number.parseInt(minute || "0"),
+                    timeUnknown: timeUnknown,
+                  }}
+                  name={name}
+                  gender={normalizedGender}
+                />
+              )}
+            </div>
+          )}
 
           {/* 총운 리포트 섹션 */}
           <div className="mt-8">
@@ -352,7 +422,7 @@ ${interpretation}
                 </div>
                 <div className="text-center space-y-1">
                   <p className="font-medium text-primary">{loadingStage}</p>
-                  <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
+                  <p className="text-sm text-muted-foreground">AI가 사��를 심층 분석하고 있습니다.</p>
                 </div>
                 <div className="w-full max-w-xs mt-1">
                   <Progress value={loadingProgress} className="h-1.5" />
@@ -373,7 +443,7 @@ ${interpretation}
             {error && (
               <div className="text-red-500 text-center py-4">
                 <p>오류가 발생했습니다: {error}</p>
-                <Button onClick={fetchInterpretation} className="mt-3" variant="outline" size="sm">
+                <Button onClick={fetchInterpretation} className="mt-3 bg-transparent" variant="outline" size="sm">
                   다시 시도
                 </Button>
               </div>
@@ -390,7 +460,7 @@ ${interpretation}
                 {/* Donation Section */}
                 <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
                   <div className="flex flex-col items-center">
-                    <h3 className="text-xl font-bold mb-3">복채 주면 운이 더 좋아진다냥!</h3>
+                    <h3 className="text-xl font-bold mb-3">복채 주면 운이 더 �����진다냥!</h3>
                     <img src="/images/donation-cat.png" alt="복채 고양이" className="w-32 h-32 object-contain mb-3" />
                     <div className="text-center space-y-1 text-xs dark:text-gray-200">
                       <p>사주 다 보고 나면,오늘 운이 조금 더 잘 풀렸으면 좋겠다냥~ 🐾</p>
@@ -444,56 +514,16 @@ ${interpretation}
                     </div>
                   </div>
                 </div>
-
-                {/* 추가 질문 섹션 */}
-                <div id="additional-questions" className="mt-6">
-                  <AdditionalQuestions
-                    saju={saju}
-                    name={name}
-                    gender={normalizedGender}
-                    model={model}
-                    relationshipStatus={relationshipStatus}
-                    interpretation={interpretation}
-                  />
-                </div>
               </div>
             )}
           </div>
 
-          {/* 대운 다이어그램 */}
-          <div className="mt-8">
-            <DaeunDiagram
-              saju={saju}
-              gender={normalizedGender}
-              solarYear={solarYear}
-              solarMonth={solarMonth}
-              solarDay={solarDay}
-              hour={hour}
-              minute={minute}
-              timeUnknown={timeUnknown}
-            />
-          </div>
-
-          {/* 채팅 버튼 및 대운 분석 버튼 */}
+          {/* 채팅 버튼 */}
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
             <Button className="flex-1 flex items-center justify-center gap-2" onClick={navigateToChatList}>
               <MessageSquare className="h-4 w-4" />
               <span>사주 채팅 상담 시작하기</span>
             </Button>
-            {/* 대운 상세분석 버튼 임시 숨김 - 아직 완성되지 않은 기능 */}
-            {/* <Button variant="outline" className="flex-1" asChild>
-              <Link
-                href={
-                  uuid
-                    ? `/daeun-analysis?uuid=${uuid}`
-                    : sajuParam
-                      ? `/daeun-analysis?saju=${encodeURIComponent(sajuParam)}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                      : `/daeun-analysis?date=${solarYear}${solarMonth}${solarDay}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`
-                }
-              >
-                10년 대운 상세분석
-              </Link>
-            </Button> */}
           </div>
         </CardContent>
       </Card>

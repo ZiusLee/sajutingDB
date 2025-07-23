@@ -7,14 +7,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button"
 
 interface DaeunPeriod {
-  age: number
-  startYear: number
-  endYear: number
+  period: string
+  ages: string
+  start: string
   stem: string
   branch: string
-  stemHanja?: string
-  branchHanja?: string
-  description?: string
+  stemHanja: string
+  branchHanja: string
+  startAge: number
+  endAge: number
 }
 
 interface DaeunDiagramProps {
@@ -37,43 +38,49 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
 
   // 안전한 대운 데이터 처리
   const safeDaeun = useMemo(() => {
-    if (!daeun || !Array.isArray(daeun)) return []
-    return daeun
+    if (!daeun || !Array.isArray(daeun)) {
+      console.log("대운 데이터가 없거나 배열이 아닙니다:", daeun)
+      return []
+    }
+
+    // 유효한 대운 데이터만 필터링
+    const validDaeun = daeun.filter(
+      (period) =>
+        period &&
+        typeof period.startAge === "number" &&
+        period.stem &&
+        period.branch &&
+        period.stemHanja &&
+        period.branchHanja,
+    )
+
+    console.log("유효한 대운 데이터:", validDaeun)
+    return validDaeun
   }, [daeun])
 
-  // 대운 데이터 수정 (연도 계산 오류 수정)
-  const correctedDaeun = useMemo(() => {
-    if (!safeDaeun.length || !birthInfo?.solarYear) return safeDaeun
-
-    return safeDaeun.map((period) => {
-      if (!period || typeof period.age !== "number") return period
-
-      return {
-        ...period,
-        startYear: birthInfo.solarYear + period.age,
-        endYear: birthInfo.solarYear + period.age + 9,
-      }
-    })
-  }, [safeDaeun, birthInfo?.solarYear])
-
-  // 현재 대운 찾기 (메모화하여 무한 리렌더링 방지)
+  // 현재 대운 찾기
   const currentDaeun = useMemo(() => {
-    if (!correctedDaeun.length || !birthInfo?.solarYear) return null
+    if (!safeDaeun.length || !birthInfo?.solarYear) return null
 
     const currentAge = currentYear - birthInfo.solarYear
+    console.log("현재 나이:", currentAge)
 
-    const current = correctedDaeun.find((period) => {
-      if (!period || typeof period.age !== "number") return false
-      return currentAge >= period.age && currentAge < period.age + 10
+    const current = safeDaeun.find((period) => {
+      const isInRange = currentAge >= period.startAge && currentAge <= period.endAge
+      console.log(
+        `대운 ${period.stem}${period.branch} (${period.startAge}-${period.endAge}세): ${isInRange ? "현재" : "아님"}`,
+      )
+      return isInRange
     })
 
+    console.log("현재 대운:", current)
     return current || null
-  }, [correctedDaeun, currentYear, birthInfo?.solarYear])
+  }, [safeDaeun, currentYear, birthInfo?.solarYear])
 
   // 대운 설명 정보
   const daeunExplanation = useMemo(() => {
     const currentDaeunText = currentDaeun
-      ? `${currentDaeun.stem}${currentDaeun.branch} (${currentDaeun.startYear}-${currentDaeun.endYear})`
+      ? `${currentDaeun.stem}${currentDaeun.branch} (${currentDaeun.startAge}-${currentDaeun.endAge}세)`
       : "해당 없음"
 
     return `대운(大運)은 10년 단위로 변화하는 인생의 큰 흐름을 나타냅니다.
@@ -85,158 +92,163 @@ const DaeunDiagram: React.FC<DaeunDiagramProps> = ({ daeun, birthInfo, name, gen
 각 대운 기간을 클릭하면 상세 정보를 확인할 수 있습니다.`
   }, [currentDaeun])
 
-  if (!correctedDaeun.length) {
+  if (!safeDaeun.length) {
+    console.log("대운 데이터가 없어서 빈 상태 표시")
     return (
-      <div className="w-full">
+      <div className="w-full bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">대운표 (大運表)</h3>
+          <h3 className="text-lg font-bold text-gray-800">{name || "사용자"}님의 현재 대운</h3>
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-white/60 hover:text-white p-1">
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600 p-1">
                 <Info className="h-4 w-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-slate-800 border-slate-700">
+            <DialogContent className="bg-white border-gray-200">
               <DialogHeader>
-                <DialogTitle className="text-white">대운표란?</DialogTitle>
+                <DialogTitle className="text-gray-800">대운표란?</DialogTitle>
               </DialogHeader>
-              <div className="text-white/90 whitespace-pre-line text-sm">{daeunExplanation}</div>
+              <div className="text-gray-700 whitespace-pre-line text-sm">{daeunExplanation}</div>
             </DialogContent>
           </Dialog>
         </div>
-        <div className="text-white/60 text-center py-8">대운 정보를 불러올 수 없습니다.</div>
+        <div className="text-gray-400 text-center py-8">대운 정보를 불러올 수 없습니다.</div>
       </div>
     )
   }
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">대운표 (大運表)</h3>
+    <div className="w-full bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-bold text-gray-800">
+          {name || "사용자"}님의 현재 대운: {currentDaeun ? `${currentDaeun.stem}${currentDaeun.branch}` : "미상"}
+        </h3>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-white/60 hover:text-white p-1">
+            <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600 p-1">
               <Info className="h-4 w-4" />
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-slate-800 border-slate-700">
+          <DialogContent className="bg-white border-gray-200">
             <DialogHeader>
-              <DialogTitle className="text-white">대운표란?</DialogTitle>
+              <DialogTitle className="text-gray-800">대운표란?</DialogTitle>
             </DialogHeader>
-            <div className="text-white/90 whitespace-pre-line text-sm">{daeunExplanation}</div>
+            <div className="text-gray-700 whitespace-pre-line text-sm">{daeunExplanation}</div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* 대운 기간들을 가로 스크롤로 표시 */}
-      <div className="overflow-x-auto">
-        <div className="flex gap-2 min-w-max pb-2">
-          {correctedDaeun.slice(0, 8).map((period, index) => {
-            if (!period || !period.stem || !period.branch) return null
-
-            let isCurrent = false
-            let isPast = false
-            let isFuture = false
-
-            if (birthInfo?.solarYear && typeof period.age === "number") {
-              const currentAge = currentYear - birthInfo.solarYear
-              isCurrent = currentAge >= period.age && currentAge < period.age + 10
-              isPast = currentAge >= period.age + 10
-              isFuture = currentAge < period.age
-            }
+      {/* 대운 기간들을 2x4 그리드로 표시 */}
+      <div className="space-y-4">
+        {/* 첫 번째 줄 - 처음 4개 */}
+        <div className="grid grid-cols-4 gap-4">
+          {safeDaeun.slice(0, 4).map((period, index) => {
+            const currentAge = birthInfo?.solarYear ? currentYear - birthInfo.solarYear : 0
+            const isCurrent = currentAge >= period.startAge && currentAge <= period.endAge
 
             return (
-              <div
-                key={`${period.stem}-${period.branch}-${index}`}
-                onClick={() => setSelectedPeriod(period)}
-                className={`
-                  flex-shrink-0 w-24 h-32 border rounded-lg p-2 cursor-pointer transition-all
-                  ${
-                    isCurrent
-                      ? "border-yellow-400 bg-yellow-400/20 shadow-lg"
-                      : isPast
-                        ? "border-gray-500 bg-gray-500/10"
-                        : "border-white/30 bg-white/10 hover:bg-white/20"
-                  }
-                `}
-              >
-                <div className="text-center h-full flex flex-col justify-between">
-                  <div>
-                    <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>{period.age}세</div>
-                    <div className={`text-lg font-bold ${isCurrent ? "text-yellow-100" : "text-white"}`}>
+              <div key={`age-${index}`} className="text-center">
+                <div className="text-sm text-gray-600 mb-2">{period.startAge}세</div>
+                <div
+                  onClick={() => setSelectedPeriod(period)}
+                  className={`
+                    w-full h-20 rounded-xl border-2 cursor-pointer transition-all shadow-sm hover:shadow-md
+                    ${isCurrent ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}
+                  `}
+                >
+                  <div className="h-full flex flex-col items-center justify-center">
+                    <div className={`text-lg font-bold ${isCurrent ? "text-blue-600" : "text-gray-800"}`}>
                       {period.stem}
                       {period.branch}
                     </div>
-                    {period.stemHanja && period.branchHanja && (
-                      <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>
-                        {period.stemHanja}
-                        {period.branchHanja}
-                      </div>
-                    )}
-                  </div>
-                  <div className={`text-xs ${isCurrent ? "text-yellow-200" : "text-white/60"}`}>
-                    {period.startYear}-{period.endYear}
+                    <div className={`text-xs ${isCurrent ? "text-blue-500" : "text-gray-500"}`}>
+                      {period.stemHanja}
+                      {period.branchHanja}
+                    </div>
+                    <div className={`text-xs mt-1 ${isCurrent ? "text-blue-500" : "text-gray-500"}`}>
+                      {period.startAge}-{period.endAge}세
+                    </div>
                   </div>
                 </div>
               </div>
             )
           })}
         </div>
-      </div>
 
-      {/* 현재 대운 강조 표시 */}
-      {currentDaeun && (
-        <div className="mt-4 p-3 bg-yellow-400/20 border border-yellow-400/30 rounded-lg">
-          <div className="text-yellow-200 text-sm font-medium">
-            현재 대운: {currentDaeun.stem}
-            {currentDaeun.branch} ({currentDaeun.startYear}-{currentDaeun.endYear})
+        {/* 두 번째 줄 - 나머지 4개 */}
+        {safeDaeun.length > 4 && (
+          <div className="grid grid-cols-4 gap-4">
+            {safeDaeun.slice(4, 8).map((period, index) => {
+              const currentAge = birthInfo?.solarYear ? currentYear - birthInfo.solarYear : 0
+              const isCurrent = currentAge >= period.startAge && currentAge <= period.endAge
+
+              return (
+                <div key={`age-${index + 4}`} className="text-center">
+                  <div className="text-sm text-gray-600 mb-2">{period.startAge}세</div>
+                  <div
+                    onClick={() => setSelectedPeriod(period)}
+                    className={`
+                      w-full h-20 rounded-xl border-2 cursor-pointer transition-all shadow-sm hover:shadow-md
+                      ${isCurrent ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}
+                    `}
+                  >
+                    <div className="h-full flex flex-col items-center justify-center">
+                      <div className={`text-lg font-bold ${isCurrent ? "text-blue-600" : "text-gray-800"}`}>
+                        {period.stem}
+                        {period.branch}
+                      </div>
+                      <div className={`text-xs ${isCurrent ? "text-blue-500" : "text-gray-500"}`}>
+                        {period.stemHanja}
+                        {period.branchHanja}
+                      </div>
+                      <div className={`text-xs mt-1 ${isCurrent ? "text-blue-500" : "text-gray-500"}`}>
+                        {period.startAge}-{period.endAge}세
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          <div className="text-yellow-100/80 text-xs mt-1">{currentDaeun.age}세부터 시작된 10년 운세 기간</div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 선택된 대운 상세 정보 모달 */}
       {selectedPeriod && (
         <Dialog open={!!selectedPeriod} onOpenChange={() => setSelectedPeriod(null)}>
-          <DialogContent className="bg-slate-800 border-slate-700">
+          <DialogContent className="bg-white border-gray-200">
             <DialogHeader>
-              <DialogTitle className="text-white">
+              <DialogTitle className="text-gray-800">
                 {selectedPeriod.stem}
-                {selectedPeriod.branch} 대운 ({selectedPeriod.startYear}-{selectedPeriod.endYear})
+                {selectedPeriod.branch} 대운 ({selectedPeriod.startAge}-{selectedPeriod.endAge}세)
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 text-white/90">
+            <div className="space-y-4 text-gray-700">
               <div>
-                <div className="text-sm text-white/60">나이</div>
+                <div className="text-sm text-gray-500">나이</div>
                 <div className="font-medium">
-                  {selectedPeriod.age}세 ~ {selectedPeriod.age + 9}세
+                  {selectedPeriod.startAge}세 ~ {selectedPeriod.endAge}세
                 </div>
               </div>
               <div>
-                <div className="text-sm text-white/60">기간</div>
-                <div className="font-medium">
-                  {selectedPeriod.startYear}년 ~ {selectedPeriod.endYear}년
-                </div>
+                <div className="text-sm text-gray-500">기간</div>
+                <div className="font-medium">{selectedPeriod.ages}</div>
               </div>
               <div>
-                <div className="text-sm text-white/60">천간지지</div>
+                <div className="text-sm text-gray-500">천간지지</div>
                 <div className="font-medium">
                   {selectedPeriod.stem}
                   {selectedPeriod.branch}
-                  {selectedPeriod.stemHanja && selectedPeriod.branchHanja && (
-                    <span className="ml-2 text-white/60">
-                      ({selectedPeriod.stemHanja}
-                      {selectedPeriod.branchHanja})
-                    </span>
-                  )}
+                  <span className="ml-2 text-gray-500">
+                    ({selectedPeriod.stemHanja}
+                    {selectedPeriod.branchHanja})
+                  </span>
                 </div>
               </div>
-              {selectedPeriod.description && (
-                <div>
-                  <div className="text-sm text-white/60">특징</div>
-                  <div className="text-sm">{selectedPeriod.description}</div>
-                </div>
-              )}
+              <div>
+                <div className="text-sm text-gray-500">시작일</div>
+                <div className="text-sm">{selectedPeriod.start}</div>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

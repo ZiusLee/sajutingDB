@@ -7,12 +7,23 @@ export async function updateAuthUserId(sessionId: string, authUserId: string): P
   try {
     console.log(`Updating auth_user_id for session ${sessionId} to ${authUserId}`)
 
-    // Skip the existence check and directly attempt the update
+    // Validate that sessionId and authUserId are valid UUIDs or strings
+    if (!sessionId || typeof sessionId !== "string") {
+      console.error("Invalid sessionId:", sessionId)
+      return false
+    }
+
+    if (!authUserId || typeof authUserId !== "string") {
+      console.error("Invalid authUserId:", authUserId)
+      return false
+    }
+
+    // Update the session with the auth user ID
     const { data, error } = await supabase
       .from("saju_sessions")
       .update({ auth_user_id: authUserId })
       .eq("id", sessionId)
-      .select("id") // Return the updated row to confirm success
+      .select("id")
 
     if (error) {
       console.error("Error updating auth_user_id:", error)
@@ -22,8 +33,7 @@ export async function updateAuthUserId(sessionId: string, authUserId: string): P
     // Check if any rows were affected
     if (!data || data.length === 0) {
       console.warn(`No rows updated for session ${sessionId}. Session might not exist.`)
-      // Despite the warning, we'll return true if no error occurred
-      return true
+      return false
     }
 
     console.log(`Successfully updated auth_user_id for session ${sessionId} to ${authUserId}`)

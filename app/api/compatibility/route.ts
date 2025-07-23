@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-// 서버 측에서 서비스 롤 키를 사용하여 Supabase 클라이언트 생성
+// 서버 측에서 서비스 롤 키를 사용하여 Supabase 클라이언트 생���
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 

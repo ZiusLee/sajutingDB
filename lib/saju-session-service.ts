@@ -729,7 +729,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         daeunData.pillars.length > 0 &&
         daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
     ) {
-      console.log(`Session ${sessionId}: 대운 데이터가 없거나 잘못됨, 새로 계산합니다.`)
+      console.log(`Session ${sessionId}: 대운 데이터가 없거나 ���못됨, 새로 계산합니다.`)
 
       // 대운 계산에 필요한 데이터가 있는지 확인
       if (

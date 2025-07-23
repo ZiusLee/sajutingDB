@@ -1,15 +1,5 @@
-import {
-  saveBirthInfo,
-  saveSajuInfo,
-  saveElements,
-  saveInterpretation,
-  saveBetaApplication,
-  saveCompatibilityAnalysis,
-} from "./db-service"
-import { supabase, getSupabase } from "./supabase-client"
-import { v4 as uuidv4 } from "uuid"
+import { supabase } from "./supabase-client"
 
-// 상대방 정보 인터페이스 정의
 export interface PartnerInfo {
   id?: string
   name: string
@@ -22,592 +12,226 @@ export interface PartnerInfo {
   timeUnknown: boolean
   relationshipStatus?: string
   createdAt?: number
-  saju?: any // 사주 정보 필드 추가
+  saju?: any
 }
 
-// 로컬 스토리지에서 사주 데이터를 가져와 데이터베이스에 저장하는 함수
 export async function syncLocalStorageToDatabase(authUserId?: string | null): Promise<string | null> {
   try {
-    // 로컬 스토리지에서 데이터 가져오기
-    const tempSajuData = localStorage.getItem("tempSajuData")
-    if (!tempSajuData) {
-      console.log("No saju data found in localStorage")
+    console.log("Starting data sync to database...")
+
+    // Get stored saju data from localStorage
+    const storedData = localStorage.getItem("tempSajuData")
+    if (!storedData) {
+      console.log("No temp saju data found in localStorage")
       return null
     }
 
-    const sajuData = JSON.parse(tempSajuData)
+    const sajuData = JSON.parse(storedData)
+    console.log("Saju data from localStorage:", sajuData)
 
-    // 이미 userId가 있으면 그대로 반환
-    if (sajuData.userId) {
-      console.log("User ID already exists:", sajuData.userId)
-
-      // 로그인된 사용자인 경우 auth_user_id 연결 시도
-      if (authUserId) {
-        try {
-          console.log("Attempting to link existing user ID to auth user ID:", sajuData.userId, authUserId)
-          const supabaseClient = getSupabase()
-          const { data, error } = await supabaseClient
-            .from("saju_sessions")
-            .update({ auth_user_id: authUserId })
-            .eq("id", sajuData.userId)
-            .select()
-
-          if (error) {
-            console.error("Error linking user ID to auth user ID:", error)
-          } else {
-            console.log("Successfully linked user ID to auth user ID:", data)
-          }
-        } catch (authError) {
-          console.error("Error updating auth_user_id:", authError)
-        }
-      } else {
-        console.log("No auth user ID provided, skipping auth_user_id update")
-      }
-
-      return sajuData.userId
+    // Use provided authUserId or get from current session
+    let userId = authUserId
+    if (!userId) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      userId = session?.user?.id || null
     }
 
-    // 익명 사용자 ID 생성
-    const userId = uuidv4()
-    console.log("Generated new user ID:", userId)
+    console.log("Auth user ID:", userId)
 
-    // Prepare saju JSONB data
-    const sajuJsonb = {
-      yearStem: sajuData.yearStem,
-      yearBranch: sajuData.yearBranch,
-      yearStemHanja: sajuData.yearStemHanja || "",
-      yearBranchHanja: sajuData.yearBranchHanja || "",
-      monthStem: sajuData.monthStem,
-      monthBranch: sajuData.monthBranch,
-      monthStemHanja: sajuData.monthStemHanja || "",
-      monthBranchHanja: sajuData.monthBranchHanja || "",
-      dayStem: sajuData.dayStem,
-      dayBranch: sajuData.dayBranch,
-      dayStemHanja: sajuData.dayStemHanja || "",
-      dayBranchHanja: sajuData.dayBranchHanja || "",
-      hourStem: sajuData.hourStem || "?",
-      hourBranch: sajuData.hourBranch || "?",
-      hourStemHanja: sajuData.hourStemHanja || "",
-      hourBranchHanja: sajuData.hourBranchHanja || "",
-      dayMaster: sajuData.dayMaster || sajuData.dayStem,
-      dayMasterHanja: sajuData.dayMasterHanja || "",
-      yearAnimal: sajuData.yearAnimal || "",
-      elements: sajuData.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
-      yearStemSibseong: sajuData.yearStemSibseong || "",
-      monthStemSibseong: sajuData.monthStemSibseong || "",
-      dayStemSibseong: "본원", // 일주의 천간은 나에 해당하는 부분으로 "본원"으로 저장
-      hourStemSibseong: sajuData.hourStemSibseong || "",
-      yearBranchSibseong: sajuData.yearBranchSibseong || "",
-      monthBranchSibseong: sajuData.monthBranchSibseong || "",
-      dayBranchSibseong: sajuData.dayBranchSibseong || "",
-      hourBranchSibseong: sajuData.hourBranchSibseong || "",
-      birthInfo: {
-        solar: {
-          year: sajuData.year,
-          month: sajuData.month,
-          day: sajuData.day,
-          hour: sajuData.hour,
-          minute: sajuData.minute,
-        },
-        lunar: {
-          year: sajuData.lunarYear || sajuData.year,
-          month: sajuData.lunarMonth || sajuData.month,
-          day: sajuData.lunarDay || sajuData.day,
-          isLeapMonth: Boolean(sajuData.isLeapMonth),
-        },
-        timeUnknown: sajuData.timeUnknown || sajuData.hour === undefined || sajuData.hour === null,
-        birthCityId: sajuData.birthCityId || "seoul",
-        timeStandard: sajuData.timeStandard || "동경135도",
-      },
+    // Prepare time data for database storage
+    const timeData = {
+      solar_hour: sajuData.timeUnknown ? null : sajuData.hour,
+      solar_minute: sajuData.timeUnknown ? null : sajuData.minute,
+      time_unknown: sajuData.timeUnknown || false,
     }
 
-    // Prepare daeun JSONB data if available
-    const daeunJsonb = sajuData.daeun || null
+    console.log("Storing saju data with time info:", {
+      parsedHour: sajuData.hour,
+      parsedMinute: sajuData.minute,
+      timeUnknown: sajuData.timeUnknown,
+    })
 
-    // API 라우트를 통해 데이터 저장
-    try {
-      console.log("Saving user data to database with user ID:", userId, "auth user ID:", authUserId || "none")
-      const response = await fetch("/api/save-user-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          authUserId, // 로그인된 사용자 ID 포함
-          ...sajuData,
-          saju: sajuJsonb, // Add the saju JSONB data
-          daeun: daeunJsonb, // Add the daeun JSONB data
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `API request failed with status ${response.status}`)
-      }
-
-      const result = await response.json()
-      console.log("Successfully saved data to database:", result)
-
-      // 사용자 ID를 localStorage에 저장
-      sajuData.userId = userId
-      localStorage.setItem("tempSajuData", JSON.stringify(sajuData))
-
-      return userId
-    } catch (apiError) {
-      console.error("Error calling save-user-data API:", apiError)
-
-      // API 호출 실패 시 직접 Supabase 호출 시도
-      try {
-        console.log("Attempting direct Supabase insertion for user:", userId)
-        const supabaseClient = getSupabase()
-        const { data, error } = await supabaseClient
-          .from("saju_sessions")
-          .insert({
-            id: userId,
-            name: sajuData.name || "Anonymous User",
-            gender: sajuData.gender || "unknown",
-            relationship_status: sajuData.relationshipStatus || "unknown",
-            auth_user_id: authUserId, // Include auth_user_id if available
-            saju: sajuJsonb, // Add the saju JSONB data
-            daeun: daeunJsonb, // Add the daeun JSONB data
-          })
-          .select()
-
-        if (error) {
-          console.error("Error with direct Supabase insertion:", error)
-          return null
-        }
-
-        console.log("Successfully inserted user directly with Supabase:", data)
-        return userId
-      } catch (supabaseError) {
-        console.error("Error with direct Supabase call:", supabaseError)
-        return null
-      }
+    // Create a new saju session
+    const sessionData = {
+      name: sajuData.name,
+      gender: sajuData.gender,
+      auth_user_id: userId, // This can be null for anonymous users
     }
-  } catch (error) {
-    console.error("Error syncing data to database:", error)
-    return null
-  }
-}
 
-// 사용자 ID가 생성된 후 나머지 데이터를 저장하는 함수
-async function saveRemainingData(userId: string, sajuData: any) {
-  // Save birth info
-  if (sajuData.year && sajuData.month && sajuData.day) {
-    try {
-      const birthInfoId = await saveBirthInfo({
-        userId,
-        solarYear: Number(sajuData.year),
-        solarMonth: Number(sajuData.month),
-        solarDay: Number(sajuData.day),
-        solarHour: sajuData.hour !== undefined ? Number(sajuData.hour) : null,
-        solarMinute: sajuData.minute !== undefined ? Number(sajuData.minute) : null,
-        lunarYear: Number(sajuData.lunarYear || sajuData.year),
-        lunarMonth: Number(sajuData.lunarMonth || sajuData.month),
-        lunarDay: Number(sajuData.lunarDay || sajuData.day),
-        isLeapMonth: Boolean(sajuData.isLeapMonth),
-        timeUnknown: sajuData.hour === undefined || sajuData.hour === null,
-      })
-      console.log("Birth info saved with ID:", birthInfoId)
-    } catch (error) {
-      console.error("Error saving birth info:", error)
+    const { data: sessionResult, error: sessionError } = await supabase
+      .from("saju_sessions")
+      .insert(sessionData)
+      .select("id")
+      .single()
+
+    if (sessionError) {
+      console.error("Error creating saju session:", sessionError)
+      return null
     }
-  }
 
-  // Save saju info
-  let sajuId = null
-  if (sajuData.yearStem && sajuData.yearBranch) {
-    try {
-      sajuId = await saveSajuInfo({
-        userId,
-        yearStem: sajuData.yearStem,
-        yearBranch: sajuData.yearBranch,
-        yearStemHanja: sajuData.yearStemHanja || "",
-        yearBranchHanja: sajuData.yearBranchHanja || "",
-        monthStem: sajuData.monthStem,
-        monthBranch: sajuData.monthBranch,
-        monthStemHanja: sajuData.monthStemHanja || "",
-        monthBranchHanja: sajuData.monthBranchHanja || "",
-        dayStem: sajuData.dayStem,
-        dayBranch: sajuData.dayBranch,
-        dayStemHanja: sajuData.dayStemHanja || "",
-        dayBranchHanja: sajuData.dayBranchHanja || "",
-        hourStem: sajuData.hourStem || "?",
-        hourBranch: sajuData.hourBranch || "?",
-        hourStemHanja: sajuData.hourStemHanja || "",
-        hourBranchHanja: sajuData.hourBranchHanja || "",
-        dayMaster: sajuData.dayMaster || sajuData.dayStem,
-        dayMasterHanja: sajuData.dayMasterHanja || "",
-        yearAnimal: sajuData.yearAnimal || "",
-      })
-      console.log("Saju info saved with ID:", sajuId)
-    } catch (error) {
-      console.error("Error saving saju info:", error)
+    const sessionId = sessionResult.id
+    console.log("Created saju session:", sessionId)
+
+    // Insert birth info into database
+    const birthInfoData = {
+      user_id: sessionId, // Use session ID as user_id
+      solar_year: sajuData.year,
+      solar_month: sajuData.month,
+      solar_day: sajuData.day,
+      ...timeData,
+      lunar_year: sajuData.lunarYear,
+      lunar_month: sajuData.lunarMonth,
+      lunar_day: sajuData.lunarDay,
+      is_leap_month: sajuData.isLeapMonth || false,
     }
-  }
 
-  // Save elements
-  if (sajuId && sajuData.elements) {
-    try {
-      const elementsId = await saveElements({
-        sajuId,
+    const { data: birthInfo, error: birthError } = await supabase
+      .from("birth_info")
+      .insert(birthInfoData)
+      .select("id")
+      .single()
+
+    if (birthError) {
+      console.error("Error inserting birth info:", birthError)
+      return null
+    }
+
+    console.log("Birth info inserted successfully:", birthInfo.id)
+
+    // Insert saju info into database
+    const sajuInfoData = {
+      user_id: sessionId,
+      year_stem: sajuData.yearStem,
+      year_branch: sajuData.yearBranch,
+      year_stem_hanja: sajuData.yearStemHanja,
+      year_branch_hanja: sajuData.yearBranchHanja,
+      month_stem: sajuData.monthStem,
+      month_branch: sajuData.monthBranch,
+      month_stem_hanja: sajuData.monthStemHanja,
+      month_branch_hanja: sajuData.monthBranchHanja,
+      day_stem: sajuData.dayStem,
+      day_branch: sajuData.dayBranch,
+      day_stem_hanja: sajuData.dayStemHanja,
+      day_branch_hanja: sajuData.dayBranchHanja,
+      hour_stem: sajuData.hourStem,
+      hour_branch: sajuData.hourBranch,
+      hour_stem_hanja: sajuData.hourStemHanja,
+      hour_branch_hanja: sajuData.hourBranchHanja,
+      day_master: sajuData.dayMaster,
+      day_master_hanja: sajuData.dayMasterHanja,
+      year_animal: sajuData.yearAnimal,
+    }
+
+    const { data: sajuInfo, error: sajuError } = await supabase
+      .from("saju_info")
+      .insert(sajuInfoData)
+      .select("id")
+      .single()
+
+    if (sajuError) {
+      console.error("Error inserting saju info:", sajuError)
+      return null
+    }
+
+    console.log("Saju info inserted successfully:", sajuInfo.id)
+
+    // Insert elements into database
+    if (sajuData.elements) {
+      const elementsData = {
+        saju_id: sajuInfo.id,
         wood: sajuData.elements.wood || 0,
         fire: sajuData.elements.fire || 0,
         earth: sajuData.elements.earth || 0,
         metal: sajuData.elements.metal || 0,
         water: sajuData.elements.water || 0,
-      })
-      console.log("Elements saved with ID:", elementsId)
-    } catch (error) {
-      console.error("Error saving elements:", error)
-    }
-  }
-
-  // Save interpretation
-  if (sajuData.sajuInterpretation) {
-    try {
-      const interpretationId = await saveInterpretation({
-        userId,
-        basicInterpretation: sajuData.sajuInterpretation,
-        modelUsed: sajuData.model || "unknown",
-        responseTime: sajuData.responseTime || "unknown",
-      })
-      console.log("Interpretation saved with ID:", interpretationId)
-    } catch (error) {
-      console.error("Error saving interpretation:", error)
-    }
-  }
-
-  // Save compatibility analyses if available
-  if (sajuData.compatibilityAnalyses && Array.isArray(sajuData.compatibilityAnalyses)) {
-    for (const analysis of sajuData.compatibilityAnalyses) {
-      try {
-        const analysisId = await saveCompatibilityAnalysis({
-          userId,
-          partnerName: analysis.partnerName || "Unknown Partner",
-          partnerGender: analysis.partnerGender || "unknown",
-          partnerBirthYear: Number(analysis.partnerBirthYear) || 0,
-          partnerBirthMonth: Number(analysis.partnerBirthMonth) || 0,
-          partnerBirthDay: Number(analysis.partnerBirthDay) || 0,
-          partnerBirthHour: analysis.partnerBirthHour !== undefined ? Number(analysis.partnerBirthHour) : null,
-          partnerBirthMinute: analysis.partnerBirthMinute !== undefined ? Number(analysis.partnerBirthMinute) : null,
-          partnerTimeUnknown: Boolean(analysis.partnerTimeUnknown),
-          relationshipStatus: analysis.relationshipStatus || "unknown",
-          compatibilityScore: Number(analysis.compatibilityScore) || 0,
-          analysisText: analysis.analysisText || "",
-          modelUsed: analysis.modelUsed || "unknown",
-          responseTime: analysis.responseTime || "unknown",
-        })
-        console.log("Compatibility analysis saved with ID:", analysisId)
-      } catch (error) {
-        console.error("Error saving compatibility analysis:", error)
       }
-    }
-  }
-}
 
-/**
- * Save beta application data
- */
-export async function saveBetaApplicationData(userId: string, selectedServices: string[]): Promise<boolean> {
-  try {
-    console.log("Saving beta application for user ID:", userId, "with services:", selectedServices)
+      const { error: elementsError } = await supabase.from("elements").insert(elementsData)
 
-    // Try direct insertion to test database access
-    const { data: directInsertData, error: directInsertError } = await supabase
-      .from("beta_applications")
-      .insert({
-        user_id: userId,
-        selected_services: selectedServices,
-        status: "pending",
-      })
-      .select("id")
-
-    if (directInsertError) {
-      console.error("Direct beta application insertion error:", directInsertError)
-
-      // 직접 삽입이 실패한 경우 기존 방식으로 시도
-      await saveBetaApplication({
-        userId,
-        selectedServices,
-      })
-    } else {
-      console.log("Beta application saved successfully:", directInsertData)
-    }
-
-    return true
-  } catch (error) {
-    console.error("Error saving beta application data:", error)
-    return false
-  }
-}
-
-/**
- * Add compatibility analysis to localStorage
- */
-export function addCompatibilityAnalysisToLocalStorage(analysis: {
-  partnerName: string
-  partnerGender: string
-  partnerBirthYear: number
-  partnerBirthMonth: number
-  partnerBirthDay: number
-  partnerBirthHour?: number
-  partnerBirthMinute?: number
-  partnerTimeUnknown: boolean
-  relationshipStatus: string
-  compatibilityScore: number
-  analysisText: string
-  modelUsed: string
-  responseTime: string
-}): boolean {
-  try {
-    const tempSajuData = localStorage.getItem("tempSajuData")
-    if (!tempSajuData) {
-      console.error("No saju data found in localStorage")
-      return false
-    }
-
-    const sajuData = JSON.parse(tempSajuData)
-
-    // Initialize compatibilityAnalyses array if it doesn't exist
-    if (!sajuData.compatibilityAnalyses) {
-      sajuData.compatibilityAnalyses = []
-    }
-
-    // Add new analysis
-    sajuData.compatibilityAnalyses.push(analysis)
-
-    // Save back to localStorage
-    localStorage.setItem("tempSajuData", JSON.stringify(sajuData))
-    return true
-  } catch (error) {
-    console.error("Error adding compatibility analysis to localStorage:", error)
-    return false
-  }
-}
-
-// 궁합 분석 결과를 localStorage에 저장하는 함수
-export function saveCompatibilityResultToLocalStorage(data: {
-  userInfo: {
-    name: string
-    gender: string
-    saju: any
-  }
-  partnerInfo: {
-    name: string
-    gender: string
-    year: number
-    month: number
-    day: number
-    hour: number | null
-    minute: number | null
-    timeUnknown: boolean
-  }
-  result: string
-  partnerSaju?: any
-  model?: string
-  timestamp?: number
-  compatibilityScore?: number
-}) {
-  try {
-    // 기존 데이터 가져오기
-    const existingDataStr = localStorage.getItem("compatibility_results")
-    const existingData = existingDataStr ? JSON.parse(existingDataStr) : []
-
-    // 새 데이터 추가
-    const newData = {
-      ...data,
-      timestamp: data.timestamp || Date.now(),
-    }
-
-    // 최대 10개까��만 저장 (오래된 것부터 삭제)
-    if (existingData.length >= 10) {
-      existingData.shift()
-    }
-
-    existingData.push(newData)
-
-    // 저장
-    localStorage.setItem("compatibility_results", JSON.stringify(existingData))
-
-    // Supabase에도 저장
-    saveCompatibilityToSupabase(data)
-
-    return true
-  } catch (error) {
-    console.error("Error saving compatibility result to localStorage:", error)
-    return false
-  }
-}
-
-/**
- * 궁합 분석 결과를 Supabase에 저장하는 함수
- */
-export async function saveCompatibilityToSupabase(data: {
-  userInfo: {
-    name: string
-    gender: string
-    saju: any
-  }
-  partnerInfo: {
-    name: string
-    gender: string
-    year: number
-    month: number
-    day: number
-    hour: number | null
-    minute: number | null
-    timeUnknown: boolean
-  }
-  result: string
-  partnerSaju?: any
-  model?: string
-  timestamp?: number
-  compatibilityScore?: number
-}) {
-  try {
-    // 사용자 ID 가져오기 (localStorage에서)
-    const tempSajuData = localStorage.getItem("tempSajuData")
-    if (!tempSajuData) {
-      console.error("No saju data found in localStorage")
-      return false
-    }
-
-    const sajuData = JSON.parse(tempSajuData)
-    const userId = sajuData.userId
-
-    if (!userId) {
-      console.error("No user ID found in localStorage")
-      // 사용자 ID가 없는 경우 먼저 사용자 데이터 저장 시도
-      const newUserId = await syncLocalStorageToDatabase()
-      if (!newUserId) {
-        console.error("Failed to create user ID")
-        return false
+      if (elementsError) {
+        console.error("Error inserting elements:", elementsError)
+      } else {
+        console.log("Elements inserted successfully")
       }
     }
 
-    // 궁합 점수 계산 (없는 경우 기본값 70)
-    const compatibilityScore = data.compatibilityScore || 70
-
-    // Supabase에 저장
-    try {
-      // 서버 API 라우트를 통해 데이터 저장
-      const response = await fetch("/api/save-compatibility", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: sajuData.userId,
-          partnerName: data.partnerInfo.name,
-          partnerGender: data.partnerInfo.gender,
-          partnerBirthYear: data.partnerInfo.year,
-          partnerBirthMonth: data.partnerInfo.month,
-          partnerBirthDay: data.partnerInfo.day,
-          partnerBirthHour: data.partnerInfo.hour,
-          partnerBirthMinute: data.partnerInfo.minute,
-          partnerTimeUnknown: data.partnerInfo.timeUnknown,
-          relationshipStatus: sajuData.relationshipStatus || "unknown",
-          compatibilityScore: compatibilityScore,
-          analysisText: data.result,
-          modelUsed: data.model || "unknown",
-          responseTime: "client-side",
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `API request failed with status ${response.status}`)
+    // Insert interpretation if available
+    if (sajuData.interpretation) {
+      const interpretationData = {
+        user_id: sessionId,
+        basic_interpretation: sajuData.interpretation,
+        model_used: "local",
+        response_time: "0ms",
       }
 
-      const result = await response.json()
-      console.log("Successfully saved compatibility analysis to Supabase:", result)
-      return true
-    } catch (apiError) {
-      console.error("Error calling save-compatibility API:", apiError)
+      const { error: interpretationError } = await supabase.from("interpretations").insert(interpretationData)
 
-      // API 호출 실패 시 직접 Supabase 호출 시도
-      try {
-        const { data: analysisData, error: analysisError } = await supabase
-          .from("compatibility_analysis")
-          .insert({
-            user_id: sajuData.userId,
-            partner_name: data.partnerInfo.name,
-            partner_gender: data.partnerInfo.gender,
-            partner_birth_year: data.partnerInfo.year,
-            partner_birth_month: data.partnerInfo.month,
-            partner_birth_day: data.partnerInfo.day,
-            partner_birth_hour: data.partnerInfo.hour,
-            partner_birth_minute: data.partnerInfo.minute,
-            partner_time_unknown: data.partnerInfo.timeUnknown,
-            relationship_status: sajuData.relationshipStatus || "unknown",
-            compatibility_score: compatibilityScore,
-            analysis_text: data.result,
-            model_used: data.model || "unknown",
-            response_time: "client-side",
-          })
-          .select("id")
-
-        if (analysisError) {
-          console.error("Error saving compatibility analysis directly to Supabase:", analysisError)
-          return false
-        }
-
-        console.log("Successfully saved compatibility analysis directly to Supabase:", analysisData)
-        return true
-      } catch (supabaseError) {
-        console.error("Error with direct Supabase call:", supabaseError)
-        return false
+      if (interpretationError) {
+        console.error("Error inserting interpretation:", interpretationError)
+      } else {
+        console.log("Interpretation inserted successfully")
       }
     }
+
+    console.log("Data sync completed successfully")
+    return sessionId
   } catch (error) {
-    console.error("Error saving compatibility to Supabase:", error)
-    return false
+    console.error("Error in syncLocalStorageToDatabase:", error)
+    return null
   }
 }
 
-/**
- * 상대방 정보를 localStorage에 저장하는 함수
- */
+export async function getUserSajuData(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("birth_info")
+      .select(`
+        *,
+        daeun_cycles (*)
+      `)
+      .eq("auth_user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching user saju data:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error in getUserSajuData:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+  }
+}
+
 export function savePartnerInfo(partner: PartnerInfo): string {
   try {
-    // 기존 데이터 가져오기
     const existingDataStr = localStorage.getItem("saved_partners")
     const existingData: PartnerInfo[] = existingDataStr ? JSON.parse(existingDataStr) : []
 
-    // 고유 ID 생성
     const partnerId = partner.id || `partner_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-    // 새 데이터 생성
     const newPartner: PartnerInfo = {
       ...partner,
       id: partnerId,
       createdAt: Date.now(),
-      saju: partner.saju || null, // 사주 정보 추가
+      saju: partner.saju || null,
     }
 
-    // 이미 존재하는 파트너인지 확인 (ID로 확인)
     const existingIndex = existingData.findIndex((p) => p.id === partnerId)
 
     if (existingIndex >= 0) {
-      // 기존 데이터 업데이트
       existingData[existingIndex] = newPartner
     } else {
-      // 새 데이터 추가
       existingData.push(newPartner)
     }
 
-    // 최대 20개까지만 저장 (오래된 것부터 삭제)
     const sortedData = existingData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     const limitedData = sortedData.slice(0, 20)
 
-    // 저장
     localStorage.setItem("saved_partners", JSON.stringify(limitedData))
-
-    // Supabase에도 저장 시도 (비동기로 처리)
-    savePartnerToSupabase(newPartner).catch((err) => console.error("Failed to save partner to Supabase:", err))
 
     console.log(`상대방 정보 저장 성공: ${partner.name}`)
     return partnerId
@@ -617,82 +241,12 @@ export function savePartnerInfo(partner: PartnerInfo): string {
   }
 }
 
-/**
- * 상대방 정보를 Supabase에 저장하는 함수
- */
-export async function savePartnerToSupabase(partner: PartnerInfo): Promise<boolean> {
-  try {
-    // 사용자 ID 가져오기 (localStorage에서)
-    const tempSajuData = localStorage.getItem("tempSajuData")
-    if (!tempSajuData) {
-      console.error("No saju data found in localStorage")
-      return false
-    }
-
-    const sajuData = JSON.parse(tempSajuData)
-    const userId = sajuData.userId
-
-    if (!userId) {
-      console.error("No user ID found in localStorage")
-      return false
-    }
-
-    // 상대방 정보를 Supabase에 저장하기 위해 compatibility_analysis 테이블 사용
-    // 실제 궁합 분석 없이 상대방 정보만 저장
-    try {
-      // 서버 API 라우트를 통해 데이터 저장
-      const response = await fetch("/api/save-compatibility", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: userId,
-          partnerName: partner.name,
-          partnerGender: partner.gender,
-          partnerBirthYear: partner.year,
-          partnerBirthMonth: partner.month,
-          partnerBirthDay: partner.day,
-          partnerBirthHour: partner.hour,
-          partnerBirthMinute: partner.minute,
-          partnerTimeUnknown: partner.timeUnknown,
-          relationshipStatus: partner.relationshipStatus || "unknown",
-          compatibilityScore: 0, // 분석 없이 저장하는 경우 0으로 설정
-          analysisText: "상대방 정보만 저장됨 (궁합 분석 없음)",
-          modelUsed: "none",
-          responseTime: "client-side",
-          partnerSaju: partner.saju || null, // 사주 정보 추가
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `API request failed with status ${response.status}`)
-      }
-
-      const result = await response.json()
-      console.log("Successfully saved partner info to Supabase:", result)
-      return true
-    } catch (apiError) {
-      console.error("Error calling save-compatibility API for partner info:", apiError)
-      return false
-    }
-  } catch (error) {
-    console.error("Error saving partner to Supabase:", error)
-    return false
-  }
-}
-
-/**
- * 저장된 상대방 정보 목록을 가져오는 함수
- */
 export function getSavedPartners(): PartnerInfo[] {
   try {
     const savedPartnersStr = localStorage.getItem("saved_partners")
     if (!savedPartnersStr) return []
 
     const savedPartners: PartnerInfo[] = JSON.parse(savedPartnersStr)
-    // 최신순으로 정렬
     return savedPartners.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   } catch (error) {
     console.error("Error getting saved partners from localStorage:", error)
@@ -700,9 +254,6 @@ export function getSavedPartners(): PartnerInfo[] {
   }
 }
 
-/**
- * 특정 상대방 정보를 삭제하는 함수
- */
 export function deletePartnerInfo(partnerId: string): boolean {
   try {
     const savedPartnersStr = localStorage.getItem("saved_partners")
@@ -715,6 +266,31 @@ export function deletePartnerInfo(partnerId: string): boolean {
     return true
   } catch (error) {
     console.error("Error deleting partner info from localStorage:", error)
+    return false
+  }
+}
+
+export async function clearTempData() {
+  try {
+    localStorage.removeItem("tempSajuData")
+    console.log("Cleared temp saju data from localStorage")
+  } catch (error) {
+    console.error("Error clearing temp data:", error)
+  }
+}
+
+export async function updateSessionWithAuthUser(sessionId: string, authUserId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("saju_sessions").update({ auth_user_id: authUserId }).eq("id", sessionId)
+
+    if (error) {
+      console.error("Error updating session with auth user:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in updateSessionWithAuthUser:", error)
     return false
   }
 }

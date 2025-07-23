@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: "인증되지 않은 사용자입니다." }, { status: 401 })
+      return NextResponse.json({ error: "인증되지 않은 사용��입니다." }, { status: 401 })
     }
 
     const { talisman_id } = await request.json()

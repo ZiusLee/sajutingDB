@@ -1,410 +1,228 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { SajuOnboardingFlow } from "@/components/saju-onboarding-flow"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Button } from "@/components/ui/button"
-import { Calendar, Heart, Briefcase, DollarSign, Activity, MapPin } from "lucide-react"
-import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
-import { calculateElementsFromSaju } from "@/lib/element-utils"
-import { ElementDisplay } from "@/components/element-display"
-import FloatingChatButton from "@/components/floating-chat-button"
+import ScrollVelocity from "@/components/ScrollVelocity"
+import { useAuth } from "@/contexts/auth-context"
 
-interface SajuProfile {
-  id: string
-  name: string
-  gender: string
-  saju: {
-    yearStem: string
-    yearBranch: string
-    monthStem: string
-    monthBranch: string
-    dayStem: string
-    dayBranch: string
-    hourStem: string
-    hourBranch: string
-    dayMaster?: string
-    dayMasterHanja?: string
-    yearAnimal?: string
-    elements?: Record<string, number>
-  }
-}
+const questionChips = [
+  // 기존 질문들
+  { icon: "💼", text: "직장을 어떤 기준으로 선택하면 좋을까?" },
+  { icon: "💕", text: "올해 나의 결혼운은 어때?" },
+  { icon: "💰", text: "언제 재물운 들어오는지 알려줘" },
+  { icon: "🍀", text: "오늘의 운세를 알려줘" },
+  { icon: "👤", text: "내 성격과 기질은 어때?" },
+  { icon: "❤️", text: "연애운이 언제 좋아질까?" },
+  { icon: "🏠", text: "이사는 언제 하는게 좋을까?" },
+  // 새로운 디테일한 질문들
+  { icon: "😰", text: "불안감이 심한데 내 사주적 원인이 뭘까?" },
+  { icon: "🤝", text: "상사와 자꾸 갈등이 생기는 이유는?" },
+  { icon: "💔", text: "이별 후 언제쯤 새로운 사랑을 만날까?" },
+  { icon: "🎯", text: "창업하기 좋은 시기는 언제일까?" },
+  { icon: "👶", text: "아이 갖기 좋은 타이밍을 알려줘" },
+  { icon: "🏆", text: "승진 가능성과 적절한 시기는?" },
+  { icon: "💸", text: "투자할 때 주의해야 할 점은?" },
+  { icon: "🌙", text: "잠이 안 오는 이유가 사주와 관련있을까?" },
+  { icon: "🍽️", text: "다이어트가 안 되는 사주적 이유는?" },
+  { icon: "👥", text: "인간관계에서 자꾸 상처받는 이유는?" },
+  { icon: "📚", text: "공부나 자격증 취득하기 좋은 시기는?" },
+  { icon: "🏃‍♀️", text: "번아웃이 왔는데 어떻게 극복할까?" },
+  { icon: "💍", text: "지금 만나는 사람과 결혼해도 될까?" },
+  { icon: "🎨", text: "내가 진짜 좋아하는 일을 찾고 싶어" },
+  { icon: "😔", text: "우울감이 지속되는 사주적 원인은?" },
+  { icon: "🏢", text: "회사를 그만둘 타이밍을 알려줘" },
+  { icon: "👨‍👩‍👧‍👦", text: "가족과의 갈등을 어떻게 해결할까?" },
+  { icon: "💪", text: "자신감을 키우려면 어떻게 해야 할까?" },
+  { icon: "🎪", text: "인생의 전환점이 언제 올까?" },
+  { icon: "🔮", text: "내년에 가장 주의해야 할 것은?" },
+  { icon: "🌟", text: "내 재능을 가장 잘 발휘할 수 있는 분야는?" },
+]
 
-export function LandingPageClient() {
+export default function LandingPageClient() {
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const [userName, setUserName] = useState("")
-  const [defaultProfile, setDefaultProfile] = useState<SajuProfile | null>(null)
-  const [elements, setElements] = useState<Record<string, number>>({
-    wood: 0,
-    fire: 0,
-    earth: 0,
-    metal: 0,
-    water: 0,
-  })
-  const supabase = createClientComponentClient()
+  const { isAuthenticated } = useAuth()
 
-  // 현재 날짜 정보
-  const today = new Date()
-  const currentMonth = today.getMonth() + 1
-  const currentDate = today.getDate()
-  const currentYear = today.getFullYear()
-  const currentHour = today.getHours()
-  const currentMinute = today.getMinutes()
-
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        setIsLoading(true)
-
-        // 사용자 인증 확인
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (!sessionData?.session) {
-          router.push("/login?returnUrl=/landing")
-          return
-        }
-
-        const { data: userData } = await supabase.auth.getUser()
-        if (userData.user) {
-          setUser(userData.user)
-          setUserName(userData.user.user_metadata?.name || userData.user.email?.split("@")[0] || "사용자")
-
-          // 기본 사주 프로필 가져오기
-          try {
-            const defaultSession = await getDefaultSajuSession(userData.user.id)
-            console.log("Default session:", defaultSession)
-
-            if (defaultSession) {
-              const profile = await getSajuProfileBySessionId(defaultSession.id)
-              console.log("Profile:", profile)
-
-              if (profile) {
-                setDefaultProfile(profile)
-
-                // 오행 계산
-                const calculatedElements = calculateElementsFromSaju(
-                  profile.saju.yearStem,
-                  profile.saju.yearBranch,
-                  profile.saju.monthStem,
-                  profile.saju.monthBranch,
-                  profile.saju.dayStem,
-                  profile.saju.dayBranch,
-                  profile.saju.hourStem,
-                  profile.saju.hourBranch,
-                )
-                setElements(calculatedElements)
-              }
-            } else {
-              console.log("No default session found")
-            }
-          } catch (error) {
-            console.error("Error loading default profile:", error)
-          }
-        }
-      } catch (error) {
-        console.error("Error loading user data:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadUserData()
-  }, [router, supabase])
-
-  // 운세 점수에 따른 날씨 아이콘
-  const getWeatherIcon = (score: number) => {
-    if (score >= 80) return "☀️"
-    if (score >= 60) return "⛅"
-    if (score >= 40) return "☁️"
-    return "🌧️"
+  const handleStartSaju = () => {
+    console.log("사주 프로필 생성하기 버튼 클릭됨")
+    setShowOnboarding(true)
   }
 
-  // 운세 점수에 따른 날씨 텍스트
-  const getWeatherText = (score: number) => {
-    if (score >= 80) return "맑음"
-    if (score >= 60) return "구름많음"
-    if (score >= 40) return "흐림"
-    return "비"
+  const handleCloseOnboarding = () => {
+    setShowOnboarding(false)
   }
 
-  // 오늘의 ��세 데이터 (실제로는 사주 기반으로 계산해야 함)
-  const todayFortunes = [
-    {
-      type: "love",
-      title: "연애운",
-      score: 85,
-      description: "좋은 인연을 만날 수 있는 날입니다",
-      icon: Heart,
-    },
-    {
-      type: "career",
-      title: "직업운",
-      score: 70,
-      description: "새로운 기회가 찾아올 예정입니다",
-      icon: Briefcase,
-    },
-    {
-      type: "money",
-      title: "재물운",
-      score: 45,
-      description: "지출에 주의가 필요한 시기입니다",
-      icon: DollarSign,
-    },
-    {
-      type: "health",
-      title: "건강운",
-      score: 90,
-      description: "컨디션이 좋은 하루가 될 것입니다",
-      icon: Activity,
-    },
-  ]
-
-  // 전체 운세 평균
-  const averageScore = Math.round(todayFortunes.reduce((sum, f) => sum + f.score, 0) / todayFortunes.length)
-  const maxScore = Math.max(...todayFortunes.map((f) => f.score))
-  const minScore = Math.min(...todayFortunes.map((f) => f.score))
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-      </div>
-    )
+  const handleLogoClick = () => {
+    router.push("/")
   }
 
-  if (!user) {
-    return null
+  const handleLoginClick = () => {
+    console.log("로그인 버튼 클릭됨")
+    router.push("/login")
+  }
+
+  const handleRegisterClick = () => {
+    console.log("회원가입 버튼 클릭됨")
+    router.push("/register")
+  }
+
+  if (showOnboarding) {
+    return <SajuOnboardingFlow onClose={handleCloseOnboarding} />
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 relative overflow-hidden">
-      {/* 배경 구름 효과 */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-20 left-10 w-32 h-16 bg-white rounded-full blur-xl"></div>
-        <div className="absolute top-40 right-20 w-24 h-12 bg-white rounded-full blur-lg"></div>
-        <div className="absolute bottom-40 left-1/4 w-40 h-20 bg-white rounded-full blur-2xl"></div>
-        <div className="absolute top-60 right-1/3 w-28 h-14 bg-white rounded-full blur-lg"></div>
-      </div>
+    <div className="min-h-screen relative overflow-hidden bg-white">
+      {/* Korean Wave Pattern Background - Transparent with lines only */}
+      <div
+        className="absolute inset-0 opacity-5"
+        style={{
+          backgroundImage: `url('/images/korean-wave-pattern.png')`,
+          backgroundSize: "300px 300px",
+          backgroundRepeat: "repeat",
+          filter: "grayscale(100%) contrast(200%)",
+        }}
+      />
 
-      <div className="relative z-10 container mx-auto px-4 py-6 pb-20">
-        {/* 헤더 - 날씨 앱 스타일 */}
-        <div className="text-center text-white mb-8 pt-4">
-          <div className="flex items-center justify-center gap-1 mb-2">
-            <MapPin className="h-4 w-4" />
-            <span className="text-sm opacity-90">서울특별시</span>
-          </div>
-          <h1 className="text-4xl font-light mb-2">{userName}님의 운세</h1>
-          <div className="text-8xl font-thin mb-2">{averageScore}</div>
-          <div className="text-xl opacity-90 mb-1">{getWeatherText(averageScore)}</div>
-          <div className="text-sm opacity-75">
-            H:{maxScore} L:{minScore}
-          </div>
+      {/* Main Content */}
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
+        {/* Main Question */}
+        <div className="mb-12">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight mb-6">
+            오늘은 어떤 것이
+            <br />
+            궁금하세요?
+          </h1>
+          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
         </div>
 
-        {/* 오늘의 운세 요약 */}
-        <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/30">
-          <p className="text-white text-center text-sm leading-relaxed">
-            오늘은 전반적으로 좋은 기운이 흐르는 날입니다. 특히 {todayFortunes.find((f) => f.score === maxScore)?.title}
-            이 매우 좋습니다.
-          </p>
-        </div>
+        {/* Scrolling Question Chips */}
+        <div className="mb-12 w-full relative">
+          {/* Left fade overlay - smaller on mobile */}
+          <div className="absolute left-0 top-0 bottom-0 w-4 md:w-20 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
+          {/* Right fade overlay - smaller on mobile */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-l from-white to-transparent z-20 pointer-events-none" />
 
-        {/* 시간별 운세 (날씨 앱의 시간별 예보 스타일) */}
-        <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/30">
-          <div className="flex justify-between items-center text-white text-sm">
-            <div className="text-center">
-              <div className="mb-2 opacity-75">지금</div>
-              <div className="text-2xl mb-2">{getWeatherIcon(averageScore)}</div>
-              <div className="font-medium">{averageScore}</div>
-            </div>
-            <div className="text-center">
-              <div className="mb-2 opacity-75">15시</div>
-              <div className="text-2xl mb-2">{getWeatherIcon(78)}</div>
-              <div className="font-medium">78</div>
-            </div>
-            <div className="text-center">
-              <div className="mb-2 opacity-75">16시</div>
-              <div className="text-2xl mb-2">{getWeatherIcon(82)}</div>
-              <div className="font-medium">82</div>
-            </div>
-            <div className="text-center">
-              <div className="mb-2 opacity-75">17시</div>
-              <div className="text-2xl mb-2">{getWeatherIcon(75)}</div>
-              <div className="font-medium">75</div>
-            </div>
-            <div className="text-center">
-              <div className="mb-2 opacity-75">18시</div>
-              <div className="text-2xl mb-2">{getWeatherIcon(68)}</div>
-              <div className="font-medium">68</div>
-            </div>
-            <div className="text-center">
-              <div className="mb-2 opacity-75">19시</div>
-              <div className="text-2xl mb-2">{getWeatherIcon(72)}</div>
-              <div className="font-medium">72</div>
-            </div>
-          </div>
-        </div>
-
-        {/* 나의 대표 사주 카드 */}
-        {defaultProfile && (
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/30">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white font-medium flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                나의 대표 사주
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-white/20"
-                onClick={() => router.push("/mypage")}
+          <div className="space-y-2">
+            {/* First row - scrolling right */}
+            <div className="h-16 overflow-hidden">
+              <ScrollVelocity
+                velocity={30}
+                parallaxStyle={{ height: "64px" }}
+                scrollerStyle={{
+                  fontSize: "1rem",
+                  fontWeight: "500",
+                  letterSpacing: "normal",
+                  filter: "none",
+                  alignItems: "center",
+                  height: "64px",
+                  display: "flex",
+                }}
+                scrollerClassName="flex items-center h-16"
+                numCopies={10}
               >
-                상세보기
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-white font-medium mb-2">{defaultProfile.name}님의 사주</h3>
-                <div className="grid grid-cols-4 gap-2 text-center text-sm">
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.yearStem}</div>
-                    <div className="text-xs text-white/70">년간</div>
-                  </div>
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.monthStem}</div>
-                    <div className="text-xs text-white/70">월간</div>
-                  </div>
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.dayStem}</div>
-                    <div className="text-xs text-white/70">일간</div>
-                  </div>
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.hourStem}</div>
-                    <div className="text-xs text-white/70">시간</div>
-                  </div>
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.yearBranch}</div>
-                    <div className="text-xs text-white/70">년지</div>
-                  </div>
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.monthBranch}</div>
-                    <div className="text-xs text-white/70">월지</div>
-                  </div>
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.dayBranch}</div>
-                    <div className="text-xs text-white/70">일지</div>
-                  </div>
-                  <div className="bg-white/20 rounded-lg p-2">
-                    <div className="text-white font-medium">{defaultProfile.saju.hourBranch}</div>
-                    <div className="text-xs text-white/70">시지</div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-white font-medium mb-2">오행 분포</h3>
-                <div className="bg-white/10 rounded-lg p-3">
-                  <ElementDisplay elements={elements} maxSlots={12} />
-                  <div className="mt-2 text-sm text-white/70">
-                    일주: {defaultProfile.saju.dayStem}
-                    {defaultProfile.saju.dayBranch}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 사주가 없는 경우 */}
-        {!defaultProfile && !isLoading && (
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl p-6 mb-6 border border-white/30 text-center">
-            <h2 className="text-white font-medium mb-2">사주 정보가 없습니다</h2>
-            <p className="text-white/70 text-sm mb-4">먼저 사주를 입력해주세요</p>
-            <Button
-              className="bg-white/30 hover:bg-white/40 text-white border-white/50"
-              onClick={() => router.push("/")}
-            >
-              사주 입력하기
-            </Button>
-          </div>
-        )}
-
-        {/* 오늘의 운세 상세 카드들 */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {todayFortunes.map((fortune) => (
-            <div key={fortune.type} className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30">
-              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <fortune.icon className="h-5 w-5 text-white" />
-                  <h3 className="text-white font-medium">{fortune.title}</h3>
+                  {questionChips.slice(0, 14).map((chip, index) => (
+                    <div
+                      key={index}
+                      className="bg-white text-black border-2 border-gray-200 px-3 py-2 md:px-4 md:py-3 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                    >
+                      <span className="text-base md:text-lg">{chip.icon}</span>
+                      <span>{chip.text}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl">{getWeatherIcon(fortune.score)}</div>
-                  <div className="text-xs text-white/70">{getWeatherText(fortune.score)}</div>
-                </div>
-              </div>
-              <p className="text-white/80 text-sm mb-3">{fortune.description}</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-white/20 rounded-full h-2">
-                  <div
-                    className="bg-white h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${fortune.score}%` }}
-                  ></div>
-                </div>
-                <span className="text-white text-sm font-medium">{fortune.score}</span>
-              </div>
+              </ScrollVelocity>
             </div>
-          ))}
-        </div>
 
-        {/* 이번 달 운세 요약 */}
-        <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/30">
-          <h2 className="text-white font-medium mb-4">이번 달 운세 요약 ({currentMonth}월)</h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-white/20 rounded-lg">
-              <span className="text-white font-medium">전체 운세</span>
-              <span className="text-white font-semibold">상승세 📈</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-green-500/30 rounded-lg text-center">
-                <div className="text-white/70 text-sm">길한 날</div>
-                <div className="text-white font-bold">{currentMonth}월 15일</div>
-              </div>
-              <div className="p-3 bg-orange-500/30 rounded-lg text-center">
-                <div className="text-white/70 text-sm">주의할 날</div>
-                <div className="text-white font-bold">{currentMonth}월 23일</div>
-              </div>
+            {/* Second row - scrolling left */}
+            <div className="h-16 overflow-hidden">
+              <ScrollVelocity
+                velocity={-25}
+                parallaxStyle={{ height: "64px" }}
+                scrollerStyle={{
+                  fontSize: "1rem",
+                  fontWeight: "500",
+                  letterSpacing: "normal",
+                  filter: "none",
+                  alignItems: "center",
+                  height: "64px",
+                  display: "flex",
+                }}
+                scrollerClassName="flex items-center h-16"
+                numCopies={10}
+              >
+                <div className="flex items-center gap-2">
+                  {questionChips.slice(14).map((chip, index) => (
+                    <div
+                      key={index + 14}
+                      className="bg-white text-black border-2 border-gray-200 px-3 py-2 md:px-4 md:py-3 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                    >
+                      <span className="text-base md:text-lg">{chip.icon}</span>
+                      <span>{chip.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollVelocity>
             </div>
           </div>
         </div>
 
-        {/* 빠른 액션 버튼들 */}
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            className="h-16 bg-white/30 hover:bg-white/40 text-white border-white/50"
-            onClick={() => router.push("/daily-fortune")}
+        {/* CTA Section */}
+        <div className="space-y-6 max-w-md w-full relative z-50">
+          <button
+            onClick={handleStartSaju}
+            className="w-[200px] h-[46px] mx-auto bg-gray-950 hover:bg-gray-800 text-white rounded-xl text-lg font-medium flex items-center justify-center gap-2 shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer"
           >
-            <div className="text-center">
-              <div className="text-lg">🎰</div>
-              <div className="text-sm">오늘의 운세</div>
+            <span>사주 프로필 생성하기</span>
+            <span className="text-xl">→</span>
+          </button>
+
+          {!isAuthenticated && (
+            <div className="flex items-center justify-center space-x-2 text-sm">
+              <span className="text-gray-500">계정이 없으신가요?</span>
+              <button
+                onClick={handleRegisterClick}
+                className="text-black hover:underline font-medium hover:text-gray-700 transition-colors cursor-pointer z-50"
+              >
+                회원가입
+              </button>
             </div>
-          </Button>
-          <Button
-            className="h-16 bg-white/30 hover:bg-white/40 text-white border-white/50"
-            onClick={() => router.push("/chat-list")}
-          >
-            <div className="text-center">
-              <div className="text-lg">💬</div>
-              <div className="text-sm">AI 상담</div>
-            </div>
-          </Button>
+          )}
         </div>
       </div>
 
-      {/* 플로팅 채팅 버튼 */}
-      <FloatingChatButton defaultProfile={defaultProfile} />
+      {/* Smooth transition fade out before wave pattern */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-amber-50/20 via-white/50 to-transparent z-5" />
+
+      {/* Oriental Wave Pattern at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-48 md:h-64 lg:h-80 z-1">
+        <div
+          className="w-full h-full opacity-10"
+          style={{
+            backgroundImage: `url('/images/oriental-wave-pattern.png')`,
+            backgroundSize: "400px 200px",
+            backgroundRepeat: "repeat-x",
+            backgroundPosition: "bottom",
+          }}
+        />
+        {/* Gradient overlay to blend with background */}
+        <div className="absolute inset-0 bg-gradient-to-t from-amber-50/20 via-transparent to-transparent" />
+      </div>
+
+      {/* Additional subtle pattern overlay for depth */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 md:h-40 z-0">
+        <div
+          className="w-full h-full opacity-5"
+          style={{
+            backgroundImage: `url('/images/oriental-wave-pattern.png')`,
+            backgroundSize: "300px 150px",
+            backgroundRepeat: "repeat-x",
+            backgroundPosition: "bottom",
+            transform: "scaleY(-1)",
+          }}
+        />
+      </div>
     </div>
   )
 }

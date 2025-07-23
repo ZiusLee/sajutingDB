@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 - 년주: ${yearStem}${yearBranch}
 - 월주: ${monthStem}${monthBranch}
 - 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})
-- 시주: ${hourStem}${hourBranch}
+- 시���: ${hourStem}${hourBranch}
 - 띠: ${yearAnimal}
 - 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
 
@@ -156,7 +156,7 @@ ${relationshipContext}
 - 상대방과의 관계에서 나타나는 사주적 특징
 
 ### 2. 2025년 을사년의 연애 기운 분석
-- 을사년의 천간/지지가 썸 관계에 미치는 영향
+- 을사년의 천간/지지가 썸 관계에 미치는 영���
 - 연애로 발전할 수 있는 시기와 기회
 
 ### 3. 썸에서 연애로 발전시키기 위한 전략
@@ -246,7 +246,7 @@ ${relationshipContext}
 ## ${dayStem}${dayBranch}일주 결혼생활 전략: [전체 내용을 관통하는 핵심 주제]
 
 ### 1. 결혼생활에서의 사주적 강점
-- 결혼생활에서 활용할 수 있는 사주의 강점
+- 결혼생활에서 활용할 수 있는 사주의 강��
 - 배우자와의 관계에서 발휘되는 장점
 
 ### 2. 결혼생활 향상을 위한 전략
@@ -265,7 +265,7 @@ ${relationshipContext}
 - 행복한 결혼생활을 위한 핵심 포인트
 - 구체적인 행동 지침과 마인드셋
 
-중요: 제목에는 반드시 이 사람의 결혼생활 전략을 관통하는 핵심 주제나 방향을 한 문장으로 명확하게 표현해주세요.
+중요: 제목에는 반드시 이 사람의 결혼생활 전략을 관통하�� 핵심 주제나 방향을 한 문장으로 명확하게 표현해주세요.
 
 한국어로 친절하게 설명해주세요. 마크다운 형식으로 응답해주세요.
 `
@@ -308,7 +308,7 @@ ${relationshipContext}
 
 ### 2. 2025년 을사년의 연애 기운 분석
 - 을사년의 천간/지지가 연애 관계에 미치는 영향
-- 연애 관계가 개선될 수 있는 시기와 기회
+- 연애 관계가 개선될 수 있는 시기와 �����회
 
 ### 3. 관계 개선을 위한 전략
 - 사주 특성을 고려한 연애 관계 개선 방법
@@ -348,7 +348,7 @@ ${relationshipContext}
       }
 - 년주: ${yearStem}${yearBranch}
 - 월주: ${monthStem}${monthBranch}
-- 일주: ${dayStem}${dayBranch} (일간: ${dayMaster})
+- 일주: ${dayStem}${dayBranch} (일���: ${dayMaster})
 - 시주: ${hourStem}${hourBranch}
 - 띠: ${yearAnimal}
 - 오행 분포: 목(${elements.wood}), 화(${elements.fire}), 토(${elements.earth}), 금(${elements.metal}), 수(${elements.water})
@@ -558,7 +558,7 @@ ${relationshipContext}
 - 오류 시간: ${new Date().toISOString()}
 - 오류 내용: ${errorMessage}
 
-## 문제 해결 방법:
+## 문��� 해결 ���법:
 1. 페이지를 새로고침하고 다시 시도해보세요.
 2. 잠시 후 다시 시도해보세요.
         `,

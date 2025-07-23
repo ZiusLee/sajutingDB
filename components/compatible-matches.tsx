@@ -42,7 +42,7 @@ export default function CompatibleMatches({
         console.log("Current window.sajuInfo:", window.sajuInfo)
         console.log("Current window.sajuFullData:", window.sajuFullData)
 
-        // 전역 변수에서 데이터를 가져와 병합
+        // 전역 ���수에서 데이터를 가져와 병합
         if (window.sajuFullData) {
           // 중요한 필드들을 명시적으로 복사
           if (window.sajuFullData.year) sajuData.year = String(window.sajuFullData.year)
@@ -101,7 +101,7 @@ export default function CompatibleMatches({
             age: 28,
             birthYear: "1996년생",
             saju: "갑인-을사-병오-정미",
-            compatibility: "당신에게 부족한 금(金)과 수(水) 오행이 풍부하여 상호 보완적인 관계",
+            compatibility: "당신에게 부족한 금(金)과 수(水) 오��이 풍부하여 상호 보완적인 관계",
             compatibilityScore: 85,
             imageUrl: "/placeholder.svg?height=150&width=150",
           },

@@ -52,7 +52,7 @@ export function CitySearch({ value, onChange, disabled = false }: CitySearchProp
     }
   }, [])
 
-  // 키보드 네비게이션 처리
+  // 키보드 네비게이션 처���
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault()

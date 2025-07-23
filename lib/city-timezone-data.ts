@@ -51,7 +51,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   {
     id: "tahiti",
     city: "타히티",
-    country: "프랑스령 폴리네시아",
+    country: "���랑스령 폴리네시아",
     timezone: "Pacific/Tahiti",
     utcOffset: -10,
     timeStandard: "서머타임",
@@ -83,7 +83,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
     country: "미국",
     timezone: "America/Los_Angeles",
     utcOffset: -8,
-    timeStandard: "서머타임",
+    timeStandard: "��머타임",
     useDST: true,
   },
   {
@@ -823,8 +823,8 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   // UTC+4.5
   {
     id: "kabul",
-    city: "카불",
-    country: "아프가니스탄",
+    city: "카���",
+    country: "아프가니스��",
     timezone: "Asia/Kabul",
     utcOffset: 4.5,
     timeStandard: "서머타임",
@@ -1307,7 +1307,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
     country: "러시아",
     timezone: "Asia/Vladivostok",
     utcOffset: 10,
-    timeStandard: "서머타임",
+    timeStandard: "서머타��",
   },
   {
     id: "port_moresby",
@@ -1419,7 +1419,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   // UTC+14
   {
     id: "kiribati",
-    city: "크리스마스 섬",
+    city: "크리스마��� 섬",
     country: "키리바시",
     timezone: "Pacific/Kiritimati",
     utcOffset: 14,

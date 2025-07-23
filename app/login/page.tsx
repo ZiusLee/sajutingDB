@@ -184,13 +184,6 @@ export default function LoginPage() {
   // Rest of the component remains the same...
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* 헤더 */}
-      <div className="flex items-center p-4 border-b">
-        <button onClick={() => router.back()} className="p-2 -ml-2" aria-label="뒤로 가기">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <h1 className="text-lg font-medium ml-2">{isResetMode ? "비밀번호 재설정" : "로그인"}</h1>
-      </div>
 
       {/* 컨텐츠 */}
       <div className="flex flex-col items-center justify-center flex-1 p-4 md:p-8">

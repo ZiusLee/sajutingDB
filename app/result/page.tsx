@@ -164,7 +164,7 @@ export default async function ResultPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* 사주 결과 표시 */}
+              {/* 사주 결과 표�� */}
               <div className="space-y-6">
                 <SajuResult
                   saju={{
@@ -326,7 +326,7 @@ export default async function ResultPage({
                 <BetaSignupForm />
               </div>
 
-              {/* 마이페이지로 돌아가기 버튼 */}
+              {/* 마이페이지�� 돌아가기 버튼 */}
               <div className="flex justify-center">
                 <Button variant="outline" asChild>
                   <Link href="/mypage">마이페이지로 돌아가기</Link>

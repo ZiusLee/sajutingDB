@@ -1,135 +1,84 @@
 "use client"
-
 import Link from "next/link"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { MoonIcon, SunIcon } from "lucide-react"
-import { useTheme } from "next-themes"
-import { useRouter } from "next/navigation"
-import { SajuLogo } from "./saju-logo"
-import { useEffect, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { SajuLogo } from "@/components/saju-logo"
+import { useAuth } from "@/hooks/use-auth"
+import { SettingsDialog } from "@/components/settings-dialog"
+import { User } from "lucide-react"
 
 export function SiteHeader() {
+  const { user, isAuthenticated } = useAuth()
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [userName, setUserName] = useState<string>("")
-  const [isLoading, setIsLoading] = useState(true)
-  const supabase = createClientComponentClient()
+  const pathname = usePathname()
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      setIsLoading(true)
-      try {
-        // First check if we have a session
-        const { data: sessionData } = await supabase.auth.getSession()
+  // Check if we're in saju chat or mypage
+  const isSajuChat = pathname?.includes("/saju-chat/")
+  //const isMyPage = pathname === "/mypage"
 
-        if (sessionData?.session) {
-          // If we have a session, get the user
-          const { data } = await supabase.auth.getUser()
-          if (data?.user) {
-            setUser(data.user)
-            // Get user name from localStorage if available
-            const storedName = localStorage.getItem("user_name")
-            setUserName(storedName || data.user.email?.split("@")[0] || "사용자")
-          }
-        } else {
-          // No session, user is not logged in (this is normal)
-          setUser(null)
-        }
-      } catch (err) {
-        // Only log actual errors, not "no session" cases
-        if (!(err instanceof Error && err.message.includes("Auth session missing"))) {
-          console.error("Unexpected error:", err)
-        }
-        setUser(null)
-      } finally {
-        setIsLoading(false)
+  const handleLogoClick = () => {
+    if (isSajuChat) {
+      // In saju chat: trigger sidebar toggle
+      if (typeof window !== "undefined" && (window as any).toggleSajuChatSidebar) {
+        ;(window as any).toggleSajuChatSidebar()
       }
+    } else {
+      // Normal behavior: navigate to home
+      router.push("/")
     }
-
-    fetchUser()
-
-    // Subscribe to auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        const storedName = localStorage.getItem("user_name")
-        setUserName(storedName || session.user.email?.split("@")[0] || "사용자")
-      } else {
-        setUser(null)
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [supabase])
-
-  // Function to navigate to mypage
-  const goToMyPage = () => {
-    console.log("Navigating to mypage")
-    router.push("/mypage")
   }
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-14 sm:h-16 items-center px-3 sm:px-6 lg:px-8 space-x-2 sm:space-x-4 sm:justify-between sm:space-x-0">
-        <div className="flex gap-2 sm:gap-6 md:gap-10 items-center">
-          <Link href="/" className="flex items-center space-x-2">
-            <SajuLogo size="sm" showText={false} />
-            <span className="font-bold text-lg text-primary dark:text-white">사주핑</span>
-          </Link>
-          <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-            <Link href="/about" className="transition-colors hover:text-foreground/80 text-foreground/60">
-              사주핑 스토리
+    <header className="fixed top-0 z-50 w-full">
+      <div className="flex h-16 lg:h-20 items-center justify-between px-2 sm:px-4 md:px-6 lg:px-8">
+        {/* Logo */}
+        <div className="flex items-center">
+          {isSajuChat ? (
+            // In saju chat: Logo acts as sidebar toggle
+            <button
+              onClick={handleLogoClick}
+              className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
+            >
+              <SajuLogo className="lg:hidden" />
+              <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
+            </button>
+          ) : (
+            // Normal behavior: Logo links to home
+            <Link href="/" className="flex items-center space-x-2">
+              <SajuLogo className="lg:hidden" />
+              <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
             </Link>
-          </nav>
+          )}
         </div>
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <nav className="flex items-center space-x-2">
-            {isLoading ? (
-              // Show loading state
-              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
-            ) : user ? (
-              // Profile avatar - using Button instead of Link for better click handling
+
+        {/* Right side */}
+        <div className="flex items-center gap-2">
+          {/* Settings button for logged-in users */}
+          {isAuthenticated && (
+            <SettingsDialog>
               <Button
                 variant="ghost"
-                className="p-0 h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
-                onClick={goToMyPage}
-                aria-label="마이페이지"
+                size="icon"
+                className="h-8 w-8 lg:h-10 lg:w-10 bg-black hover:bg-gray-800 text-white"
               >
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {userName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
+                <User className="h-4 w-4 lg:h-5 lg:w-5" />
               </Button>
-            ) : (
-              <Button variant="default" onClick={() => router.push("/login")}>
-                로그인
-              </Button>
-            )}
-            <ThemeToggle />
-          </nav>
+            </SettingsDialog>
+          )}
+
+          {/* Login button for non-logged-in users */}
+          {!isAuthenticated && (
+            <Button
+              className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-3 sm:px-4 lg:px-6 py-2 text-sm lg:text-base font-medium"
+              onClick={() => router.push("/login")}
+            >
+              로그인
+            </Button>
+          )}
         </div>
       </div>
     </header>
   )
 }
 
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
-
-  return (
-    <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
-      <SunIcon className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <MoonIcon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Toggle theme</span>
-    </Button>
-  )
-}
+export default SiteHeader
