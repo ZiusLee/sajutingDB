@@ -4,14 +4,30 @@ import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore,
+    })
+
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
+    console.log("Smart Memory GET - User:", user?.id, "Auth Error:", authError)
+
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      console.log("Smart Memory GET - Unauthorized:", { authError, hasUser: !!user })
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        {
+          status: 401,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
     const { searchParams } = new URL(request.url)
@@ -31,26 +47,166 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("메모리 조회 오류:", error)
-      return NextResponse.json({ error: "Failed to fetch memories" }, { status: 500 })
+      return NextResponse.json(
+        { error: "Failed to fetch memories", details: error.message },
+        {
+          status: 500,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
-    return NextResponse.json({ memories })
+    console.log("Smart Memory GET - Success:", memories?.length, "memories found")
+    return NextResponse.json(
+      { memories },
+      {
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
   } catch (error) {
-    console.error("API 오류:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Smart Memory GET - API 오류:", error)
+    return NextResponse.json(
+      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        status: 500,
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore,
+    })
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    console.log("Smart Memory POST - User:", user?.id, "Auth Error:", authError)
+
+    if (authError || !user) {
+      console.log("Smart Memory POST - Unauthorized:", { authError, hasUser: !!user })
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        {
+          status: 401,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
+    }
+
+    const body = await request.json()
+    console.log("Smart Memory POST - Body:", body)
+
+    const { content, type, keywords, importance, is_pinned } = body
+
+    if (!content || !type) {
+      return NextResponse.json(
+        { error: "Content and type are required" },
+        {
+          status: 400,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
+    }
+
+    const { data, error } = await supabase
+      .from("smart_contexts")
+      .insert({
+        user_id: user.id,
+        content,
+        type,
+        keywords: keywords || [],
+        importance: importance || 1,
+        is_pinned: is_pinned || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("메모리 저장 오류:", error)
+      return NextResponse.json(
+        { error: "Failed to save memory", details: error.message },
+        {
+          status: 500,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
+    }
+
+    console.log("Smart Memory POST - Success:", data)
+    return NextResponse.json(
+      { memory: data },
+      {
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
+  } catch (error) {
+    console.error("Smart Memory POST - API 오류:", error)
+    return NextResponse.json(
+      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        status: 500,
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore,
+    })
+
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        {
+          status: 401,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
     const { id, content, type, keywords, importance, is_pinned } = await request.json()
@@ -72,26 +228,65 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error("메모리 업데이트 오류:", error)
-      return NextResponse.json({ error: "Failed to update memory" }, { status: 500 })
+      return NextResponse.json(
+        { error: "Failed to update memory", details: error.message },
+        {
+          status: 500,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
-    return NextResponse.json({ memory: data })
+    return NextResponse.json(
+      { memory: data },
+      {
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
   } catch (error) {
-    console.error("API 오류:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Smart Memory PUT - API 오류:", error)
+    return NextResponse.json(
+      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        status: 500,
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore,
+    })
+
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        {
+          status: 401,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
     const { searchParams } = new URL(request.url)
@@ -103,26 +298,91 @@ export async function DELETE(request: NextRequest) {
 
       if (error) {
         console.error("전체 메모리 삭제 오류:", error)
-        return NextResponse.json({ error: "Failed to delete all memories" }, { status: 500 })
+        return NextResponse.json(
+          { error: "Failed to delete all memories", details: error.message },
+          {
+            status: 500,
+            headers: {
+              "Access-Control-Allow-Credentials": "true",
+              "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+            },
+          },
+        )
       }
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json(
+        { success: true },
+        {
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
     if (!id) {
-      return NextResponse.json({ error: "Memory ID is required" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Memory ID is required" },
+        {
+          status: 400,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
     const { error } = await supabase.from("smart_contexts").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) {
       console.error("메모리 삭제 오류:", error)
-      return NextResponse.json({ error: "Failed to delete memory" }, { status: 500 })
+      return NextResponse.json(
+        { error: "Failed to delete memory", details: error.message },
+        {
+          status: 500,
+          headers: {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+          },
+        },
+      )
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(
+      { success: true },
+      {
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
   } catch (error) {
-    console.error("API 오류:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Smart Memory DELETE - API 오류:", error)
+    return NextResponse.json(
+      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        status: 500,
+        headers: {
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        },
+      },
+    )
   }
+}
+
+// OPTIONS 메서드 추가 (CORS preflight 요청 처리)
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Credentials": "true",
+    },
+  })
 }
