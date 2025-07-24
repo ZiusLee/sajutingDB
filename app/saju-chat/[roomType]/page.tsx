@@ -54,8 +54,6 @@ export default function SajuChatPage() {
 
     const initializePage = async () => {
       try {
-        console.log("🔄 Initializing saju chat page for room:", roomId)
-
         // 로컬 스토리지에서 사주 데이터 가져오기
         const savedSaju = localStorage.getItem("current_saju")
 
@@ -94,7 +92,6 @@ export default function SajuChatPage() {
           // Auto-create temporary chat room if no roomId is provided
           let chatRoom = null
           if (!roomId) {
-            console.log("🆕 Creating temporary chat room...")
             chatRoom = createTemporaryChatRoom({
               sessionId,
               title: "새로운 대화",
@@ -103,7 +100,6 @@ export default function SajuChatPage() {
             })
 
             setCurrentChatRoom(chatRoom)
-            console.log("✅ Temporary chat room created:", chatRoom.id)
 
             // Update URL with the temporary room ID without triggering a page reload
             const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
@@ -127,7 +123,6 @@ export default function SajuChatPage() {
           // 마이페이지에서 왔는지 확인 (한 번만 체크하고 플래그 제거)
           const fromMyPage = sessionStorage.getItem("from_mypage")
           if (fromMyPage === "true") {
-            console.log("✅ Chat opened from mypage - flag confirmed")
             // 플래그 제거하여 무한 로그 방지
             sessionStorage.removeItem("from_mypage")
           }
@@ -137,7 +132,6 @@ export default function SajuChatPage() {
           setIsLoggedIn(!!userToken)
 
           setLoading(false)
-          console.log("✅ Page initialization completed")
         }
       } catch (error) {
         console.error("❌ Error loading saju data:", error)
@@ -192,13 +186,15 @@ export default function SajuChatPage() {
 
   const handleChatRoomPersisted = (newChatRoomId: string) => {
     // Update the current chat room when it gets persisted
-    setCurrentChatRoom({ id: newChatRoomId, isTemporary: false })
+    setCurrentChatRoom((prev) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
 
-    // Update URL with the persisted room ID
+    // Update URL with the persisted room ID without triggering re-render
     const newUrl = `/saju-chat/${roomType}?roomId=${newChatRoomId}`
-    window.history.replaceState({}, "", newUrl)
+    if (window.history.replaceState) {
+      window.history.replaceState(null, "", newUrl)
+    }
 
-    console.log("✅ Chat room persisted and URL updated:", newChatRoomId)
+    // Don't log this as it's not necessary for user experience
   }
 
   const handleGuideModalClose = () => {

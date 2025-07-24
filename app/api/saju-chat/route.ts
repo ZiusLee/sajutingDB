@@ -177,8 +177,12 @@ async function createSimpleSummary(messages: any[], roomType: string) {
 
 // 🚀 스마트 메모리 통합 함수
 async function getMemoryContext(userId: string, userMessage: string, roomType: string): Promise<string> {
-  if (!ENABLE_SMART_MEMORY || !userId) {
-    console.log("🧠 Smart memory disabled or no user ID")
+  if (!ENABLE_SMART_MEMORY) {
+    console.log("🧠 Smart memory is disabled by environment variable.")
+    return ""
+  }
+  if (!userId) {
+    console.log("🧠 No user ID provided, skipping memory context.")
     return ""
   }
 
@@ -205,8 +209,12 @@ async function processMemoryAsync(
   assistantResponse: string,
   existingContext?: string,
 ) {
-  if (!ENABLE_SMART_MEMORY || !userId) {
-    console.log("🧠 Smart memory disabled or no user ID - skipping memory processing")
+  if (!ENABLE_SMART_MEMORY) {
+    console.log("🧠 Smart memory is disabled, skipping async memory processing.")
+    return
+  }
+  if (!userId) {
+    console.log("🧠 No user ID provided, skipping async memory processing.")
     return
   }
 

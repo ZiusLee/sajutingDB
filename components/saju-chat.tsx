@@ -121,6 +121,8 @@ export default function SajuChat({
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
+  const [transitionMessages, setTransitionMessages] = useState<any[] | null>(null)
+  const isPersistingRef = useRef(false)
 
   // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
@@ -149,13 +151,11 @@ export default function SajuChat({
     calculatedDaeun: any
     stableBirthInfo: any
     initialMessages: any[]
-    aiChatBody: any
     isInitialized: boolean
   }>({
     calculatedDaeun: null,
     stableBirthInfo: null,
     initialMessages: [],
-    aiChatBody: {},
     isInitialized: false,
   })
 
@@ -180,32 +180,66 @@ export default function SajuChat({
   // Get the effective chat room ID (persisted ID takes precedence)
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
+  // This derived state ensures the body for the AI hook is always up-to-date.
+  const aiChatBody = useMemo(() => {
+    if (!chatData.isInitialized) return {}
+
+    const compressedSajuObject =
+      stableSaju && chatData.stableBirthInfo
+        ? compressSaju(
+            stableSaju,
+            chatData.stableBirthInfo.solarYear?.toString(),
+            chatData.stableBirthInfo.solarMonth?.toString(),
+            chatData.stableBirthInfo.solarDay?.toString(),
+            chatData.stableBirthInfo.solarHour?.toString(),
+            chatData.stableBirthInfo.solarMinute?.toString(),
+            chatData.stableBirthInfo.timeUnknown,
+          )
+        : stableSaju
+
+    return {
+      name,
+      gender,
+      roomType,
+      userId: stableUserId,
+      currentYear: 2025,
+      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+      birthInfo: chatData.stableBirthInfo,
+      compressedSaju: compressedSajuObject,
+      daeun: chatData.calculatedDaeun,
+      chatRoomId: effectiveChatRoomId,
+    }
+  }, [
+    chatData.isInitialized,
+    chatData.stableBirthInfo,
+    chatData.calculatedDaeun,
+    stableSaju,
+    name,
+    gender,
+    roomType,
+    stableUserId,
+    effectiveChatRoomId,
+  ])
+
   // Initialize chat data
   useEffect(() => {
     let isMounted = true
 
     const initializeChatData = async () => {
-      if (!stableSaju) {
-        console.log("⏭️ No saju data, skipping initialization")
+      if (isPersistingRef.current) {
+        isPersistingRef.current = false
         return
       }
 
-      console.log("🔄 Initializing chat data for room:", effectiveChatRoomId)
+      if (!stableSaju) {
+        return
+      }
+
+      if (chatData.isInitialized && aiChatBody.chatRoomId === effectiveChatRoomId) {
+        return
+      }
 
       try {
-        const compressedSajuObject =
-          stableSaju && stableBirthInfo
-            ? compressSaju(
-                stableSaju,
-                stableBirthInfo.solarYear?.toString(),
-                stableBirthInfo.solarMonth?.toString(),
-                stableBirthInfo.solarDay?.toString(),
-                stableBirthInfo.solarHour?.toString(),
-                stableBirthInfo.solarMinute?.toString(),
-                stableBirthInfo.timeUnknown,
-              )
-            : stableSaju
-
         let calculatedDaeunData = null
         if (stableSaju?.yearStem && stableBirthInfo?.solarYear && gender) {
           try {
@@ -238,8 +272,6 @@ export default function SajuChat({
                 content: msg.content,
                 createdAt: msg.createdAt,
               }))
-
-            console.log(`📨 Loaded ${pastMessages.length} messages for chat room ${effectiveChatRoomId}`)
           }
         } catch (error) {
           console.error("❌ Error loading past messages:", error)
@@ -250,53 +282,50 @@ export default function SajuChat({
             ? pastMessages
             : [{ id: generateUUID(), role: "assistant" as const, content: getInitialMessage(name, roomType) }]
 
-        const chatBody = {
-          name,
-          gender,
-          roomType,
-          userId: stableUserId,
-          currentYear: 2025,
-          yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-          birthInfo: stableBirthInfo,
-          compressedSaju: compressedSajuObject,
-          daeun: calculatedDaeunData,
-          chatRoomId: effectiveChatRoomId,
-        }
-
         if (isMounted) {
           setChatData({
             calculatedDaeun: calculatedDaeunData,
             stableBirthInfo: stableBirthInfo,
             initialMessages: initialChatMessages,
-            aiChatBody: chatBody,
             isInitialized: true,
           })
           setLastSavedMessageCount(pastMessages.length)
-          console.log("✅ Chat data initialized successfully")
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
       }
     }
 
-    setChatData((prev) => ({ ...prev, isInitialized: false }))
+    if (
+      !chatData.isInitialized ||
+      (aiChatBody.chatRoomId !== effectiveChatRoomId && !effectiveChatRoomId?.startsWith("temp-"))
+    ) {
+      setChatData((prev) => ({ ...prev, isInitialized: false }))
+    }
+
     initializeChatData()
 
     return () => {
       isMounted = false
     }
-  }, [stableSaju, name, gender, roomType, stableBirthInfo, stableUserId, effectiveChatRoomId, sessionId])
+  }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId])
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
     api: "/api/saju-chat",
     id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
-    initialMessages: chatData.initialMessages,
-    body: chatData.aiChatBody,
+    initialMessages: transitionMessages ?? chatData.initialMessages, // Use transition messages if available
+    body: aiChatBody,
+    onFinish: () => {
+      // After a message is successfully sent with the new persisted ID,
+      // we can clear the transition state.
+      if (transitionMessages) {
+        setTransitionMessages(null)
+      }
+    },
     onError: (error) => {
       console.error("❌ 채팅 오류:", error)
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
     },
-    key: effectiveChatRoomId || "default",
   })
 
   // Save messages to database when new messages are added
@@ -332,9 +361,22 @@ export default function SajuChat({
 
         // If a temporary chat room was persisted, update our state
         if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
+          console.log(
+            `Transitioning from temp room ${effectiveChatRoomId} to persisted room ${result.persistedChatRoomId}`,
+          )
+
+          // 1. Preserve the current messages for the next render
+          setTransitionMessages(messages)
+
+          // 2. Update the chat room ID state, which will trigger a re-render
           setPersistedChatRoomId(result.persistedChatRoomId)
           onChatRoomPersisted?.(result.persistedChatRoomId)
-          console.log(`✅ Chat room persisted: ${effectiveChatRoomId} -> ${result.persistedChatRoomId}`)
+
+          // 3. Update URL without page refresh
+          if (window.history.pushState) {
+            const newUrl = `/saju-chat/${roomType}?roomId=${result.persistedChatRoomId}`
+            window.history.replaceState(null, "", newUrl)
+          }
         }
       } catch (error) {
         console.error("❌ Error saving messages:", error)
