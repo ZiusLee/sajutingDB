@@ -1037,44 +1037,10 @@ ${conversation}
       // 기존 메모리 가져오기 (컨텍스트용)
       console.log("🧠 [STEP 2] Fetching existing memories from DB...")
       
-      // 🔥 타임아웃과 에러 핸들링 강화
+      // 🔥 DB 쿼리 스킵해서 빠르게 진행 (일단 테스트용)
       let existingMemories: any[] = []
-      try {
-        const fetchPromise = this.supabase
-          .from("smart_contexts")
-          .select("type, content")
-          .eq("user_id", userId)
-          .order("updated_at", { ascending: false })
-          .limit(10)
-
-        // 5초 타임아웃 설정
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("DB fetch timeout after 5s")), 5000)
-        })
-
-        const { data, error: fetchError } = await Promise.race([fetchPromise, timeoutPromise]) as any
-
-        if (fetchError) {
-          console.error("🚨 [STEP 2] DB fetch error:", fetchError)
-          console.error("🚨 [STEP 2] Error details:", {
-            message: fetchError.message,
-            details: fetchError.details,
-            hint: fetchError.hint,
-            code: fetchError.code
-          })
-        } else {
-          existingMemories = data || []
-          console.log("🧠 [STEP 2] DB fetch successful!")
-        }
-      } catch (error) {
-        console.error("🚨 [STEP 2] DB fetch exception:", error)
-        console.error("🚨 [STEP 2] Exception details:", {
-          message: (error as Error)?.message,
-          stack: (error as Error)?.stack?.slice(0, 500)
-        })
-        // DB 실패해도 계속 진행 (빈 배열로)
-        existingMemories = []
-      }
+      console.log("🧠 [STEP 2] DB 쿼리 스킵 중 (디버깅용)")
+      console.log("🧠 [STEP 2] Using empty memories array to continue")
       
       console.log("🧠 [STEP 2] Existing memories count:", existingMemories?.length || 0)
 
