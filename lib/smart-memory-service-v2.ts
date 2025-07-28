@@ -124,8 +124,17 @@ class SmartMemoryServiceV2 {
   // 개선된 메모리 추출 - Few-shot learning과 chain of thought
   async extractMemoryCandidate(userMessage: string, assistantResponse: string, previousMemories?: any[]) {
     try {
+      console.log("🧠 [EXTRACT 1] Starting extractMemoryCandidate")
+      console.log("🧠 [EXTRACT 1] User message:", userMessage.slice(0, 100))
+      console.log("🧠 [EXTRACT 1] Assistant response:", assistantResponse.slice(0, 100))
+      
       // Pre-filter: Skip extraction for low-value conversations
-      if (!this.shouldExtractFromConversation(userMessage, assistantResponse)) {
+      console.log("🧠 [EXTRACT 1] Checking if conversation should be extracted...")
+      const shouldExtract = this.shouldExtractFromConversation(userMessage, assistantResponse)
+      console.log("🧠 [EXTRACT 1] Should extract:", shouldExtract)
+      
+      if (!shouldExtract) {
+        console.log("🧠 [EXTRACT 1] Skipping extraction - low value conversation")
         return {
           shouldSave: false,
           memories: [],
@@ -133,12 +142,16 @@ class SmartMemoryServiceV2 {
         }
       }
 
+      console.log("🧠 [EXTRACT 2] Building conversation and context...")
       const conversation = `사용자: ${userMessage}\nAI: ${assistantResponse}`
 
       // 이전 메모리 컨텍스트 생성 (더 간결하게)
       const memoryContext = previousMemories?.length
         ? `\n\n기존 정보:\n${previousMemories.slice(0, 5).map((m) => `- ${m.content}`).join("\n")}`
         : ""
+      
+      console.log("🧠 [EXTRACT 2] Memory context length:", memoryContext.length)
+      console.log("🧠 [EXTRACT 2] Calling GPT for memory extraction...")
 
       const result = await generateObject({
         model: openai("gpt-4o-mini"), // 비용 효율적인 모델 사용
@@ -182,9 +195,20 @@ ${conversation}
 - 모호하면 추출하지 않음`,
       })
 
+      console.log("🧠 [EXTRACT 2] GPT extraction completed!")
+      console.log("🧠 [EXTRACT 2] Result:", {
+        shouldSave: result.object.shouldSave,
+        memoriesCount: result.object.memories.length,
+        reasoning: result.object.reasoning?.slice(0, 100)
+      })
+
       return result.object
     } catch (error) {
-      console.error("메모리 추출 실패:", error)
+      console.error("🚨 [EXTRACT ERROR] 메모리 추출 실패:", error)
+      console.error("🚨 [EXTRACT ERROR] Error details:", {
+        message: (error as Error)?.message,
+        stack: (error as Error)?.stack?.slice(0, 500)
+      })
       return {
         shouldSave: false,
         memories: [],
@@ -991,46 +1015,52 @@ ${conversation}
   // 대화 처리 (메인 함수)
   async processConversation(userId: string, conversationId: string, userMessage: string, assistantResponse: string) {
     try {
-      console.log("🧠 Processing conversation for user:", userId)
-      console.log("🧠 User message:", userMessage.slice(0, 100) + "...")
-      console.log("🧠 Assistant response:", assistantResponse.slice(0, 100) + "...")
+      console.log("🧠 [STEP 1] Processing conversation for user:", userId)
+      console.log("🧠 [STEP 1] User message:", userMessage.slice(0, 100) + "...")
+      console.log("🧠 [STEP 1] Assistant response:", assistantResponse.slice(0, 100) + "...")
       
       // 환경 변수 체크
-      console.log("🧠 Environment check:", {
+      console.log("🧠 [STEP 1] Environment check:", {
         hasOpenAI: !!process.env.OPENAI_API_KEY,
         hasSupabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
         isClientSide: typeof window !== "undefined"
       })
 
       // 기존 메모리 가져오기 (컨텍스트용)
-      const { data: existingMemories } = await this.supabase
+      console.log("🧠 [STEP 2] Fetching existing memories from DB...")
+      const { data: existingMemories, error: fetchError } = await this.supabase
         .from("smart_contexts")
         .select("type, content")
         .eq("user_id", userId)
         .order("updated_at", { ascending: false })
         .limit(10)
 
-      console.log("🧠 Existing memories count:", existingMemories?.length || 0)
+      if (fetchError) {
+        console.error("🚨 [STEP 2] DB fetch error:", fetchError)
+      }
+      console.log("🧠 [STEP 2] Existing memories count:", existingMemories?.length || 0)
 
       // 메모리 후보 추출
-      console.log("🧠 Starting memory extraction...")
+      console.log("🧠 [STEP 3] Starting memory extraction...")
+      console.log("🧠 [STEP 3] Calling extractMemoryCandidate...")
       const extraction = await this.extractMemoryCandidate(userMessage, assistantResponse, existingMemories)
       
-      console.log("🧠 Extraction result:", {
+      console.log("🧠 [STEP 3] Extraction completed!")
+      console.log("🧠 [STEP 3] Extraction result:", {
         shouldSave: extraction.shouldSave,
         memoriesCount: extraction.memories.length,
         reasoning: extraction.reasoning
       })
 
       if (!extraction.shouldSave || extraction.memories.length === 0) {
-        console.log("🧠 No memorable information found - skipping save")
+        console.log("🧠 [STEP 4] No memorable information found - skipping save")
         return extraction
       }
 
       // 메모리 저장
-      console.log("🧠 Attempting to save memories:", extraction.memories.length)
+      console.log("🧠 [STEP 4] Attempting to save memories:", extraction.memories.length)
       extraction.memories.forEach((memory, index) => {
-        console.log(`🧠 Memory ${index + 1}:`, {
+        console.log(`🧠 [STEP 4] Memory ${index + 1}:`, {
           type: memory.type,
           content: memory.content.slice(0, 50) + "...",
           importance: memory.importance,
@@ -1038,9 +1068,10 @@ ${conversation}
         })
       })
       
+      console.log("🧠 [STEP 4] Calling saveMemories...")
       const savedMemories = await this.saveMemories(userId, extraction.memories, conversationId)
 
-      console.log("🧠 Save operation completed:", {
+      console.log("🧠 [STEP 4] Save operation completed:", {
         attempted: extraction.memories.length,
         saved: savedMemories.length,
         success: savedMemories.length > 0
