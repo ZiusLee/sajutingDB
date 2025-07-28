@@ -45,7 +45,7 @@ const QueryUnderstandingSchema = z.object({
 })
 
 class SmartMemoryServiceV2 {
-  private supabase = createClient(
+  supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
@@ -57,7 +57,7 @@ class SmartMemoryServiceV2 {
   )
 
   // 개선된 임베딩 생성 - 에러 처리 및 재시도 로직
-  private async generateEmbedding(text: string, retries = 3): Promise<number[]> {
+  async generateEmbedding(text: string, retries = 3): Promise<number[]> {
     for (let i = 0; i < retries; i++) {
       try {
         // Server-side에서만 실행되도록 보장

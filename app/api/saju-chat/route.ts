@@ -5,7 +5,7 @@ import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { solarToLunar } from "@/lib/lunar-calendar"
 import { parseMessageForDatesAndBirth, formatDateForDisplay, testMessageParsing } from "@/lib/message-parser"
 import { parseMessageWithGPT } from "@/lib/gpt-date-parser"
-import { smartMemoryService } from "@/lib/smart-memory-service"
+import { smartMemoryServiceV2 } from "@/lib/smart-memory-service-v2"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -154,7 +154,7 @@ async function getMemoryContext(userId: string, userMessage: string, roomType: s
 
   try {
     console.log("🧠 Getting memory context for user:", userId)
-    const memoryContext = await smartMemoryService.getRelevantMemories(userId, userMessage)
+    const memoryContext = await smartMemoryServiceV2.getRelevantMemories(userId, userMessage)
 
     if (shouldLog("DEBUG")) {
       console.log("🧠 메모리 컨텍스트 추가:", memoryContext)

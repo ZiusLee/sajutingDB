@@ -10,7 +10,7 @@ export function AboutSajuping() {
       <div className="flex justify-center mb-8">
         <Image
           src="/images/sajuping_character.png"
-          alt="사주핑 캐릭터"
+          alt="사주핑 캐��터"
           width={150}
           height={150}
           className="animate-bounce-slow"
