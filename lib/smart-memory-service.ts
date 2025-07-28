@@ -43,6 +43,15 @@ class SmartMemoryService {
   // 임베딩 생성
   private async generateEmbedding(text: string): Promise<number[]> {
     try {
+      // Ensure this only runs on server-side
+      if (typeof window !== "undefined") {
+        throw new Error("Embedding generation must run on server-side")
+      }
+
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error("OPENAI_API_KEY is not configured")
+      }
+
       const response = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
         headers: {
@@ -57,7 +66,8 @@ class SmartMemoryService {
       })
 
       if (!response.ok) {
-        throw new Error(`Embedding API error: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(`Embedding API error: ${response.status} - ${JSON.stringify(errorData)}`)
       }
 
       const data = await response.json()
@@ -144,10 +154,10 @@ ${conversation}
 
     for (const memory of memories) {
       try {
-        // 중요도 필터링 - 0.6 이상만 저장  
+        // 중요도 필터링 - 0.6 이상만 저장
         if (memory.importance < 0.6) {
-          console.log(`⏭️ Low importance score (${memory.importance}), skipping: ${memory.content.substring(0, 50)}`);
-          continue;
+          console.log(`⏭️ Low importance score (${memory.importance}), skipping: ${memory.content.substring(0, 50)}`)
+          continue
         }
 
         // 중복 확인
@@ -363,6 +373,39 @@ ${conversation}
       console.error("메모리 정리 실패:", error)
       return 0
     }
+  }
+}
+
+// 🚀 스마트 메모리 통합 함수
+async function getMemoryContext(userId: string, userMessage: string, roomType: string): Promise<string> {
+  const ENABLE_SMART_MEMORY = process.env.ENABLE_SMART_MEMORY === "true"
+
+  if (!ENABLE_SMART_MEMORY) {
+    console.log("🧠 Smart memory is disabled by environment variable.")
+    return ""
+  }
+  if (!userId) {
+    console.log("🧠 No user ID provided, skipping memory context.")
+    return ""
+  }
+
+  const shouldLog = (level: string) => {
+    return process.env.LOG_LEVEL === level
+  }
+
+  try {
+    console.log("🧠 Getting memory context for user:", userId)
+    const memoryContext = await smartMemoryService.getRelevantMemories(userId, userMessage)
+
+    if (shouldLog("DEBUG")) {
+      console.log("🧠 메모리 컨텍스트 추가:", memoryContext)
+    }
+
+    return memoryContext
+  } catch (error) {
+    console.error("메모리 컨텍스트 생성 실패:", error)
+    // Return empty string instead of throwing to prevent chat failure
+    return ""
   }
 }
 

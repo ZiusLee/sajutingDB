@@ -323,8 +323,25 @@ export default function SajuChat({
       }
     },
     onError: (error) => {
-      console.error("❌ 채팅 오류:", error)
-      toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+      console.error("❌ 채팅 오류 상세:", {
+        error,
+        message: error.message,
+        stack: error.stack,
+        body: aiChatBody,
+        sessionId,
+        effectiveChatRoomId,
+      })
+
+      // Show more specific error message
+      let errorMessage = "오류가 발생했습니다. 다시 시도해주세요."
+
+      if (error.message?.includes("Internal server error")) {
+        errorMessage = "서버에서 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+      } else if (error.message?.includes("Configuration error")) {
+        errorMessage = "서버 설정에 문제가 있습니다. 관리자에게 문의해주세요."
+      }
+
+      toast.error(errorMessage)
     },
   })
 
@@ -463,6 +480,20 @@ export default function SajuChat({
     [stableConcerns, roomType],
   )
 
+  // Validate aiChatBody before initializing chat
+  useEffect(() => {
+    if (chatData.isInitialized && aiChatBody.compressedSaju) {
+      console.log("✅ Chat initialized with body:", {
+        hasCompressedSaju: !!aiChatBody.compressedSaju,
+        name: aiChatBody.name,
+        gender: aiChatBody.gender,
+        roomType: aiChatBody.roomType,
+        userId: aiChatBody.userId,
+        chatRoomId: aiChatBody.chatRoomId,
+      })
+    }
+  }, [chatData.isInitialized, aiChatBody])
+
   // Loading and error states
   if (!chatData.isInitialized) {
     return (
@@ -475,7 +506,13 @@ export default function SajuChat({
     )
   }
 
-  if (!stableSaju) {
+  if (!stableSaju || !aiChatBody.compressedSaju) {
+    console.error("❌ Missing required data:", {
+      hasStableSaju: !!stableSaju,
+      hasCompressedSaju: !!aiChatBody.compressedSaju,
+      chatDataInitialized: chatData.isInitialized,
+    })
+
     return (
       <div className="flex h-screen items-center justify-center bg-background p-4 text-center">
         <div>

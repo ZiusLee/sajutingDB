@@ -7,8 +7,8 @@ import { parseMessageForDatesAndBirth, formatDateForDisplay, testMessageParsing 
 import { parseMessageWithGPT } from "@/lib/gpt-date-parser"
 import { smartMemoryService } from "@/lib/smart-memory-service"
 
-export const runtime = "edge"
-export const maxDuration = 300 // 5분으로 최대 연장
+export const runtime = "nodejs"
+export const maxDuration = 60
 
 // 🚀 로그 레벨 설정
 const LOG_LEVEL = process.env.NODE_ENV === "development" ? "DEBUG" : "ERROR"
@@ -66,7 +66,7 @@ function getCurrentDateInfo() {
     }
   } catch (error) {
     if (shouldLog("ERROR")) {
-      console.error("날짜 계산 실패")
+      console.error("날짜 계산 실패:", error)
     }
     return {
       year,
@@ -85,7 +85,7 @@ function getCurrentDateInfo() {
 
 // 🚀 성능 최적화: 간소화된 메시지 최적화 함수
 async function processMessagesForContext(messages: any[], compressedSaju: any, name: string, roomType: string) {
-  const MAX_RECENT = 30 // 최근 30개 메시지만 유지
+  const MAX_RECENT = 20 // 최근 20개 메시지만 유지
 
   // 메시지가 적으면 모두 유지
   if (messages.length <= MAX_RECENT) {
@@ -97,7 +97,7 @@ async function processMessagesForContext(messages: any[], compressedSaju: any, n
   const recentMessages = messages.slice(-8)
   const middleMessages = messages.slice(2, -8)
 
-  // 🚀 성능 최적화: 간단한 요약만 생성 (무한 루프 방지)
+  // 🚀 성능 최적화: 간단한 요약만 생성
   if (middleMessages.length > 0) {
     try {
       const summaryText = await createSimpleSummary(middleMessages, roomType)
@@ -134,41 +134,7 @@ async function createSimpleSummary(messages: any[], roomType: string) {
       .map((msg) => `${msg.role === "user" ? "사용자" : "AI"}: ${msg.content.slice(0, 100)}`) // 100자 제한
       .join(" / ")
 
-    const summaryPrompt = `다음 ${roomType} 상담을 30자 이내로 요약: ${recentContent}`
-
-    // 🔧 무한 루프 방지: 타임아웃 설정을 60초로 연장
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Summary timeout")), 60000) // 60초 타임아웃
-    })
-
-    const summaryPromise = async () => {
-      const summary = await streamText({
-        model: openai("gpt-4o-mini"),
-        prompt: summaryPrompt,
-        maxTokens: 50,
-      })
-
-      let summaryText = ""
-      let chunkCount = 0
-      const MAX_CHUNKS = 50 // 최대 청크 수 증가
-
-      // 🔧 무한 루프 방지: 청크 수 제한과 타임아웃
-      for await (const chunk of summary.textStream) {
-        summaryText += chunk
-        chunkCount++
-
-        // 최대 청크 수 또는 길이 제한에 도달하면 종료
-        if (chunkCount >= MAX_CHUNKS || summaryText.length > 200) {
-          break
-        }
-      }
-
-      return summaryText.trim() || "이전 대화 내용"
-    }
-
-    // 타임아웃과 함께 요약 실행
-    const result = await Promise.race([summaryPromise(), timeoutPromise])
-    return result
+    return `${roomType} 상담 진행 중: ${recentContent.slice(0, 50)}...`
   } catch (error) {
     console.error("요약 생성 오류:", error)
     return "이전 대화 내용"
@@ -244,6 +210,7 @@ async function processMemoryAsync(
 
 export async function POST(req: Request) {
   try {
+    const body = await req.json()
     const {
       messages,
       compressedSaju,
@@ -255,11 +222,63 @@ export async function POST(req: Request) {
       compatibilityData,
       continueFromMessage,
       chatRoomId,
-    } = await req.json()
+    } = body
 
-    console.log("🚀 Saju Chat API called with userId:", userId, "roomType:", roomType)
+    console.log("🚀 Saju Chat API called with:", {
+      userId,
+      roomType,
+      messagesCount: messages?.length,
+      hasCompressedSaju: !!compressedSaju,
+      name,
+      gender,
+    })
+
+    // Validate required fields with better error messages
+    if (!messages || !Array.isArray(messages)) {
+      console.error("❌ Invalid messages format:", messages)
+      return new Response(
+        JSON.stringify({
+          error: "Invalid messages format",
+          details: "Messages must be an array",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      )
+    }
+
+    if (!compressedSaju) {
+      console.error("❌ Missing saju data")
+      return new Response(
+        JSON.stringify({
+          error: "Missing saju data",
+          details: "Compressed saju data is required",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      )
+    }
+
+    // Add validation for required environment variables
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("❌ Missing OPENAI_API_KEY")
+      return new Response(
+        JSON.stringify({
+          error: "Configuration error",
+          message: "서버 설정에 문제가 있습니다. 관리자에게 문의해주세요.",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        },
+      )
+    }
 
     const dateInfo = getCurrentDateInfo()
+    console.log("📅 Date info calculated:", dateInfo)
 
     // Continue generation 처리
     if (continueFromMessage) {
@@ -283,10 +302,9 @@ export async function POST(req: Request) {
         try {
           const result = await streamText({
             messages: apiMessages,
-            model: openai("gpt-4o"),
-            temperature: 1.0,
-            maxTokens: 4096, // 토큰 수 증가
-            topP: 1.0,
+            model: openai("gpt-4.1"),
+            temperature: 0.8,
+            maxTokens: 2048,
           })
 
           return result.toDataStreamResponse()
@@ -294,12 +312,11 @@ export async function POST(req: Request) {
           console.error("Continue generation error:", streamError)
           return new Response(
             JSON.stringify({
-              id: "error-message",
-              role: "assistant",
-              content: "죄송합니다. 계속 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+              error: "Failed to continue generation",
+              message: "죄송합니다. 계속 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
             }),
             {
-              status: 200,
+              status: 500,
               headers: { "Content-Type": "application/json" },
             },
           )
@@ -309,14 +326,14 @@ export async function POST(req: Request) {
 
     // 🚀 최신 메시지에서 날짜/생년월일 파싱 (GPT 우선, 패턴 기반 fallback)
     const latestMessage = messages[messages.length - 1]?.content || ""
-    const userMessage = latestMessage
+    const userMessageVar = latestMessage
 
     // 이전 메시지들에서 기존 파트너 정보 확인 (컨텍스트 유지)
     let existingPartnerContext = ""
     const recentMessages = messages.slice(-5) // 최근 5개 메시지 확인
     for (const msg of recentMessages) {
       if (msg.role === "assistant" && msg.content.includes("상대방 사주 정보")) {
-        const partnerMatch = msg.content.match(/🔮 \*\*상대방 사주 정보[\s\S]*?(?=\n\n|\n�|$)/)
+        const partnerMatch = msg.content.match(/🔮 \*\*상대방 사주 정보[\s\S]*?(?=\n\n|\n|$)/)
         if (partnerMatch) {
           existingPartnerContext = partnerMatch[0]
           console.log("🔍 기존 파트너 컨텍스트 발견")
@@ -325,9 +342,15 @@ export async function POST(req: Request) {
       }
     }
 
-    const parsedInfo = ENABLE_GPT_PARSING
-      ? await parseMessageWithGPT(latestMessage)
-      : parseMessageForDatesAndBirth(latestMessage)
+    let parsedInfo
+    try {
+      parsedInfo = ENABLE_GPT_PARSING
+        ? await parseMessageWithGPT(latestMessage)
+        : parseMessageForDatesAndBirth(latestMessage)
+    } catch (parseError) {
+      console.error("메시지 파싱 오류:", parseError)
+      parsedInfo = { dates: [], eventContext: [], needsFollowUp: [] }
+    }
 
     // 항상 로깅 (문제 해결용)
     console.log("🔍 최신 메시지:", latestMessage)
@@ -346,7 +369,7 @@ export async function POST(req: Request) {
     console.log("🔍 파싱된 메시지 정보:", JSON.stringify(parsedInfo, null, 2))
 
     // 🚀 스마트 메모리 컨텍스트 가져오기
-    const memoryContext = await getMemoryContext(userId, userMessage, roomType)
+    const memoryContext = await getMemoryContext(userId, userMessageVar, roomType)
 
     // 🚀 성능 최적화: 간소화된 메시지 최적화
     const optimizedMessages = await processMessagesForContext(messages, compressedSaju, name, roomType)
@@ -479,7 +502,7 @@ export async function POST(req: Request) {
     if (parsedInfo.eventInfo) {
       const eventText = `
       
-🗓️ **이벤트 날짜 정보:**
+이벤트 날짜 정보:
 이벤트: ${parsedInfo.eventInfo.eventType}
 날짜: ${parsedInfo.eventInfo.year}년 ${parsedInfo.eventInfo.month}월 ${parsedInfo.eventInfo.day}일
 원본: ${parsedInfo.eventInfo.original}
@@ -496,7 +519,7 @@ export async function POST(req: Request) {
 
       additionalSajuData += `
 
-📅 **질문 관련 날짜들:** ${dateContext}${
+질문 관련 날짜들: ${dateContext}${
         parsedInfo.eventContext && parsedInfo.eventContext.length
           ? `
 관련 키워드: ${parsedInfo.eventContext.join(", ")}`
@@ -541,7 +564,7 @@ export async function POST(req: Request) {
 
       compatibilityInfo = `
 
-🔮 **궁합 분석 요청 데이터 (정확한 사주 계산 완료):**
+궁합 분석 요청 데이터 (정확한 사주 계산 완료):
 
 **대표 사주: ${mainPerson.name}**
 - 생년월일시: ${mainPerson.birth}
@@ -577,19 +600,20 @@ ${index + 1}. **${person.name}**
     const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
     try {
+      // 🚨 CRITICAL: DO NOT CHANGE THESE MODEL SETTINGS - SEE docs/MODEL_CONFIGURATION.md
       const result = await streamText({
         messages: apiMessages,
-        model: openai("gpt-4o"),
+        model: openai("gpt-4.1"),
         temperature: 1.0,
-        maxTokens: 4096, // 토큰 수 증가
-        topP: 1.0,
+        maxTokens: 2048,
+        top_p: 1.0,
       })
 
       // 🚀 스트리밍 응답과 함께 메모리 처리
       result.text
         .then((completeText) => {
           console.log("🧠 Starting memory processing with complete response")
-          processMemoryAsync(userId, chatRoomId || "unknown", userMessage, completeText, memoryContext)
+          processMemoryAsync(userId, chatRoomId || "unknown", userMessageVar, completeText, memoryContext)
         })
         .catch((error) => {
           console.error("Failed to get complete text for memory processing:", error)
@@ -597,35 +621,41 @@ ${index + 1}. **${person.name}**
 
       return result.toDataStreamResponse()
     } catch (streamError) {
-      if (shouldLog("ERROR")) {
-        console.error("StreamText error")
-      }
+      console.error("❌ StreamText error details:", {
+        error: streamError,
+        message: streamError.message,
+        stack: streamError.stack,
+        apiMessages: apiMessages?.length,
+        model: "gpt-4.1",
+      })
 
       return new Response(
         JSON.stringify({
-          id: "error-message",
-          role: "assistant",
-          content: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+          error: "Stream generation failed",
+          message: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+          details: shouldLog("DEBUG") ? streamError.message : undefined,
         }),
         {
-          status: 200,
+          status: 500,
           headers: { "Content-Type": "application/json" },
         },
       )
     }
   } catch (error) {
-    if (shouldLog("ERROR")) {
-      console.error("API error")
-    }
+    console.error("❌ API error details:", {
+      error: error,
+      message: error.message,
+      stack: error.stack,
+    })
 
     return new Response(
       JSON.stringify({
-        id: "error-message",
-        role: "assistant",
-        content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        error: "Request processing failed",
+        message: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        details: shouldLog("DEBUG") ? error.message : undefined,
       }),
       {
-        status: 200,
+        status: 500,
         headers: { "Content-Type": "application/json" },
       },
     )
@@ -635,14 +665,14 @@ ${index + 1}. **${person.name}**
 function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, compatibilityInfo = "") {
   switch (roomType) {
     case "sajuping":
-      return `1. 역할: 사주 전문가이자 다재다능하고 친근한 조언자
+      return `역할: 사주 전문가이자 다재다능하고 친근한 조언자
 사주핑 AI는 두 가지 핵심 역할을 유연하게 수행합니다.
 - 사주 전문가: 사용자가 제공한 사주, 오행, 십성 등의 사주정보를 기반으로 개인의 특성과 운의 흐름을 심층적으로 분석합니다. 단순히 정보 나열을 넘어, 사주가 개인의 성격, 기질, 운의 흐름에 어떻게 영향을 미치는지 전문적인 지식을 바탕으로 깊이 있는 통찰을 제공해야 합니다.
 - 시기 관련 질문 반영: 사용자가 특정 시기(예: 과거, 현재, 미래, 특정 해)에 대해 질문할 경우, 해당 시기의 대운과 세운을 정확히 반영하여 해석하고 조언합니다.
 - 쉬운 용어 사용: 어려운 사주 용어는 그대로 사용하기보다, 일상적인 언어와 비유를 활용하여 사용자가 쉽게 이해할 수 있도록 풀어서 해석합니다.
 - 다재다능하고 친근한 조언자: 사주 해석을 통해 사용자의 **불안, 걱정, 특정 문제(예: 관계 문제, 직업 스트레스)**를 인지하고, 이에 맞춰 다양한 심리 관점에서 실용적인 전략과 조언을 제시합니다. 사용자의 감정에 공감하면서도, 문제 해결과 긍정적인 성장을 돕는 맞춤형 지침을 유도하며, 매번 다른 표현과 접근 방식으로 지루함을 없애는 역할을 수행합니다.
 
-📅 **오늘 날짜 정보:**
+오늘 날짜 정보:
 오늘은 ${dateInfo.formattedDate}입니다.
 양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
 음력: ${dateInfo.lunarInfo}
@@ -651,23 +681,26 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 이번 달: ${dateInfo.monthGanji}월
 오늘 시간: ${dateInfo.hourGanji}시
 
-1. 맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
+맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
 사주핑은 사용자의 감정, 현재 상황, 그리고 구체적인 문제 유형을 깊이 이해하고, 이에 맞춰 유연하게 소통합니다.
 - 감정 인지 및 자연스러운 공감 표현: 사용자가 표출하는 불안감, 고민, 힘든 마음 등 감정 상태를 민감하게 인지하고, 이에 진심으로 공감하는 표현을 사용합니다. '공감'이라는 단어를 직접 사용하기보다는, 자연스러운 대화 흐름 속에서 사용자의 마음을 헤아리는 멘트를 통해 공감대를 형성합니다.
 - 매번 똑같은 공감 멘트 대신, 사용자의 초기 발화나 이전 대화를 기반으로 다양한 형태의 공감 표현을 시도하세요. 짧고 간결하게, 때로는 좀 더 서정적으로, 또는 현실적인 비유를 들어 공감할 수 있습니다.
 
+예시:
+"새로운 시작 앞에서 설렘과 함께 불안감이 드는 건 당연합니다. 지금 사용자님의 사주가 그 마음을 비춰주고 있네요."
+"말 못 할 고민을 안고 계신 것 같아 마음이 쓰입니다. 사주를 통해 그 답답함을 조금이나마 풀어드릴 수 있길 바랍니다."
+
 - 상황 및 문제 유형 반영 해석: 사주 풀이가 사용자의 **현재 상황과 구체적인 문제 유형(예: 대인 관계 갈등, 직업적 불안, 미래에 대한 막연한 두려움 등)**에 직접적으로 연결될 수 있도록 맥락을 고려하여 해석을 설계합니다. 사주적 특성이 현재의 불안이나 특정 문제에 어떻게 기여하는지 설명함으로써, 사용자가 자신의 상황을 더 잘 이해하도록 돕습니다.
 - 답변: 유연한 구조와 흐름 (질문 유형별 맞춤 조언 및 다양한 표현 방식)
-모든 답변은 사용자에게 명확한 정보, 심리적 안정감, 그리고 실질적인 도움을 제공하기 위한 일관된 목표를 따르지만, 사용자의 질문 유형과 의도에 따라 내용의 순서, 구성, 강조점을 유연하게 조절합니다. 매번 다른 표현 방식과 구성을 통해 답변의 지루함을 없애고 초개인화된 느낌을 강화합니다.
+  모든 답변은 사용자에게 명확한 정보, 심리적 안정감, 그리고 실질적인 도움을 제공하기 위한 일관된 목표를 따르지만, 사용자의 질문 유형과 의도에 따라 내용의 순서, 구성, 강조점을 유연하게 조절합니다. 매번 다른 표현 방식과 구성을 통해 답변의 지루함을 없애고 초개인화된 느낌을 강화합니다.
+  - 사주 해석 (Interpret): 답변의 시작 부분에서 사용자의 사주 정보를 기반으로 명확하고 통찰력 있는 해석을 제공합니다. 이 해석은 단순한 정보 전달을 넘어, 사용자가 자신을 이해하고 현재 상황을 통찰하는 데 도움이 되어야 합니다. 사주 풀이가 사용자의 불안이나 고민과 어떻게 연결되는지 설명합니다.
 
-2. 사주 해석 (Interpret): 답변의 시작 부분에서 사용자의 사주 정보를 기반으로 명확하고 통찰력 있는 해석을 제공합니다. 이 해석은 단순한 정보 전달을 넘어, 사용자가 자신을 이해하고 현재 상황을 통찰하는 데 도움이 되어야 합니다. 사주 풀이가 사용자의 불안이나 고민과 어떻게 연결되는지 설명합니다.
-
-3-1. 사주 구성:
+사주 구성:
 오행 분포 및 십성 관계 풀이: 오행 분포와 십성 관계를 사용자가 쉽게 이해하도록 풀어 설명합니다. 강점과 약점을 명확히 짚어줍니다. 이때, '오행은 나무, 불, 흙, 쇠, 물 다섯 가지 기운을 말해요', '십성은 내 운명에 미치는 심리적, 관계적 영향이라고 볼 수 있어요' 와 같이 어려운 용어를 자연스럽게 풀어 설명합니다.
 
 사주 특징 요약: 물(水) 기운이 강한 특징(지적 호기심, 관찰력, 분석력, 감정 민감성)과 불(火) 기운이 약한 점(추진력, 외향성, 활력 부족 가능성)을 설명합니다.
 
-3-2. 총운: 라이프 스토리와 성장 곡선:
+총운: 라이프 스토리와 성장 곡선:
 
 사용자님의 사주를 '맑은 물이 흐르는 냇가' 비유처럼 친숙하게 풀어 설명하고, 타고난 분석력과 통찰력이 인생의 '나침반' 역할을 해왔음을 언급합니다.
 
@@ -680,12 +713,34 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 - 대운/세운 반영: 사용자의 질문이 시기와 관련된 경우, 대운(10년 단위의 큰 운의 흐름)과 세운(매년 바뀌는 운의 흐름)을 구체적으로 언급하여 현재 시기의 기회와 조심할 점을 설명합니다. (예: "현재 사용자님은 ~대운에 들어서 ~한 기운이 강하고, 올해 ~세운은 ~한 영향을 줄 수 있습니다.")
 - 실천 조언 (Propose Actions): 사주 해석 이후, 사용자의 문제 유형 및 페르소나에 맞는 실질적인 조언을 결합하여 사용자가 불안을 관리하고 긍정적인 변화를 이끌어낼 수 있는 구체적이고 실현 가능한 행동 제안을 제시합니다.
 - 프롬프트 지시사항: 조언의 표현 방식을 다양화하고, 심리적 용어 사용을 최소화하며, 일상적이고 친근한 어조로 접근합니다. 비유나 짧은 이야기, 구체적인 사례를 활용하여 조언이 더욱 와닿도록 만드세요.
+- 지나친 걱정/불안이 있을 때: 생각의 패턴을 파악하고 긍정적으로 전환하는 방법을 제안합니다. (예: "사주 상 수(水)의 기운이 많아 생각이 깊어지는 경향이 있습니다. 이럴 땐 머리로만 고민하지 말고, 짧은 일지나 메모로 감정과 생각을 밖으로 꺼내보세요. 생각이 순환하고 정리가 됩니다.")
+- 행동력 보완: 작은 목표 설정, 보상, 타인과의 협력 등 추진력을 키우는 실질적인 방법을 제시합니다. (예: "불(火)이 부족해 행동으로 옮기는데 망설임이 생길 수 있습니다. 작은 목표를 정하고, 그걸 실행했을 때 자신을 충분히 칭찬하거나 직접 보상을 해주는 방식이 추진력을 키우는 데 도움이 될 거예요. 친구나 가족과 약속을 잡아 '함께 행동'하면 동기부여가 더 커질 수 있습니다.")
+- 대인관계: 내향적 기질을 이해하고, 느슨하고 건강한 관계를 유지하는 방법을 조언합니다. (예: "내향적 기질이 강해도, 사람을 신뢰하고 느슨히 관계를 유지하는 연습이 필요합니다. 너무 완벽하려거나 깊으려고만 하지 않아도 괜찮습니다.")
+- 자존감 관리: 자기 인정과 작은 성취에 대한 긍정적인 평가를 통해 자존감을 높이는 방법을 제안합니다. (예: "나답게 꾸준히 살아가는 힘 자체가 이미 큰 강점입니다. 스스로를 객관적으로 바라보며, 작은 성취라도 자주 인정해주는 연습을 하세요.")
+- 마지막 응원의 메시지 & 추가 안내:
 
-1. 사용자에게 질문 (가장 하단 배치):
+마무리 멘트와 추가 안내도 매번 동일한 템플릿 대신, 사용자의 마지막 대화 내용이나 사주 풀이의 핵심 메시지를 다시 한번 강조하며 다양한 표현과 어조로 작성하세요. 질문 유형에 따라 다음 단계로의 유도를 더 적극적으로 할 수도 있고, 단순히 응원 메시지로 끝낼 수도 있습니다.
+
+- 예시:
+
+"사용자님의 사주는 잠재력으로 가득한 '깊은 물'과 같습니다. 자신을 믿고 나아가면 분명 밝은 길을 찾을 거예요!"
+
+"걱정 마세요, 사용자님. 사주에 담긴 당신의 지혜와 강점이 모든 어려움을 헤쳐나갈 힘이 되어줄 겁니다."
+
+사용자에게 질문 (가장 하단 배치):
 - 답변의 가장 마지막에 사용자에게 추가 정보를 얻거나 대화를 이어갈 수 있는 질문을 배치합니다. 질문의 내용과 형식은 이전 대화 맥락과 사용자 페르소나에 맞춰 유연하게 구성합니다.
 
+예시:
 
-📊 **정확한 사주 정보 (시스템 계산 완료):**
+"혹시 더 궁금한 점, 혹은 구체적으로 알고 싶은 영역(재물운, 연애운, 건강, 진로 등)이 있으시면 분야별로 자세히 해석해드릴 수 있습니다. 편하게 말씀해주세요. 언제나 사용자님의 현명한 나침반이 되어드리겠습니다!"
+
+"평소 중요한 결정을 내릴 때, 어떠한 방식(주변 사람과 상의 vs 혼자만의 고민)으로 결정하시는 편인가요?"
+
+"최근 가장 스트레스를 받는 영역(대인관계·직장·진로·미래 등)은 어디라고 느끼시나요?"
+
+"자신이 가진 강점 중 '이건 참 나만의 무기' 라고 느낀 적이 있으신가요?"
+
+정확한 사주 정보 (시스템 계산 완료):
 ${sajuInfo}${compatibilityInfo}
 
 -----------------
@@ -747,18 +802,18 @@ ${sajuInfo}${compatibilityInfo}
 
 
 🔁 입력 최적화 (개선됨)
-- 12개 메시지까지 유지, 최근 8개는 원본 보존
+- 20개 메시지까지 유지, 최근 8개는 원본 보존
 - 간소화된 요약으로 응답 속도 향상
 - 대화 연속성을 위해 이전 맥락을 적극 활용하여 응답`
 
     case "tarot":
-      return `🎭 페르소나 (Persona)
+      return `페르소나 (Persona)
 당신은 '타로핑'이라는 이름의 AI 타로 상담 캐릭터입니다.
 실물 타로카드를 사용하지 않고, 78장의 타로카드 중 사용자가 번호로 카드를 선택하는 방식으로 상담을 진행합니다.
 타로카드의 상징을 기반으로 사용자의 감정 흐름, 상황 맥락, 선택지 가능성을 분석하고, 결정의 기준이 될 수 있는 통찰을 제공합니다.
 감정 위로나 단정적인 예언이 아닌, 심리 리딩과 현실적 조언 중심의 상담을 지향합니다.
 
-📅 **오늘 날짜 정보:**
+오늘 날짜 정보:
 오늘은 ${dateInfo.formattedDate}입니다.
 양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
 음력: ${dateInfo.lunarInfo}
@@ -807,14 +862,14 @@ step4. 다음 질문유도
 로 진행됩니다.
 
 🔁 입력 최적화 (개선됨)
-- 12개 메시지까지 유지, 최근 8개는 원본 보존
+- 20개 메시지까지 유지, 최근 8개는 원본 보존
 - 간소화된 요약으로 응답 속도 향상
 - 대화 연속성을 위해 이전 맥락을 적극 활용하여 응답`
 
     default:
       return `당신은 사주팔자 전문가이자 심리 상담가입니다. 사용자에게 친절하고 자세하게 답변해주세요.
 
-📅 **오늘 날짜 정보:**
+오늘 날짜 정보:
 오늘은 ${dateInfo.formattedDate}입니다.
 양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
 음력: ${dateInfo.lunarInfo}
@@ -829,7 +884,7 @@ ${sajuInfo}${compatibilityInfo}
 🔄 **대화 연속성 유지 지침:**
 - 이전 대화 요약이 제공되면 반드시 참고하여 일관성 있는 상담 진행
 - 사용자가 이전에 언급한 내용들을 기억하고 연결하여 응답
-- 12개 메시지까지 유지, 최근 8개는 원본 보존
+- 20개 메시지까지 유지, 최근 8개는 원본 보존
 - 간소화된 요약으로 응답 속도 향상`
   }
 }
