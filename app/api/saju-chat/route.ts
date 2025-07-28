@@ -190,7 +190,7 @@ async function processMemoryAsync(
   setTimeout(async () => {
     try {
       console.log("🧠 Processing memory for user:", userId)
-      const result = await smartMemoryService.processConversation(userId, sessionId, userMessage, assistantResponse)
+      const result = await smartMemoryServiceV2.processConversation(userId, sessionId, userMessage, assistantResponse)
 
       if (shouldLog("DEBUG")) {
         console.log("🧠 메모리 처리 결과:", result)
