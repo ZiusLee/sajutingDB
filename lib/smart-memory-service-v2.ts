@@ -574,12 +574,14 @@ ${conversation}
       const embedding = await this.generateEmbedding(query)
       console.log("🧠 임베딩 생성 완료, 차원:", embedding.length)
 
-      // 3. 다단계 검색 전략
-      const searchResults = await this.multiStageSearch(userId, query, embedding, understanding, limit)
+      // 3. 🔥 Modern Vector-First Search
+      const searchResults = await this.modernVectorSearch(userId, query, embedding, understanding, limit)
       
       if (searchResults.length === 0) {
         console.log("🧠 검색 결과 없음, fallback 적용")
-        return await this.getFallbackMemories(userId, understanding.memoryTypes, 3)
+        const fallbackMemories = await this.getFallbackMemories(userId, understanding.memoryTypes, 3)
+        console.log("🧠 Fallback 메모리 개수:", fallbackMemories.length)
+        return fallbackMemories
       }
 
       // 4. 컨텍스트 생성
@@ -593,40 +595,46 @@ ${conversation}
     }
   }
 
-  // 다단계 검색 전략
-  private async multiStageSearch(userId: string, query: string, embedding: number[], understanding: any, limit: number): Promise<any[]> {
-    let results: any[] = []
-
-    // Stage 1: 정확한 키워드 매칭
-    if (understanding.keywords.length > 0) {
-      const keywordResults = await this.searchByKeywords(userId, understanding.keywords, limit)
-      results.push(...keywordResults)
-      console.log(`🔍 키워드 검색 결과: ${keywordResults.length}개`)
-    }
-
-    // Stage 2: 벡터 유사도 검색
+  // 🔥 Modern Vector-First Search (OpenAI/Anthropic 스타일)
+  private async modernVectorSearch(userId: string, query: string, embedding: number[], understanding: any, limit: number): Promise<any[]> {
+    // Stage 1: Pure Vector Search (매우 낮은 임계값)
     const { data: vectorResults, error } = await this.supabase.rpc("search_relevant_memories", {
       p_user_id: userId,
       p_query_embedding: embedding,
-      p_query_keywords: understanding.keywords,
-      p_memory_types: understanding.memoryTypes.length > 0 ? understanding.memoryTypes : null,
-      p_similarity_threshold: 0.2, // 더 낮은 threshold로 더 많은 결과
-      p_result_limit: limit * 3, // 더 많은 후보 가져오기
+      p_query_keywords: null, // 키워드 무시
+      p_memory_types: null, // 타입 제한 없음
+      p_similarity_threshold: 0.05, // 매우 낮은 임계값으로 recall 최대화
+      p_result_limit: limit * 5, // 더 많은 후보
     })
 
+    let results: any[] = []
     if (!error && vectorResults) {
-      results.push(...vectorResults)
-      console.log(`🔍 벡터 검색 결과: ${vectorResults.length}개`)
+      results = vectorResults
+      console.log(`🔍 Pure Vector 검색 결과: ${vectorResults.length}개`)
     }
 
-    // Stage 3: 중복 제거 및 점수 계산
+    // Stage 2: 결과가 부족하면 임계값 더 낮춤
+    if (results.length < limit) {
+      const { data: moreResults } = await this.supabase.rpc("search_relevant_memories", {
+        p_user_id: userId,
+        p_query_embedding: embedding,
+        p_query_keywords: null,
+        p_memory_types: null,
+        p_similarity_threshold: 0.01, // 거의 모든 메모리 포함
+        p_result_limit: limit * 10,
+      })
+      
+      if (moreResults) {
+        results.push(...moreResults)
+        console.log(`🔍 Extended Vector 검색 결과: ${moreResults.length}개 추가`)
+      }
+    }
+
+    // Stage 3: 중복 제거 및 점수 계산  
     const uniqueResults = this.deduplicateAndScore(results, query, understanding)
+    console.log(`🔍 최종 정제된 결과: ${uniqueResults.length}개`)
     
-    // Stage 4: 다양성 필터링 (같은 타입만 너무 많이 반환하지 않도록)
-    const diverseResults = this.applyDiversityFilter(uniqueResults, limit)
-    
-    console.log(`🔍 최종 필터링된 결과: ${diverseResults.length}개`)
-    return diverseResults
+    return uniqueResults.slice(0, limit)
   }
 
   // 키워드 기반 검색
