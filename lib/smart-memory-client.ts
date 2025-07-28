@@ -37,19 +37,23 @@ export class SmartMemoryClient {
   ) {
     try {
       const params = new URLSearchParams({
-        userId,
-        query,
+        search: query,
         ...(options?.limit && { limit: options.limit.toString() }),
         ...(options?.types && { types: options.types.join(",") }),
       })
 
+      console.log("🔍 클라이언트 검색 요청:", { query, options })
       const response = await fetch(`/api/smart-memory?${params}`)
       
       if (!response.ok) {
+        const errorData = await response.json()
+        console.error("🔍 검색 실패:", errorData)
         throw new Error("Failed to search memories")
       }
 
-      return await response.json()
+      const result = await response.json()
+      console.log("🔍 검색 결과:", result)
+      return result
     } catch (error) {
       console.error("Memory search failed:", error)
       throw error
@@ -92,7 +96,7 @@ export class SmartMemoryClient {
   // Delete memory
   async deleteMemory(userId: string, memoryId: string) {
     try {
-      const response = await fetch(`/api/smart-memory?userId=${userId}&id=${memoryId}`, {
+      const response = await fetch(`/api/smart-memory?id=${memoryId}`, {
         method: "DELETE",
       })
 
@@ -110,7 +114,7 @@ export class SmartMemoryClient {
   // Get memory statistics
   async getMemoryStats(userId: string) {
     try {
-      const response = await fetch(`/api/smart-memory/stats?userId=${userId}`)
+      const response = await fetch(`/api/smart-memory?stats=true`)
       
       if (!response.ok) {
         throw new Error("Failed to get memory stats")

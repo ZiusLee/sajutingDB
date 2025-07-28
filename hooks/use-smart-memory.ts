@@ -41,15 +41,17 @@ export function useSmartMemory(userId?: string) {
         })
         setMemories(result.data || [])
       } else {
-        // 전체 메모리 조회
+        // 전체 메모리 조회 - 인증된 사용자 기준으로 조회
         const url = new URL("/api/smart-memory", window.location.origin)
-        url.searchParams.set("userId", userId)
         if (options?.limit) {
           url.searchParams.set("limit", options.limit.toString())
         }
 
+        console.log("📋 전체 메모리 조회 중...")
         const response = await fetch(url.toString())
         const data = await response.json()
+
+        console.log("📋 API 응답:", { ok: response.ok, status: response.status, data })
 
         if (!response.ok) {
           throw new Error(data.error || "Failed to fetch memories")
@@ -127,7 +129,7 @@ export function useSmartMemory(userId?: string) {
 
   const deleteAllMemories = async () => {
     try {
-      const response = await fetch(`/api/smart-memory?deleteAll=true&userId=${userId}`, {
+      const response = await fetch(`/api/smart-memory?deleteAll=true`, {
         method: "DELETE",
       })
 

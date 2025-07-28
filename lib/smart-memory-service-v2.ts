@@ -3,6 +3,17 @@ import { openai } from "@ai-sdk/openai"
 import { generateObject, generateText } from "ai"
 import { z } from "zod"
 
+// Node.js 환경 변수 타입 지원
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      OPENAI_API_KEY?: string
+      NEXT_PUBLIC_SUPABASE_URL?: string
+      SUPABASE_SERVICE_ROLE_KEY?: string
+    }
+  }
+}
+
 // 개선된 메모리 타입 정의 - 더 세밀한 분류
 const MemoryType = z.enum([
   "identity",       // 신원, 직업, 역할
@@ -46,8 +57,8 @@ const QueryUnderstandingSchema = z.object({
 
 class SmartMemoryServiceV2 {
   supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : '') || '',
+    (typeof process !== 'undefined' ? process.env.SUPABASE_SERVICE_ROLE_KEY : '') || '',
     {
       auth: {
         autoRefreshToken: false,
@@ -56,19 +67,39 @@ class SmartMemoryServiceV2 {
     }
   )
 
-  // 개선된 임베딩 생성 - 에러 처리 및 재시도 로직
+  // 개선된 임베딩 생성 - 클라이언트/서버 환경 모두 지원
   async generateEmbedding(text: string, retries = 3): Promise<number[]> {
     for (let i = 0; i < retries; i++) {
       try {
-        // Server-side에서만 실행되도록 보장
+        // 클라이언트 사이드에서는 /api/embeddings 엔드포인트 사용
         if (typeof window !== "undefined") {
-          throw new Error("Embedding generation must run on server-side")
+          const response = await fetch("/api/embeddings", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text: text.slice(0, 8000) }),
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(`Embedding API error: ${error.error}`)
+          }
+
+          const data = await response.json()
+          return data.embedding
+        }
+
+        // 서버 사이드에서는 직접 OpenAI API 호출
+        const apiKey = typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : undefined
+        if (!apiKey) {
+          throw new Error("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다")
         }
 
         const response = await fetch("https://api.openai.com/v1/embeddings", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -179,10 +210,10 @@ ${conversation}
       // 1. 동일 타입 내 높은 유사도 검색
       if (type) {
         const { data: exactMatch } = await this.supabase.rpc("find_similar_memory", {
-          p_user_id: userId,
-          p_query_embedding: embedding,
-          p_memory_type: type,
-          p_similarity_threshold: 0.9,  // 매우 유사한 것만
+          user_id: userId,
+          query_embedding: embedding,
+          memory_type: type,
+          similarity_threshold: 0.9,  // 매우 유사한 것만
         })
 
         if (exactMatch && exactMatch.length > 0) {
@@ -192,12 +223,12 @@ ${conversation}
 
       // 2. 모든 타입에서 의미적 유사성 검색
       const { data: semanticMatch } = await this.supabase.rpc("search_relevant_memories", {
-        p_user_id: userId,
-        p_query_embedding: embedding,
-        p_query_keywords: null,
-        p_memory_types: null,
-        p_similarity_threshold: 0.85,
-        p_result_limit: 1,
+        user_id: userId,
+        query_embedding: embedding,
+        query_keywords: null,
+        memory_types: null,
+        similarity_threshold: 0.85,
+        result_limit: 1,
       })
 
       if (semanticMatch && semanticMatch.length > 0) {
@@ -397,25 +428,38 @@ ${conversation}
     limit = 5
   ): Promise<string> {
     try {
+      console.log("🧠 getRelevantMemories 시작:", { userId, query, limit })
+      
       // 1. 쿼리 이해
       const understanding = await this.understandQuery(query)
+      console.log("🧠 쿼리 이해 결과:", understanding)
       
       // 2. 쿼리 임베딩 생성
       const embedding = await this.generateEmbedding(query)
+      console.log("🧠 임베딩 생성 완료, 차원:", embedding.length)
 
       // 3. 하이브리드 검색 (벡터 + 키워드)
+      console.log("🧠 DB 검색 실행 중...")
       const { data, error } = await this.supabase.rpc("search_relevant_memories", {
-        p_user_id: userId,
-        p_query_embedding: embedding,
-        p_query_keywords: understanding.keywords,
-        p_memory_types: understanding.memoryTypes.length > 0 
+        user_id: userId,
+        query_embedding: embedding,
+        query_keywords: understanding.keywords,
+        memory_types: understanding.memoryTypes.length > 0 
           ? understanding.memoryTypes 
           : null,
-        p_similarity_threshold: 0.6,  // 더 낮은 threshold로 더 많은 결과
-        p_result_limit: limit * 2,     // 후처리를 위해 더 많이 가져옴
+        similarity_threshold: 0.3,  // 더 낮은 threshold로 더 많은 결과
+        result_limit: limit * 2,     // 후처리를 위해 더 많이 가져옴
       })
 
-      if (error || !data || data.length === 0) {
+      if (error) {
+        console.error("🧠 DB 검색 오류:", error)
+        return ""
+      }
+
+      console.log("🧠 DB 검색 결과:", data?.length || 0, "개")
+      
+      if (!data || data.length === 0) {
+        console.log("🧠 검색 결과 없음")
         return ""
       }
 
@@ -584,24 +628,33 @@ ${conversation}
     }
   ) {
     try {
+      console.log("🔍 searchMemories 시작:", { userId, query, options })
+      
       // 쿼리 이해
       const understanding = await this.understandQuery(query)
+      console.log("🔍 쿼리 이해 결과:", understanding)
       
       // 쿼리 임베딩 생성
       const embedding = await this.generateEmbedding(query)
+      console.log("🔍 임베딩 생성 완료, 차원:", embedding.length)
 
       // 검색 실행
+      console.log("🔍 DB 검색 실행 중...")
       const { data, error } = await this.supabase.rpc("search_relevant_memories", {
-        p_user_id: userId,
-        p_query_embedding: embedding,
-        p_query_keywords: understanding.keywords,
-        p_memory_types: options?.types || understanding.memoryTypes || null,
-        p_similarity_threshold: 0.5,
-        p_result_limit: options?.limit || 20,
+        user_id: userId,
+        query_embedding: embedding,
+        query_keywords: understanding.keywords,
+        memory_types: options?.types || understanding.memoryTypes || null,
+        similarity_threshold: 0.3,  // 더 낮은 threshold
+        result_limit: options?.limit || 20,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("🔍 DB 검색 오류:", error)
+        throw error
+      }
 
+      console.log("🔍 DB 검색 결과:", data?.length || 0, "개")
       return data || []
     } catch (error) {
       console.error("메모리 검색 실패:", error)
@@ -660,4 +713,17 @@ ${conversation}
   }
 }
 
-export const smartMemoryServiceV2 = new SmartMemoryServiceV2()
+// 안전한 인스턴스 생성
+let _smartMemoryServiceV2: SmartMemoryServiceV2 | null = null
+
+export const smartMemoryServiceV2 = (() => {
+  if (!_smartMemoryServiceV2) {
+    try {
+      _smartMemoryServiceV2 = new SmartMemoryServiceV2()
+    } catch (error) {
+      console.error("SmartMemoryServiceV2 초기화 실패:", error)
+      throw error
+    }
+  }
+  return _smartMemoryServiceV2
+})()
