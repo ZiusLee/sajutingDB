@@ -593,7 +593,7 @@ ${conversation}
   // 🔥 Modern Vector-First Search (OpenAI/Anthropic 스타일)
   private async modernVectorSearch(userId: string, query: string, embedding: number[], understanding: any, limit: number): Promise<any[]> {
     // Stage 1: Pure Vector Search (매우 낮은 임계값)
-    const { data: vectorResults, error } = await this.supabase.rpc("search_relevant_memories", {
+    const { data: vectorResults, error } = await this.supabase.rpc("search_memories_fixed", {
       p_user_id: userId,
       p_query_embedding: embedding,
       p_query_keywords: null, // 키워드 무시
@@ -617,7 +617,7 @@ ${conversation}
 
     // Stage 2: 결과가 부족하면 임계값 더 낮춤
     if (results.length < limit) {
-      const { data: moreResults } = await this.supabase.rpc("search_relevant_memories", {
+      const { data: moreResults } = await this.supabase.rpc("search_memories_fixed", {
         p_user_id: userId,
         p_query_embedding: embedding,
         p_query_keywords: null,
@@ -1035,7 +1035,7 @@ ${conversation}
 
       // 검색 실행 - Fixed parameter names
       console.log("🔍 DB 검색 실행 중...")
-      const { data, error } = await this.supabase.rpc("search_relevant_memories", {
+      const { data, error } = await this.supabase.rpc("search_memories_fixed", {
         p_user_id: userId,
         p_query_embedding: embedding,
         p_query_keywords: understanding.keywords,
