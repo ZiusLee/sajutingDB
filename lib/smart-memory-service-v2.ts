@@ -535,10 +535,10 @@ ${conversation}
     try {
       console.log("🧠 getRelevantMemories 시작:", { userId, query, limit })
 
-      // 0. 빈 쿼리 체크
-      if (!query || query.trim().length < 3) {
+      // 0. 빈 쿼리 체크 (더 관대하게)
+      if (!query || query.trim().length < 2) {
         console.log("🧠 쿼리가 너무 짧음, 최근 메모리만 반환")
-        return await this.getRecentMemories(userId, 3)
+        return await this.getRecentMemories(userId, 5) // 더 많은 최근 메모리
       }
 
       // 1. 쿼리 이해
@@ -585,8 +585,8 @@ ${conversation}
       p_query_embedding: embedding,
       p_query_keywords: understanding.keywords,
       p_memory_types: understanding.memoryTypes.length > 0 ? understanding.memoryTypes : null,
-      p_similarity_threshold: 0.4, // 적당한 threshold
-      p_result_limit: limit * 2,
+      p_similarity_threshold: 0.2, // 더 낮은 threshold로 더 많은 결과
+      p_result_limit: limit * 3, // 더 많은 후보 가져오기
     })
 
     if (!error && vectorResults) {
@@ -639,40 +639,40 @@ ${conversation}
     })).sort((a, b) => b.finalScore - a.finalScore)
   }
 
-  // 개선된 관련성 점수 계산
+  // 개선된 관련성 점수 계산 (더 관대하게)
   private calculateRelevanceScore(memory: any, query: string, understanding: any): number {
     let score = 0
 
-    // 벡터 유사도 (40%)
+    // 벡터 유사도 (30%) - 가중치 낮춤
     if (memory.relevance_score) {
-      score += memory.relevance_score * 0.4
+      score += memory.relevance_score * 0.3
     }
 
-    // 키워드 매칭 (25%)
+    // 키워드 매칭 (30%) - 가중치 높임
     if (memory.keyword_score) {
-      score += memory.keyword_score * 0.25
+      score += memory.keyword_score * 0.3
     }
 
     // 중요도 (20%)
     score += (memory.importance_score || 0.5) * 0.2
 
-    // 최근성 (10%)
+    // 최근성 (15%) - 더 오래된 것도 포함
     const daysSinceUpdate = (Date.now() - new Date(memory.updated_at).getTime()) / (1000 * 60 * 60 * 24)
-    const recencyScore = Math.max(0, 1 - daysSinceUpdate / 30) // 30일 기준
-    score += recencyScore * 0.1
+    const recencyScore = Math.max(0.2, 1 - daysSinceUpdate / 60) // 60일 기준, 최소 0.2점
+    score += recencyScore * 0.15
 
     // 참조 빈도 (5%)
-    const referenceScore = Math.min(1, (memory.reference_count || 1) / 10)
+    const referenceScore = Math.min(1, (memory.reference_count || 1) / 5) // 더 쉽게 높은 점수
     score += referenceScore * 0.05
 
     return score
   }
 
-  // 다양성 필터 (같은 타입이 너무 많지 않도록)
+  // 다양성 필터 (더 관대하게)
   private applyDiversityFilter(results: any[], limit: number): any[] {
     const filtered = []
     const typeCounts: Record<string, number> = {}
-    const maxPerType = Math.max(1, Math.floor(limit / 3)) // 타입당 최대 개수
+    const maxPerType = Math.max(2, Math.floor(limit / 2)) // 타입당 더 많이 허용
 
     for (const result of results) {
       const count = typeCounts[result.type] || 0
@@ -682,6 +682,12 @@ ${conversation}
       }
       
       if (filtered.length >= limit) break
+    }
+
+    // 만약 다양성 필터로 너무 적게 나오면 상위 결과 그대로 반환
+    if (filtered.length < Math.min(3, limit) && results.length >= 3) {
+      console.log("🔍 다양성 필터가 너무 제한적, 상위 결과 반환")
+      return results.slice(0, limit)
     }
 
     return filtered
@@ -999,7 +1005,7 @@ ${conversation}
         p_query_embedding: embedding,
         p_query_keywords: understanding.keywords,
         p_memory_types: options?.types || understanding.memoryTypes || null,
-        p_similarity_threshold: 0.3, // 더 낮은 threshold
+        p_similarity_threshold: 0.15, // 매우 낮은 threshold로 더 많은 결과
         p_result_limit: options?.limit || 20,
       })
 
