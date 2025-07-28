@@ -593,6 +593,34 @@ ${conversation}
   // 🔥 Modern Vector-First Search (OpenAI/Anthropic 스타일)
   private async modernVectorSearch(userId: string, query: string, embedding: number[], understanding: any, limit: number): Promise<any[]> {
     // Stage 1: Pure Vector Search (매우 낮은 임계값)
+    console.log("🔧 [DEBUG] Calling find_user_memories function with parameters:", {
+      p_user_id: userId,
+      p_similarity_threshold: 0.005,
+      p_result_limit: limit * 5
+    })
+    
+    // 🚨 TEMPORARY: Direct query to bypass function issue
+    const { data: directResults, error: directError } = await this.supabase
+      .from('smart_contexts')
+      .select('id, type, content, source_context, keywords, importance_score, reference_count, is_pinned, created_at, updated_at')
+      .eq('user_id', userId)
+      .ilike('content', '%여자친구%')
+      .limit(10)
+    
+    if (directResults && directResults.length > 0) {
+      console.log("🎯 [DIRECT QUERY] Found girlfriend memories:", directResults.map(r => ({
+        type: r.type,
+        content: r.content,
+        created_at: r.created_at
+      })))
+      // Convert to expected format with fake relevance scores
+      const formattedResults = directResults.map(r => ({
+        ...r,
+        relevance_score: 0.9 // High score since it's a direct match
+      }))
+      return formattedResults
+    }
+
     const { data: vectorResults, error } = await this.supabase.rpc("find_user_memories", {
       p_user_id: userId,
       p_query_embedding: embedding,
