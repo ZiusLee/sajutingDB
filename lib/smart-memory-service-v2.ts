@@ -598,7 +598,7 @@ ${conversation}
       p_query_embedding: embedding,
       p_query_keywords: null, // 키워드 무시
       p_memory_types: null, // 타입 제한 없음
-      p_similarity_threshold: 0.05, // 매우 낮은 임계값으로 recall 최대화
+      p_similarity_threshold: 0.005, // 🚨 극도로 낮은 임계값으로 recall 극대화
       p_result_limit: limit * 5, // 더 많은 후보
     })
 
@@ -606,6 +606,13 @@ ${conversation}
     if (!error && vectorResults) {
       results = vectorResults
       console.log(`🔍 Pure Vector 검색 결과: ${vectorResults.length}개`)
+      if (vectorResults.length > 0) {
+        vectorResults.slice(0, 3).forEach((result, i) => {
+          console.log(`  ${i+1}. [${result.type}] ${result.content} (score: ${result.relevance_score?.toFixed(3)})`)
+        })
+      }
+    } else if (error) {
+      console.error("🚨 Vector search error:", error)
     }
 
     // Stage 2: 결과가 부족하면 임계값 더 낮춤
@@ -615,7 +622,7 @@ ${conversation}
         p_query_embedding: embedding,
         p_query_keywords: null,
         p_memory_types: null,
-        p_similarity_threshold: 0.01, // 거의 모든 메모리 포함
+        p_similarity_threshold: 0.001, // 🚨 거의 모든 메모리 강제 포함
         p_result_limit: limit * 10,
       })
       
