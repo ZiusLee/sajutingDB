@@ -593,34 +593,6 @@ ${conversation}
   // 🔥 Modern Vector-First Search (OpenAI/Anthropic 스타일)
   private async modernVectorSearch(userId: string, query: string, embedding: number[], understanding: any, limit: number): Promise<any[]> {
     // Stage 1: Pure Vector Search (매우 낮은 임계값)
-    console.log("🔧 [DEBUG] Calling find_user_memories function with parameters:", {
-      p_user_id: userId,
-      p_similarity_threshold: 0.005,
-      p_result_limit: limit * 5
-    })
-    
-    // 🚨 TEMPORARY: Direct query to bypass function issue
-    const { data: directResults, error: directError } = await this.supabase
-      .from('smart_contexts')
-      .select('id, type, content, source_context, keywords, importance_score, reference_count, is_pinned, created_at, updated_at')
-      .eq('user_id', userId)
-      .ilike('content', '%여자친구%')
-      .limit(10)
-    
-    if (directResults && directResults.length > 0) {
-      console.log("🎯 [DIRECT QUERY] Found girlfriend memories:", directResults.map(r => ({
-        type: r.type,
-        content: r.content,
-        created_at: r.created_at
-      })))
-      // Convert to expected format with fake relevance scores
-      const formattedResults = directResults.map(r => ({
-        ...r,
-        relevance_score: 0.9 // High score since it's a direct match
-      }))
-      return formattedResults
-    }
-
     const { data: vectorResults, error } = await this.supabase.rpc("find_user_memories", {
       p_user_id: userId,
       p_query_embedding: embedding,
@@ -661,34 +633,15 @@ ${conversation}
     }
 
     // Stage 3: 중복 제거 및 점수 계산  
-    const uniqueResults = this.deduplicateAndScore(results, query, understanding)
+    const uniqueResults = this.deduplicateAndScore(results)
     console.log(`🔍 최종 정제된 결과: ${uniqueResults.length}개`)
     
     return uniqueResults.slice(0, limit)
   }
 
-  // 키워드 기반 검색
-  private async searchByKeywords(userId: string, keywords: string[], limit: number): Promise<any[]> {
-    const keywordQueries = keywords.map(keyword => `%${keyword}%`)
-    
-    const { data, error } = await this.supabase
-      .from("smart_contexts")
-      .select("*")
-      .eq("user_id", userId)
-      .or(keywordQueries.map(kw => `content.ilike.${kw}`).join(","))
-      .order("reference_count", { ascending: false })
-      .limit(limit)
-
-    if (error) {
-      console.error("키워드 검색 실패:", error)
-      return []
-    }
-
-    return data || []
-  }
 
   // 중복 제거 및 점수 계산
-  private deduplicateAndScore(results: any[], query: string, understanding: any): any[] {
+  private deduplicateAndScore(results: any[]): any[] {
     const seen = new Set<string>()
     const unique = results.filter(result => {
       if (seen.has(result.id)) return false
@@ -696,65 +649,15 @@ ${conversation}
       return true
     })
 
-    return unique.map(memory => ({
-      ...memory,
-      finalScore: this.calculateRelevanceScore(memory, query, understanding)
-    })).sort((a, b) => b.finalScore - a.finalScore)
+    // Sort by relevance_score (from vector search) and importance
+    return unique.sort((a, b) => {
+      const scoreA = (a.relevance_score || 0) * 0.8 + (a.importance_score || 0.5) * 0.2
+      const scoreB = (b.relevance_score || 0) * 0.8 + (b.importance_score || 0.5) * 0.2
+      return scoreB - scoreA
+    })
   }
 
-  // 개선된 관련성 점수 계산 (더 관대하게)
-  private calculateRelevanceScore(memory: any, query: string, understanding: any): number {
-    let score = 0
 
-    // 벡터 유사도 (30%) - 가중치 낮춤
-    if (memory.relevance_score) {
-      score += memory.relevance_score * 0.3
-    }
-
-    // 키워드 매칭 (30%) - 가중치 높임
-    if (memory.keyword_score) {
-      score += memory.keyword_score * 0.3
-    }
-
-    // 중요도 (20%)
-    score += (memory.importance_score || 0.5) * 0.2
-
-    // 최근성 (15%) - 더 오래된 것도 포함
-    const daysSinceUpdate = (Date.now() - new Date(memory.updated_at).getTime()) / (1000 * 60 * 60 * 24)
-    const recencyScore = Math.max(0.2, 1 - daysSinceUpdate / 60) // 60일 기준, 최소 0.2점
-    score += recencyScore * 0.15
-
-    // 참조 빈도 (5%)
-    const referenceScore = Math.min(1, (memory.reference_count || 1) / 5) // 더 쉽게 높은 점수
-    score += referenceScore * 0.05
-
-    return score
-  }
-
-  // 다양성 필터 (더 관대하게)
-  private applyDiversityFilter(results: any[], limit: number): any[] {
-    const filtered = []
-    const typeCounts: Record<string, number> = {}
-    const maxPerType = Math.max(2, Math.floor(limit / 2)) // 타입당 더 많이 허용
-
-    for (const result of results) {
-      const count = typeCounts[result.type] || 0
-      if (count < maxPerType || filtered.length < limit) {
-        filtered.push(result)
-        typeCounts[result.type] = count + 1
-      }
-      
-      if (filtered.length >= limit) break
-    }
-
-    // 만약 다양성 필터로 너무 적게 나오면 상위 결과 그대로 반환
-    if (filtered.length < Math.min(3, limit) && results.length >= 3) {
-      console.log("🔍 다양성 필터가 너무 제한적, 상위 결과 반환")
-      return results.slice(0, limit)
-    }
-
-    return filtered
-  }
 
   // 최근 메모리 가져오기 (fallback용)
   private async getRecentMemories(userId: string, limit: number): Promise<string> {
