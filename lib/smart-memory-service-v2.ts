@@ -444,43 +444,65 @@ ${conversation}
         }
 
         // 새 메모리 생성 (중복 확인 실패했거나 기존 메모리가 없는 경우)
-        console.log(`💾 Creating new memory: "${memory.content.slice(0, 50)}..."`)
+        console.log(`💾 [DEBUG] Creating new memory: "${memory.content.slice(0, 50)}..."`)
+        console.log(`💾 [DEBUG] Memory details:`, {
+          type: memory.type,
+          importance: memory.importance,
+          confidence: memory.confidence,
+          keywords: memory.keywords,
+          embedding_length: embedding.length
+        })
         
         try {
+          const insertData = {
+            user_id: userId,
+            type: memory.type,
+            content: memory.content,
+            source_context: memory.sourceQuote || null,
+            relevance_embedding: embedding,
+            keywords: memory.keywords || [],
+            importance_score: memory.importance,
+            reference_count: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            first_mentioned: new Date().toISOString(),
+            last_referenced: new Date().toISOString(),
+          }
+          
+          console.log(`💾 [DEBUG] Insert data:`, {
+            ...insertData,
+            relevance_embedding: `[${embedding.length} dimensions]`,
+            content: insertData.content.slice(0, 100)
+          })
+
           const { data: newMemory, error: insertError } = await this.supabase
             .from("smart_contexts")
-            .insert({
-              user_id: userId,
-              type: memory.type,
-              content: memory.content,
-              source_context: memory.sourceQuote || null,
-              relevance_embedding: embedding,
-              keywords: memory.keywords || [],
-              importance_score: memory.importance,
-              reference_count: 1,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              first_mentioned: new Date().toISOString(),
-              last_referenced: new Date().toISOString(),
-            })
+            .insert(insertData)
             .select()
             .single()
 
           if (insertError) {
-            console.error("❌ Failed to insert new memory:", insertError)
-            console.error("❌ Memory data:", {
-              user_id: userId,
-              type: memory.type,
-              content: memory.content.slice(0, 100),
-              embedding_length: embedding.length
+            console.error("❌ [DEBUG] Failed to insert new memory:", {
+              error: insertError,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint,
+              code: insertError.code
             })
+            console.error("❌ [DEBUG] Insert data was:", insertData)
             
             // DB 에러라도 계속 진행
             continue
           }
 
           if (newMemory) {
-            console.log(`✅ Successfully created memory: ${newMemory.id}`)
+            console.log(`✅ [DEBUG] Successfully created memory: ${newMemory.id}`)
+            console.log(`✅ [DEBUG] Created memory data:`, {
+              id: newMemory.id,
+              type: newMemory.type,
+              content: newMemory.content?.slice(0, 50),
+              keywords: newMemory.keywords
+            })
             
             // 대화 링크 추가 (실패해도 메모리는 저장됨)
             try {
@@ -489,15 +511,18 @@ ${conversation}
                 memory_id: newMemory.id,
                 usage_type: "created",
               })
-              console.log(`✅ Conversation link created for memory: ${newMemory.id}`)
+              console.log(`✅ [DEBUG] Conversation link created for memory: ${newMemory.id}`)
             } catch (linkError) {
-              console.error("⚠️ Failed to create conversation link (memory still saved):", linkError)
+              console.error("⚠️ [DEBUG] Failed to create conversation link (memory still saved):", linkError)
             }
 
             savedMemories.push({ ...newMemory, action: "created" })
+          } else {
+            console.error("❌ [DEBUG] Insert succeeded but no data returned")
           }
         } catch (creationError) {
-          console.error("❌ Memory creation failed with exception:", creationError)
+          console.error("❌ [DEBUG] Memory creation failed with exception:", creationError)
+          console.error("❌ [DEBUG] Exception stack:", creationError.stack)
           continue
         }
       } catch (error) {

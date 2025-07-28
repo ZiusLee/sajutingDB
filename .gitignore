@@ -1,27 +1,189 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+-- Smart Memory V2 Migration
+-- Execute this in Supabase SQL Editor
 
-# dependencies
-/node_modules
+-- Step 1: Add new columns
+ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS source_context TEXT;
+ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS keywords TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;
+ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS first_mentioned TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS last_referenced TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
-# next.js
-/.next/
-/out/
+-- Step 2: Create conversation links table
+CREATE TABLE IF NOT EXISTS conversation_memory_links (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    memory_id UUID NOT NULL REFERENCES smart_contexts(id) ON DELETE CASCADE,
+    usage_type TEXT NOT NULL CHECK (usage_type IN ('created', 'referenced', 'updated')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-# production
-/build
+-- Step 3: Update existing data
+UPDATE smart_contexts 
+SET 
+    keywords = ARRAY[]::TEXT[],
+    source_context = '이전 대화에서 생성됨',
+    first_mentioned = COALESCE(first_mentioned, created_at),
+    last_referenced = COALESCE(last_referenced, updated_at)
+WHERE keywords IS NULL OR source_context IS NULL OR first_mentioned IS NULL OR last_referenced IS NULL;
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+-- Step 4: Create basic indexes
+CREATE INDEX IF NOT EXISTS idx_smart_contexts_user_id ON smart_contexts(user_id);
+CREATE INDEX IF NOT EXISTS idx_smart_contexts_type ON smart_contexts(type);
+CREATE INDEX IF NOT EXISTS idx_smart_contexts_user_type ON smart_contexts(user_id, type);
+CREATE INDEX IF NOT EXISTS idx_conversation_memory_links_conversation ON conversation_memory_links(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_memory_links_memory ON conversation_memory_links(memory_id);
 
-# env files
-.env*
+-- Step 5: Create search functions (essential ones only)
+CREATE OR REPLACE FUNCTION search_relevant_memories(
+    p_user_id UUID,
+    p_query_embedding VECTOR(1536),
+    p_query_keywords TEXT[] DEFAULT NULL,
+    p_memory_types TEXT[] DEFAULT NULL,
+    p_similarity_threshold FLOAT DEFAULT 0.6,
+    p_result_limit INTEGER DEFAULT 10
+)
+RETURNS TABLE (
+    id UUID,
+    type TEXT,
+    content TEXT,
+    source_context TEXT,
+    keywords TEXT[],
+    importance_score FLOAT,
+    reference_count INTEGER,
+    is_pinned BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    relevance_score FLOAT,
+    keyword_score FLOAT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    WITH keyword_matches AS (
+        SELECT 
+            sc.id,
+            CASE 
+                WHEN p_query_keywords IS NULL OR array_length(p_query_keywords, 1) IS NULL THEN 0.0
+                ELSE (
+                    SELECT COUNT(DISTINCT qk)::FLOAT / GREATEST(array_length(p_query_keywords, 1), 1)
+                    FROM unnest(p_query_keywords) AS qk
+                    WHERE EXISTS (
+                        SELECT 1 FROM unnest(sc.keywords) AS k
+                        WHERE lower(k) LIKE '%' || lower(qk) || '%'
+                    ) OR lower(sc.content) LIKE '%' || lower(qk) || '%'
+                )
+            END AS keyword_match_score
+        FROM smart_contexts sc
+        WHERE sc.user_id = p_user_id
+    )
+    SELECT 
+        sc.id,
+        sc.type,
+        sc.content,
+        sc.source_context,
+        sc.keywords,
+        sc.importance_score,
+        sc.reference_count,
+        sc.is_pinned,
+        sc.created_at,
+        sc.updated_at,
+        (1 - (sc.relevance_embedding <=> p_query_embedding)) AS relevance_score,
+        km.keyword_match_score AS keyword_score
+    FROM smart_contexts sc
+    JOIN keyword_matches km ON km.id = sc.id
+    WHERE 
+        sc.user_id = p_user_id
+        AND (p_memory_types IS NULL OR sc.type = ANY(p_memory_types))
+        AND (
+            (1 - (sc.relevance_embedding <=> p_query_embedding)) >= p_similarity_threshold
+            OR km.keyword_match_score >= 0.5
+            OR sc.is_pinned = true
+        )
+    ORDER BY 
+        sc.is_pinned DESC,
+        (
+            (1 - (sc.relevance_embedding <=> p_query_embedding)) * 0.6 +
+            km.keyword_match_score * 0.2 +
+            sc.importance_score * 0.2
+        ) DESC,
+        sc.reference_count DESC
+    LIMIT p_result_limit;
+END;
+$$;
 
-# vercel
-.vercel
+CREATE OR REPLACE FUNCTION find_similar_memory(
+    p_user_id UUID,
+    p_query_embedding VECTOR(1536),
+    p_memory_type TEXT,
+    p_similarity_threshold FLOAT DEFAULT 0.85
+)
+RETURNS TABLE (
+    id UUID,
+    type TEXT,
+    content TEXT,
+    source_context TEXT,
+    keywords TEXT[],
+    importance_score FLOAT,
+    reference_count INTEGER,
+    is_pinned BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    similarity_score FLOAT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        sc.id,
+        sc.type,
+        sc.content,
+        sc.source_context,
+        sc.keywords,
+        sc.importance_score,
+        sc.reference_count,
+        sc.is_pinned,
+        sc.created_at,
+        sc.updated_at,
+        (1 - (sc.relevance_embedding <=> p_query_embedding)) AS similarity_score
+    FROM smart_contexts sc
+    WHERE 
+        sc.user_id = p_user_id
+        AND sc.type = p_memory_type
+        AND (1 - (sc.relevance_embedding <=> p_query_embedding)) >= p_similarity_threshold
+    ORDER BY 
+        (1 - (sc.relevance_embedding <=> p_query_embedding)) DESC
+    LIMIT 1;
+END;
+$$;
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+CREATE OR REPLACE FUNCTION find_cross_type_duplicate(
+    p_user_id UUID,
+    p_query_embedding VECTOR(1536),
+    p_similarity_threshold FLOAT DEFAULT 0.85
+)
+RETURNS TABLE (
+    id UUID,
+    type TEXT,
+    content TEXT,
+    similarity_score FLOAT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        sc.id,
+        sc.type,
+        sc.content,
+        (1 - (sc.relevance_embedding <=> p_query_embedding)) AS similarity_score
+    FROM smart_contexts sc
+    WHERE 
+        sc.user_id = p_user_id
+        AND (1 - (sc.relevance_embedding <=> p_query_embedding)) >= p_similarity_threshold
+    ORDER BY 
+        (1 - (sc.relevance_embedding <=> p_query_embedding)) DESC
+    LIMIT 5;
+END;
+$$;

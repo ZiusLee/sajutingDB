@@ -175,6 +175,9 @@ async function processMemoryAsync(
   assistantResponse: string,
   existingContext?: string,
 ) {
+  console.log("🧠 [DEBUG] ENABLE_SMART_MEMORY:", ENABLE_SMART_MEMORY)
+  console.log("🧠 [DEBUG] Environment variable:", process.env.ENABLE_SMART_MEMORY)
+  
   if (!ENABLE_SMART_MEMORY) {
     console.log("🧠 Smart memory is disabled, skipping async memory processing.")
     return
@@ -189,20 +192,26 @@ async function processMemoryAsync(
   // 비동기로 실행하여 응답 속도에 영향 없음
   setTimeout(async () => {
     try {
-      console.log("🧠 Processing memory for user:", userId)
+      console.log("🧠 [DEBUG] Processing memory for user:", userId)
+      console.log("🧠 [DEBUG] Session ID:", sessionId)
+      console.log("🧠 [DEBUG] User message preview:", userMessage.slice(0, 100))
+      console.log("🧠 [DEBUG] Assistant response preview:", assistantResponse.slice(0, 100))
+      
       const result = await smartMemoryServiceV2.processConversation(userId, sessionId, userMessage, assistantResponse)
 
-      if (shouldLog("DEBUG")) {
-        console.log("🧠 메모리 처리 결과:", result)
-      }
+      console.log("🧠 [DEBUG] Raw result:", JSON.stringify(result, null, 2))
 
       if (result && result.shouldSave) {
-        console.log(`✅ Memory processing completed: ${result.memories.length} memories processed`)
+        console.log(`✅ [DEBUG] Memory processing completed: ${result.memories?.length || 0} memories extracted, ${result.savedMemories?.length || 0} saved`)
+        if (result.savedMemories?.length > 0) {
+          console.log("✅ [DEBUG] Saved memories:", result.savedMemories.map(m => ({ id: m.id, content: m.content?.slice(0, 50) })))
+        }
       } else {
-        console.log("ℹ️ No memorable information found in this conversation")
+        console.log("ℹ️ [DEBUG] No memorable information found:", result?.reasoning || "No reason provided")
       }
     } catch (error) {
-      console.error("비동기 메모리 처리 실패:", error)
+      console.error("🚨 [DEBUG] 비동기 메모리 처리 실패:", error)
+      console.error("🚨 [DEBUG] Error stack:", error.stack)
       // 메모리 처리 실패는 채팅에 영향을 주지 않음
     }
   }, 100) // 100ms 후 실행
