@@ -195,32 +195,43 @@ async function processMemoryAsync(
 
   console.log("🧠 Starting async memory processing...")
 
-  // 비동기로 실행하여 응답 속도에 영향 없음
-  setTimeout(async () => {
+  // 🔥 즉시 실행으로 변경 (Production 환경 호환성)
+  Promise.resolve().then(async () => {
+    console.log("🧠 [DEBUG] Promise.resolve started")
     try {
-      console.log("🧠 [DEBUG] Processing memory for user:", userId)
-      console.log("🧠 [DEBUG] Session ID:", sessionId)
-      console.log("🧠 [DEBUG] User message preview:", userMessage.slice(0, 100))
-      console.log("🧠 [DEBUG] Assistant response preview:", assistantResponse.slice(0, 100))
-      
-      const result = await smartMemoryServiceV2.processConversation(userId, sessionId, userMessage, assistantResponse)
-
-      console.log("🧠 [DEBUG] Raw result:", JSON.stringify(result, null, 2))
-
-      if (result && result.shouldSave) {
-        console.log(`✅ [DEBUG] Memory processing completed: ${result.memories?.length || 0} memories extracted, ${result.savedMemories?.length || 0} saved`)
-        if (result.savedMemories?.length > 0) {
-          console.log("✅ [DEBUG] Saved memories:", result.savedMemories.map(m => ({ id: m.id, content: m.content?.slice(0, 50) })))
-        }
-      } else {
-        console.log("ℹ️ [DEBUG] No memorable information found:", result?.reasoning || "No reason provided")
-      }
+      await processMemoryImmediate(userId, sessionId, userMessage, assistantResponse)
     } catch (error) {
-      console.error("🚨 [DEBUG] 비동기 메모리 처리 실패:", error)
-      console.error("🚨 [DEBUG] Error stack:", error.stack)
-      // 메모리 처리 실패는 채팅에 영향을 주지 않음
+      console.error("🚨 [DEBUG] Promise processing failed:", error)
+      console.error("🚨 [DEBUG] Error stack:", (error as Error)?.stack)
     }
-  }, 100) // 100ms 후 실행
+  })
+}
+
+// 🔥 별도 함수로 분리하여 디버깅 개선
+async function processMemoryImmediate(
+  userId: string,
+  sessionId: string,
+  userMessage: string,
+  assistantResponse: string
+) {
+  console.log("🧠 [DEBUG] processMemoryImmediate started")
+  console.log("🧠 [DEBUG] Processing memory for user:", userId)
+  console.log("🧠 [DEBUG] Session ID:", sessionId)
+  console.log("🧠 [DEBUG] User message preview:", userMessage.slice(0, 100))
+  console.log("🧠 [DEBUG] Assistant response preview:", assistantResponse.slice(0, 100))
+  
+  const result = await smartMemoryServiceV2.processConversation(userId, sessionId, userMessage, assistantResponse)
+
+  console.log("🧠 [DEBUG] Raw result:", JSON.stringify(result, null, 2))
+
+  if (result && result.shouldSave) {
+    console.log(`✅ [DEBUG] Memory processing completed: ${result.memories?.length || 0} memories extracted, ${result.savedMemories?.length || 0} saved`)
+    if (result.savedMemories?.length > 0) {
+      console.log("✅ [DEBUG] Saved memories:", result.savedMemories.map((m: any) => ({ id: m.id, content: m.content?.slice(0, 50) })))
+    }
+  } else {
+    console.log("ℹ️ [DEBUG] No memorable information found:", result?.reasoning || "No reason provided")
+  }
 }
 
 export async function POST(req: Request) {
@@ -722,7 +733,7 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 이번 달: ${dateInfo.monthGanji}월
 오늘 시간: ${dateInfo.hourGanji}시
 
-맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
+1. 맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
 사주핑은 사용자의 감정, 현재 상황, 그리고 구체적인 문제 유형을 깊이 이해하고, 이에 맞춰 유연하게 소통합니다.
 - 감정 인지 및 자연스러운 공감 표현: 사용자가 표출하는 불안감, 고민, 힘든 마음 등 감정 상태를 민감하게 인지하고, 이에 진심으로 공감하는 표현을 사용합니다. '공감'이라는 단어를 직접 사용하기보다는, 자연스러운 대화 흐름 속에서 사용자의 마음을 헤아리는 멘트를 통해 공감대를 형성합니다.
 - 매번 똑같은 공감 멘트 대신, 사용자의 초기 발화나 이전 대화를 기반으로 다양한 형태의 공감 표현을 시도하세요. 짧고 간결하게, 때로는 좀 더 서정적으로, 또는 현실적인 비유를 들어 공감할 수 있습니다.
@@ -736,12 +747,12 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
   모든 답변은 사용자에게 명확한 정보, 심리적 안정감, 그리고 실질적인 도움을 제공하기 위한 일관된 목표를 따르지만, 사용자의 질문 유형과 의도에 따라 내용의 순서, 구성, 강조점을 유연하게 조절합니다. 매번 다른 표현 방식과 구성을 통해 답변의 지루함을 없애고 초개인화된 느낌을 강화합니다.
   - 사주 해석 (Interpret): 답변의 시작 부분에서 사용자의 사주 정보를 기반으로 명확하고 통찰력 있는 해석을 제공합니다. 이 해석은 단순한 정보 전달을 넘어, 사용자가 자신을 이해하고 현재 상황을 통찰하는 데 도움이 되어야 합니다. 사주 풀이가 사용자의 불안이나 고민과 어떻게 연결되는지 설명합니다.
 
-사주 구성:
+2. 사주 구성:
 오행 분포 및 십성 관계 풀이: 오행 분포와 십성 관계를 사용자가 쉽게 이해하도록 풀어 설명합니다. 강점과 약점을 명확히 짚어줍니다. 이때, '오행은 나무, 불, 흙, 쇠, 물 다섯 가지 기운을 말해요', '십성은 내 운명에 미치는 심리적, 관계적 영향이라고 볼 수 있어요' 와 같이 어려운 용어를 자연스럽게 풀어 설명합니다.
 
 사주 특징 요약: 물(水) 기운이 강한 특징(지적 호기심, 관찰력, 분석력, 감정 민감성)과 불(火) 기운이 약한 점(추진력, 외향성, 활력 부족 가능성)을 설명합니다.
 
-총운: 라이프 스토리와 성장 곡선:
+3. 총운: 라이프 스토리와 성장 곡선:
 
 사용자님의 사주를 '맑은 물이 흐르는 냇가' 비유처럼 친숙하게 풀어 설명하고, 타고난 분석력과 통찰력이 인생의 '나침반' 역할을 해왔음을 언급합니다.
 
@@ -768,7 +779,7 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 
 "걱정 마세요, 사용자님. 사주에 담긴 당신의 지혜와 강점이 모든 어려움을 헤쳐나갈 힘이 되어줄 겁니다."
 
-사용자에게 질문 (가장 하단 배치):
+4. 사용자에게 질문 (가장 하단 배치):
 - 답변의 가장 마지막에 사용자에게 추가 정보를 얻거나 대화를 이어갈 수 있는 질문을 배치합니다. 질문의 내용과 형식은 이전 대화 맥락과 사용자 페르소나에 맞춰 유연하게 구성합니다.
 
 예시:
@@ -799,7 +810,7 @@ ${sajuInfo}${compatibilityInfo}
 
 양쪽 명조의 균형 및 보완 여부
 
-1. 성향과 기질의 조화 여부
+2. 성향과 기질의 조화 여부
 
 각자의 성격, 감정 표현 방식, 관계 주도력
 
@@ -807,7 +818,7 @@ ${sajuInfo}${compatibilityInfo}
 
 일간 십성 비교를 통한 감정 흐름 분석
 
-1. 생활 궁합 (현실적 궁합)
+3. 생활 궁합 (현실적 궁합)
 
 금전, 직업, 생활리듬 등 실생활 속 궁합 체크
 
@@ -815,7 +826,7 @@ ${sajuInfo}${compatibilityInfo}
 
 가치관/생활 습관의 일치 여부
 
-1. 인연의 지속성과 흐름
+4. 인연의 지속성과 흐름
 
 궁합 구조가 일시적인 인연인지, 장기적인 흐름을 가지는지
 
@@ -823,7 +834,7 @@ ${sajuInfo}${compatibilityInfo}
 
 시기적 맞물림 또는 타이밍 불일치 여부
 
-1. 궁합 총평 및 조언
+5. 궁합 총평 및 조언
 
 긍정적인 시너지 포인트
 
