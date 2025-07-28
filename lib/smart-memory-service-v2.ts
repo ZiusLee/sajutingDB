@@ -28,29 +28,25 @@ const MemoryType = z.enum([
   "skill", // 능력, 기술
 ])
 
-// 메모리 추출 스키마 - 더 상세한 메타데이터 포함
+// 🔥 Modern Pure Embedding Schema (키워드 제거)
 const MemoryExtractionSchema = z.object({
   shouldSave: z.boolean(),
   memories: z.array(
     z.object({
       type: MemoryType,
-      content: z.string().describe("핵심 정보만 간결하게"),
+      content: z.string().describe("핵심 정보만 간결하고 검색 가능하게 작성"),
       importance: z.number().min(0).max(1),
       confidence: z.number().min(0).max(1).describe("정보의 확실성"),
       temporalContext: z.enum(["past", "present", "future", "timeless"]),
-      entities: z.array(z.string()).describe("관련 인물/장소/조직"),
-      keywords: z.array(z.string()).describe("검색용 키워드"),
       sourceQuote: z.string().optional().describe("원문 인용"),
     }),
   ),
   reasoning: z.string(),
 })
 
-// 쿼리 이해 스키마
+// 🔥 Simplified Query Understanding (키워드 의존성 감소)
 const QueryUnderstandingSchema = z.object({
   intent: z.string().describe("사용자 의도"),
-  keywords: z.array(z.string()).describe("핵심 키워드"),
-  entities: z.array(z.string()).describe("언급된 개체"),
   temporalContext: z.enum(["past", "present", "future", "any"]),
   memoryTypes: z.array(MemoryType).describe("관련 메모리 타입"),
 })
@@ -446,10 +442,9 @@ ${conversation}
         // 새 메모리 생성 (중복 확인 실패했거나 기존 메모리가 없는 경우)
         console.log(`💾 [DEBUG] Creating new memory: "${memory.content.slice(0, 50)}..."`)
         console.log(`💾 [DEBUG] Memory details:`, {
-          type: memory.type,
+          type: memory.type,  
           importance: memory.importance,
           confidence: memory.confidence,
-          keywords: memory.keywords,
           embedding_length: embedding.length
         })
         
@@ -460,7 +455,7 @@ ${conversation}
             content: memory.content,
             source_context: memory.sourceQuote || null,
             relevance_embedding: embedding,
-            keywords: memory.keywords || [],
+            keywords: [], // 🔥 Empty array - pure embedding approach
             importance_score: memory.importance,
             reference_count: 1,
             created_at: new Date().toISOString(),
