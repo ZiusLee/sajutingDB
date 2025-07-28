@@ -224,6 +224,8 @@ async function processMemoryAsync(
 }
 
 export async function POST(req: Request) {
+  console.log("🚀 [DEBUG] Saju Chat API called from:", req.headers.get('user-agent'))
+  
   try {
     const body = await req.json()
     const {
@@ -635,13 +637,16 @@ ${index + 1}. **${person.name}**
       })
 
       // 🚀 스트리밍 응답과 함께 메모리 처리
+      console.log("🚀 [DEBUG] Setting up memory processing for userId:", userId)
+      
       result.text
         .then((completeText) => {
-          console.log("🧠 Starting memory processing with complete response")
+          console.log("🧠 [DEBUG] Text streaming completed, starting memory processing")
+          console.log("🧠 [DEBUG] Complete text length:", completeText.length)
           processMemoryAsync(userId, chatRoomId || "unknown", userMessageVar, completeText, memoryContext)
         })
         .catch((error) => {
-          console.error("Failed to get complete text for memory processing:", error)
+          console.error("❌ [DEBUG] Failed to get complete text for memory processing:", error)
         })
 
       return result.toDataStreamResponse()
