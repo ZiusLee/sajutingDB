@@ -57,8 +57,8 @@ const QueryUnderstandingSchema = z.object({
 
 class SmartMemoryServiceV2 {
   supabase = createClient(
-    (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_URL : "") || "",
-    (typeof process !== "undefined" ? process.env.SUPABASE_SERVICE_ROLE_KEY : "") || "",
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    process.env.SUPABASE_SERVICE_ROLE_KEY || "",
     {
       auth: {
         autoRefreshToken: false,
@@ -91,7 +91,7 @@ class SmartMemoryServiceV2 {
         }
 
         // 서버 사이드에서는 직접 OpenAI API 호출
-        const apiKey = typeof process !== "undefined" ? process.env?.OPENAI_API_KEY : undefined
+        const apiKey = process.env.OPENAI_API_KEY
         if (!apiKey) {
           throw new Error("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다")
         }
