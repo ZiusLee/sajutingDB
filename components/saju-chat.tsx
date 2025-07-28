@@ -136,6 +136,13 @@ export default function SajuChat({
       }
 
       const userId = localStorage.getItem("user_id")
+      console.log("🔍 [DEBUG] localStorage user_id check:", {
+        userId: userId || "❌ NOT FOUND",
+        userAgent: navigator.userAgent,
+        storageKeys: Object.keys(localStorage),
+        currentOrigin: window.location.origin
+      })
+      
       if (userId) {
         return userId
       }
@@ -143,7 +150,9 @@ export default function SajuChat({
       console.error("Error getting session ID:", error)
     }
 
-    return `fallback-${Date.now()}`
+    const fallbackId = `fallback-${Date.now()}`
+    console.log("⚠️ [DEBUG] Using fallback userId:", fallbackId)
+    return fallbackId
   }, [])
 
   // Stable state that won't cause re-renders

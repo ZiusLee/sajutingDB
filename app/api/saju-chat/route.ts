@@ -177,6 +177,12 @@ async function processMemoryAsync(
 ) {
   console.log("🧠 [DEBUG] ENABLE_SMART_MEMORY:", ENABLE_SMART_MEMORY)
   console.log("🧠 [DEBUG] Environment variable:", process.env.ENABLE_SMART_MEMORY)
+  console.log("🧠 [DEBUG] Environment check:", {
+    NODE_ENV: process.env.NODE_ENV,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY ? "✅ SET" : "❌ MISSING",
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ SET" : "❌ MISSING",
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ SET" : "❌ MISSING"
+  })
   
   if (!ENABLE_SMART_MEMORY) {
     console.log("🧠 Smart memory is disabled, skipping async memory processing.")
@@ -234,12 +240,22 @@ export async function POST(req: Request) {
     } = body
 
     console.log("🚀 Saju Chat API called with:", {
-      userId,
+      userId: userId || "❌ MISSING",
       roomType,
       messagesCount: messages?.length,
       hasCompressedSaju: !!compressedSaju,
       name,
       gender,
+    })
+    
+    // 🚀 브라우저별 차이 디버깅
+    console.log("🔍 [DEBUG] Request details for browser compatibility:", {
+      userAgent: req.headers.get('user-agent'),
+      referer: req.headers.get('referer'),
+      origin: req.headers.get('origin'),
+      hasUserId: !!userId,
+      userIdType: typeof userId,
+      bodyKeys: Object.keys(body)
     })
 
     // Validate required fields with better error messages
