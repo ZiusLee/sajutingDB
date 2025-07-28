@@ -237,11 +237,13 @@ ${conversation}
     try {
       const embedding = await this.generateEmbedding(query)
 
-      const { data, error } = await supabase.rpc("search_relevant_memories", {
-        user_id: userId,
-        query_embedding: embedding,
-        similarity_threshold: 0.7,
-        result_limit: limit,
+      const { data, error } = await supabase.rpc("find_user_memories", {
+        p_user_id: userId,
+        p_query_embedding: embedding,
+        p_query_keywords: null,
+        p_memory_types: null,
+        p_similarity_threshold: 0.005,
+        p_result_limit: limit,
       })
 
       if (error) {
