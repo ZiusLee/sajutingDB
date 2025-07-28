@@ -161,11 +161,24 @@ class SmartMemoryServiceV2 {
       console.log("🧠 [EXTRACT 2] Memory context length:", memoryContext.length)
       console.log("🧠 [EXTRACT 2] Calling GPT for memory extraction...")
 
-      const result = await generateObject({
-        model: openai("gpt-4o-mini"), // 비용 효율적인 모델 사용
-        schema: MemoryExtractionSchema,
-        temperature: 0.1, // 더 일관된 결과
-        prompt: `대화에서 사용자에 대한 새로운 사실적 정보만 추출하세요.${memoryContext}
+      // 🔥 GPT 호출을 제대로 된 타임아웃과 함께 실행
+      let result: any
+      try {
+        console.log("🧠 [EXTRACT 2] Starting GPT generateObject call...")
+        
+        // 15초 타임아웃 설정
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            console.log("🚨 [EXTRACT 2] GPT call timed out after 15s")
+            reject(new Error("GPT generateObject timeout after 15s"))
+          }, 15000)
+        })
+
+        const gptPromise = generateObject({
+          model: openai("gpt-4o-mini"),
+          schema: MemoryExtractionSchema,
+          temperature: 0.1,
+          prompt: `대화에서 사용자에 대한 새로운 사실적 정보만 추출하세요.${memoryContext}
 
 대화:
 ${conversation}
@@ -201,16 +214,46 @@ ${conversation}
 - 새로운 정보만 추출 (기존 정보와 비교)
 - 최대 2개까지만 추출
 - 모호하면 추출하지 않음`,
-      })
+        })
 
-      console.log("🧠 [EXTRACT 2] GPT extraction completed!")
-      console.log("🧠 [EXTRACT 2] Result:", {
-        shouldSave: result.object.shouldSave,
-        memoriesCount: result.object.memories.length,
-        reasoning: result.object.reasoning?.slice(0, 100)
-      })
+        console.log("🧠 [EXTRACT 2] Waiting for GPT response or timeout...")
+        result = await Promise.race([gptPromise, timeoutPromise])
+        
+        console.log("🧠 [EXTRACT 2] GPT call completed successfully!")
+        console.log("🧠 [EXTRACT 2] Result:", {
+          shouldSave: result.object.shouldSave,
+          memoriesCount: result.object.memories.length,
+          reasoning: result.object.reasoning?.slice(0, 100)
+        })
 
-      return result.object
+        return result.object
+      } catch (error) {
+        console.error("🚨 [EXTRACT 2] GPT call failed:", error)
+        console.error("🚨 [EXTRACT 2] Error details:", {
+          message: (error as Error)?.message,
+          stack: (error as Error)?.stack?.slice(0, 500)
+        })
+        
+        // 폴백: 사용자 질문을 그대로 저장
+        console.log("🧠 [EXTRACT 2] Using fallback - saving user message as-is")
+        const fallbackResult = {
+          shouldSave: true,
+          memories: [
+            {
+              type: "situation" as any,
+              content: userMessage.trim(),
+              importance: 0.6,
+              confidence: 0.7,
+              temporalContext: "present" as any,
+              sourceQuote: userMessage
+            }
+          ],
+          reasoning: "GPT 실패로 인한 폴백 - 사용자 원문 저장"
+        }
+        
+        console.log("🧠 [EXTRACT 2] Fallback result created:", fallbackResult.memories[0].content)
+        return fallbackResult
+      }
     } catch (error) {
       console.error("🚨 [EXTRACT ERROR] 메모리 추출 실패:", error)
       console.error("🚨 [EXTRACT ERROR] Error details:", {
