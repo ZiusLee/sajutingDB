@@ -140,9 +140,9 @@ export default function SajuChat({
         userId: userId || "❌ NOT FOUND",
         userAgent: navigator.userAgent,
         storageKeys: Object.keys(localStorage),
-        currentOrigin: window.location.origin
+        currentOrigin: window.location.origin,
       })
-      
+
       if (userId) {
         return userId
       }
@@ -324,6 +324,7 @@ export default function SajuChat({
     id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
     initialMessages: transitionMessages ?? chatData.initialMessages, // Use transition messages if available
     body: aiChatBody,
+    experimental_throttle: 50,
     onFinish: () => {
       // After a message is successfully sent with the new persisted ID,
       // we can clear the transition state.
@@ -548,7 +549,6 @@ export default function SajuChat({
           name={name}
           gender={gender}
           birthInfo={chatData.stableBirthInfo}
-          calculatedDaeun={chatData.calculatedDaeun}
           sessionId={sessionId}
           roomType={roomType}
           currentChatRoomId={effectiveChatRoomId}
@@ -565,7 +565,6 @@ export default function SajuChat({
             name={name}
             gender={gender}
             birthInfo={chatData.stableBirthInfo}
-            calculatedDaeun={chatData.calculatedDaeun}
             sessionId={sessionId}
             roomType={roomType}
             currentChatRoomId={effectiveChatRoomId}

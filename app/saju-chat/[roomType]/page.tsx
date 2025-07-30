@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import SajuChat from "@/components/saju-chat"
 import { useToast } from "@/components/ui/use-toast"
@@ -36,10 +36,14 @@ export default function SajuChatPage() {
     }
   }, [roomType, router])
 
+  const handleSidebarToggle = useCallback(() => {
+    setSidebarOpen((prev) => !prev)
+  }, [])
+
   useEffect(() => {
     // Store sidebar toggle function globally for site header to access
     if (typeof window !== "undefined") {
-      ;(window as any).toggleSajuChatSidebar = () => setSidebarOpen((prev) => !prev)
+      ;(window as any).toggleSajuChatSidebar = handleSidebarToggle
     }
 
     return () => {
@@ -47,7 +51,7 @@ export default function SajuChatPage() {
         delete (window as any).toggleSajuChatSidebar
       }
     }
-  }, [])
+  }, [handleSidebarToggle])
 
   useEffect(() => {
     let isMounted = true
@@ -153,7 +157,7 @@ export default function SajuChatPage() {
     }
   }, [router, toast, roomType, roomId])
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     try {
       // 저장된 원래 경로가 있으면 그 경로로 이동
       const savedReturnPath = localStorage.getItem("chat_return_path")
@@ -182,26 +186,27 @@ export default function SajuChatPage() {
       console.error("Error in handleBack:", error)
       router.push("/chat-list")
     }
-  }
+  }, [router, saju])
 
-  const handleChatRoomPersisted = (newChatRoomId: string) => {
-    // Update the current chat room when it gets persisted
-    setCurrentChatRoom((prev) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
+  const handleChatRoomPersisted = useCallback(
+    (newChatRoomId: string) => {
+      // Update the current chat room when it gets persisted
+      setCurrentChatRoom((prev) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
 
-    // Update URL with the persisted room ID without triggering re-render
-    const newUrl = `/saju-chat/${roomType}?roomId=${newChatRoomId}`
-    if (window.history.replaceState) {
-      window.history.replaceState(null, "", newUrl)
-    }
+      // Update URL with the persisted room ID without triggering re-render
+      const newUrl = `/saju-chat/${roomType}?roomId=${newChatRoomId}`
+      if (window.history.replaceState) {
+        window.history.replaceState(null, "", newUrl)
+      }
+    },
+    [roomType],
+  )
 
-    // Don't log this as it's not necessary for user experience
-  }
-
-  const handleGuideModalClose = () => {
+  const handleGuideModalClose = useCallback(() => {
     setShowGuideModal(false)
     // Mark that user has seen the guide
     localStorage.setItem("has_seen_chat_guide", "true")
-  }
+  }, [])
 
   if (loading) {
     return (
@@ -240,7 +245,7 @@ export default function SajuChatPage() {
           birthInfo={saju.birthInfo}
           concerns={saju.concerns || []}
           isSidebarOpen={isSidebarOpen}
-          onSidebarToggle={() => setSidebarOpen((prev) => !prev)}
+          onSidebarToggle={handleSidebarToggle}
           currentChatRoomId={currentChatRoom?.id}
           temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
           onChatRoomPersisted={handleChatRoomPersisted}
