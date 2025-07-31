@@ -46,6 +46,9 @@ export interface SmartContext {
   updated_at: string
   last_referenced?: string
   relevance_embedding: number[]
+  quality_score?: number
+  is_low_quality?: boolean
+  semantic_hash?: string
 }
 
 export interface MemoryUsage {
@@ -64,4 +67,5 @@ export interface MemorySearchResult {
   importance_score: number
   reference_count: number
   last_referenced?: string
+  quality_score?: number
 }

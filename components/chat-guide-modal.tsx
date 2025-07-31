@@ -1,9 +1,11 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { MessageCircle, History, ArrowRight, X } from "lucide-react"
+import { MessageCircle, History, ArrowRight } from "lucide-react"
 
 interface ChatGuideModalProps {
   isOpen: boolean
@@ -56,7 +58,8 @@ export function ChatGuideModal({ isOpen, onClose, userName }: ChatGuideModalProp
     },
   ]
 
-  const handleNext = () => {
+  const handleNext = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault() // Prevent any default button behavior
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1)
     } else {
@@ -64,7 +67,8 @@ export function ChatGuideModal({ isOpen, onClose, userName }: ChatGuideModalProp
     }
   }
 
-  const handleSkip = () => {
+  const handleSkip = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault() // Prevent any default button behavior
     onClose()
   }
 
