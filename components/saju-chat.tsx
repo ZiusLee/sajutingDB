@@ -112,7 +112,11 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
 
     const secondQuestion = generateConcernQuestion(concerns)
 
-    return ["내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로", secondQuestion]
+    // 🔥 FIX: Ensure exactly 2 questions are returned
+    const questions = ["내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로", secondQuestion]
+
+    console.log("🎯 Generated exactly 2 initial questions:", questions)
+    return questions
   }
 
   return []
@@ -436,26 +440,25 @@ export default function SajuChat({
           messageRole: message.role,
         })
 
-        // Check if we need to send the next question
-        if (currentQuestionIndex < initialQuestionsToSend.length - 1) {
+        // 🔥 FIX: Check if we need to send the next question (only send second question after first response)
+        if (currentQuestionIndex === 0 && initialQuestionsToSend.length > 1) {
           // Clear any existing timeout
           if (nextQuestionTimeoutRef.current) {
             clearTimeout(nextQuestionTimeoutRef.current)
           }
 
-          // Increment the question index
-          const nextIndex = currentQuestionIndex + 1
-          setCurrentQuestionIndex(nextIndex)
+          // Increment to second question
+          setCurrentQuestionIndex(1)
 
-          // Send the next question after a short delay
+          // Send the second question after a short delay
           nextQuestionTimeoutRef.current = setTimeout(() => {
-            const nextQuestion = initialQuestionsToSend[nextIndex]
-            console.log(`📤 Sending question ${nextIndex + 1}/${initialQuestionsToSend.length}:`, nextQuestion)
-            append({ role: "user", content: nextQuestion })
+            const secondQuestion = initialQuestionsToSend[1]
+            console.log(`📤 Sending second question (2/2):`, secondQuestion)
+            append({ role: "user", content: secondQuestion })
           }, 1000)
-        } else {
-          // All initial questions have been sent
-          console.log("✅ All initial questions completed")
+        } else if (currentQuestionIndex === 1) {
+          // After second question response, end initial questions mode
+          console.log("✅ Both initial questions completed")
           setIsInitialQuestionsMode(false)
           setInitialQuestionsToSend([])
           setCurrentQuestionIndex(0)
