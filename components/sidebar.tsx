@@ -7,11 +7,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2, MessageSquare, ChevronUp, ChevronDown } from "lucide-react"
 import SajuDiagram from "@/components/saju-diagram"
-import DaeunDiagram from "@/components/daeun-diagram"
 import { getChatRooms, createChatRoom, deleteChatRoom, type ChatRoom } from "@/lib/chat-room-service"
 import { toast } from "sonner"
-import { useAuth } from "@/contexts/auth-context"
-import { SignInModal } from "@/components/signin-modal"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +28,6 @@ interface SidebarProps {
   name: string
   gender: string
   birthInfo?: BirthInfo
-  calculatedDaeun: any
   sessionId: string
   roomType: string
   currentChatRoomId?: string
@@ -44,7 +40,6 @@ export default function Sidebar({
   name,
   gender,
   birthInfo,
-  calculatedDaeun,
   sessionId,
   roomType,
   currentChatRoomId,
@@ -52,11 +47,9 @@ export default function Sidebar({
   onNewChat,
 }: SidebarProps) {
   const router = useRouter()
-  const { isAuthenticated } = useAuth()
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
   const [loadingChatRooms, setLoadingChatRooms] = useState(false)
   const [creatingNewChat, setCreatingNewChat] = useState(false)
-  const [showSignInModal, setShowSignInModal] = useState(false)
   const [profileCollapsed, setProfileCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("profile_collapsed") === "true"
@@ -89,12 +82,6 @@ export default function Sidebar({
   }, [sessionId])
 
   const handleNewChat = async () => {
-    // 로그인 상태 확인
-    if (!isAuthenticated) {
-      setShowSignInModal(true)
-      return
-    }
-
     if (creatingNewChat) return
 
     setCreatingNewChat(true)
@@ -138,14 +125,6 @@ export default function Sidebar({
     onChatRoomSelect(chatRoomId)
   }
 
-  const handleSignInSuccess = () => {
-    setShowSignInModal(false)
-    // 로그인 성공 후 새 채팅 생성 재시도
-    setTimeout(() => {
-      handleNewChat()
-    }, 500)
-  }
-
   const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -159,151 +138,145 @@ export default function Sidebar({
   }
 
   return (
-    <>
-      <div className="h-full flex flex-col bg-gray-50 border-r">
-        {/* Profile Section - Collapsible */}
-        <div className="flex-shrink-0 border-b bg-white">
-          <Collapsible open={!profileCollapsed} onOpenChange={(open) => setProfileCollapsed(!open)}>
-            <div className="p-4">
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full flex items-center justify-between p-2 hover:bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <div className="text-left">
-                      <h3 className="font-semibold text-gray-900">{name}</h3>
-                      <p className="text-sm text-gray-500">
-                        {gender === "male" ? "남성" : "여성"} • {birthInfo?.solarYear}년생
-                      </p>
-                    </div>
+    <div className="h-full overflow-y-auto bg-gray-50 border-r">
+      {/* Profile Section - Collapsible */}
+      <div className="border-b bg-white">
+        <Collapsible open={!profileCollapsed} onOpenChange={(open) => setProfileCollapsed(!open)}>
+          <div className="p-4">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full flex items-center justify-between p-2 hover:bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <div className="text-left">
+                    <h3 className="font-semibold text-gray-900">{name}</h3>
+                    <p className="text-sm text-gray-500">
+                      {gender === "male" ? "남성" : "여성"} • {birthInfo?.solarYear}년생
+                    </p>
                   </div>
-                  {profileCollapsed ? (
-                    <ChevronDown className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <ChevronUp className="h-4 w-4 text-gray-500" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-
-              <CollapsibleContent className="space-y-4 mt-4">
-                <SajuDiagram saju={saju} name={name} gender={gender} variant="sidebar" {...birthInfo} />
-                {calculatedDaeun && (
-                  <DaeunDiagram
-                    daeun={calculatedDaeun.pillars || []}
-                    birthInfo={birthInfo}
-                    name={name}
-                    gender={gender}
-                  />
+                </div>
+                {profileCollapsed ? (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 text-gray-500" />
                 )}
-              </CollapsibleContent>
-            </div>
-          </Collapsible>
-        </div>
-
-        {/* Chat History Section */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex-shrink-0 p-4 bg-white border-b">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                대화 목록
-              </h3>
-              <Button onClick={handleNewChat} disabled={creatingNewChat} size="sm" className="h-8 px-3 text-xs">
-                <Plus className="h-3 w-3 mr-1" />새 대화
               </Button>
-            </div>
-          </div>
+            </CollapsibleTrigger>
 
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-2">
-              {loadingChatRooms ? (
-                <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : chatRooms.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">아직 대화가 없습니다</p>
-                  <p className="text-xs text-gray-400 mt-1">새 대화를 시작해보세요</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {chatRooms.map((room) => (
-                    <div
-                      key={room.id}
-                      onClick={() => handleChatRoomClick(room.id)}
-                      className={`group relative p-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 ${
-                        currentChatRoomId === room.id
-                          ? "bg-blue-50 border border-blue-200"
-                          : "bg-white border border-gray-100"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm text-gray-900 truncate">{room.title}</h4>
-                          {room.lastMessage && (
-                            <p className="text-xs text-gray-500 mt-1 truncate">
-                              {room.lastMessage.role === "user" ? "나: " : "사주핑: "}
-                              {room.lastMessage.content}
-                            </p>
-                          )}
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-xs text-gray-400">
-                              {formatRelativeTime(room.lastMessage?.createdAt || room.createdAt)}
-                            </span>
-                            {room.messageCount && room.messageCount > 0 && (
-                              <span className="text-xs text-gray-400">{room.messageCount}개 메시지</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 ml-2 hover:bg-red-100 hover:text-red-600"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>대화 삭제</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                이 대화를 삭제하시겠습니까? 삭제된 대화는 복구할 수 없습니다.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>취소</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={(e) => handleDeleteChatRoom(room.id, e)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                삭제
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <CollapsibleContent className="space-y-4 mt-4">
+              <SajuDiagram
+                saju={saju}
+                name={name}
+                gender={gender}
+                variant="sidebar"
+                solarYear={birthInfo?.solarYear}
+                solarMonth={birthInfo?.solarMonth}
+                solarDay={birthInfo?.solarDay}
+                hour={birthInfo?.solarHour}
+                minute={birthInfo?.solarMinute}
+                lunarYear={birthInfo?.lunarYear}
+                lunarMonth={birthInfo?.lunarMonth}
+                lunarDay={birthInfo?.lunarDay}
+                timeUnknown={birthInfo?.timeUnknown}
+                location="서울특별시"
+              />
+            </CollapsibleContent>
           </div>
-        </div>
+        </Collapsible>
       </div>
 
-      {/* Sign In Modal */}
-      <SignInModal
-        isOpen={showSignInModal}
-        onClose={() => setShowSignInModal(false)}
-        onAuthSuccess={handleSignInSuccess}
-        title="로그인이 필요합니다"
-        description="새로운 대화를 시작하려면 로그인해주세요."
-      />
-    </>
+      {/* Chat History Section */}
+      <div className="bg-white">
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              대화 목록
+            </h3>
+            <Button onClick={handleNewChat} disabled={creatingNewChat} size="sm" className="h-8 px-3 text-xs">
+              <Plus className="h-3 w-3 mr-1" />새 대화
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-2">
+          {loadingChatRooms ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : chatRooms.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">아직 대화가 없습니다</p>
+              <p className="text-xs text-gray-400 mt-1">새 대화를 시작해보세요</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {chatRooms.map((room) => (
+                <div
+                  key={room.id}
+                  onClick={() => handleChatRoomClick(room.id)}
+                  className={`group relative p-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 ${
+                    currentChatRoomId === room.id
+                      ? "bg-blue-50 border border-blue-200"
+                      : "bg-white border border-gray-100"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm text-gray-900 truncate">{room.title}</h4>
+                      {room.lastMessage && (
+                        <p className="text-xs text-gray-500 mt-1 truncate">
+                          {room.lastMessage.role === "user" ? "나: " : "사주핑: "}
+                          {room.lastMessage.content}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-400">
+                          {formatRelativeTime(room.lastMessage?.createdAt || room.createdAt)}
+                        </span>
+                        {room.messageCount && room.messageCount > 0 && (
+                          <span className="text-xs text-gray-400">{room.messageCount}개 메시지</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 ml-2 hover:bg-red-100 hover:text-red-600"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>대화 삭제</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            이 대화를 삭제하시겠습니까? 삭제된 대화는 복구할 수 없습니다.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>취소</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={(e) => handleDeleteChatRoom(room.id, e)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            삭제
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

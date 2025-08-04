@@ -7,7 +7,7 @@ export async function signInWithSocial(provider: "kakao" | "google" | "facebook"
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
 
@@ -21,14 +21,4 @@ export async function signInWithSocial(provider: "kakao" | "google" | "facebook"
       error: error instanceof Error ? error.message : `${provider} 로그인 중 오류가 발생했습니다.`,
     }
   }
-}
-
-// Google 로그인 전용 함수
-export async function signInWithGoogle() {
-  return signInWithSocial("google")
-}
-
-// Kakao 로그인 전용 함수
-export async function signInWithKakao() {
-  return signInWithSocial("kakao")
 }

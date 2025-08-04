@@ -1,39 +1,11 @@
--- Smart Memory V2 Migration
--- Execute this in Supabase SQL Editor
+-- Upgrade script for improved memory functions
+-- This fixes parameter naming issues and improves search functionality
 
--- Step 1: Add new columns
-ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS source_context TEXT;
-ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS keywords TEXT[] DEFAULT ARRAY[]::TEXT[];
-ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;
-ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS first_mentioned TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-ALTER TABLE smart_contexts ADD COLUMN IF NOT EXISTS last_referenced TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+-- Drop existing functions first
+DROP FUNCTION IF EXISTS search_relevant_memories CASCADE;
+DROP FUNCTION IF EXISTS find_similar_memory CASCADE;
 
--- Step 2: Create conversation links table
-CREATE TABLE IF NOT EXISTS conversation_memory_links (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    conversation_id TEXT NOT NULL,
-    memory_id UUID NOT NULL REFERENCES smart_contexts(id) ON DELETE CASCADE,
-    usage_type TEXT NOT NULL CHECK (usage_type IN ('created', 'referenced', 'updated')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Step 3: Update existing data
-UPDATE smart_contexts 
-SET 
-    keywords = ARRAY[]::TEXT[],
-    source_context = '이전 대화에서 생성됨',
-    first_mentioned = COALESCE(first_mentioned, created_at),
-    last_referenced = COALESCE(last_referenced, updated_at)
-WHERE keywords IS NULL OR source_context IS NULL OR first_mentioned IS NULL OR last_referenced IS NULL;
-
--- Step 4: Create basic indexes
-CREATE INDEX IF NOT EXISTS idx_smart_contexts_user_id ON smart_contexts(user_id);
-CREATE INDEX IF NOT EXISTS idx_smart_contexts_type ON smart_contexts(type);
-CREATE INDEX IF NOT EXISTS idx_smart_contexts_user_type ON smart_contexts(user_id, type);
-CREATE INDEX IF NOT EXISTS idx_conversation_memory_links_conversation ON conversation_memory_links(conversation_id);
-CREATE INDEX IF NOT EXISTS idx_conversation_memory_links_memory ON conversation_memory_links(memory_id);
-
--- Step 5: Create search functions (essential ones only)
+-- Create improved search function with fixed parameter names
 CREATE OR REPLACE FUNCTION search_relevant_memories(
     p_user_id UUID,
     p_query_embedding VECTOR(1536),
@@ -88,6 +60,7 @@ BEGIN
         sc.is_pinned,
         sc.created_at,
         sc.updated_at,
+        -- Cosine similarity (1 - distance)
         (1 - (sc.relevance_embedding <=> p_query_embedding)) AS relevance_score,
         km.keyword_match_score AS keyword_score
     FROM smart_contexts sc
@@ -96,12 +69,19 @@ BEGIN
         sc.user_id = p_user_id
         AND (p_memory_types IS NULL OR sc.type = ANY(p_memory_types))
         AND (
+            -- Include if vector similarity is above threshold
             (1 - (sc.relevance_embedding <=> p_query_embedding)) >= p_similarity_threshold
-            OR km.keyword_match_score >= 0.5
-            OR sc.is_pinned = true
+            OR 
+            -- OR if keyword match is significant
+            km.keyword_match_score >= 0.5
+            OR
+            -- OR if it's pinned
+            sc.is_pinned = true
         )
     ORDER BY 
+        -- Prioritize pinned memories
         sc.is_pinned DESC,
+        -- Combined score: vector similarity + keyword match + importance
         (
             (1 - (sc.relevance_embedding <=> p_query_embedding)) * 0.6 +
             km.keyword_match_score * 0.2 +
@@ -112,6 +92,7 @@ BEGIN
 END;
 $$;
 
+-- Create improved duplicate detection function
 CREATE OR REPLACE FUNCTION find_similar_memory(
     p_user_id UUID,
     p_query_embedding VECTOR(1536),
@@ -158,6 +139,31 @@ BEGIN
 END;
 $$;
 
+-- Add new columns if they don't exist
+DO $$
+BEGIN
+    -- Add first_mentioned column if not exists
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'smart_contexts' 
+        AND column_name = 'first_mentioned'
+    ) THEN
+        ALTER TABLE smart_contexts 
+        ADD COLUMN first_mentioned TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+
+    -- Add last_referenced column if not exists
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'smart_contexts' 
+        AND column_name = 'last_referenced'
+    ) THEN
+        ALTER TABLE smart_contexts 
+        ADD COLUMN last_referenced TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+END $$;
+
+-- Create a function for cross-type duplicate search
 CREATE OR REPLACE FUNCTION find_cross_type_duplicate(
     p_user_id UUID,
     p_query_embedding VECTOR(1536),
@@ -187,3 +193,13 @@ BEGIN
     LIMIT 5;
 END;
 $$;
+
+-- Create index for keyword search if not exists
+CREATE INDEX IF NOT EXISTS idx_smart_contexts_keywords ON smart_contexts USING GIN(keywords);
+
+-- Create composite index for user_id and type
+CREATE INDEX IF NOT EXISTS idx_smart_contexts_user_type ON smart_contexts(user_id, type);
+
+-- Analyze tables for query optimization
+ANALYZE smart_contexts;
+ANALYZE conversation_memory_links;

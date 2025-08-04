@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase-client"
+import { persistTemporaryChatRoom, generateChatRoomTitle } from "./chat-room-service"
 
 export interface Message {
   id?: string
@@ -33,6 +34,11 @@ export interface MessageStats {
 // Get messages for a session, optionally filtered by chat room
 export async function getSessionMessages(sessionId: string, chatRoomId?: string): Promise<Message[]> {
   try {
+    // If it's a temporary chat room, return empty array since no messages are saved yet
+    if (chatRoomId?.startsWith("temp-")) {
+      return []
+    }
+
     const params = new URLSearchParams({ sessionId })
     if (chatRoomId) {
       params.append("chatRoomId", chatRoomId)
@@ -54,6 +60,11 @@ export async function getSessionMessages(sessionId: string, chatRoomId?: string)
 // Get messages for a specific chat room only
 export async function getChatRoomMessages(chatRoomId: string): Promise<Message[]> {
   try {
+    // If it's a temporary chat room, return empty array
+    if (chatRoomId.startsWith("temp-")) {
+      return []
+    }
+
     const { data: messages, error } = await supabase
       .from("messages")
       .select(`
@@ -108,14 +119,49 @@ export async function getChatRoomMessages(chatRoomId: string): Promise<Message[]
   }
 }
 
-// Save multiple messages
+// Save multiple messages with temporary chat room handling
 export async function saveMessages(
   sessionId: string,
   messages: Message[],
   roomType = "sajuping",
   chatRoomId?: string,
-): Promise<{ savedCount: number; messageIds: string[] }> {
+  temporaryChatRoom?: any,
+): Promise<{ savedCount: number; messageIds: string[]; persistedChatRoomId?: string }> {
   try {
+    let finalChatRoomId = chatRoomId
+    let persistedChatRoomId: string | undefined
+
+    // If we have a temporary chat room and this is the first user message, persist it
+    if (temporaryChatRoom?.isTemporary && messages.some((msg) => msg.role === "user")) {
+      try {
+        // Generate title from first user message
+        const firstUserMessage = messages.find((msg) => msg.role === "user")
+        const title = firstUserMessage ? generateChatRoomTitle(firstUserMessage.content) : "새로운 대화"
+
+        const persistedRoom = await persistTemporaryChatRoom({
+          ...temporaryChatRoom,
+          sessionId: sessionId, // Explicitly pass sessionId
+          title,
+        })
+
+        finalChatRoomId = persistedRoom.id
+        persistedChatRoomId = persistedRoom.id
+      } catch (error) {
+        console.error("❌ Failed to persist temporary chat room:", error)
+        // Continue without chat room ID if persistence fails
+        finalChatRoomId = undefined
+      }
+    }
+
+    // Don't save messages if we still have a temporary chat room ID
+    if (finalChatRoomId?.startsWith("temp-")) {
+      return {
+        savedCount: 0,
+        messageIds: [],
+        persistedChatRoomId,
+      }
+    }
+
     const response = await fetch("/api/messages", {
       method: "POST",
       headers: {
@@ -125,7 +171,7 @@ export async function saveMessages(
         sessionId,
         messages,
         roomType,
-        chatRoomId,
+        chatRoomId: finalChatRoomId,
       }),
     })
 
@@ -137,6 +183,7 @@ export async function saveMessages(
     return {
       savedCount: data.savedCount || 0,
       messageIds: data.messageIds || [],
+      persistedChatRoomId,
     }
   } catch (error) {
     console.error("Error saving messages:", error)
@@ -144,21 +191,22 @@ export async function saveMessages(
   }
 }
 
-// Save a single message
+// Save a single message with temporary chat room handling
 export async function saveSingleMessage(
   sessionId: string,
   message: Message,
   roomType = "sajuping",
   messageOrder?: number,
   chatRoomId?: string,
-): Promise<string | null> {
+  temporaryChatRoom?: any,
+): Promise<{ messageId: string | null; persistedChatRoomId?: string }> {
   try {
     let finalMessageOrder = messageOrder
 
     // messageOrder가 제공되지 않은 경우, 자동으로 순서 번호 생성
     if (!finalMessageOrder) {
-      if (chatRoomId) {
-        // 채팅룸별 메시지 순서 계산
+      if (chatRoomId && !chatRoomId.startsWith("temp-")) {
+        // 채팅룸별 메시지 순서 계산 (temporary room이 아닌 경우만)
         const { data: existingMessages, error } = await supabase
           .from("messages")
           .select("message_order")
@@ -174,21 +222,8 @@ export async function saveSingleMessage(
           finalMessageOrder = lastOrder + 1
         }
       } else {
-        // 세션별 메시지 순서 계산
-        const { data: existingMessages, error } = await supabase
-          .from("messages")
-          .select("message_order")
-          .eq("session_id", sessionId)
-          .order("message_order", { ascending: false })
-          .limit(1)
-
-        if (error) {
-          console.error("Error fetching existing messages:", error)
-          finalMessageOrder = 1
-        } else {
-          const lastOrder = existingMessages?.[0]?.message_order || 0
-          finalMessageOrder = lastOrder + 1
-        }
+        // 세션별 메시지 순서 계산 또는 temporary room인 경우
+        finalMessageOrder = 1
       }
     }
 
@@ -198,11 +233,14 @@ export async function saveSingleMessage(
       chatRoomId,
     }
 
-    const result = await saveMessages(sessionId, [messageToSave], roomType, chatRoomId)
-    return result.messageIds[0] || null
+    const result = await saveMessages(sessionId, [messageToSave], roomType, chatRoomId, temporaryChatRoom)
+    return {
+      messageId: result.messageIds[0] || null,
+      persistedChatRoomId: result.persistedChatRoomId,
+    }
   } catch (error) {
     console.error("Error saving single message:", error)
-    return null
+    return { messageId: null }
   }
 }
 
@@ -328,7 +366,7 @@ export async function getMessageStats(sessionId?: string, chatRoomId?: string): 
   try {
     let query = supabase.from("messages").select("role, response_time_ms, created_at")
 
-    if (chatRoomId) {
+    if (chatRoomId && !chatRoomId.startsWith("temp-")) {
       query = query.eq("chat_room_id", chatRoomId)
     } else if (sessionId) {
       query = query.eq("session_id", sessionId)

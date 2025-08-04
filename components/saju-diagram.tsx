@@ -12,14 +12,14 @@ interface SajuDiagramProps {
   size?: "sm" | "md" | "lg"
   name?: string
   gender?: string
-  solarYear?: string
-  solarMonth?: string
-  solarDay?: string
-  hour?: string
-  minute?: string
-  lunarYear?: string
-  lunarMonth?: string
-  lunarDay?: string
+  solarYear?: string | number
+  solarMonth?: string | number
+  solarDay?: string | number
+  hour?: string | number
+  minute?: string | number
+  lunarYear?: string | number
+  lunarMonth?: string | number
+  lunarDay?: string | number
   location?: string
   variant?: "chat" | "sidebar" | "card"
 }
@@ -131,6 +131,26 @@ export default function SajuDiagram({
     earth: "토(土)",
     metal: "금(金)",
     water: "수(水)",
+  }
+
+  // Fixed formatTime function to properly handle time display
+  const formatTime = (h: string | number, m: string | number) => {
+    // Handle the case where timeUnknown is true
+    if (timeUnknown) {
+      return "시간 모름"
+    }
+
+    // Convert to numbers and validate
+    const hourNum = typeof h === "string" ? Number.parseInt(h, 10) : h
+    const minuteNum = typeof m === "string" ? Number.parseInt(m, 10) : m
+
+    // Check if we have valid numbers
+    if (isNaN(hourNum) || isNaN(minuteNum)) {
+      return "시간 정보 없음"
+    }
+
+    // Format with leading zeros
+    return `${hourNum.toString().padStart(2, "0")}시 ${minuteNum.toString().padStart(2, "0")}분`
   }
 
   // 색상 가져오기 함수들
@@ -282,7 +302,7 @@ export default function SajuDiagram({
             </div>
           </div>
 
-          {/* Birth Info */}
+          {/* Birth Info - Fixed time display */}
           <div className="space-y-1 text-sm text-muted-foreground">
             <div className="flex justify-start gap-2">
               <span>생일</span>
@@ -293,7 +313,7 @@ export default function SajuDiagram({
             <div className="flex justify-start gap-2">
               <span>생시</span>
               <span>
-                오전 {hour}시 {minute}분, {location || "서울특별시"}
+                {formatTime(hour, minute)}, {location || "서울특별시"}
               </span>
             </div>
             <div className="flex justify-start gap-2">
@@ -440,7 +460,7 @@ export default function SajuDiagram({
         </div>
       </div>
 
-      {/* Birth info */}
+      {/* Birth info - Fixed time display */}
       <div className="space-y-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <span className="font-medium">생일</span>
@@ -451,7 +471,7 @@ export default function SajuDiagram({
         <div className="flex items-center gap-2">
           <span className="font-medium">생시</span>
           <span>
-            오전 {hour}시 {minute}분, {location || "서울특별시"}
+            {formatTime(hour, minute)}, {location || "서울특별시"}
           </span>
         </div>
         <div className="flex items-center gap-2">

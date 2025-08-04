@@ -51,7 +51,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   {
     id: "tahiti",
     city: "타히티",
-    country: "프랑스령 폴리네시아",
+    country: "���랑스령 폴리네시아",
     timezone: "Pacific/Tahiti",
     utcOffset: -10,
     timeStandard: "서머타임",

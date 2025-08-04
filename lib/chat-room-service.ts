@@ -13,12 +13,14 @@ export interface ChatRoom {
     role: string
     createdAt: string
   } | null
+  isTemporary?: boolean // Add flag for temporary rooms
 }
 
 export interface CreateChatRoomRequest {
   sessionId: string
   title?: string
   roomType?: string
+  isTemporary?: boolean
 }
 
 export interface UpdateChatRoomRequest {
@@ -38,8 +40,56 @@ export interface ChatRoomWithSession extends ChatRoom {
   }
 }
 
+// Create a temporary chat room (in-memory only)
+export function createTemporaryChatRoom(data: CreateChatRoomRequest): ChatRoom {
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+  return {
+    id: tempId,
+    sessionId: data.sessionId,
+    title: data.title || "새로운 대화",
+    roomType: data.roomType || "sajuping",
+    createdAt: new Date().toISOString(),
+    isTemporary: true,
+  }
+}
+
+// Persist a temporary chat room to the database
+export async function persistTemporaryChatRoom(tempChatRoom: ChatRoom & { sessionId?: string }): Promise<ChatRoom> {
+  const sessionId = tempChatRoom.sessionId || tempChatRoom.sessionId
+
+  if (!sessionId) {
+    throw new Error("Session ID is required to persist chat room")
+  }
+
+  const response = await fetch("/api/chat-rooms", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionId: sessionId,
+      title: tempChatRoom.title,
+      roomType: tempChatRoom.roomType,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || "Failed to persist chat room")
+  }
+
+  const result = await response.json()
+  return result.chatRoom
+}
+
 // Create a new chat room
 export async function createChatRoom(data: CreateChatRoomRequest): Promise<ChatRoom> {
+  // If it's a temporary room, create it in-memory first
+  if (data.isTemporary) {
+    return createTemporaryChatRoom(data)
+  }
+
   const response = await fetch("/api/chat-rooms", {
     method: "POST",
     headers: {
@@ -57,7 +107,7 @@ export async function createChatRoom(data: CreateChatRoomRequest): Promise<ChatR
   return result.chatRoom
 }
 
-// Get all chat rooms for a session
+// Get all chat rooms for a session (excluding temporary ones)
 export async function getChatRooms(sessionId: string): Promise<ChatRoom[]> {
   const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
 
@@ -67,11 +117,16 @@ export async function getChatRooms(sessionId: string): Promise<ChatRoom[]> {
   }
 
   const result = await response.json()
-  return result.chatRooms
+  return result.chatRooms.filter((room: ChatRoom) => !room.isTemporary)
 }
 
 // Get a specific chat room with session info
 export async function getChatRoom(chatRoomId: string): Promise<ChatRoomWithSession> {
+  // If it's a temporary room, we can't fetch it from the database
+  if (chatRoomId.startsWith("temp-")) {
+    throw new Error("Temporary chat room not found in database")
+  }
+
   const response = await fetch(`/api/chat-rooms/${chatRoomId}`)
 
   if (!response.ok) {

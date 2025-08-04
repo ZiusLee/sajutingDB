@@ -1,169 +1,150 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { useRouter, useParams, useSearchParams } from "next/navigation"
+import { useEffect, useState, Suspense } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth"
 import SajuChat from "@/components/saju-chat"
-import { useToast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
-// 파일 상단에 URL 유틸리티 함수 import 추가
-import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
+import { getSajuSession } from "@/lib/saju-session-service"
+import { getChatRoom } from "@/lib/chat-room-service"
+import type { BirthInfo } from "@/types/birth-date"
 
-export default function SajuChatPage() {
+function SajuChatPage() {
   const router = useRouter()
-  const params = useParams()
   const searchParams = useSearchParams()
-  const { toast } = useToast()
-  const [saju, setSaju] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [sessionKey, setSessionKey] = useState<string>("")
-  const [isSidebarOpen, setSidebarOpen] = useState(false)
+  const { user, isLoading: authLoading } = useAuth()
 
-  // Stabilize roomId to prevent infinite re-renders
-  const roomId = useMemo(() => searchParams.get("roomId"), [searchParams])
-  const roomType = useMemo(() => params.roomType as string, [params.roomType])
+  const [sajuData, setSajuData] = useState<any>(null)
+  const [chatRoom, setChatRoom] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const roomType = "sajuping" // Or get from path params if dynamic
 
   useEffect(() => {
-    // Store sidebar toggle function globally for site header to access
-    if (typeof window !== "undefined") {
-      ;(window as any).toggleSajuChatSidebar = () => setSidebarOpen((prev) => !prev)
-    }
+    const initialize = async () => {
+      setIsLoading(true)
+      setError(null)
 
-    return () => {
-      if (typeof window !== "undefined") {
-        delete (window as any).toggleSajuChatSidebar
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    let isMounted = true
-
-    const initializePage = async () => {
       try {
-        console.log("🔄 Initializing saju chat page for room:", roomId)
-
-        // 로컬 스토리지에서 사주 데이터 가져오기
-        const savedSaju = localStorage.getItem("current_saju")
-
-        if (!savedSaju) {
-          if (isMounted) {
-            toast({
-              title: "사주 정보가 없습니다",
-              description: "먼저 사주를 입력해주세요.",
-              variant: "destructive",
-            })
-            router.push("/")
-          }
-          return
+        // 1. Get Saju Session
+        const sessionKey = localStorage.getItem("saju_session_key")
+        if (!sessionKey) {
+          throw new Error("사주 세션 정보를 찾을 수 없습니다. 다시 시작해주세요.")
         }
 
-        const parsedSaju = JSON.parse(savedSaju)
-
-        if (isMounted) {
-          setSaju(parsedSaju)
-
-          // Generate a unique session key for this chat room
-          const generatedKey = `chat_${parsedSaju.name || "user"}_${roomType}`
-          setSessionKey(generatedKey)
-
-          // 원래 경로 저장 (있는 경우)
-          const lastChatData = loadSajuFromLocalStorage("last_chat_saju_data")
-          if (lastChatData && lastChatData.returnPath) {
-            localStorage.setItem("chat_return_path", lastChatData.returnPath)
-          }
-
-          // 마이페이지에서 왔는지 확인 (한 번만 체크하고 플래그 제거)
-          const fromMyPage = sessionStorage.getItem("from_mypage")
-          if (fromMyPage === "true") {
-            console.log("✅ Chat opened from mypage - flag confirmed")
-            // 플래그 제거하여 무한 로그 방지
-            sessionStorage.removeItem("from_mypage")
-          }
-
-          // 로그인 상태 확인
-          const userToken = localStorage.getItem("user_token")
-          setIsLoggedIn(!!userToken)
-
-          setLoading(false)
-          console.log("✅ Page initialization completed")
+        const session = await getSajuSession(sessionKey)
+        if (!session) {
+          throw new Error("사주 세션이 만료되었거나 유효하지 않습니다.")
         }
-      } catch (error) {
-        console.error("❌ Error loading saju data:", error)
-        if (isMounted) {
-          toast({
-            title: "데이터 로딩 오류",
-            description: "사주 데이터를 불러오는 중 오류가 발생했습니다.",
-            variant: "destructive",
-          })
-          router.push("/")
+        setSajuData(session)
+
+        // 2. Get or Create Chat Room
+        const roomId = searchParams.get("roomId")
+        let currentChatRoom
+
+        if (roomId) {
+          currentChatRoom = await getChatRoom(roomId)
+          if (!currentChatRoom) {
+            throw new Error("채팅방을 찾을 수 없습니다.")
+          }
+        } else {
+          // Create a temporary chat room object for the first message
+          currentChatRoom = {
+            id: `temp-${Date.now()}`,
+            isTemporary: true,
+            saju_session_key: sessionKey,
+            room_type: roomType,
+            user_id: user?.id || null,
+            session_id: session.sessionId,
+          }
         }
+        setChatRoom(currentChatRoom)
+      } catch (err: any) {
+        console.error("Chat initialization error:", err)
+        setError(err.message || "채팅을 시작하는 중 오류가 발생했습니다.")
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    initializePage()
-
-    return () => {
-      isMounted = false
+    if (!authLoading) {
+      initialize()
     }
-  }, [router, toast, roomType, roomId]) // Removed searchParams, using stable roomId instead
+  }, [searchParams, authLoading, user])
 
   const handleBack = () => {
-    try {
-      // 저장된 원래 경로가 있으면 그 경로로 이동
-      const savedReturnPath = localStorage.getItem("chat_return_path")
-
-      if (savedReturnPath) {
-        // 사주 데이터가 있는지 확인
-        if (saju) {
-          // URL 유틸리티 함수를 사용하여 사주 데이터를 URL에 추가
-          const urlWithSaju = addSajuToUrl(savedReturnPath, saju.saju, saju.name, saju.gender)
-
-          router.push(urlWithSaju)
-        } else {
-          router.push(savedReturnPath)
-        }
-      } else if (saju) {
-        // 사주 데이터가 있으면 결과 페이지로 이동
-        const sajuParam = encodeURIComponent(JSON.stringify(saju.saju))
-        const nameParam = saju.name ? `&name=${encodeURIComponent(saju.name)}` : ""
-        const genderParam = saju.gender ? `&gender=${encodeURIComponent(saju.gender)}` : ""
-
-        router.push(`/result?saju=${sajuParam}${nameParam}${genderParam}`)
-      } else {
-        router.push("/chat-list")
-      }
-    } catch (error) {
-      console.error("Error in handleBack:", error)
-      router.push("/chat-list")
-    }
+    router.push("/")
   }
 
-  if (loading) {
+  const handleChatRoomPersisted = (newChatRoomId: string) => {
+    // Update the local state to reflect the persisted chat room
+    setChatRoom((prev: any) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
+  }
+
+  if (isLoading || authLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          채팅을 준비하는 중...
+        </div>
       </div>
     )
   }
 
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background p-4 text-center">
+        <div>
+          <h2 className="text-xl font-semibold text-destructive">오류 발생</h2>
+          <p className="text-muted-foreground mt-2">{error}</p>
+          <button
+            onClick={() => router.push("/")}
+            className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            홈으로 돌아가기
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!sajuData) {
+    return null // Or a more specific loading/error state
+  }
+
   return (
-    <div className="container mx-auto px-4 py-6">
-      <SajuChat
-        saju={saju.saju}
-        name={saju.name || "사용자"}
-        gender={saju.gender || "남"}
-        initialInterpretation={saju.interpretation || ""}
-        roomType={roomType}
-        onBack={handleBack}
-        isLoggedIn={isLoggedIn}
-        sessionKey={sessionKey}
-        birthInfo={saju.birthInfo}
-        concerns={saju.concerns || []}
-        isSidebarOpen={isSidebarOpen}
-        onSidebarToggle={() => setSidebarOpen((prev) => !prev)}
-        currentChatRoomId={roomId || undefined}
-      />
-    </div>
+    <SajuChat
+      saju={sajuData.saju}
+      name={sajuData.name}
+      gender={sajuData.gender}
+      initialInterpretation={sajuData.initialInterpretation}
+      roomType={roomType}
+      onBack={handleBack}
+      isLoggedIn={!!user}
+      sessionKey={sajuData.sessionKey}
+      birthInfo={sajuData.birthInfo as BirthInfo}
+      concerns={sajuData.concerns}
+      currentChatRoomId={chatRoom?.id}
+      temporaryChatRoom={chatRoom?.isTemporary ? chatRoom : null}
+      onChatRoomPersisted={handleChatRoomPersisted}
+    />
+  )
+}
+
+export default function SajuChatPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            페이지를 불러오는 중...
+          </div>
+        </div>
+      }
+    >
+      <SajuChatPage />
+    </Suspense>
   )
 }
