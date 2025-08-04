@@ -25,7 +25,7 @@ export async function uploadFile(bucket: string, path: string, file: File) {
   }
 }
 
-// ���일 다운로드 URL 가져오기
+// 파일 다운로드 URL 가져오기
 export async function getFileUrl(bucket: string, path: string) {
   try {
     const { data, error } = await supabase.storage.from(bucket).getPublicUrl(path)

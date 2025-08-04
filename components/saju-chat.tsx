@@ -121,7 +121,8 @@ export default function SajuChat({
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
-  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [transitionMessages, setTransitionMessages] = useState<any[] | null>(null)
+  const isPersistingRef = useRef(false)
 
   // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
@@ -234,6 +235,11 @@ export default function SajuChat({
     let isMounted = true
 
     const initializeChatData = async () => {
+      if (isPersistingRef.current) {
+        isPersistingRef.current = false
+        return
+      }
+
       if (!stableSaju) {
         return
       }
@@ -316,9 +322,16 @@ export default function SajuChat({
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
     api: "/api/saju-chat",
     id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
-    initialMessages: chatData.initialMessages,
+    initialMessages: transitionMessages ?? chatData.initialMessages, // Use transition messages if available
     body: aiChatBody,
     experimental_throttle: 50,
+    onFinish: () => {
+      // After a message is successfully sent with the new persisted ID,
+      // we can clear the transition state.
+      if (transitionMessages) {
+        setTransitionMessages(null)
+      }
+    },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", {
         error,
@@ -345,7 +358,7 @@ export default function SajuChat({
   // Save messages to database when new messages are added
   useEffect(() => {
     const saveNewMessages = async () => {
-      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized || isTransitioning) {
+      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) {
         return
       }
 
@@ -373,27 +386,24 @@ export default function SajuChat({
 
         setLastSavedMessageCount(messages.length)
 
-        // If a temporary chat room was persisted, update our state smoothly
+        // If a temporary chat room was persisted, update our state
         if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
-          console.log(`✅ Chat room persisted: ${effectiveChatRoomId} -> ${result.persistedChatRoomId}`)
+          console.log(
+            `Transitioning from temp room ${effectiveChatRoomId} to persisted room ${result.persistedChatRoomId}`,
+          )
 
-          // Set transitioning state to prevent UI flicker
-          setIsTransitioning(true)
+          // 1. Preserve the current messages for the next render
+          setTransitionMessages(messages)
 
-          // Update the persisted chat room ID
+          // 2. Update the chat room ID state, which will trigger a re-render
           setPersistedChatRoomId(result.persistedChatRoomId)
           onChatRoomPersisted?.(result.persistedChatRoomId)
 
-          // Update URL silently without page refresh
-          if (window.history.replaceState) {
+          // 3. Update URL without page refresh
+          if (window.history.pushState) {
             const newUrl = `/saju-chat/${roomType}?roomId=${result.persistedChatRoomId}`
             window.history.replaceState(null, "", newUrl)
           }
-
-          // Clear transitioning state after a brief moment
-          setTimeout(() => {
-            setIsTransitioning(false)
-          }, 100)
         }
       } catch (error) {
         console.error("❌ Error saving messages:", error)
@@ -416,7 +426,6 @@ export default function SajuChat({
     sessionId,
     temporaryChatRoom,
     onChatRoomPersisted,
-    isTransitioning,
   ])
 
   const handleSuggestedQuestionClick = (question: string) => {
@@ -475,43 +484,6 @@ export default function SajuChat({
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
-
-  // Handle mobile keyboard and viewport changes
-  useEffect(() => {
-    const handleResize = () => {
-      // Force a re-render when viewport changes (keyboard open/close)
-      if (chatContainerRef.current) {
-        const container = chatContainerRef.current
-        // Scroll to bottom if user was already at bottom
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-        if (isNearBottom) {
-          setTimeout(() => {
-            container.scrollTo({
-              top: container.scrollHeight,
-              behavior: "smooth",
-            })
-          }, 100)
-        }
-      }
-    }
-
-    // Listen for viewport changes (keyboard open/close on mobile)
-    window.addEventListener("resize", handleResize)
-    window.addEventListener("orientationchange", handleResize)
-
-    // Visual viewport API for better mobile support
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleResize)
-    }
-
-    return () => {
-      window.removeEventListener("resize", handleResize)
-      window.removeEventListener("orientationchange", handleResize)
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", handleResize)
-      }
-    }
-  }, [])
 
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
@@ -603,19 +575,19 @@ export default function SajuChat({
       </Sheet>
 
       {/* Main Chat Area - Flexible width */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen supports-[height:100dvh]:h-[100dvh]">
-        {/* Chat Messages Container - Mobile optimized with safe area */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen">
+        {/* Chat Messages Container - Mobile optimized */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto mobile-scroll-container"
+          className="flex-1 overflow-y-auto"
           style={{
-            height: "calc(100dvh - 140px)", // Use dynamic viewport height for mobile
+            height: "calc(100vh - 140px)", // Reserve space for input area
             minHeight: 0,
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
-            {/* Show temporary room indicator only if still temporary and not transitioning */}
-            {temporaryChatRoom?.isTemporary && !persistedChatRoomId && !isTransitioning && (
+            {/* Show temporary room indicator */}
+            {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
@@ -682,8 +654,8 @@ export default function SajuChat({
           </div>
         </div>
 
-        {/* Input Area - Fixed at bottom with mobile optimization and safe area */}
-        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4">
+        {/* Input Area - Fixed at bottom with mobile optimization */}
+        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}

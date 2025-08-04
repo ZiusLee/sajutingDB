@@ -1,8 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { openai } from "@ai-sdk/openai"
-import { generateObject } from "ai"
+import { generateObject, generateText } from "ai"
 import { z } from "zod"
-import crypto from "crypto"
 
 // Node.js 환경 변수 타입 지원
 declare global {
@@ -282,136 +281,112 @@ AI: ${assistantResponse}
     return personalInfoIndicators.some((pattern) => pattern.test(conversation))
   }
 
-  // NEW: Helper to check for generic content
-  private isGenericContent(content: string): boolean {
-    const lowerContent = content.toLowerCase().trim()
-    const genericPatterns = [
-      /^안녕/,
-      /^고마워/,
-      /^감사/,
-      /^네$/,
-      /^알겠습니다/,
-      /^(hello|thank|yes|ok)/,
-      /^(오늘|내일) 날씨/,
-      /^지금 몇 시/,
-    ]
-    return genericPatterns.some((p) => p.test(lowerContent)) || lowerContent.length < 5
-  }
+  // 개선된 중복 확인 - 단계적 접근
+  private async findSimilarMemory(userId: string, content: string, embedding: number[], type?: string): Promise<any> {
+    try {
+      // 단계 1: 정확한 텍스트 매칭 (가장 빠름)
+      const exactTextMatch = await this.findExactTextMatch(userId, content, type)
+      if (exactTextMatch) {
+        console.log("🎯 정확한 텍스트 매칭 발견")
+        return exactTextMatch
+      }
 
-  // NEW: Helper to check for AI-generated content
-  private isAIGeneratedContent(content: string): boolean {
-    const aiIndicators = [
-      "제가 분석하기로는",
-      "당신은 ~인 것 같아요",
-      "금전운이 좋을 것 같습니다",
-      "~에 대해 더 알려주시겠어요?",
-      "다음과 같은 방법",
-      "몇 가지 팁",
-    ]
-    return aiIndicators.some((indicator) => content.includes(indicator))
-  }
+      // 단계 2: 동일 타입 내 높은 유사도 검색
+      if (type) {
+        const typeThreshold = this.getTypeSpecificThreshold(type)
+        const { data: sameTypeMatch } = await this.supabase.rpc("find_similar_memory", {
+          p_user_id: userId,
+          p_query_embedding: embedding,
+          p_memory_type: type,
+          p_similarity_threshold: typeThreshold,
+        })
 
-  // NEW: Quality score calculation
-  private async calculateQualityScore(memory: any): Promise<number> {
-    let score = 1.0
-    const content = memory.content || ""
+        if (sameTypeMatch && sameTypeMatch.length > 0) {
+          const bestMatch = sameTypeMatch[0]
+          if (bestMatch.similarity_score >= typeThreshold) {
+            console.log(`🎯 동일 타입 유사 매칭 발견 (${type}, score: ${bestMatch.similarity_score})`)
+            return bestMatch
+          }
+        }
+      }
 
-    // Length check (soft filter)
-    if (content.length < 8) score *= 0.3
-    else if (content.length < 15) score *= 0.7
+      // 단계 3: 크로스 타입 검색 (더 엄격한 기준)
+      const { data: crossTypeMatch } = await this.supabase.rpc("find_cross_type_duplicate", {
+        p_user_id: userId,
+        p_query_embedding: embedding,
+        p_similarity_threshold: 0.92, // 매우 높은 유사도만
+      })
 
-    // Generic content check
-    if (this.isGenericContent(content)) score *= 0.5
+      if (crossTypeMatch && crossTypeMatch.length > 0) {
+        const bestMatch = crossTypeMatch[0]
+        console.log(`🎯 크로스 타입 매칭 발견 (score: ${bestMatch.similarity_score})`)
+        return bestMatch
+      }
 
-    // AI-generated content check
-    if (this.isAIGeneratedContent(content)) score *= 0.2
-
-    // Confidence from extraction model
-    if (memory.confidence) {
-      score *= 0.5 + memory.confidence * 0.5 // Scale confidence to not be too punishing
+      return null
+    } catch (error) {
+      console.error("유사 메모리 검색 실패:", error)
+      return null
     }
-
-    return Math.max(0.1, score) // Ensure a minimum score of 0.1
   }
 
-  // NEW: Enhanced duplicate check
-  private async enhancedDuplicateCheck(
-    userId: string,
-    memory: any,
-    embedding: number[],
-  ): Promise<{ isDuplicate: boolean; similarity: number; strategy: string; existingMemory?: any }> {
-    const content = memory.content
-    const type = memory.type
+  // 정확한 텍스트 매칭 (임베딩보다 빠름)
+  private async findExactTextMatch(userId: string, content: string, type?: string): Promise<any> {
+    const cleanContent = content.toLowerCase().trim()
 
-    // 1. Exact text matching (via semantic hash)
-    const semanticHash = crypto.createHash("sha256").update(content.trim().toLowerCase()).digest("hex")
-    const { data: hashMatch, error: hashError } = await this.supabase
+    const query = this.supabase
       .from("smart_contexts")
       .select("*")
       .eq("user_id", userId)
-      .eq("semantic_hash", semanticHash)
-      .limit(1)
+      .ilike("content", `%${cleanContent}%`)
 
-    if (hashMatch && hashMatch.length > 0) {
-      return { isDuplicate: true, similarity: 1.0, strategy: "semantic_hash_match", existingMemory: hashMatch[0] }
+    if (type) {
+      query.eq("type", type)
     }
 
-    // 2. High similarity within the same type
-    const typeThreshold = this.getTypeSpecificThreshold(type)
-    const { data: sameTypeMatch } = await this.supabase.rpc("find_similar_memory", {
-      p_user_id: userId,
-      p_query_embedding: embedding,
-      p_memory_type: type,
-      p_similarity_threshold: typeThreshold,
-    })
+    const { data, error } = await query.limit(1)
 
-    if (sameTypeMatch && sameTypeMatch.length > 0) {
-      const bestMatch = sameTypeMatch[0]
-      if (bestMatch.similarity_score >= typeThreshold) {
-        return {
-          isDuplicate: true,
-          similarity: bestMatch.similarity_score,
-          strategy: "same_type_high_similarity",
-          existingMemory: bestMatch,
-        }
-      }
-    }
-
-    // 3. Cross-type check for very high similarity
-    const { data: crossTypeMatch } = await this.supabase.rpc("find_cross_type_duplicate", {
-      p_user_id: userId,
-      p_query_embedding: embedding,
-      p_similarity_threshold: 0.92, // Very high similarity
-    })
-
-    if (crossTypeMatch && crossTypeMatch.length > 0) {
-      const bestMatch = crossTypeMatch[0]
-      return {
-        isDuplicate: true,
-        similarity: bestMatch.similarity_score,
-        strategy: "cross_type_high_similarity",
-        existingMemory: bestMatch,
-      }
-    }
-
-    return { isDuplicate: false, similarity: 0, strategy: "no_duplicate_found" }
+    if (error) return null
+    return data && data.length > 0 ? data[0] : null
   }
 
-  // UPDATED: Type-specific thresholds
+  // 타입별 임계값 (더 세밀한 조정)
   private getTypeSpecificThreshold(type: string): number {
     const thresholds: Record<string, number> = {
-      identity: 0.92, // 0.95 → 0.92 (살짝 완화)
-      goal: 0.85, // 유지
-      emotion: 0.82, // 0.8 → 0.82
-      relationship: 0.9, // 유지
-      interest: 0.83, // 0.8 → 0.83
-      preference: 0.85, // 유지
-      situation: 0.78, // 0.75 → 0.78
-      experience: 0.9, // 유지
-      belief: 0.9, // 유지
-      skill: 0.85, // 유지
+      identity: 0.95, // 신원 정보는 매우 엄격
+      goal: 0.85, // 목표는 다양할 수 있음
+      emotion: 0.8, // 감정은 유사해도 다를 수 있음
+      relationship: 0.9, // 관계 정보는 엄격
+      interest: 0.8, // 관심사는 유연
+      preference: 0.85, // 선호도는 중간
+      situation: 0.75, // 상황은 자주 변함
+      experience: 0.9, // 경험은 고유함
+      belief: 0.9, // 신념은 중요
+      skill: 0.85, // 기술은 중간
     }
+
     return thresholds[type] || 0.85
+  }
+
+  // 의미적 중복 체크
+  private async checkSemanticDuplicate(newContent: string, existingContent: string): Promise<boolean> {
+    try {
+      const { text } = await generateText({
+        model: openai("gpt-4o-mini"),
+        temperature: 0,
+        prompt: `다음 두 정보가 본질적으로 같은 내용인지 판단해주세요.
+
+정보 1: "${newContent}"
+정보 2: "${existingContent}"
+
+같은 내용이면 "YES", 다른 내용이면 "NO"만 답하세요.`,
+      })
+
+      return text.trim().toUpperCase() === "YES"
+    } catch (error) {
+      console.error("의미적 중복 체크 실패:", error)
+      return false
+    }
   }
 
   // 쿼리 이해 및 확장
@@ -441,81 +416,191 @@ AI: ${assistantResponse}
     }
   }
 
-  // UPDATED: 개선된 메모리 저장
+  // 개선된 메모리 저장
   async saveMemories(userId: string, memories: any[], conversationId: string) {
     const savedMemories = []
 
     for (const memory of memories) {
       try {
-        console.log(`💾 Processing memory: "${memory.content.slice(0, 50)}..."`)
-
-        // 1. 품질 점수 계산
-        const qualityScore = await this.calculateQualityScore(memory)
-        console.log(`📊 Quality score: ${qualityScore} for: "${memory.content.slice(0, 30)}..."`)
-
-        // 2. 임베딩 생성
-        const embedding = await this.generateEmbedding(memory.content)
-
-        // 3. 강화된 중복 체크
-        const duplicateCheck = await this.enhancedDuplicateCheck(userId, memory, embedding)
-
-        if (duplicateCheck.isDuplicate && duplicateCheck.existingMemory) {
-          console.log(`🔄 Duplicate found (${duplicateCheck.strategy}). Updating existing memory.`)
-          const { error: updateError } = await this.supabase
-            .from("smart_contexts")
-            .update({
-              reference_count: duplicateCheck.existingMemory.reference_count + 1,
-              last_referenced: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              // Optionally, update quality score if new one is higher
-              quality_score: Math.max(duplicateCheck.existingMemory.quality_score, qualityScore),
-            })
-            .eq("id", duplicateCheck.existingMemory.id)
-
-          if (updateError) console.error("❌ Failed to update existing memory:", updateError)
-          else savedMemories.push({ ...duplicateCheck.existingMemory, action: "refreshed" })
-
-          continue // Skip to next memory
-        }
-
-        // 4. 새 메모리 생성 (정보 손실 방지)
-        const semanticHash = crypto.createHash("sha256").update(memory.content.trim().toLowerCase()).digest("hex")
-
-        const insertData = {
-          user_id: userId,
-          type: memory.type,
-          content: memory.content,
-          source_context: memory.sourceQuote || null,
-          relevance_embedding: embedding,
-          keywords: [], // Pure embedding approach
-          importance_score: memory.importance,
-          reference_count: 1,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          first_mentioned: new Date().toISOString(),
-          last_referenced: new Date().toISOString(),
-          quality_score: qualityScore,
-          is_low_quality: qualityScore < 0.5,
-          semantic_hash: semanticHash,
-        }
-
-        const { data: newMemory, error: insertError } = await this.supabase
-          .from("smart_contexts")
-          .insert(insertData)
-          .select()
-          .single()
-
-        if (insertError) {
-          console.error("❌ Failed to insert new memory:", insertError)
+        // 기본 필터링만 (더 관대하게)
+        const effectiveScore = memory.importance * (memory.confidence || 1)
+        if (effectiveScore < 0.3) {
+          // 0.5에서 0.3으로 낮춤
+          console.log(`⏭️ Very low effective score (${effectiveScore}), skipping: "${memory.content.slice(0, 50)}..."`)
           continue
         }
 
-        if (newMemory) {
-          console.log(`✅ Successfully created memory: ${newMemory.id} (Quality: ${qualityScore})`)
-          savedMemories.push({ ...newMemory, action: "created" })
+        console.log(`💾 Processing memory (score: ${effectiveScore}): "${memory.content.slice(0, 50)}..."`)
+
+        // 품질 체크는 정보용으로만 (저장은 막지 않음)
+        const qualityScore = this.calculateMemoryQuality(memory)
+        console.log(`📊 Quality score: ${qualityScore} for: "${memory.content.slice(0, 30)}..."`)
+
+        // 컨텐츠 길이만 체크 (너무 짧으면 의미 없음)
+        if (!memory.content || memory.content.trim().length < 5) {
+          console.log(`⏭️ Content too short, skipping: "${memory.content}"`)
+          continue
+        }
+
+        // 임베딩 생성 (에러 핸들링 강화)
+        let embedding: number[]
+        try {
+          embedding = await this.generateEmbedding(memory.content)
+          console.log(`✅ Embedding generated successfully, dimensions: ${embedding.length}`)
+        } catch (embeddingError) {
+          console.error(`❌ Embedding generation failed for: "${memory.content.slice(0, 50)}..."`, embeddingError)
+
+          // 임베딩 실패 시 건너뛰지 말고 기본값 사용 (null embeddings는 DB에서 처리 가능)
+          console.log("⚠️ Continuing without embedding - will save but search may be limited")
+          embedding = new Array(1536).fill(0) // 0으로 채운 더미 임베딩
+        }
+
+        // 중복 확인 (개선된 로직)
+        let existingMemory: any = null
+        try {
+          existingMemory = await this.findSimilarMemory(userId, memory.content, embedding, memory.type)
+        } catch (duplicateError) {
+          console.error("❌ Duplicate check failed:", duplicateError)
+          console.log("⚠️ Continuing without duplicate check")
+        }
+
+        if (existingMemory) {
+          console.log(`🔄 Found similar memory (${existingMemory.id}), attempting to merge/update.`)
+          try {
+            // 의미적 중복 체크를 한 번 더 해서 정말 같은 내용인지 확인
+            const isSemanticDuplicate = await this.checkSemanticDuplicate(memory.content, existingMemory.content)
+            if (isSemanticDuplicate) {
+              console.log(`✅ Semantic duplicate confirmed. Updating reference count and timestamp.`)
+              const { error: updateError } = await this.supabase
+                .from("smart_contexts")
+                .update({
+                  reference_count: existingMemory.reference_count + 1,
+                  last_referenced: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", existingMemory.id)
+
+              if (updateError) {
+                console.error("❌ Failed to update existing memory timestamp:", updateError)
+              } else {
+                savedMemories.push({ ...existingMemory, action: "refreshed" })
+              }
+              continue // 중복이므로 새 메모리 생성 건너뛰기
+            }
+
+            // 의미적으로 다르면 병합 시도
+            const mergedContent = await this.mergeMemories(existingMemory.content, memory.content)
+            console.log(`🔄 Merging content. New content: "${mergedContent.slice(0, 50)}..."`)
+
+            const { data: updatedMemory, error: updateError } = await this.supabase
+              .from("smart_contexts")
+              .update({
+                content: mergedContent,
+                keywords: [...new Set([...(existingMemory.keywords || []), ...(memory.keywords || [])])],
+                reference_count: existingMemory.reference_count + 1,
+                importance_score: Math.max(existingMemory.importance_score, memory.importance),
+                last_referenced: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existingMemory.id)
+              .select()
+              .single()
+
+            if (updateError) {
+              console.error("❌ Failed to update/merge existing memory:", updateError)
+            } else {
+              console.log(`✅ Successfully merged memory: ${existingMemory.id}`)
+              savedMemories.push({ ...updatedMemory, action: "merged" })
+            }
+          } catch (mergeError) {
+            console.error("❌ Memory merge/update process failed:", mergeError)
+          }
+          continue // 어쨌든 기존 메모리가 있었으므로 새로 생성하지 않음
+        }
+
+        // 새 메모리 생성 (중복 확인 실패했거나 기존 메모리가 없는 경우)
+        console.log(`💾 [DEBUG] Creating new memory: "${memory.content.slice(0, 50)}..."`)
+        console.log(`💾 [DEBUG] Memory details:`, {
+          type: memory.type,
+          importance: memory.importance,
+          confidence: memory.confidence,
+          embedding_length: embedding.length,
+        })
+
+        try {
+          const insertData = {
+            user_id: userId,
+            type: memory.type,
+            content: memory.content,
+            source_context: memory.sourceQuote || null,
+            relevance_embedding: embedding,
+            keywords: [], // 🔥 Empty array - pure embedding approach
+            importance_score: memory.importance,
+            reference_count: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            first_mentioned: new Date().toISOString(),
+            last_referenced: new Date().toISOString(),
+          }
+
+          console.log(`💾 [DEBUG] Insert data:`, {
+            ...insertData,
+            relevance_embedding: `[${embedding.length} dimensions]`,
+            content: insertData.content.slice(0, 100),
+          })
+
+          const { data: newMemory, error: insertError } = await this.supabase
+            .from("smart_contexts")
+            .insert(insertData)
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error("❌ [DEBUG] Failed to insert new memory:", {
+              error: insertError,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint,
+              code: insertError.code,
+            })
+            console.error("❌ [DEBUG] Insert data was:", insertData)
+
+            // DB 에러라도 계속 진행
+            continue
+          }
+
+          if (newMemory) {
+            console.log(`✅ [DEBUG] Successfully created memory: ${newMemory.id}`)
+            console.log(`✅ [DEBUG] Created memory data:`, {
+              id: newMemory.id,
+              type: newMemory.type,
+              content: newMemory.content?.slice(0, 50),
+              keywords: newMemory.keywords,
+            })
+
+            // 대화 링크 추가 (실패해도 메모리는 저장됨)
+            try {
+              await this.supabase.from("conversation_memory_links").insert({
+                conversation_id: conversationId,
+                memory_id: newMemory.id,
+                usage_type: "created",
+              })
+              console.log(`✅ [DEBUG] Conversation link created for memory: ${newMemory.id}`)
+            } catch (linkError) {
+              console.error("⚠️ [DEBUG] Failed to create conversation link (memory still saved):", linkError)
+            }
+
+            savedMemories.push({ ...newMemory, action: "created" })
+          } else {
+            console.error("❌ [DEBUG] Insert succeeded but no data returned")
+          }
+        } catch (creationError) {
+          console.error("❌ [DEBUG] Memory creation failed with exception:", creationError)
+          console.error("❌ [DEBUG] Exception stack:", creationError.stack)
+          continue
         }
       } catch (error) {
-        console.error("메모리 처리 중 에러:", error)
+        console.error("메모리 처리 실패:", error)
         continue
       }
     }
@@ -523,69 +608,124 @@ AI: ${assistantResponse}
     return savedMemories
   }
 
-  // UPDATED: 개선된 관련 메모리 검색
+  // 메모리 병합
+  private async mergeMemories(existing: string, new_content: string): Promise<string> {
+    try {
+      const { text } = await generateText({
+        model: openai("gpt-4o-mini"),
+        temperature: 0.2,
+        prompt: `다음 두 정보를 자연스럽게 하나로 통합하세요. 중복을 제거하고 더 구체적이거나 최신 정보를 우선하세요.
+
+기존 정보: "${existing}"
+새로운 정보: "${new_content}"
+
+통합된 정보 (한 문장으로):`,
+      })
+
+      return text.trim()
+    } catch (error) {
+      console.error("메모리 병합 실패:", error)
+      return `${existing} / ${new_content}`
+    }
+  }
+
+  // 개선된 관련 메모리 검색
   async getRelevantMemories(userId: string, query: string, limit = 5): Promise<string> {
     try {
       console.log("🧠 getRelevantMemories 시작:", { userId, query, limit })
 
+      // 0. 빈 쿼리 체크 (더 관대하게)
       if (!query || query.trim().length < 2) {
-        console.log("🧠 쿼리가 너무 짧음, 최근 고품질 메모리 반환")
-        return await this.getRecentMemories(userId, 5)
+        console.log("🧠 쿼리가 너무 짧음, 최근 메모리만 반환")
+        return await this.getRecentMemories(userId, 5) // 더 많은 최근 메모리
       }
 
+      // 1. 쿼리 이해
       const understanding = await this.understandQuery(query)
-      const embedding = await this.generateEmbedding(query)
+      console.log("🧠 쿼리 이해 결과:", understanding)
 
-      // Vector-First Search
-      const searchResults = await this.modernVectorSearch(userId, embedding, understanding, limit)
+      // 2. 쿼리 임베딩 생성
+      const embedding = await this.generateEmbedding(query)
+      console.log("🧠 임베딩 생성 완료, 차원:", embedding.length)
+
+      // 3. 🔥 Modern Vector-First Search
+      const searchResults = await this.modernVectorSearch(userId, query, embedding, understanding, limit)
 
       if (searchResults.length === 0) {
         console.log("🧠 검색 결과 없음, fallback 적용")
-        return await this.getRecentMemories(userId, 3)
+        const fallbackMemories = await this.getFallbackMemories(userId, understanding.memoryTypes, 3)
+        console.log("🧠 Fallback 메모리 개수:", fallbackMemories.length)
+        return fallbackMemories
       }
 
+      // 4. 컨텍스트 생성
       const context = this.formatMemoryContext(searchResults, understanding.intent)
       console.log("🧠 최종 컨텍스트 길이:", context.length)
       return context
     } catch (error) {
       console.error("관련 메모리 검색 실패:", error)
+      // 에러 시 최소한의 컨텍스트라도 제공
       return await this.getRecentMemories(userId, 2)
     }
   }
 
-  // UPDATED: Modern Vector-First Search with quality consideration
+  // 🔥 Modern Vector-First Search (OpenAI/Anthropic 스타일)
   private async modernVectorSearch(
     userId: string,
+    query: string,
     embedding: number[],
     understanding: any,
     limit: number,
   ): Promise<any[]> {
-    // Stage 1: Vector Search with a more reasonable threshold
+    // Stage 1: Pure Vector Search (매우 낮은 임계값)
     const { data: vectorResults, error } = await this.supabase.rpc("find_user_memories", {
       p_user_id: userId,
       p_query_embedding: embedding,
-      p_query_keywords: null,
-      p_memory_types: null,
-      p_similarity_threshold: 0.25, // Increased from 0.005 to reduce noise
-      p_result_limit: limit * 5,
+      p_query_keywords: null, // 키워드 무시
+      p_memory_types: null, // 타입 제한 없음
+      p_similarity_threshold: 0.005, // 🚨 극도로 낮은 임계값으로 recall 극대화
+      p_result_limit: limit * 5, // 더 많은 후보
     })
 
-    if (error) {
+    let results: any[] = []
+    if (!error && vectorResults) {
+      results = vectorResults
+      console.log(`🔍 Pure Vector 검색 결과: ${vectorResults.length}개`)
+      if (vectorResults.length > 0) {
+        vectorResults.slice(0, 3).forEach((result, i) => {
+          console.log(`  ${i + 1}. [${result.type}] ${result.content} (score: ${result.relevance_score?.toFixed(3)})`)
+        })
+      }
+    } else if (error) {
       console.error("🚨 Vector search error:", error)
-      return []
     }
 
-    console.log(`🔍 Vector 검색 결과: ${vectorResults?.length || 0}개`)
+    // Stage 2: 결과가 부족하면 임계값 더 낮춤
+    if (results.length < limit) {
+      const { data: moreResults } = await this.supabase.rpc("find_user_memories", {
+        p_user_id: userId,
+        p_query_embedding: embedding,
+        p_query_keywords: null,
+        p_memory_types: null,
+        p_similarity_threshold: 0.001, // 🚨 거의 모든 메모리 강제 포함
+        p_result_limit: limit * 10,
+      })
 
-    // Stage 2: Re-rank results considering quality
-    const rerankedResults = this.rerankWithQuality(vectorResults || [])
-    console.log(`🔍 최종 정제된 결과: ${rerankedResults.length}개`)
+      if (moreResults) {
+        results.push(...moreResults)
+        console.log(`🔍 Extended Vector 검색 결과: ${moreResults.length}개 추가`)
+      }
+    }
 
-    return rerankedResults.slice(0, limit)
+    // Stage 3: 중복 제거 및 점수 계산
+    const uniqueResults = this.deduplicateAndScore(results)
+    console.log(`🔍 최종 정제된 결과: ${uniqueResults.length}개`)
+
+    return uniqueResults.slice(0, limit)
   }
 
-  // NEW: Re-ranking function
-  private rerankWithQuality(results: any[]): any[] {
+  // 중복 제거 및 점수 계산
+  private deduplicateAndScore(results: any[]): any[] {
     const seen = new Set<string>()
     const unique = results.filter((result) => {
       if (seen.has(result.id)) return false
@@ -593,26 +733,153 @@ AI: ${assistantResponse}
       return true
     })
 
-    // Sort by a combined score: relevance, quality, and importance
+    // Sort by relevance_score (from vector search) and importance
     return unique.sort((a, b) => {
-      const scoreA = (a.relevance_score || 0) * 0.6 + (a.quality_score || 0.5) * 0.3 + (a.importance_score || 0.5) * 0.1
-      const scoreB = (b.relevance_score || 0) * 0.6 + (b.quality_score || 0.5) * 0.3 + (b.importance_score || 0.5) * 0.1
+      const scoreA = (a.relevance_score || 0) * 0.8 + (a.importance_score || 0.5) * 0.2
+      const scoreB = (b.relevance_score || 0) * 0.8 + (b.importance_score || 0.5) * 0.2
       return scoreB - scoreA
     })
   }
 
-  // UPDATED: Get recent HIGH-QUALITY memories
+  // 최근 메모리 가져오기 (fallback용)
   private async getRecentMemories(userId: string, limit: number): Promise<string> {
     const { data, error } = await this.supabase
       .from("smart_contexts")
       .select("*")
       .eq("user_id", userId)
-      .eq("is_low_quality", false) // Only get high-quality memories
       .order("updated_at", { ascending: false })
       .limit(limit)
 
     if (error || !data || data.length === 0) return ""
+
     return this.formatMemoryContext(data, "최근 활동")
+  }
+
+  // 타입별 fallback 메모리
+  private async getFallbackMemories(userId: string, preferredTypes: string[], limit: number): Promise<string> {
+    if (preferredTypes.length === 0) {
+      return await this.getRecentMemories(userId, limit)
+    }
+
+    const { data, error } = await this.supabase
+      .from("smart_contexts")
+      .select("*")
+      .eq("user_id", userId)
+      .in("type", preferredTypes)
+      .order("importance_score", { ascending: false })
+      .limit(limit)
+
+    if (error || !data || data.length === 0) {
+      return await this.getRecentMemories(userId, limit)
+    }
+
+    return this.formatMemoryContext(data, "관련 정보")
+  }
+
+  // 메모리 품질 평가
+  private calculateMemoryQuality(memory: any): number {
+    let score = 0
+
+    // 기본 중요도 (40%)
+    score += (memory.importance || 0.5) * 0.4
+
+    // 확신도 (20%)
+    score += (memory.confidence || 0.5) * 0.2
+
+    // 내용의 구체성 (20%)
+    const specificityScore = this.calculateSpecificity(memory.content)
+    score += specificityScore * 0.2
+
+    // 키워드 품질 (10%)
+    const keywordScore = this.calculateKeywordQuality(memory.keywords || [])
+    score += keywordScore * 0.1
+
+    // 타입 적절성 (10%)
+    const typeScore = this.calculateTypeAppropriateScore(memory.type, memory.content)
+    score += typeScore * 0.1
+
+    return Math.min(1, Math.max(0, score))
+  }
+
+  // 내용 구체성 계산
+  private calculateSpecificity(content: string): number {
+    if (!content || content.length < 10) return 0.1
+
+    let score = 0.5 // 기본 점수
+
+    // 길이 점수 (적당한 길이가 좋음)
+    const length = content.length
+    if (length >= 20 && length <= 200) {
+      score += 0.2
+    } else if (length < 10) {
+      score -= 0.3
+    }
+
+    // 구체적인 정보 지시자
+    const specificIndicators = [
+      /\d+/g, // 숫자
+      /[가-힣]+[시도군구]/g, // 지역명
+      /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, // 이메일
+      /\d{2,4}[-년]\d{1,2}[-월]/g, // 날짜
+      /(주식회사|회사|대학교|학교)/g, // 조직명
+    ]
+
+    specificIndicators.forEach((regex) => {
+      if (regex.test(content)) {
+        score += 0.1
+      }
+    })
+
+    // 모호한 표현 감점
+    const vagueIndicators = [/(아마|아마도|아닌가|같다|것 같다|될 것 같다)/g, /(가끔|때때로|종종|보통)/g]
+
+    vagueIndicators.forEach((regex) => {
+      const matches = content.match(regex)
+      if (matches) {
+        score -= matches.length * 0.05
+      }
+    })
+
+    return Math.min(1, Math.max(0, score))
+  }
+
+  // 키워드 품질 계산
+  private calculateKeywordQuality(keywords: string[]): number {
+    if (!keywords || keywords.length === 0) return 0.3
+
+    let score = 0.5
+
+    // 키워드 개수 (3-7개가 적당)
+    if (keywords.length >= 3 && keywords.length <= 7) {
+      score += 0.3
+    } else if (keywords.length > 10) {
+      score -= 0.2
+    }
+
+    // 키워드 길이 (너무 짧거나 길면 안 좋음)
+    const avgLength = keywords.reduce((sum, kw) => sum + kw.length, 0) / keywords.length
+    if (avgLength >= 3 && avgLength <= 10) {
+      score += 0.2
+    }
+
+    return Math.min(1, Math.max(0, score))
+  }
+
+  // 타입 적절성 계산
+  private calculateTypeAppropriateScore(type: string, content: string): number {
+    const typePatterns: Record<string, RegExp[]> = {
+      identity: [/이름|나이|직업|살|years|job|work|name/i],
+      goal: [/목표|계획|하고 싶|goal|plan|want|hoping/i],
+      preference: [/좋아|싫어|prefer|like|dislike|love|hate/i],
+      relationship: [/가족|친구|연인|부모|형제|family|friend|parent/i],
+      situation: [/현재|지금|요즘|최근|currently|now|recently/i],
+    }
+
+    const patterns = typePatterns[type]
+    if (!patterns) return 0.5
+
+    const hasMatch = patterns.some((pattern) => pattern.test(content))
+    return hasMatch ? 0.8 : 0.3
   }
 
   // 메모리 컨텍스트 포맷팅
@@ -648,8 +915,8 @@ AI: ${assistantResponse}
     Object.entries(grouped).forEach(([type, mems]: [string, any]) => {
       context += `### ${typeNames[type] || type}\n`
       mems.forEach((memory: any) => {
-        const quality = memory.quality_score ? ` (품질: ${memory.quality_score.toFixed(2)})` : ""
-        context += `- ${memory.content}${quality}\n`
+        const confidence = memory.confidence ? ` (확신도: ${memory.confidence})` : ""
+        context += `- ${memory.content}${confidence}\n`
       })
       context += "\n"
     })
@@ -658,6 +925,102 @@ AI: ${assistantResponse}
 
     console.log("🎨 생성된 컨텍스트:", context.substring(0, 200) + "...")
     return context
+  }
+
+  // 메모리 통합 및 요약 (주기적 실행)
+  async consolidateMemories(userId: string) {
+    try {
+      // 비슷한 메모리들을 찾아 통합
+      const { data: memories } = await this.supabase
+        .from("smart_contexts")
+        .select("*")
+        .eq("user_id", userId)
+        .order("type")
+
+      const consolidationTasks = []
+      const processedIds = new Set()
+
+      for (const memory of memories || []) {
+        if (processedIds.has(memory.id)) continue
+
+        // 유사한 메모리 찾기
+        const similar = memories.filter(
+          (m: any) => m.id !== memory.id && !processedIds.has(m.id) && m.type === memory.type,
+        )
+
+        if (similar.length > 0) {
+          // 통합 작업 추가
+          consolidationTasks.push(this.consolidateGroup([memory, ...similar]))
+          similar.forEach((m: any) => processedIds.add(m.id))
+        }
+
+        processedIds.add(memory.id)
+      }
+
+      // 병렬로 통합 실행
+      await Promise.all(consolidationTasks)
+
+      return { consolidated: consolidationTasks.length }
+    } catch (error) {
+      console.error("메모리 통합 실패:", error)
+      return { consolidated: 0 }
+    }
+  }
+
+  // 메모리 그룹 통합
+  private async consolidateGroup(memories: any[]) {
+    if (memories.length < 2) return
+
+    try {
+      // GPT로 통합된 메모리 생성
+      const contents = memories.map((m) => m.content).join("\n- ")
+      const { text } = await generateText({
+        model: openai("gpt-4o-mini"),
+        temperature: 0.3,
+        prompt: `다음 관련 정보들을 하나의 통합된 정보로 요약하세요:
+
+- ${contents}
+
+통합된 정보 (구체적이고 간결하게):`,
+      })
+
+      const consolidatedContent = text.trim()
+      const embedding = await this.generateEmbedding(consolidatedContent)
+
+      // 새로운 통합 메모리 생성
+      const { data: newMemory } = await this.supabase
+        .from("smart_contexts")
+        .insert({
+          user_id: memories[0].user_id,
+          type: memories[0].type,
+          content: consolidatedContent,
+          relevance_embedding: embedding,
+          keywords: [...new Set(memories.flatMap((m) => m.keywords || []))],
+          importance_score: Math.max(...memories.map((m) => m.importance_score)),
+          reference_count: memories.reduce((sum, m) => sum + m.reference_count, 0),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          first_mentioned: new Date(
+            Math.min(...memories.map((m) => new Date(m.first_mentioned || m.created_at).getTime())),
+          ).toISOString(),
+          last_referenced: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (newMemory) {
+        // 기존 메모리들 삭제
+        await this.supabase
+          .from("smart_contexts")
+          .delete()
+          .in(
+            "id",
+            memories.map((m) => m.id),
+          )
+      }
+    } catch (error) {
+      console.error("메모리 그룹 통합 실패:", error)
+    }
   }
 
   // 메모리 검색 (public method for API)
@@ -672,17 +1035,23 @@ AI: ${assistantResponse}
     try {
       console.log("🔍 searchMemories 시작:", { userId, query, options })
 
+      // 쿼리 이해
       const understanding = await this.understandQuery(query)
-      const embedding = await this.generateEmbedding(query)
+      console.log("🔍 쿼리 이해 결과:", understanding)
 
+      // 쿼리 임베딩 생성
+      const embedding = await this.generateEmbedding(query)
+      console.log("🔍 임베딩 생성 완료, 차원:", embedding.length)
+
+      // 검색 실행 - Fixed parameter names
       console.log("🔍 DB 검색 실행 중...")
       const { data, error } = await this.supabase.rpc("find_user_memories", {
         p_user_id: userId,
         p_query_embedding: embedding,
         p_query_keywords: understanding.keywords,
         p_memory_types: options?.types || understanding.memoryTypes || null,
-        p_similarity_threshold: 0.25, // Increased threshold
-        p_result_limit: (options?.limit || 20) * 2, // Fetch more to re-rank
+        p_similarity_threshold: 0.15, // 매우 낮은 threshold로 더 많은 결과
+        p_result_limit: options?.limit || 20,
       })
 
       if (error) {
@@ -690,10 +1059,8 @@ AI: ${assistantResponse}
         throw error
       }
 
-      const reranked = this.rerankWithQuality(data || [])
-
-      console.log("🔍 DB 검색 결과:", reranked.length || 0, "개")
-      return reranked.slice(0, options?.limit || 20)
+      console.log("🔍 DB 검색 결과:", data?.length || 0, "개")
+      return data || []
     } catch (error) {
       console.error("메모리 검색 실패:", error)
       throw error
@@ -704,12 +1071,36 @@ AI: ${assistantResponse}
   async processConversation(userId: string, conversationId: string, userMessage: string, assistantResponse: string) {
     try {
       console.log("🧠 [STEP 1] Processing conversation for user:", userId)
+      console.log("🧠 [STEP 1] User message:", userMessage.slice(0, 100) + "...")
+      console.log("🧠 [STEP 1] Assistant response:", assistantResponse.slice(0, 100) + "...")
 
-      const extraction = await this.extractMemoryCandidate(userMessage, assistantResponse)
+      // 환경 변수 체크
+      console.log("🧠 [STEP 1] Environment check:", {
+        hasOpenAI: !!process.env.OPENAI_API_KEY,
+        hasSupabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        isClientSide: typeof window !== "undefined",
+      })
 
+      // 기존 메모리 가져오기 (컨텍스트용)
+      console.log("🧠 [STEP 2] Fetching existing memories from DB...")
+
+      // 🔥 DB 쿼리 스킵해서 빠르게 진행 (일단 테스트용)
+      const existingMemories: any[] = []
+      console.log("🧠 [STEP 2] DB 쿼리 스킵 중 (디버깅용)")
+      console.log("🧠 [STEP 2] Using empty memories array to continue")
+
+      console.log("🧠 [STEP 2] Existing memories count:", existingMemories?.length || 0)
+
+      // 메모리 후보 추출
+      console.log("🧠 [STEP 3] Starting memory extraction...")
+      console.log("🧠 [STEP 3] Calling extractMemoryCandidate...")
+      const extraction = await this.extractMemoryCandidate(userMessage, assistantResponse, existingMemories)
+
+      console.log("🧠 [STEP 3] Extraction completed!")
       console.log("🧠 [STEP 3] Extraction result:", {
         shouldSave: extraction.shouldSave,
         memoriesCount: extraction.memories.length,
+        reasoning: extraction.reasoning,
       })
 
       if (!extraction.shouldSave || extraction.memories.length === 0) {
@@ -717,12 +1108,24 @@ AI: ${assistantResponse}
         return extraction
       }
 
+      // 메모리 저장
       console.log("🧠 [STEP 4] Attempting to save memories:", extraction.memories.length)
+      extraction.memories.forEach((memory, index) => {
+        console.log(`🧠 [STEP 4] Memory ${index + 1}:`, {
+          type: memory.type,
+          content: memory.content.slice(0, 50) + "...",
+          importance: memory.importance,
+          confidence: memory.confidence,
+        })
+      })
+
+      console.log("🧠 [STEP 4] Calling saveMemories...")
       const savedMemories = await this.saveMemories(userId, extraction.memories, conversationId)
 
       console.log("🧠 [STEP 4] Save operation completed:", {
         attempted: extraction.memories.length,
         saved: savedMemories.length,
+        success: savedMemories.length > 0,
       })
 
       return {
@@ -731,6 +1134,7 @@ AI: ${assistantResponse}
       }
     } catch (error) {
       console.error("🚨 Memory processing failed with error:", error)
+      console.error("🚨 Error stack:", error.stack)
       throw error
     }
   }
