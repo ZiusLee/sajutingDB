@@ -7,7 +7,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
-import { ChatGuideModal } from "@/components/chat-guide-modal"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -20,7 +19,6 @@ export default function SajuChatPage() {
   const [sessionKey, setSessionKey] = useState<string>("")
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [currentChatRoom, setCurrentChatRoom] = useState<any>(null)
-  const [showGuideModal, setShowGuideModal] = useState(false)
 
   // Stabilize roomId and roomType to prevent infinite re-renders
   const roomId = useMemo(() => searchParams.get("roomId"), [searchParams])
@@ -89,10 +87,6 @@ export default function SajuChatPage() {
             sessionId = userId || `fallback-${Date.now()}`
           }
 
-          // Check if this is a first-time visit to saju-chat
-          const hasSeenChatGuide = localStorage.getItem("has_seen_chat_guide")
-          const shouldShowGuide = !hasSeenChatGuide && !roomId // Only show for new chats
-
           // Auto-create temporary chat room if no roomId is provided
           let chatRoom = null
           if (!roomId) {
@@ -108,11 +102,6 @@ export default function SajuChatPage() {
             // Update URL with the temporary room ID without triggering a page reload
             const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
             window.history.replaceState({}, "", newUrl)
-
-            // Show guide modal for new chats
-            if (shouldShowGuide) {
-              setShowGuideModal(true)
-            }
           } else {
             // If roomId exists, we'll handle it in the chat component
             setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
@@ -202,12 +191,6 @@ export default function SajuChatPage() {
     [roomType],
   )
 
-  const handleGuideModalClose = useCallback(() => {
-    setShowGuideModal(false)
-    // Mark that user has seen the guide
-    localStorage.setItem("has_seen_chat_guide", "true")
-  }, [])
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -231,29 +214,24 @@ export default function SajuChatPage() {
   }
 
   return (
-    <>
-      <div className="container mx-auto px-4 py-6">
-        <SajuChat
-          saju={saju.saju}
-          name={saju.name || "사용자"}
-          gender={saju.gender || "남"}
-          initialInterpretation={saju.interpretation || ""}
-          roomType={roomType}
-          onBack={handleBack}
-          isLoggedIn={isLoggedIn}
-          sessionKey={sessionKey}
-          birthInfo={saju.birthInfo}
-          concerns={saju.concerns || []}
-          isSidebarOpen={isSidebarOpen}
-          onSidebarToggle={handleSidebarToggle}
-          currentChatRoomId={currentChatRoom?.id}
-          temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
-          onChatRoomPersisted={handleChatRoomPersisted}
-        />
-      </div>
-
-      {/* Chat Guide Modal */}
-      <ChatGuideModal isOpen={showGuideModal} onClose={handleGuideModalClose} userName={saju?.name || "사용자"} />
-    </>
+    <div className="container mx-auto px-4 py-6">
+      <SajuChat
+        saju={saju.saju}
+        name={saju.name || "사용자"}
+        gender={saju.gender || "남"}
+        initialInterpretation={saju.interpretation || ""}
+        roomType={roomType}
+        onBack={handleBack}
+        isLoggedIn={isLoggedIn}
+        sessionKey={sessionKey}
+        birthInfo={saju.birthInfo}
+        concerns={saju.concerns || []}
+        isSidebarOpen={isSidebarOpen}
+        onSidebarToggle={handleSidebarToggle}
+        currentChatRoomId={currentChatRoom?.id}
+        temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
+        onChatRoomPersisted={handleChatRoomPersisted}
+      />
+    </div>
   )
 }

@@ -121,8 +121,7 @@ export default function SajuChat({
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
-  const [transitionMessages, setTransitionMessages] = useState<any[] | null>(null)
-  const isPersistingRef = useRef(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
@@ -235,11 +234,6 @@ export default function SajuChat({
     let isMounted = true
 
     const initializeChatData = async () => {
-      if (isPersistingRef.current) {
-        isPersistingRef.current = false
-        return
-      }
-
       if (!stableSaju) {
         return
       }
@@ -322,16 +316,9 @@ export default function SajuChat({
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
     api: "/api/saju-chat",
     id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
-    initialMessages: transitionMessages ?? chatData.initialMessages, // Use transition messages if available
+    initialMessages: chatData.initialMessages,
     body: aiChatBody,
     experimental_throttle: 50,
-    onFinish: () => {
-      // After a message is successfully sent with the new persisted ID,
-      // we can clear the transition state.
-      if (transitionMessages) {
-        setTransitionMessages(null)
-      }
-    },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", {
         error,
@@ -358,7 +345,7 @@ export default function SajuChat({
   // Save messages to database when new messages are added
   useEffect(() => {
     const saveNewMessages = async () => {
-      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) {
+      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized || isTransitioning) {
         return
       }
 
@@ -386,24 +373,27 @@ export default function SajuChat({
 
         setLastSavedMessageCount(messages.length)
 
-        // If a temporary chat room was persisted, update our state
+        // If a temporary chat room was persisted, update our state smoothly
         if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
-          console.log(
-            `Transitioning from temp room ${effectiveChatRoomId} to persisted room ${result.persistedChatRoomId}`,
-          )
+          console.log(`✅ Chat room persisted: ${effectiveChatRoomId} -> ${result.persistedChatRoomId}`)
 
-          // 1. Preserve the current messages for the next render
-          setTransitionMessages(messages)
+          // Set transitioning state to prevent UI flicker
+          setIsTransitioning(true)
 
-          // 2. Update the chat room ID state, which will trigger a re-render
+          // Update the persisted chat room ID
           setPersistedChatRoomId(result.persistedChatRoomId)
           onChatRoomPersisted?.(result.persistedChatRoomId)
 
-          // 3. Update URL without page refresh
-          if (window.history.pushState) {
+          // Update URL silently without page refresh
+          if (window.history.replaceState) {
             const newUrl = `/saju-chat/${roomType}?roomId=${result.persistedChatRoomId}`
             window.history.replaceState(null, "", newUrl)
           }
+
+          // Clear transitioning state after a brief moment
+          setTimeout(() => {
+            setIsTransitioning(false)
+          }, 100)
         }
       } catch (error) {
         console.error("❌ Error saving messages:", error)
@@ -426,6 +416,7 @@ export default function SajuChat({
     sessionId,
     temporaryChatRoom,
     onChatRoomPersisted,
+    isTransitioning,
   ])
 
   const handleSuggestedQuestionClick = (question: string) => {
@@ -586,8 +577,8 @@ export default function SajuChat({
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
-            {/* Show temporary room indicator */}
-            {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
+            {/* Show temporary room indicator only if still temporary and not transitioning */}
+            {temporaryChatRoom?.isTemporary && !persistedChatRoomId && !isTransitioning && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
