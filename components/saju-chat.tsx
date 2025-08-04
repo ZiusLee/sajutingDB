@@ -156,8 +156,10 @@ export default function SajuChat({
   const scrollPositionRef = useRef<number>(0)
   const isTransitioningRef = useRef<boolean>(false)
   const [initialQuestionsToSend, setInitialQuestionsToSend] = useState<string[]>([])
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const hasInitializedRef = useRef(false)
+  const nextQuestionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
 
   // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
@@ -305,6 +307,39 @@ export default function SajuChat({
         let pastMessages: any[] = []
         let shouldSendInitialQuestions = false
 
+        // Check if this is the first chat room for this session
+        let isFirstRoom = false
+        try {
+          if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
+            // Get all chat rooms for this session to check if this is the first one
+            const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+            if (response.ok) {
+              const result = await response.json()
+              const chatRooms = result.chatRooms || []
+
+              // Sort by creation date and check if current room is the first
+              const sortedRooms = chatRooms.sort(
+                (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              )
+
+              isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
+            }
+          } else if (effectiveChatRoomId?.startsWith("temp-")) {
+            // For temporary rooms, check if there are any existing rooms
+            const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+            if (response.ok) {
+              const result = await response.json()
+              const chatRooms = result.chatRooms || []
+              isFirstRoom = chatRooms.length === 0 // First room if no existing rooms
+            } else {
+              isFirstRoom = true // Assume first if can't check
+            }
+          }
+        } catch (error) {
+          console.error("Error checking if first chat room:", error)
+          isFirstRoom = true // Default to first room behavior on error
+        }
+
         try {
           if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
             const messages = await getSessionMessages(sessionId, effectiveChatRoomId)
@@ -335,12 +370,17 @@ export default function SajuChat({
             isInitialized: true,
           })
           setLastSavedMessageCount(pastMessages.length)
+          setIsFirstChatRoom(isFirstRoom)
 
-          // Set up initial questions to send if this is a new chat
-          if (shouldSendInitialQuestions && roomType === "sajuping") {
+          // Set up initial questions to send only if this is the first chat room and a new chat
+          if (shouldSendInitialQuestions && roomType === "sajuping" && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
-            setCurrentQuestionIndex(0)
+            setIsInitialQuestionsMode(true)
+          } else if (shouldSendInitialQuestions && !isFirstRoom) {
+            // For non-first chat rooms, send a simple greeting
+            setInitialQuestionsToSend(["오늘은 무엇이 궁금하신가요?"])
+            setIsInitialQuestionsMode(true)
           }
         }
       } catch (error) {
@@ -375,20 +415,42 @@ export default function SajuChat({
         setTransitionMessages(null)
       }
 
-      // Send next initial question if available
-      if (initialQuestionsToSend.length > 0 && currentQuestionIndex < initialQuestionsToSend.length - 1) {
-        const nextIndex = currentQuestionIndex + 1
-        setCurrentQuestionIndex(nextIndex)
+      // Only handle initial questions if we're in initial questions mode and it's the first chat room
+      if (isInitialQuestionsMode && initialQuestionsToSend.length > 0 && isFirstChatRoom) {
+        const currentUserMessages = messages.filter((msg) => msg.role === "user").length
+        const nextQuestionIndex = currentUserMessages // This will be the index of the next question to send
 
-        // Send the next question after a short delay
-        setTimeout(() => {
-          const nextQuestion = initialQuestionsToSend[nextIndex]
-          append({ role: "user", content: nextQuestion })
-        }, 1000)
-      } else if (initialQuestionsToSend.length > 0 && currentQuestionIndex >= initialQuestionsToSend.length - 1) {
-        // All initial questions have been sent
+        console.log("🔄 Initial questions progress:", {
+          currentUserMessages,
+          nextQuestionIndex,
+          totalQuestions: initialQuestionsToSend.length,
+          isInitialQuestionsMode,
+          isFirstChatRoom,
+        })
+
+        if (nextQuestionIndex < initialQuestionsToSend.length) {
+          // Clear any existing timeout
+          if (nextQuestionTimeoutRef.current) {
+            clearTimeout(nextQuestionTimeoutRef.current)
+          }
+
+          // Send the next question after a short delay
+          nextQuestionTimeoutRef.current = setTimeout(() => {
+            const nextQuestion = initialQuestionsToSend[nextQuestionIndex]
+            console.log("📤 Sending next initial question:", nextQuestion)
+            append({ role: "user", content: nextQuestion })
+          }, 1000)
+        } else {
+          // All initial questions have been sent
+          console.log("✅ All initial questions completed")
+          setIsInitialQuestionsMode(false)
+          setInitialQuestionsToSend([])
+        }
+      } else if (isInitialQuestionsMode && !isFirstChatRoom) {
+        // For non-first chat rooms, just end the initial questions mode after first response
+        console.log("✅ Simple greeting completed for non-first chat room")
+        setIsInitialQuestionsMode(false)
         setInitialQuestionsToSend([])
-        setCurrentQuestionIndex(0)
       }
     },
     onError: (error) => {
@@ -419,14 +481,17 @@ export default function SajuChat({
     if (
       chatData.isInitialized &&
       aiChatBody.compressedSaju &&
+      isInitialQuestionsMode &&
       initialQuestionsToSend.length > 0 &&
-      currentQuestionIndex === 0 &&
       messages.length === 0 &&
       !hasInitializedRef.current &&
-      !isLoading
+      !isLoading &&
+      isFirstChatRoom !== null // Wait until we know if it's first room
     ) {
       hasInitializedRef.current = true
       const firstQuestion = initialQuestionsToSend[0]
+
+      console.log("📤 Sending first initial question:", firstQuestion, "isFirstRoom:", isFirstChatRoom)
 
       // Send the first question
       setTimeout(() => {
@@ -436,12 +501,22 @@ export default function SajuChat({
   }, [
     chatData.isInitialized,
     aiChatBody.compressedSaju,
+    isInitialQuestionsMode,
     initialQuestionsToSend,
-    currentQuestionIndex,
     messages.length,
     isLoading,
     append,
+    isFirstChatRoom,
   ])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (nextQuestionTimeoutRef.current) {
+        clearTimeout(nextQuestionTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Save messages to database when new messages are added
   useEffect(() => {
@@ -658,7 +733,7 @@ export default function SajuChat({
   }, [chatData.isInitialized, aiChatBody])
 
   // Loading and error states
-  if (!chatData.isInitialized) {
+  if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -839,7 +914,7 @@ export default function SajuChat({
           )}
 
           <div className="space-y-2">
-            {!isLoading && messages.length >= 4 && (
+            {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
@@ -862,7 +937,7 @@ export default function SajuChat({
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
                   className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
-                  disabled={isLoading}
+                  disabled={isLoading || isInitialQuestionsMode}
                 />
                 <Popover>
                   <PopoverTrigger asChild>
@@ -871,6 +946,7 @@ export default function SajuChat({
                       variant="ghost"
                       size="icon"
                       className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
+                      disabled={isInitialQuestionsMode}
                     >
                       <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
@@ -889,7 +965,7 @@ export default function SajuChat({
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading}
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
