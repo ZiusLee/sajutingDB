@@ -376,11 +376,13 @@ export default function SajuChat({
           // Set up initial questions to send only if this is the first chat room and a new chat
           if (shouldSendInitialQuestions && roomType === "sajuping" && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
+            console.log("🎯 Setting up initial questions for first chat room:", questions)
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
             setCurrentQuestionIndex(0)
           } else if (shouldSendInitialQuestions && !isFirstRoom) {
             // For non-first chat rooms, send a simple greeting
+            console.log("🎯 Setting up simple greeting for non-first chat room")
             setInitialQuestionsToSend(["오늘은 무엇이 궁금하신가요?"])
             setIsInitialQuestionsMode(true)
             setCurrentQuestionIndex(0)
@@ -420,29 +422,28 @@ export default function SajuChat({
 
       // Only handle initial questions if we're in initial questions mode and it's the first chat room
       if (isInitialQuestionsMode && initialQuestionsToSend.length > 0 && isFirstChatRoom) {
-        const nextQuestionIndex = currentQuestionIndex + 1
-
         console.log("🔄 Initial questions progress:", {
           currentQuestionIndex,
-          nextQuestionIndex,
           totalQuestions: initialQuestionsToSend.length,
           isInitialQuestionsMode,
           isFirstChatRoom,
         })
 
-        if (nextQuestionIndex < initialQuestionsToSend.length) {
+        // Check if we need to send the next question
+        if (currentQuestionIndex < initialQuestionsToSend.length - 1) {
           // Clear any existing timeout
           if (nextQuestionTimeoutRef.current) {
             clearTimeout(nextQuestionTimeoutRef.current)
           }
 
-          // Update the current question index
-          setCurrentQuestionIndex(nextQuestionIndex)
+          // Increment the question index
+          const nextIndex = currentQuestionIndex + 1
+          setCurrentQuestionIndex(nextIndex)
 
           // Send the next question after a short delay
           nextQuestionTimeoutRef.current = setTimeout(() => {
-            const nextQuestion = initialQuestionsToSend[nextQuestionIndex]
-            console.log("📤 Sending next initial question:", nextQuestion)
+            const nextQuestion = initialQuestionsToSend[nextIndex]
+            console.log(`📤 Sending question ${nextIndex + 1}/${initialQuestionsToSend.length}:`, nextQuestion)
             append({ role: "user", content: nextQuestion })
           }, 1000)
         } else {
@@ -499,7 +500,7 @@ export default function SajuChat({
       hasInitializedRef.current = true
       const firstQuestion = initialQuestionsToSend[0]
 
-      console.log("📤 Sending first initial question:", firstQuestion, "isFirstRoom:", isFirstChatRoom)
+      console.log("📤 Sending first initial question (1/2):", firstQuestion, "isFirstRoom:", isFirstChatRoom)
 
       // Send the first question
       setTimeout(() => {
