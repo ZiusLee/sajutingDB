@@ -80,12 +80,76 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
   return allQuestions.slice(0, 6)
 }
 
-const getInitialMessage = (name: string, roomType: string): string => {
+const getInitialMessages = (
+  name: string,
+  roomType: string,
+  saju: any,
+  concerns: string[] = [],
+): Array<{ id: string; role: "user" | "assistant"; content: string }> => {
   const userName = name || "사용자"
+
   if (roomType === "sajuping") {
-    return `안녕하세요, ${userName}님! 저는 사주핑이에요. ${userName}님의 사주를 바탕으로 인생의 모든 영역에 대해 상담해드릴게요. 나에 사주에 대한 설명, 나의 오행 특징, 사주적 성향, 올해의 연애운, 재물운등 나의 사주에 대해 채팅창에 물어보세요`
+    // Generate concern-based second question
+    const generateConcernQuestion = (concerns: string[]): string => {
+      const concernLabels: Record<string, string> = {
+        love: "연애운",
+        breakup: "이별 후 회복",
+        health: "건강운",
+        marriage: "결혼운",
+        money: "재물운",
+        work: "학업운",
+        relationship: "인간관계",
+        career: "직업운",
+        job: "취업운",
+        future: "미래 방향성",
+        workplace: "직장 생활",
+        friend: "인간관계",
+        family: "가족운",
+      }
+
+      if (concerns.length === 0) {
+        return "연애운에 대해서 나의 대운과 올해 세운을 기반으로 5줄로 설명해줘."
+      }
+
+      const primaryConcern = concerns[0]
+      const concernLabel = concernLabels[primaryConcern] || "운세"
+
+      return `${concernLabel}에 대해서 나의 대운과 올해 세운을 기반으로 5줄로 설명해줘.`
+    }
+
+    const secondQuestion = generateConcernQuestion(concerns)
+
+    return [
+      {
+        id: generateUUID(),
+        role: "user" as const,
+        content: "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로",
+      },
+      {
+        id: generateUUID(),
+        role: "assistant" as const,
+        content: "", // This will be filled by the AI response
+      },
+      {
+        id: generateUUID(),
+        role: "user" as const,
+        content: secondQuestion,
+      },
+      {
+        id: generateUUID(),
+        role: "assistant" as const,
+        content: "", // This will be filled by the AI response
+      },
+    ]
   }
-  return `안녕하세요, ${userName}님! 무엇을 도와드릴까요?`
+
+  return [
+    {
+      id: generateUUID(),
+      role: "user" as const,
+      content: "안녕하세요! 무엇을 도와드릴까요?",
+    },
+  ]
 }
 
 // Generate a simple UUID v4
@@ -289,9 +353,7 @@ export default function SajuChat({
         }
 
         const initialChatMessages =
-          pastMessages.length > 0
-            ? pastMessages
-            : [{ id: generateUUID(), role: "assistant" as const, content: getInitialMessage(name, roomType) }]
+          pastMessages.length > 0 ? pastMessages : getInitialMessages(name, roomType, stableSaju, stableConcerns)
 
         if (isMounted) {
           setChatData({
@@ -319,7 +381,7 @@ export default function SajuChat({
     return () => {
       isMounted = false
     }
-  }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId])
+  }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId, stableConcerns])
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
     api: "/api/saju-chat",
@@ -515,42 +577,42 @@ export default function SajuChat({
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
 
-    // Handle mobile keyboard and viewport changes
-    useEffect(() => {
-      const handleResize = () => {
-        // Force a re-render when viewport changes (keyboard open/close)
-        if (chatContainerRef.current) {
-          const container = chatContainerRef.current
-          // Scroll to bottom if user was already at bottom
-          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-          if (isNearBottom) {
-            setTimeout(() => {
-              container.scrollTo({
-                top: container.scrollHeight,
-                behavior: "smooth",
-              })
-            }, 100)
-          }
+  // Handle mobile keyboard and viewport changes
+  useEffect(() => {
+    const handleResize = () => {
+      // Force a re-render when viewport changes (keyboard open/close)
+      if (chatContainerRef.current) {
+        const container = chatContainerRef.current
+        // Scroll to bottom if user was already at bottom
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+        if (isNearBottom) {
+          setTimeout(() => {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: "smooth",
+            })
+          }, 100)
         }
       }
+    }
 
-      // Listen for viewport changes (keyboard open/close on mobile)
-      window.addEventListener("resize", handleResize)
-      window.addEventListener("orientationchange", handleResize)
+    // Listen for viewport changes (keyboard open/close on mobile)
+    window.addEventListener("resize", handleResize)
+    window.addEventListener("orientationchange", handleResize)
 
-      // Visual viewport API for better mobile support
+    // Visual viewport API for better mobile support
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleResize)
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      window.removeEventListener("orientationchange", handleResize)
       if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", handleResize)
+        window.visualViewport.removeEventListener("resize", handleResize)
       }
-
-      return () => {
-        window.removeEventListener("resize", handleResize)
-        window.removeEventListener("orientationchange", handleResize)
-        if (window.visualViewport) {
-          window.visualViewport.removeEventListener("resize", handleResize)
-        }
-      }
-    }, [])
+    }
+  }, [])
 
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
@@ -662,13 +724,17 @@ export default function SajuChat({
 
             {messages.map((message, index) => (
               <div key={message.id || index}>
-                {message.role === "assistant" ? (
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="text-foreground text-base sm:text-lg leading-relaxed prose prose-sm sm:prose-lg max-w-none break-words [&>p]:mb-3 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base sm:[&>h3]:text-lg [&>ul]:mb-3 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2 [&>ul]:pl-3 sm:[&>ul]:pl-4 [&>li]:text-base sm:[&>li]:text-lg">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                {message.role === "user" ? (
+                  <div className="flex justify-end">
+                    <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base leading-relaxed">
+                      {message.content}
                     </div>
-                    {index === 0 && (
-                      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
+                  </div>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {/* Show Saju Diagram before first assistant message (index 1) */}
+                    {index === 1 && (
+                      <div className="max-w-md mx-auto">
                         <SajuDiagram
                           saju={stableSaju}
                           name={name}
@@ -685,28 +751,31 @@ export default function SajuChat({
                           lunarDay={chatData.stableBirthInfo?.lunarDay}
                           location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
                         />
-                        {chatData.calculatedDaeun && (
-                          <DaeunDiagram
-                            daeun={chatData.calculatedDaeun.pillars || []}
-                            birthInfo={chatData.stableBirthInfo}
-                            name={name}
-                            gender={gender}
-                          />
-                        )}
                       </div>
                     )}
+
+                    {/* Show Daeun Diagram before second assistant message (index 3) */}
+                    {index === 3 && chatData.calculatedDaeun && (
+                      <div className="max-w-md mx-auto">
+                        <DaeunDiagram
+                          daeun={chatData.calculatedDaeun.pillars || []}
+                          birthInfo={chatData.stableBirthInfo}
+                          name={name}
+                          gender={gender}
+                        />
+                      </div>
+                    )}
+
+                    <div className="text-foreground text-base sm:text-lg leading-relaxed prose prose-sm sm:prose-lg max-w-none break-words [&>p]:mb-3 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base sm:[&>h3]:text-lg [&>ul]:mb-3 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2 [&>ul]:pl-3 sm:[&>ul]:pl-4 [&>li]:text-base sm:[&>li]:text-lg">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    </div>
+
                     <MessageFeedbackButtons
                       messageId={message.id || `temp-${index}`}
                       messageContent={message.content}
                       sessionId={sessionId}
                       onRetry={() => reload()}
                     />
-                  </div>
-                ) : (
-                  <div className="flex justify-end">
-                    <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base leading-relaxed">
-                      {message.content}
-                    </div>
                   </div>
                 )}
               </div>
@@ -721,7 +790,7 @@ export default function SajuChat({
           </div>
         </div>
 
-         {/* Input Area - Fixed at bottom with mobile optimization and safe area */}
+        {/* Input Area - Fixed at bottom with mobile optimization and safe area */}
         <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4">
           {showScrollButton && (
             <Button
@@ -735,7 +804,7 @@ export default function SajuChat({
           )}
 
           <div className="space-y-2">
-            {!isLoading && messages.length >= 1 && (
+            {!isLoading && messages.length >= 4 && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
