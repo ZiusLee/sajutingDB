@@ -25,11 +25,15 @@ interface SmartMemory {
   user_id: string
   content: string
   type: string
-  keywords: string
-  importance: number
+  keywords: string[]
+  importance_score: number
+  reference_count: number
   is_pinned: boolean
   created_at: string
   updated_at: string
+  first_mentioned?: string
+  last_referenced?: string
+  source_context?: string
 }
 
 interface MemoryDashboardProps {
@@ -144,7 +148,7 @@ export function MemoryDashboard({ userId }: MemoryDashboardProps) {
                           locale: ko,
                         })}
                       </span>
-                      {memory.importance > 7 && (
+                      {memory.importance_score > 0.7 && (
                         <>
                           <span>•</span>
                           <span className="text-orange-600 font-medium">중요</span>

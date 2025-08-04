@@ -146,7 +146,6 @@ export async function saveMessages(
 
         finalChatRoomId = persistedRoom.id
         persistedChatRoomId = persistedRoom.id
-        console.log(`✅ Persisted temporary chat room: ${temporaryChatRoom.id} -> ${persistedRoom.id}`)
       } catch (error) {
         console.error("❌ Failed to persist temporary chat room:", error)
         // Continue without chat room ID if persistence fails
@@ -156,7 +155,6 @@ export async function saveMessages(
 
     // Don't save messages if we still have a temporary chat room ID
     if (finalChatRoomId?.startsWith("temp-")) {
-      console.log("⏭️ Skipping message save for temporary chat room:", finalChatRoomId)
       return {
         savedCount: 0,
         messageIds: [],

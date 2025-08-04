@@ -1,0 +1,82 @@
+/* Mobile touch optimizations */
+@media (max-width: 768px) {
+  /* Improve touch targets */
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better button touch feedback */
+  button:active,
+  .button:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease-in-out;
+  }
+
+  /* Prevent text selection on UI elements */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Smooth momentum scrolling */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+  }
+
+  /* Fix for iOS input focus */
+  input:focus,
+  textarea:focus {
+    transform: translateZ(0);
+  }
+
+  /* Prevent horizontal scroll */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Better modal/dialog positioning on mobile */
+  .mobile-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Keyboard-aware containers */
+  .keyboard-container {
+    height: 100vh;
+    height: 100dvh;
+    transition: height 0.3s ease-in-out;
+  }
+
+  .keyboard-container.keyboard-open {
+    height: calc(100vh - env(keyboard-inset-height, 0px));
+    height: calc(100dvh - env(keyboard-inset-height, 0px));
+  }
+}
+
+/* PWA optimizations */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Landscape mode optimizations */
+@media (max-width: 768px) and (orientation: landscape) {
+  .landscape-adjust {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}

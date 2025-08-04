@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import SajuChat from "@/components/saju-chat"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
-import { ChatGuideModal } from "@/components/chat-guide-modal"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -20,7 +19,6 @@ export default function SajuChatPage() {
   const [sessionKey, setSessionKey] = useState<string>("")
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [currentChatRoom, setCurrentChatRoom] = useState<any>(null)
-  const [showGuideModal, setShowGuideModal] = useState(false)
 
   // Stabilize roomId and roomType to prevent infinite re-renders
   const roomId = useMemo(() => searchParams.get("roomId"), [searchParams])
@@ -36,10 +34,14 @@ export default function SajuChatPage() {
     }
   }, [roomType, router])
 
+  const handleSidebarToggle = useCallback(() => {
+    setSidebarOpen((prev) => !prev)
+  }, [])
+
   useEffect(() => {
     // Store sidebar toggle function globally for site header to access
     if (typeof window !== "undefined") {
-      ;(window as any).toggleSajuChatSidebar = () => setSidebarOpen((prev) => !prev)
+      ;(window as any).toggleSajuChatSidebar = handleSidebarToggle
     }
 
     return () => {
@@ -47,15 +49,13 @@ export default function SajuChatPage() {
         delete (window as any).toggleSajuChatSidebar
       }
     }
-  }, [])
+  }, [handleSidebarToggle])
 
   useEffect(() => {
     let isMounted = true
 
     const initializePage = async () => {
       try {
-        console.log("🔄 Initializing saju chat page for room:", roomId)
-
         // 로컬 스토리지에서 사주 데이터 가져오기
         const savedSaju = localStorage.getItem("current_saju")
 
@@ -87,14 +87,9 @@ export default function SajuChatPage() {
             sessionId = userId || `fallback-${Date.now()}`
           }
 
-          // Check if this is a first-time visit to saju-chat
-          const hasSeenChatGuide = localStorage.getItem("has_seen_chat_guide")
-          const shouldShowGuide = !hasSeenChatGuide && !roomId // Only show for new chats
-
           // Auto-create temporary chat room if no roomId is provided
           let chatRoom = null
           if (!roomId) {
-            console.log("🆕 Creating temporary chat room...")
             chatRoom = createTemporaryChatRoom({
               sessionId,
               title: "새로운 대화",
@@ -103,16 +98,10 @@ export default function SajuChatPage() {
             })
 
             setCurrentChatRoom(chatRoom)
-            console.log("✅ Temporary chat room created:", chatRoom.id)
 
             // Update URL with the temporary room ID without triggering a page reload
             const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
             window.history.replaceState({}, "", newUrl)
-
-            // Show guide modal for new chats
-            if (shouldShowGuide) {
-              setShowGuideModal(true)
-            }
           } else {
             // If roomId exists, we'll handle it in the chat component
             setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
@@ -127,7 +116,6 @@ export default function SajuChatPage() {
           // 마이페이지에서 왔는지 확인 (한 번만 체크하고 플래그 제거)
           const fromMyPage = sessionStorage.getItem("from_mypage")
           if (fromMyPage === "true") {
-            console.log("✅ Chat opened from mypage - flag confirmed")
             // 플래그 제거하여 무한 로그 방지
             sessionStorage.removeItem("from_mypage")
           }
@@ -137,7 +125,6 @@ export default function SajuChatPage() {
           setIsLoggedIn(!!userToken)
 
           setLoading(false)
-          console.log("✅ Page initialization completed")
         }
       } catch (error) {
         console.error("❌ Error loading saju data:", error)
@@ -159,7 +146,7 @@ export default function SajuChatPage() {
     }
   }, [router, toast, roomType, roomId])
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     try {
       // 저장된 원래 경로가 있으면 그 경로로 이동
       const savedReturnPath = localStorage.getItem("chat_return_path")
@@ -188,24 +175,21 @@ export default function SajuChatPage() {
       console.error("Error in handleBack:", error)
       router.push("/chat-list")
     }
-  }
+  }, [router, saju])
 
-  const handleChatRoomPersisted = (newChatRoomId: string) => {
-    // Update the current chat room when it gets persisted
-    setCurrentChatRoom({ id: newChatRoomId, isTemporary: false })
+  const handleChatRoomPersisted = useCallback(
+    (newChatRoomId: string) => {
+      // Update the current chat room when it gets persisted
+      setCurrentChatRoom((prev) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
 
-    // Update URL with the persisted room ID
-    const newUrl = `/saju-chat/${roomType}?roomId=${newChatRoomId}`
-    window.history.replaceState({}, "", newUrl)
-
-    console.log("✅ Chat room persisted and URL updated:", newChatRoomId)
-  }
-
-  const handleGuideModalClose = () => {
-    setShowGuideModal(false)
-    // Mark that user has seen the guide
-    localStorage.setItem("has_seen_chat_guide", "true")
-  }
+      // Update URL with the persisted room ID without triggering re-render
+      const newUrl = `/saju-chat/${roomType}?roomId=${newChatRoomId}`
+      if (window.history.replaceState) {
+        window.history.replaceState(null, "", newUrl)
+      }
+    },
+    [roomType],
+  )
 
   if (loading) {
     return (
@@ -230,29 +214,24 @@ export default function SajuChatPage() {
   }
 
   return (
-    <>
-      <div className="container mx-auto px-4 py-6">
-        <SajuChat
-          saju={saju.saju}
-          name={saju.name || "사용자"}
-          gender={saju.gender || "남"}
-          initialInterpretation={saju.interpretation || ""}
-          roomType={roomType}
-          onBack={handleBack}
-          isLoggedIn={isLoggedIn}
-          sessionKey={sessionKey}
-          birthInfo={saju.birthInfo}
-          concerns={saju.concerns || []}
-          isSidebarOpen={isSidebarOpen}
-          onSidebarToggle={() => setSidebarOpen((prev) => !prev)}
-          currentChatRoomId={currentChatRoom?.id}
-          temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
-          onChatRoomPersisted={handleChatRoomPersisted}
-        />
-      </div>
-
-      {/* Chat Guide Modal */}
-      <ChatGuideModal isOpen={showGuideModal} onClose={handleGuideModalClose} userName={saju?.name || "사용자"} />
-    </>
+    <div className="container mx-auto px-4 py-6">
+      <SajuChat
+        saju={saju.saju}
+        name={saju.name || "사용자"}
+        gender={saju.gender || "남"}
+        initialInterpretation={saju.interpretation || ""}
+        roomType={roomType}
+        onBack={handleBack}
+        isLoggedIn={isLoggedIn}
+        sessionKey={sessionKey}
+        birthInfo={saju.birthInfo}
+        concerns={saju.concerns || []}
+        isSidebarOpen={isSidebarOpen}
+        onSidebarToggle={handleSidebarToggle}
+        currentChatRoomId={currentChatRoom?.id}
+        temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
+        onChatRoomPersisted={handleChatRoomPersisted}
+      />
+    </div>
   )
 }

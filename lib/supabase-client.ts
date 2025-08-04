@@ -13,16 +13,10 @@ export function getSupabase() {
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxcndrdHBteXlseHloZ3Nyd2xvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTEzNzA1NzYsImV4cCI6MjAyNjk0NjU3Nn0.Yd_6UO8X_XCZGjopPWbNxIEaW_yXONTkGPJlG_LBHV0",
       options: {
         auth: {
-          persistSession: true, // 세션 지속성 활성화
+          persistSession: false,
           storageKey: "sajuping-auth",
           autoRefreshToken: true,
           detectSessionInUrl: true,
-          flowType: "pkce", // PKCE 플로우 사용
-        },
-        global: {
-          headers: {
-            "X-Client-Info": "sajuping-web",
-          },
         },
       },
     })
@@ -68,48 +62,6 @@ export async function getFileUrl(bucket: string, path: string): Promise<string> 
   } catch (error) {
     console.error("Failed to get file URL from Supabase:", error)
     throw error
-  }
-}
-
-// 인증 상태 디버깅 함수 추가
-export async function debugAuthState() {
-  const client = getSupabase()
-
-  try {
-    // 현재 세션 확인
-    const { data: sessionData, error: sessionError } = await client.auth.getSession()
-    console.log("🔍 Session Debug:", {
-      hasSession: !!sessionData.session,
-      sessionError,
-      userId: sessionData.session?.user?.id,
-      expiresAt: sessionData.session?.expires_at,
-    })
-
-    // 현재 사용자 확인
-    const { data: userData, error: userError } = await client.auth.getUser()
-    console.log("🔍 User Debug:", {
-      hasUser: !!userData.user,
-      userError,
-      userId: userData.user?.id,
-      email: userData.user?.email,
-    })
-
-    // 쿠키 확인
-    console.log("🔍 Cookies:", {
-      allCookies: document.cookie,
-      hasSupabaseCookie: document.cookie.includes("sb-"),
-      hasAuthCookie: document.cookie.includes("sajuping-auth"),
-    })
-
-    return {
-      session: sessionData.session,
-      user: userData.user,
-      sessionError,
-      userError,
-    }
-  } catch (error) {
-    console.error("🔍 Auth Debug Error:", error)
-    return { error }
   }
 }
 

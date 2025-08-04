@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SajuLogo } from "@/components/saju-logo"
@@ -184,7 +184,6 @@ export default function LoginPage() {
   // Rest of the component remains the same...
   return (
     <div className="flex flex-col min-h-screen bg-background">
-
       {/* 컨텐츠 */}
       <div className="flex flex-col items-center justify-center flex-1 p-4 md:p-8">
         <div className="w-full max-w-md mx-auto">
@@ -244,7 +243,11 @@ export default function LoginPage() {
                   </div>
 
                   {/* 이메일 로그인 버튼 */}
-                  <Button variant="outline" className="w-full py-5" onClick={() => setShowEmailForm(true)}>
+                  <Button
+                    variant="outline"
+                    className="w-full py-5 bg-transparent"
+                    onClick={() => setShowEmailForm(true)}
+                  >
                     이메일로 로그인
                   </Button>
                 </>
@@ -309,6 +312,7 @@ export default function LoginPage() {
                         <div className="flex items-center justify-between">
                           <Label htmlFor="password">비밀번호</Label>
                           <Button
+                            type="button"
                             variant="link"
                             className="p-0 h-auto text-sm"
                             onClick={(e) => {
