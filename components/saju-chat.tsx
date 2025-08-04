@@ -287,11 +287,25 @@ export default function SajuChat({
           setIsFirstChatRoom(isFirstRoom)
 
           if (shouldSendInitialQuestions) {
-            const questions = isFirstRoom
-              ? getInitialUserQuestions(name, roomType, stableConcerns)
-              : ["오늘은 무엇이 궁금하신가요?"]
-            setInitialQuestionsToSend(questions)
-            setIsInitialQuestionsMode(true)
+            if (isFirstRoom) {
+              // 첫 번째 채팅룸: 사용자 질문 2개 자동 전송
+              const questions = getInitialUserQuestions(name, roomType, stableConcerns)
+              setInitialQuestionsToSend(questions)
+              setIsInitialQuestionsMode(true)
+            } else {
+              // 첫 번째가 아닌 채팅룸: 어시스턴트 메시지로 시작
+              const assistantWelcomeMessage = {
+                id: generateUUID(),
+                role: "assistant" as const,
+                content: "안녕하세요! 오늘은 무엇이 궁금하신가요?",
+                createdAt: new Date().toISOString(),
+              }
+              setChatData((prev) => ({
+                ...prev,
+                initialMessages: [assistantWelcomeMessage],
+              }))
+              setLastSavedMessageCount(1)
+            }
           }
         }
       } catch (error) {
