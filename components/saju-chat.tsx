@@ -117,12 +117,11 @@ export default function SajuChat({
   const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
   const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
   const chatContainerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
@@ -188,36 +187,6 @@ export default function SajuChat({
 
   // Get the effective chat room ID (persisted ID takes precedence)
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
-
-  // Handle mobile keyboard visibility (iOS Safari specific)
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const handleResize = () => {
-      if (window.innerWidth <= 768) {
-        const viewportHeight = window.visualViewport?.height || window.innerHeight
-        const windowHeight = window.innerHeight
-        const heightDiff = windowHeight - viewportHeight
-
-        // Only consider it keyboard if height difference is significant
-        if (heightDiff > 150) {
-          setKeyboardHeight(heightDiff)
-        } else {
-          setKeyboardHeight(0)
-        }
-      }
-    }
-
-    // Use visualViewport API if available (better for mobile)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleResize)
-      return () => window.visualViewport?.removeEventListener("resize", handleResize)
-    } else {
-      // Fallback for older browsers
-      window.addEventListener("resize", handleResize)
-      return () => window.removeEventListener("resize", handleResize)
-    }
-  }, [])
 
   // This derived state ensures the body for the AI hook is always up-to-date.
   const aiChatBody = useMemo(() => {
@@ -376,7 +345,7 @@ export default function SajuChat({
   // Save messages to database when new messages are added
   useEffect(() => {
     const saveNewMessages = async () => {
-      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) {
+      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized || isTransitioning) {
         return
       }
 
@@ -408,27 +377,23 @@ export default function SajuChat({
         if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
           console.log(`✅ Chat room persisted: ${effectiveChatRoomId} -> ${result.persistedChatRoomId}`)
 
-          // Update the persisted chat room ID immediately without any transition state
+          // Set transitioning state to prevent UI flicker
+          setIsTransitioning(true)
+
+          // Update the persisted chat room ID
           setPersistedChatRoomId(result.persistedChatRoomId)
           onChatRoomPersisted?.(result.persistedChatRoomId)
 
-          // Update URL silently without page refresh - use requestIdleCallback for smoother transition
-          if (window.requestIdleCallback) {
-            window.requestIdleCallback(() => {
-              if (window.history.replaceState) {
-                const newUrl = `/saju-chat/${roomType}?roomId=${result.persistedChatRoomId}`
-                window.history.replaceState(null, "", newUrl)
-              }
-            })
-          } else {
-            // Fallback for browsers that don't support requestIdleCallback
-            setTimeout(() => {
-              if (window.history.replaceState) {
-                const newUrl = `/saju-chat/${roomType}?roomId=${result.persistedChatRoomId}`
-                window.history.replaceState(null, "", newUrl)
-              }
-            }, 0)
+          // Update URL silently without page refresh
+          if (window.history.replaceState) {
+            const newUrl = `/saju-chat/${roomType}?roomId=${result.persistedChatRoomId}`
+            window.history.replaceState(null, "", newUrl)
           }
+
+          // Clear transitioning state after a brief moment
+          setTimeout(() => {
+            setIsTransitioning(false)
+          }, 100)
         }
       } catch (error) {
         console.error("❌ Error saving messages:", error)
@@ -451,6 +416,7 @@ export default function SajuChat({
     sessionId,
     temporaryChatRoom,
     onChatRoomPersisted,
+    isTransitioning,
   ])
 
   const handleSuggestedQuestionClick = (question: string) => {
@@ -510,6 +476,43 @@ export default function SajuChat({
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
 
+  // Handle mobile keyboard and viewport changes
+  useEffect(() => {
+    const handleResize = () => {
+      // Force a re-render when viewport changes (keyboard open/close)
+      if (chatContainerRef.current) {
+        const container = chatContainerRef.current
+        // Scroll to bottom if user was already at bottom
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+        if (isNearBottom) {
+          setTimeout(() => {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: "smooth",
+            })
+          }, 100)
+        }
+      }
+    }
+
+    // Listen for viewport changes (keyboard open/close on mobile)
+    window.addEventListener("resize", handleResize)
+    window.addEventListener("orientationchange", handleResize)
+
+    // Visual viewport API for better mobile support
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleResize)
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      window.removeEventListener("orientationchange", handleResize)
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", handleResize)
+      }
+    }
+  }, [])
+
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
     [stableConcerns, roomType],
@@ -566,7 +569,7 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
+    <div className="flex h-screen bg-white">
       {/* Desktop Sidebar - Fixed width */}
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
@@ -600,20 +603,20 @@ export default function SajuChat({
       </Sheet>
 
       {/* Main Chat Area - Flexible width */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Chat Messages Container - Mobile optimized with proper height calculation */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen supports-[height:100dvh]:h-[100dvh]">
+        {/* Chat Messages Container - Mobile optimized with safe area */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto overscroll-behavior-y-contain"
+          className="flex-1 overflow-y-auto mobile-scroll-container"
           style={{
-            height: keyboardHeight > 0 ? `calc(100vh - 140px - ${keyboardHeight}px)` : "calc(100vh - 140px)",
-            paddingBottom: keyboardHeight > 0 ? "20px" : "0px",
+            height: "calc(100dvh - 140px)", // Use dynamic viewport height for mobile
+            minHeight: 0,
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
-            {/* Show temporary room indicator only if still temporary */}
-            {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
-              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3 transition-opacity duration-300">
+            {/* Show temporary room indicator only if still temporary and not transitioning */}
+            {temporaryChatRoom?.isTemporary && !persistedChatRoomId && !isTransitioning && (
+              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
@@ -679,89 +682,75 @@ export default function SajuChat({
           </div>
         </div>
 
-        {/* Input Area - Fixed at bottom with ChatGPT-like mobile optimization */}
-        <div
-          className="border-t bg-white flex-shrink-0 relative z-50"
-          style={{
-            position: keyboardHeight > 0 ? "fixed" : "relative",
-            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : "auto",
-            left: keyboardHeight > 0 ? "0" : "auto",
-            right: keyboardHeight > 0 ? "0" : "auto",
-            width: keyboardHeight > 0 ? "100%" : "auto",
-            paddingBottom: keyboardHeight > 0 ? "env(safe-area-inset-bottom)" : "0",
-          }}
-        >
-          <div className="p-3 sm:p-4">
-            {showScrollButton && (
-              <Button
-                onClick={scrollToBottom}
-                variant="outline"
-                size="sm"
-                className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
-              >
-                <ArrowDown className="h-4 w-4" />
-              </Button>
+        {/* Input Area - Fixed at bottom with mobile optimization and safe area */}
+        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4">
+          {showScrollButton && (
+            <Button
+              onClick={scrollToBottom}
+              variant="outline"
+              size="sm"
+              className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          )}
+
+          <div className="space-y-2">
+            {!isLoading && messages.length >= 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {suggestedQuestions.map((q, i) => (
+                  <Button
+                    key={i}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 min-w-fit"
+                    onClick={() => handleSuggestedQuestionClick(q)}
+                  >
+                    {q}
+                  </Button>
+                ))}
+              </div>
             )}
 
-            <div className="space-y-2">
-              {!isLoading && messages.length >= 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                  {suggestedQuestions.map((q, i) => (
+            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+              <div className="flex-1 relative">
+                <Input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="무엇이든 물어보세요"
+                  className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
+                  disabled={isLoading}
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
                     <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 min-w-fit"
-                      onClick={() => handleSuggestedQuestionClick(q)}
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
                     >
-                      {q}
+                      <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
-                  ))}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="flex gap-2 items-center">
-                <div className="flex-1 relative">
-                  <Input
-                    ref={inputRef}
-                    value={input}
-                    onChange={handleInputChange}
-                    placeholder="무엇이든 물어보세요"
-                    className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base resize-none"
-                    disabled={isLoading}
-                    style={{ fontSize: "16px" }} // Prevent zoom on iOS
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
-                      >
-                        <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-48 sm:w-56 p-2 mb-2" align="end">
-                      <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                        <span className="mr-2 sm:mr-3 text-sm sm:text-base">💕</span>궁합 보기
-                      </Button>
-                      <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                        <span className="mr-2 sm:mr-3 text-sm sm:text-base">👥</span>다른 사람 사주 봐주기
-                      </Button>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <Button
-                  type="submit"
-                  size="icon"
-                  className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                  disabled={!input.trim() || isLoading}
-                >
-                  <Send className="h-3 w-3 sm:h-4 sm:w-4" />
-                </Button>
-              </form>
-            </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 sm:w-56 p-2 mb-2" align="end">
+                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
+                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">💕</span>궁합 보기
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
+                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">👥</span>다른 사람 사주 봐주기
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <Button
+                type="submit"
+                size="icon"
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
+                disabled={!input.trim() || isLoading}
+              >
+                <Send className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            </form>
           </div>
         </div>
       </div>
