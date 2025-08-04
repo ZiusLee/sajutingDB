@@ -578,7 +578,15 @@ export default function SajuChat({
                           name={name}
                           gender={gender}
                           variant="card"
-                          {...chatData.stableBirthInfo}
+                          solarYear={chatData.stableBirthInfo?.solarYear}
+                          solarMonth={chatData.stableBirthInfo?.solarMonth}
+                          solarDay={chatData.stableBirthInfo?.solarDay}
+                          hour={chatData.stableBirthInfo?.solarHour}
+                          minute={chatData.stableBirthInfo?.solarMinute}
+                          timeUnknown={chatData.stableBirthInfo?.timeUnknown}
+                          lunarYear={chatData.stableBirthInfo?.lunarYear}
+                          lunarMonth={chatData.stableBirthInfo?.lunarMonth}
+                          lunarDay={chatData.stableBirthInfo?.lunarDay}
                           location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
                         />
                       </div>

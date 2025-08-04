@@ -35,38 +35,38 @@ export async function getUserSajuProfiles() {
     const { data: sessions, error: sessionsError } = await supabase
       .from("saju_sessions")
       .select(`
-      id,
-      name,
-      gender,
-      email,
-      created_at,
-      auth_user_id,
-      is_default,
-      saju,
-      birth_info (
         id,
-        solar_year,
-        solar_month,
-        solar_day,
-        solar_hour,
-        solar_minute,
-        lunar_year,
-        lunar_month,
-        lunar_day,
-        time_unknown
-      ),
-      saju_info (
-        id,
-        year_stem,
-        year_branch,
-        month_stem,
-        month_branch,
-        day_stem,
-        day_branch,
-        hour_stem,
-        hour_branch
-      )
-    `)
+        name,
+        gender,
+        email,
+        created_at,
+        auth_user_id,
+        is_default,
+        saju,
+        birth_info (
+          id,
+          solar_year,
+          solar_month,
+          solar_day,
+          solar_hour,
+          solar_minute,
+          lunar_year,
+          lunar_month,
+          lunar_day,
+          time_unknown
+        ),
+        saju_info (
+          id,
+          year_stem,
+          year_branch,
+          month_stem,
+          month_branch,
+          day_stem,
+          day_branch,
+          hour_stem,
+          hour_branch
+        )
+      `)
       .eq("auth_user_id", authUserId)
 
     console.log("Full query result:", sessions)
@@ -433,10 +433,10 @@ export async function getSajuDataByUuid(uuid: string) {
       .from("saju_sessions")
       .select(
         `
-      *,
-      birth_info(*),
-      saju_info(*)
-    `,
+        *,
+        birth_info(*),
+        saju_info(*)
+      `,
       )
       .eq("id", uuid)
       .single()
@@ -449,10 +449,10 @@ export async function getSajuDataByUuid(uuid: string) {
         .from("birth_info")
         .select(
           `
-        *,
-        saju_sessions(*),
-        saju_info!inner(*)
-      `,
+          *,
+          saju_sessions(*),
+          saju_info!inner(*)
+        `,
         )
         .eq("id", uuid)
         .single()
@@ -594,27 +594,6 @@ export async function getUserSajuSessions(authUserId: string): Promise<any[]> {
 }
 
 /**
- * Get a saju session by its ID
- */
-export async function getSajuSession(sessionId: string): Promise<any | null> {
-  try {
-    const supabase = createClientComponentClient()
-
-    const { data, error } = await supabase.from("saju_sessions").select("*").eq("id", sessionId).single()
-
-    if (error) {
-      console.error(`Error getting saju session ${sessionId}:`, error)
-      return null
-    }
-
-    return data
-  } catch (error) {
-    console.error(`Error in getSajuSession for id ${sessionId}:`, error)
-    return null
-  }
-}
-
-/**
  * Set a saju session as the default for a user
  */
 export async function setDefaultSajuSession(authUserId: string, sessionId: string): Promise<boolean> {
@@ -687,44 +666,44 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
     const { data, error } = await supabase
       .from("saju_sessions")
       .select(`
-      id,
-      name,
-      gender,
-      created_at,
-      saju,
-      birth_info (
         id,
-        solar_year,
-        solar_month,
-        solar_day,
-        solar_hour,
-        solar_minute,
-        lunar_year,
-        lunar_month,
-        lunar_day,
-        time_unknown
-      ),
-      saju_info (
-        year_stem,
-        year_branch,
-        month_stem,
-        month_branch,
-        day_stem,
-        day_branch,
-        hour_stem,
-        hour_branch,
-        year_stem_hanja,
-        year_branch_hanja,
-        month_stem_hanja,
-        month_branch_hanja,
-        day_stem_hanja,
-        day_branch_hanja,
-        hour_stem_hanja,
-        hour_branch_hanja,
-        day_master,
-        day_master_hanja
-      )
-    `)
+        name,
+        gender,
+        created_at,
+        saju,
+        birth_info (
+          id,
+          solar_year,
+          solar_month,
+          solar_day,
+          solar_hour,
+          solar_minute,
+          lunar_year,
+          lunar_month,
+          lunar_day,
+          time_unknown
+        ),
+        saju_info (
+          year_stem,
+          year_branch,
+          month_stem,
+          month_branch,
+          day_stem,
+          day_branch,
+          hour_stem,
+          hour_branch,
+          year_stem_hanja,
+          year_branch_hanja,
+          month_stem_hanja,
+          month_branch_hanja,
+          day_stem_hanja,
+          day_branch_hanja,
+          hour_stem_hanja,
+          hour_branch_hanja,
+          day_master,
+          day_master_hanja
+        )
+      `)
       .eq("id", sessionId)
       .single()
 
@@ -750,7 +729,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         daeunData.pillars.length > 0 &&
         daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
     ) {
-      console.log(`Session ${sessionId}: 대운 데이터가 없거나 못됨, 새로 계산합니다.`)
+      console.log(`Session ${sessionId}: 대운 데이터가 없거나 ���못됨, 새로 계산합니다.`)
 
       // 대운 계산에 필요한 데이터가 있는지 확인
       if (
