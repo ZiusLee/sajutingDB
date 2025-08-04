@@ -82,7 +82,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
-    const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로"
+    const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘"
 
     const generateConcernQuestion = (concerns: string[]): string => {
       const concernLabels: Record<string, string> = {
@@ -102,12 +102,12 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
       }
 
       if (concerns.length === 0) {
-        return "연애운에 대해서 나의 대운과 올해 세운을 기반으로 5줄로 설명해줘."
+        return "연애운에 대해서 나의 대운과 올해 세운을 기반으로 설명해줘."
       }
 
       const primaryConcern = concerns[0]
       const concernLabel = concernLabels[primaryConcern] || "운세"
-      return `${concernLabel}에 대해서 나의 대운과 올해 세운을 기반으로 5줄로 설명해줘.`
+      return `${concernLabel}에 대해서 나의 대운과 올해 세운을 기반으로 설명해줘.`
     }
 
     const secondQuestion = generateConcernQuestion(concerns)
@@ -289,7 +289,7 @@ export default function SajuChat({
           if (shouldSendInitialQuestions) {
             const questions = isFirstRoom
               ? getInitialUserQuestions(name, roomType, stableConcerns)
-              : ["오늘의 날짜를 사주로 계산해서 오늘 운세를 3줄로 알려주세요"]
+              : ["오늘의 날짜를 사주로 계산해서 오늘 운세를 알려주세요"]
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
           }
