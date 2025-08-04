@@ -515,6 +515,43 @@ export default function SajuChat({
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
 
+    // Handle mobile keyboard and viewport changes
+    useEffect(() => {
+      const handleResize = () => {
+        // Force a re-render when viewport changes (keyboard open/close)
+        if (chatContainerRef.current) {
+          const container = chatContainerRef.current
+          // Scroll to bottom if user was already at bottom
+          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+          if (isNearBottom) {
+            setTimeout(() => {
+              container.scrollTo({
+                top: container.scrollHeight,
+                behavior: "smooth",
+              })
+            }, 100)
+          }
+        }
+      }
+
+      // Listen for viewport changes (keyboard open/close on mobile)
+      window.addEventListener("resize", handleResize)
+      window.addEventListener("orientationchange", handleResize)
+
+      // Visual viewport API for better mobile support
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", handleResize)
+      }
+
+      return () => {
+        window.removeEventListener("resize", handleResize)
+        window.removeEventListener("orientationchange", handleResize)
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener("resize", handleResize)
+        }
+      }
+    }, [])
+
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
     [stableConcerns, roomType],
@@ -611,7 +648,7 @@ export default function SajuChat({
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
           style={{
-            height: "calc(100vh - 140px)", // Reserve space for input area
+            height: "calc(100dvh - 140px)", // Reserve space for input area
             minHeight: 0,
           }}
         >
@@ -684,8 +721,8 @@ export default function SajuChat({
           </div>
         </div>
 
-        {/* Input Area - Fixed at bottom with mobile optimization */}
-        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0">
+         {/* Input Area - Fixed at bottom with mobile optimization and safe area */}
+        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
