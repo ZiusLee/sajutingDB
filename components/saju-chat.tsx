@@ -80,14 +80,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
   return allQuestions.slice(0, 6)
 }
 
-const getInitialMessages = (
-  name: string,
-  roomType: string,
-  saju: any,
-  concerns: string[] = [],
-): Array<{ id: string; role: "user" | "assistant"; content: string }> => {
-  const userName = name || "사용자"
-
+const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
     // Generate concern-based second question
     const generateConcernQuestion = (concerns: string[]): string => {
@@ -119,37 +112,10 @@ const getInitialMessages = (
 
     const secondQuestion = generateConcernQuestion(concerns)
 
-    return [
-      {
-        id: generateUUID(),
-        role: "user" as const,
-        content: "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로",
-      },
-      {
-        id: generateUUID(),
-        role: "assistant" as const,
-        content: "", // This will be filled by the AI response
-      },
-      {
-        id: generateUUID(),
-        role: "user" as const,
-        content: secondQuestion,
-      },
-      {
-        id: generateUUID(),
-        role: "assistant" as const,
-        content: "", // This will be filled by the AI response
-      },
-    ]
+    return ["내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로", secondQuestion]
   }
 
-  return [
-    {
-      id: generateUUID(),
-      role: "user" as const,
-      content: "안녕하세요! 무엇을 도와드릴까요?",
-    },
-  ]
+  return []
 }
 
 // Generate a simple UUID v4
@@ -189,6 +155,9 @@ export default function SajuChat({
   const isPersistingRef = useRef(false)
   const scrollPositionRef = useRef<number>(0)
   const isTransitioningRef = useRef<boolean>(false)
+  const [initialQuestionsToSend, setInitialQuestionsToSend] = useState<string[]>([])
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const hasInitializedRef = useRef(false)
 
   // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
@@ -334,6 +303,8 @@ export default function SajuChat({
         }
 
         let pastMessages: any[] = []
+        let shouldSendInitialQuestions = false
+
         try {
           if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
             const messages = await getSessionMessages(sessionId, effectiveChatRoomId)
@@ -347,22 +318,30 @@ export default function SajuChat({
                 content: msg.content,
                 createdAt: msg.createdAt,
               }))
+          } else {
+            // New chat - prepare initial questions to send
+            shouldSendInitialQuestions = true
           }
         } catch (error) {
           console.error("❌ Error loading past messages:", error)
+          shouldSendInitialQuestions = true
         }
-
-        const initialChatMessages =
-          pastMessages.length > 0 ? pastMessages : getInitialMessages(name, roomType, stableSaju, stableConcerns)
 
         if (isMounted) {
           setChatData({
             calculatedDaeun: calculatedDaeunData,
             stableBirthInfo: stableBirthInfo,
-            initialMessages: initialChatMessages,
+            initialMessages: pastMessages,
             isInitialized: true,
           })
           setLastSavedMessageCount(pastMessages.length)
+
+          // Set up initial questions to send if this is a new chat
+          if (shouldSendInitialQuestions && roomType === "sajuping") {
+            const questions = getInitialUserQuestions(name, roomType, stableConcerns)
+            setInitialQuestionsToSend(questions)
+            setCurrentQuestionIndex(0)
+          }
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
@@ -383,7 +362,7 @@ export default function SajuChat({
     }
   }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId, stableConcerns])
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload } = useAIChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
     api: "/api/saju-chat",
     id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
     initialMessages: transitionMessages ?? chatData.initialMessages, // Use transition messages if available
@@ -394,6 +373,22 @@ export default function SajuChat({
       // we can clear the transition state.
       if (transitionMessages) {
         setTransitionMessages(null)
+      }
+
+      // Send next initial question if available
+      if (initialQuestionsToSend.length > 0 && currentQuestionIndex < initialQuestionsToSend.length - 1) {
+        const nextIndex = currentQuestionIndex + 1
+        setCurrentQuestionIndex(nextIndex)
+
+        // Send the next question after a short delay
+        setTimeout(() => {
+          const nextQuestion = initialQuestionsToSend[nextIndex]
+          append({ role: "user", content: nextQuestion })
+        }, 1000)
+      } else if (initialQuestionsToSend.length > 0 && currentQuestionIndex >= initialQuestionsToSend.length - 1) {
+        // All initial questions have been sent
+        setInitialQuestionsToSend([])
+        setCurrentQuestionIndex(0)
       }
     },
     onError: (error) => {
@@ -418,6 +413,35 @@ export default function SajuChat({
       toast.error(errorMessage)
     },
   })
+
+  // Send first initial question when chat is ready
+  useEffect(() => {
+    if (
+      chatData.isInitialized &&
+      aiChatBody.compressedSaju &&
+      initialQuestionsToSend.length > 0 &&
+      currentQuestionIndex === 0 &&
+      messages.length === 0 &&
+      !hasInitializedRef.current &&
+      !isLoading
+    ) {
+      hasInitializedRef.current = true
+      const firstQuestion = initialQuestionsToSend[0]
+
+      // Send the first question
+      setTimeout(() => {
+        append({ role: "user", content: firstQuestion })
+      }, 500)
+    }
+  }, [
+    chatData.isInitialized,
+    aiChatBody.compressedSaju,
+    initialQuestionsToSend,
+    currentQuestionIndex,
+    messages.length,
+    isLoading,
+    append,
+  ])
 
   // Save messages to database when new messages are added
   useEffect(() => {
@@ -669,6 +693,17 @@ export default function SajuChat({
     )
   }
 
+  // Helper function to determine when to show diagrams
+  const shouldShowSajuDiagram = (index: number) => {
+    // Show before first assistant response (after first user message)
+    return index === 1 && messages[index].role === "assistant"
+  }
+
+  const shouldShowDaeunDiagram = (index: number) => {
+    // Show before second assistant response (after second user message)
+    return index === 3 && messages[index].role === "assistant"
+  }
+
   return (
     <div className="flex h-screen bg-white">
       {/* Desktop Sidebar - Fixed width */}
@@ -732,8 +767,8 @@ export default function SajuChat({
                   </div>
                 ) : (
                   <div className="space-y-3 sm:space-y-4">
-                    {/* Show Saju Diagram before first assistant message (index 1) */}
-                    {index === 1 && (
+                    {/* Show Saju Diagram before first assistant message */}
+                    {shouldShowSajuDiagram(index) && (
                       <div className="max-w-md mx-auto">
                         <SajuDiagram
                           saju={stableSaju}
@@ -754,8 +789,8 @@ export default function SajuChat({
                       </div>
                     )}
 
-                    {/* Show Daeun Diagram before second assistant message (index 3) */}
-                    {index === 3 && chatData.calculatedDaeun && (
+                    {/* Show Daeun Diagram before second assistant message */}
+                    {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
                       <div className="max-w-md mx-auto">
                         <DaeunDiagram
                           daeun={chatData.calculatedDaeun.pillars || []}
