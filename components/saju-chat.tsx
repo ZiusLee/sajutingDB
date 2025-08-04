@@ -84,7 +84,6 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
   if (roomType === "sajuping") {
     const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로"
 
-    // Generate concern-based second question
     const generateConcernQuestion = (concerns: string[]): string => {
       const concernLabels: Record<string, string> = {
         love: "연애운",
@@ -112,17 +111,13 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
     }
 
     const secondQuestion = generateConcernQuestion(concerns)
-
-    // 🔥 FIXED: 정확히 2개의 질문만 반환하고 로깅 추가
     const questions = [firstQuestion, secondQuestion]
     console.log("🎯 Generated exactly 2 initial questions:", questions)
     return questions
   }
-
   return []
 }
 
-// Generate a simple UUID v4
 function generateUUID() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
@@ -161,43 +156,24 @@ export default function SajuChat({
   const isTransitioningRef = useRef<boolean>(false)
   const [initialQuestionsToSend, setInitialQuestionsToSend] = useState<string[]>([])
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
-  const hasInitializedRef = useRef(false)
-  const nextQuestionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
 
-  // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
     try {
       const savedSaju = localStorage.getItem("current_saju")
       if (savedSaju) {
         const parsedSaju = JSON.parse(savedSaju)
-        if (parsedSaju.sessionId) {
-          return parsedSaju.sessionId
-        }
+        if (parsedSaju.sessionId) return parsedSaju.sessionId
       }
-
       const userId = localStorage.getItem("user_id")
-      console.log("🔍 [DEBUG] localStorage user_id check:", {
-        userId: userId || "❌ NOT FOUND",
-        userAgent: navigator.userAgent,
-        storageKeys: Object.keys(localStorage),
-        currentOrigin: window.location.origin,
-      })
-
-      if (userId) {
-        return userId
-      }
+      if (userId) return userId
     } catch (error) {
       console.error("Error getting session ID:", error)
     }
-
-    const fallbackId = `fallback-${Date.now()}`
-    console.log("⚠️ [DEBUG] Using fallback userId:", fallbackId)
-    return fallbackId
+    return `fallback-${Date.now()}`
   }, [])
 
-  // Stable state that won't cause re-renders
   const [chatData, setChatData] = useState<{
     calculatedDaeun: any
     stableBirthInfo: any
@@ -210,31 +186,17 @@ export default function SajuChat({
     isInitialized: false,
   })
 
-  // Stabilize all props to prevent infinite re-renders
-  const stableSaju = useMemo(() => {
-    if (!saju) return null
-    return JSON.parse(JSON.stringify(saju))
-  }, [JSON.stringify(saju)])
-
-  const stableBirthInfo = useMemo(() => {
-    if (!birthInfo) return null
-    return JSON.parse(JSON.stringify(birthInfo))
-  }, [JSON.stringify(birthInfo)])
-
-  const stableConcerns = useMemo(() => {
-    if (!concerns) return []
-    return [...concerns]
-  }, [JSON.stringify(concerns)])
-
+  const stableSaju = useMemo(() => (saju ? JSON.parse(JSON.stringify(saju)) : null), [JSON.stringify(saju)])
+  const stableBirthInfo = useMemo(
+    () => (birthInfo ? JSON.parse(JSON.stringify(birthInfo)) : null),
+    [JSON.stringify(birthInfo)],
+  )
+  const stableConcerns = useMemo(() => (concerns ? [...concerns] : []), [JSON.stringify(concerns)])
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
-
-  // Get the effective chat room ID (persisted ID takes precedence)
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
-  // This derived state ensures the body for the AI hook is always up-to-date.
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
-
     const compressedSajuObject =
       stableSaju && chatData.stableBirthInfo
         ? compressSaju(
@@ -247,7 +209,6 @@ export default function SajuChat({
             chatData.stableBirthInfo.timeUnknown,
           )
         : stableSaju
-
     return {
       name,
       gender,
@@ -272,99 +233,47 @@ export default function SajuChat({
     effectiveChatRoomId,
   ])
 
-  // Initialize chat data
   useEffect(() => {
     let isMounted = true
-
     const initializeChatData = async () => {
-      if (isPersistingRef.current) {
-        isPersistingRef.current = false
-        return
-      }
-
-      if (!stableSaju) {
-        return
-      }
-
-      if (chatData.isInitialized && aiChatBody.chatRoomId === effectiveChatRoomId) {
-        return
-      }
-
+      if (!stableSaju) return
       try {
-        let calculatedDaeunData = null
-        if (stableSaju?.yearStem && stableBirthInfo?.solarYear && gender) {
-          try {
-            calculatedDaeunData = calculateDaeunInfo(
-              { yearStem: stableSaju.yearStem, monthStem: stableSaju.monthStem, monthBranch: stableSaju.monthBranch },
-              stableBirthInfo.solarYear,
-              stableBirthInfo.solarMonth,
-              stableBirthInfo.solarDay,
-              gender,
-              stableBirthInfo.solarHour,
-              stableBirthInfo.solarMinute,
-              stableBirthInfo.timeUnknown,
-            )
-          } catch (error) {
-            console.error("❌ 대운 계산 오류:", error)
-          }
-        }
+        const calculatedDaeunData =
+          stableSaju?.yearStem && stableBirthInfo?.solarYear && gender
+            ? calculateDaeunInfo(
+                { yearStem: stableSaju.yearStem, monthStem: stableSaju.monthStem, monthBranch: stableSaju.monthBranch },
+                stableBirthInfo.solarYear,
+                stableBirthInfo.solarMonth,
+                stableBirthInfo.solarDay,
+                gender,
+                stableBirthInfo.solarHour,
+                stableBirthInfo.solarMinute,
+                stableBirthInfo.timeUnknown,
+              )
+            : null
 
         let pastMessages: any[] = []
         let shouldSendInitialQuestions = false
-
-        // Check if this is the first chat room for this session
         let isFirstRoom = false
-        try {
-          if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
-            // Get all chat rooms for this session to check if this is the first one
-            const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-            if (response.ok) {
-              const result = await response.json()
-              const chatRooms = result.chatRooms || []
 
-              // Sort by creation date and check if current room is the first
-              const sortedRooms = chatRooms.sort(
-                (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-              )
-
-              isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
-            }
-          } else if (effectiveChatRoomId?.startsWith("temp-")) {
-            // For temporary rooms, check if there are any existing rooms
-            const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-            if (response.ok) {
-              const result = await response.json()
-              const chatRooms = result.chatRooms || []
-              isFirstRoom = chatRooms.length === 0 // First room if no existing rooms
-            } else {
-              isFirstRoom = true // Assume first if can't check
-            }
+        if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
+          const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+          if (response.ok) {
+            const result = await response.json()
+            const chatRooms = result.chatRooms || []
+            const sortedRooms = chatRooms.sort(
+              (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+            )
+            isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
           }
-        } catch (error) {
-          console.error("Error checking if first chat room:", error)
-          isFirstRoom = true // Default to first room behavior on error
-        }
-
-        try {
-          if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
-            const messages = await getSessionMessages(sessionId, effectiveChatRoomId)
-
-            pastMessages = messages
-              .filter((msg) => msg.role === "user" || msg.role === "assistant")
-              .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
-              .map((msg) => ({
-                id: msg.id,
-                role: msg.role,
-                content: msg.content,
-                createdAt: msg.createdAt,
-              }))
-          } else {
-            // New chat - prepare initial questions to send
-            shouldSendInitialQuestions = true
-          }
-        } catch (error) {
-          console.error("❌ Error loading past messages:", error)
+          pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
+            .filter((msg) => msg.role === "user" || msg.role === "assistant")
+            .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+            .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+        } else {
           shouldSendInitialQuestions = true
+          const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+          isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
         }
 
         if (isMounted) {
@@ -377,35 +286,19 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
-          // Set up initial questions to send only if this is the first chat room and a new chat
-          if (shouldSendInitialQuestions && roomType === "sajuping" && isFirstRoom) {
-            const questions = getInitialUserQuestions(name, roomType, stableConcerns)
-            console.log("🎯 Setting up initial questions for first chat room:", questions)
+          if (shouldSendInitialQuestions) {
+            const questions = isFirstRoom
+              ? getInitialUserQuestions(name, roomType, stableConcerns)
+              : ["사주바탕으로 오늘의 운세를 3줄로 알려주세요"]
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
-            setCurrentQuestionIndex(0)
-          } else if (shouldSendInitialQuestions && !isFirstRoom) {
-            // For non-first chat rooms, send a simple greeting
-            console.log("🎯 Setting up simple greeting for non-first chat room")
-            setInitialQuestionsToSend(["오늘은 무엇이 궁금하신가요?"])
-            setIsInitialQuestionsMode(true)
-            setCurrentQuestionIndex(0)
           }
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
       }
     }
-
-    if (
-      !chatData.isInitialized ||
-      (aiChatBody.chatRoomId !== effectiveChatRoomId && !effectiveChatRoomId?.startsWith("temp-"))
-    ) {
-      setChatData((prev) => ({ ...prev, isInitialized: false }))
-    }
-
     initializeChatData()
-
     return () => {
       isMounted = false
     }
@@ -414,148 +307,85 @@ export default function SajuChat({
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
     api: "/api/saju-chat",
     id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
-    initialMessages: transitionMessages ?? chatData.initialMessages, // Use transition messages if available
+    initialMessages: transitionMessages ?? chatData.initialMessages,
     body: aiChatBody,
     experimental_throttle: 50,
     onFinish: (message) => {
-      // After a message is successfully sent with the new persisted ID,
-      // we can clear the transition state.
-      if (transitionMessages) {
-        setTransitionMessages(null)
-      }
-
-      // 🔥 FIXED: 더 안전한 초기 질문 처리 로직
-      if (
-        isInitialQuestionsMode &&
-        initialQuestionsToSend.length === 2 && // 정확히 2개 질문만 처리
-        isFirstChatRoom &&
-        message.role === "assistant"
-      ) {
-        console.log("🔄 AI response completed:", {
-          currentQuestionIndex,
-          totalQuestions: initialQuestionsToSend.length,
-          messageRole: message.role,
-        })
-
-        // 첫 번째 AI 응답 후 두 번째 질문 전송
-        if (currentQuestionIndex === 0) {
-          console.log("📤 Sending second question after first AI response")
-          setCurrentQuestionIndex(1)
-
-          // Clear any existing timeout
-          if (nextQuestionTimeoutRef.current) {
-            clearTimeout(nextQuestionTimeoutRef.current)
-          }
-
-          nextQuestionTimeoutRef.current = setTimeout(() => {
-            const secondQuestion = initialQuestionsToSend[1]
-            console.log(`📤 Actually sending second question:`, secondQuestion)
-            append({ role: "user", content: secondQuestion })
-          }, 1000)
-        }
-        // 두 번째 AI 응답 후 초기 질문 모드 종료
-        else if (currentQuestionIndex === 1) {
-          console.log("✅ Second AI response completed - ending initial questions mode")
-          setIsInitialQuestionsMode(false)
-          setInitialQuestionsToSend([])
-          setCurrentQuestionIndex(0)
-
-          // Clear any existing timeout
-          if (nextQuestionTimeoutRef.current) {
-            clearTimeout(nextQuestionTimeoutRef.current)
-            nextQuestionTimeoutRef.current = null
-          }
-        }
-      } else if (isInitialQuestionsMode && !isFirstChatRoom && message.role === "assistant") {
-        // For non-first chat rooms, just end the initial questions mode after first response
-        console.log("✅ Simple greeting completed for non-first chat room")
-        setIsInitialQuestionsMode(false)
-        setInitialQuestionsToSend([])
-        setCurrentQuestionIndex(0)
-
-        if (nextQuestionTimeoutRef.current) {
-          clearTimeout(nextQuestionTimeoutRef.current)
-          nextQuestionTimeoutRef.current = null
-        }
-      }
+      if (transitionMessages) setTransitionMessages(null)
+      console.log("✅ onFinish triggered for message from:", message.role)
     },
     onError: (error) => {
-      console.error("❌ 채팅 오류 상세:", {
-        error,
-        message: error.message,
-        stack: error.stack,
-        body: aiChatBody,
-        sessionId,
-        effectiveChatRoomId,
-      })
-
-      // Show more specific error message
-      let errorMessage = "오류가 발생했습니다. 다시 시도해주세요."
-
-      if (error.message?.includes("Internal server error")) {
-        errorMessage = "서버에서 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-      } else if (error.message?.includes("Configuration error")) {
-        errorMessage = "서버 설정에 문제가 있습니다. 관리자에게 문의해주세요."
-      }
-
-      toast.error(errorMessage)
+      console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
+      toast.error("오류가 발생했습니다. 다시 시도해주세요.")
     },
   })
 
-  // Send first initial question when chat is ready
+  // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
+
   useEffect(() => {
     if (
-      chatData.isInitialized &&
-      aiChatBody.compressedSaju &&
       isInitialQuestionsMode &&
-      initialQuestionsToSend.length > 0 &&
-      messages.length === 0 &&
-      !hasInitializedRef.current &&
       !isLoading &&
-      isFirstChatRoom !== null && // Wait until we know if it's first room
-      currentQuestionIndex === 0 // Only send if we haven't started yet
+      messages.length === 0 &&
+      initialQuestionsToSend.length > 0 &&
+      !initialQuestionsSent.q1
     ) {
-      hasInitializedRef.current = true
-      const firstQuestion = initialQuestionsToSend[0]
+      console.log("📤 [Flow] Sending first question...")
+      setInitialQuestionsSent((prev) => ({ ...prev, q1: true }))
+      append({ role: "user", content: initialQuestionsToSend[0] })
+    }
+  }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-      console.log("📤 Sending first initial question (1/2):", firstQuestion, "isFirstRoom:", isFirstChatRoom)
-
-      // Send the first question
-      setTimeout(() => {
-        append({ role: "user", content: firstQuestion })
-      }, 500)
+  useEffect(() => {
+    if (
+      isInitialQuestionsMode &&
+      isFirstChatRoom &&
+      !isLoading &&
+      messages.length === 2 &&
+      messages[1].role === "assistant" &&
+      initialQuestionsToSend.length > 1 &&
+      !initialQuestionsSent.q2
+    ) {
+      console.log("📤 [Flow] Received first answer. Sending second question...")
+      const timeoutId = setTimeout(() => {
+        setInitialQuestionsSent((prev) => ({ ...prev, q2: true }))
+        append({ role: "user", content: initialQuestionsToSend[1] })
+      }, 1000)
+      return () => clearTimeout(timeoutId)
     }
   }, [
-    chatData.isInitialized,
-    aiChatBody.compressedSaju,
     isInitialQuestionsMode,
-    initialQuestionsToSend,
-    messages.length,
-    isLoading,
-    append,
     isFirstChatRoom,
-    currentQuestionIndex,
+    isLoading,
+    messages,
+    initialQuestionsToSend,
+    append,
+    initialQuestionsSent.q2,
   ])
 
-  // Cleanup timeout on unmount
   useEffect(() => {
-    return () => {
-      if (nextQuestionTimeoutRef.current) {
-        clearTimeout(nextQuestionTimeoutRef.current)
+    const endInitialMode = () => {
+      console.log("✅ [Flow] Ending initial questions mode.")
+      setIsInitialQuestionsMode(false)
+      setInitialQuestionsToSend([])
+    }
+
+    if (isInitialQuestionsMode && !isLoading) {
+      if (isFirstChatRoom && messages.length === 4 && messages[3].role === "assistant") {
+        endInitialMode()
+      } else if (!isFirstChatRoom && messages.length === 2 && messages[1].role === "assistant") {
+        endInitialMode()
       }
     }
-  }, [])
+  }, [isInitialQuestionsMode, isFirstChatRoom, isLoading, messages])
 
-  // Save messages to database when new messages are added
+  // --- End of fundamental fix ---
+
   useEffect(() => {
     const saveNewMessages = async () => {
-      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) {
-        return
-      }
-
+      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) return
       savingRef.current = true
       const newMessages = messages.slice(lastSavedMessageCount)
-
       const messagesToSave = newMessages.map((msg, index) => ({
         id: generateUUID(),
         role: msg.role,
@@ -566,37 +396,16 @@ export default function SajuChat({
       }))
 
       try {
-        console.log("💾 Saving messages:", {
-          sessionId,
-          messageCount: messagesToSave.length,
-          chatRoomId: effectiveChatRoomId,
-          temporaryRoom: temporaryChatRoom?.isTemporary,
-        })
-
         const result = await saveMessages(sessionId, messagesToSave, roomType, effectiveChatRoomId, temporaryChatRoom)
-
         setLastSavedMessageCount(messages.length)
-
-        // If a temporary chat room was persisted, update our state
         if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
-          console.log(
-            `Transitioning from temp room ${effectiveChatRoomId} to persisted room ${result.persistedChatRoomId}`,
-          )
-
-          // Save current scroll position before transition
           if (chatContainerRef.current) {
             scrollPositionRef.current = chatContainerRef.current.scrollTop
             isTransitioningRef.current = true
           }
-
-          // 1. Preserve the current messages for the next render
           setTransitionMessages(messages)
-
-          // 2. Update the chat room ID state, which will trigger a re-render
           setPersistedChatRoomId(result.persistedChatRoomId)
           onChatRoomPersisted?.(result.persistedChatRoomId)
-
-          // 3. Update URL without page refresh
           if (window.history.pushState) {
             const newUrl = `/saju-chat/${roomType}?roomId=${result.persistedChatRoomId}`
             window.history.replaceState(null, "", newUrl)
@@ -609,10 +418,7 @@ export default function SajuChat({
         savingRef.current = false
       }
     }
-
-    if (messages.length > 0 && !isLoading) {
-      saveNewMessages()
-    }
+    if (messages.length > 0 && !isLoading) saveNewMessages()
   }, [
     messages,
     lastSavedMessageCount,
@@ -625,22 +431,11 @@ export default function SajuChat({
     onChatRoomPersisted,
   ])
 
-  // Restore scroll position after chat room transition
   useEffect(() => {
     if (isTransitioningRef.current && chatContainerRef.current && transitionMessages === null) {
-      // Transition is complete, restore scroll position
       const container = chatContainerRef.current
-
-      // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
-        if (scrollPositionRef.current > 0) {
-          container.scrollTop = scrollPositionRef.current
-        } else {
-          // If we were at the bottom, stay at the bottom
-          container.scrollTop = container.scrollHeight
-        }
-
-        // Reset transition state
+        container.scrollTop = scrollPositionRef.current > 0 ? scrollPositionRef.current : container.scrollHeight
         isTransitioningRef.current = false
         scrollPositionRef.current = 0
       })
@@ -654,113 +449,44 @@ export default function SajuChat({
   }
 
   const handleChatRoomSelect = (chatRoomId: string) => {
-    if (window.innerWidth < 1024) {
-      setSidebarOpen(false)
-    }
-    // Use window.location instead of router to avoid hook issues
+    if (window.innerWidth < 1024) setSidebarOpen(false)
     window.location.href = `/saju-chat/${roomType}?roomId=${chatRoomId}`
   }
 
   const handleNewChat = () => {
-    // Navigate to a new chat without roomId to trigger auto-creation
     window.location.href = `/saju-chat/${roomType}`
   }
 
   const scrollToBottom = () => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      })
-    }
+    if (chatContainerRef.current)
+      chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: "smooth" })
   }
 
-  // Auto-scroll to bottom when new messages arrive (기존 useEffect 수정)
   useEffect(() => {
     if (chatContainerRef.current && !isTransitioningRef.current) {
-      const container = chatContainerRef.current
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-
-      if (isNearBottom || messages.length === 1) {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: "smooth",
-        })
+      const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current
+      if (scrollHeight - scrollTop - clientHeight < 100 || messages.length === 1) {
+        scrollToBottom()
       }
     }
   }, [messages])
 
-  // Handle scroll button visibility
   useEffect(() => {
     const container = chatContainerRef.current
     if (!container) return
-
     const handleScroll = () => {
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-      setShowScrollButton(!isNearBottom && messages.length > 1)
+      const { scrollHeight, scrollTop, clientHeight } = container
+      setShowScrollButton(scrollHeight - scrollTop - clientHeight >= 100 && messages.length > 1)
     }
-
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
-
-  // Handle mobile keyboard and viewport changes
-  useEffect(() => {
-    const handleResize = () => {
-      // Force a re-render when viewport changes (keyboard open/close)
-      if (chatContainerRef.current) {
-        const container = chatContainerRef.current
-        // Scroll to bottom if user was already at bottom
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-        if (isNearBottom) {
-          setTimeout(() => {
-            container.scrollTo({
-              top: container.scrollHeight,
-              behavior: "smooth",
-            })
-          }, 100)
-        }
-      }
-    }
-
-    // Listen for viewport changes (keyboard open/close on mobile)
-    window.addEventListener("resize", handleResize)
-    window.addEventListener("orientationchange", handleResize)
-
-    // Visual viewport API for better mobile support
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleResize)
-    }
-
-    return () => {
-      window.removeEventListener("resize", handleResize)
-      window.removeEventListener("orientationchange", handleResize)
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", handleResize)
-      }
-    }
-  }, [])
 
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
     [stableConcerns, roomType],
   )
 
-  // Validate aiChatBody before initializing chat
-  useEffect(() => {
-    if (chatData.isInitialized && aiChatBody.compressedSaju) {
-      console.log("✅ Chat initialized with body:", {
-        hasCompressedSaju: !!aiChatBody.compressedSaju,
-        name: aiChatBody.name,
-        gender: aiChatBody.gender,
-        roomType: aiChatBody.roomType,
-        userId: aiChatBody.userId,
-        chatRoomId: aiChatBody.chatRoomId,
-      })
-    }
-  }, [chatData.isInitialized, aiChatBody])
-
-  // Loading and error states
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -773,12 +499,6 @@ export default function SajuChat({
   }
 
   if (!stableSaju || !aiChatBody.compressedSaju) {
-    console.error("❌ Missing required data:", {
-      hasStableSaju: !!stableSaju,
-      hasCompressedSaju: !!aiChatBody.compressedSaju,
-      chatDataInitialized: chatData.isInitialized,
-    })
-
     return (
       <div className="flex h-screen items-center justify-center bg-background p-4 text-center">
         <div>
@@ -796,20 +516,24 @@ export default function SajuChat({
     )
   }
 
-  // Helper function to determine when to show diagrams
   const shouldShowSajuDiagram = (index: number) => {
-    // Show before first assistant response (after first user message)
-    return index === 1 && messages[index].role === "assistant"
+    // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
+    if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
+      return true
+    }
+    // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
+    if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
+      return true
+    }
+    return false
   }
-
   const shouldShowDaeunDiagram = (index: number) => {
-    // Show before second assistant response (after second user message)
-    return index === 3 && messages[index].role === "assistant"
+    // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (네 번째 메시지)
+    return isFirstChatRoom && index === 3 && messages[index].role === "assistant"
   }
 
   return (
     <div className="flex h-screen bg-white">
-      {/* Desktop Sidebar - Fixed width */}
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -823,8 +547,6 @@ export default function SajuChat({
           onNewChat={handleNewChat}
         />
       </div>
-
-      {/* Mobile Sidebar Sheet - 2/3 width */}
       <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-[66.67vw] max-w-sm p-0">
           <Sidebar
@@ -840,26 +562,18 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-
-      {/* Main Chat Area - Flexible width */}
       <div className="flex-1 flex flex-col min-w-0 h-screen">
-        {/* Chat Messages Container - Mobile optimized */}
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
-          style={{
-            height: "calc(100dvh - 140px)", // Reserve space for input area
-            minHeight: 0,
-          }}
+          style={{ height: "calc(100dvh - 140px)", minHeight: 0 }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
-            {/* Show temporary room indicator */}
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
-
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "user" ? (
@@ -870,7 +584,6 @@ export default function SajuChat({
                   </div>
                 ) : (
                   <div className="space-y-3 sm:space-y-4">
-                    {/* Show Saju Diagram before first assistant message */}
                     {shouldShowSajuDiagram(index) && (
                       <div className="max-w-md mx-auto">
                         <SajuDiagram
@@ -891,8 +604,6 @@ export default function SajuChat({
                         />
                       </div>
                     )}
-
-                    {/* Show Daeun Diagram before second assistant message */}
                     {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
                       <div className="max-w-md mx-auto">
                         <DaeunDiagram
@@ -903,11 +614,9 @@ export default function SajuChat({
                         />
                       </div>
                     )}
-
                     <div className="text-foreground text-base sm:text-lg leading-relaxed prose prose-sm sm:prose-lg max-w-none break-words [&>p]:mb-3 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base sm:[&>h3]:text-lg [&>ul]:mb-3 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2 [&>ul]:pl-3 sm:[&>ul]:pl-4 [&>li]:text-base sm:[&>li]:text-lg">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                     </div>
-
                     <MessageFeedbackButtons
                       messageId={message.id || `temp-${index}`}
                       messageContent={message.content}
@@ -927,8 +636,6 @@ export default function SajuChat({
             )}
           </div>
         </div>
-
-        {/* Input Area - Fixed at bottom with mobile optimization and safe area */}
         <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4">
           {showScrollButton && (
             <Button
@@ -940,7 +647,6 @@ export default function SajuChat({
               <ArrowDown className="h-4 w-4" />
             </Button>
           )}
-
           <div className="space-y-2">
             {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
@@ -957,7 +663,6 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-
             <form onSubmit={handleSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
