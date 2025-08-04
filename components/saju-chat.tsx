@@ -289,7 +289,7 @@ export default function SajuChat({
           if (shouldSendInitialQuestions) {
             const questions = isFirstRoom
               ? getInitialUserQuestions(name, roomType, stableConcerns)
-              : ["오늘은 무엇이 궁금하신가요?"]
+              : ["사주바탕으로 오늘의 운세를 3줄로 알려주세요"]
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
           }
