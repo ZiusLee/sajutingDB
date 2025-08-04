@@ -87,6 +87,8 @@
     color-scheme: light;
     /* Prevent zoom on iOS */
     -webkit-text-size-adjust: 100%;
+    /* Improve mobile scrolling */
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
@@ -97,6 +99,8 @@
     -moz-osx-font-smoothing: grayscale;
     /* Prevent text selection highlighting issues */
     -webkit-tap-highlight-color: transparent;
+    /* Prevent overscroll bounce on mobile */
+    overscroll-behavior: none;
   }
 
   /* Ensure buttons maintain consistent styling across browsers */
@@ -113,6 +117,67 @@
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+  }
+
+  /* Mobile-specific optimizations */
+  @media screen and (max-width: 768px) {
+    /* Prevent input zoom on iOS */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    textarea,
+    select {
+      font-size: 16px !important;
+      transform: translateZ(0);
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    /* Improve touch scrolling */
+    * {
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Prevent body scroll when keyboard is open */
+    body.keyboard-open {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Optimize for mobile viewport */
+    .mobile-optimized {
+      height: 100vh;
+      height: 100dvh; /* Dynamic viewport height */
+    }
+  }
+
+  /* Smooth transitions for chat room changes */
+  .chat-transition {
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  /* Prevent layout shift during keyboard appearance */
+  .overscroll-behavior-y-contain {
+    overscroll-behavior-y: contain;
+  }
+
+  /* iOS Safari specific fixes */
+  @supports (-webkit-touch-callout: none) {
+    /* iOS Safari */
+    .ios-input-fix {
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+  }
+
+  /* Keyboard handling for mobile */
+  @media screen and (max-width: 768px) {
+    .keyboard-aware-container {
+      transition: height 0.3s ease-in-out;
+    }
   }
 }
 
@@ -160,9 +225,38 @@
   scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
 }
 
+/* Hide scrollbar for suggested questions */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Ensure consistent styling across browsers for dark mode preference */
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: light;
+  }
+}
+
+/* ChatGPT-like mobile input positioning */
+@media screen and (max-width: 768px) {
+  .mobile-input-fixed {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: white;
+    border-top: 1px solid hsl(var(--border));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Adjust chat container when keyboard is visible */
+  .chat-container-keyboard-adjust {
+    padding-bottom: 140px; /* Height of input area */
   }
 }
