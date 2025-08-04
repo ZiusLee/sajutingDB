@@ -413,7 +413,7 @@ export default function SajuChat({
     initialMessages: transitionMessages ?? chatData.initialMessages, // Use transition messages if available
     body: aiChatBody,
     experimental_throttle: 50,
-    onFinish: () => {
+    onFinish: (message) => {
       // After a message is successfully sent with the new persisted ID,
       // we can clear the transition state.
       if (transitionMessages) {
@@ -421,12 +421,19 @@ export default function SajuChat({
       }
 
       // Only handle initial questions if we're in initial questions mode and it's the first chat room
-      if (isInitialQuestionsMode && initialQuestionsToSend.length > 0 && isFirstChatRoom) {
-        console.log("🔄 Initial questions progress:", {
+      // AND the finished message is from the assistant (AI response completed)
+      if (
+        isInitialQuestionsMode &&
+        initialQuestionsToSend.length > 0 &&
+        isFirstChatRoom &&
+        message.role === "assistant"
+      ) {
+        console.log("🔄 AI response completed, checking for next question:", {
           currentQuestionIndex,
           totalQuestions: initialQuestionsToSend.length,
           isInitialQuestionsMode,
           isFirstChatRoom,
+          messageRole: message.role,
         })
 
         // Check if we need to send the next question
@@ -453,7 +460,7 @@ export default function SajuChat({
           setInitialQuestionsToSend([])
           setCurrentQuestionIndex(0)
         }
-      } else if (isInitialQuestionsMode && !isFirstChatRoom) {
+      } else if (isInitialQuestionsMode && !isFirstChatRoom && message.role === "assistant") {
         // For non-first chat rooms, just end the initial questions mode after first response
         console.log("✅ Simple greeting completed for non-first chat room")
         setIsInitialQuestionsMode(false)
