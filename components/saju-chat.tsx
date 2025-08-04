@@ -82,6 +82,8 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
+    const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로"
+
     // Generate concern-based second question
     const generateConcernQuestion = (concerns: string[]): string => {
       const concernLabels: Record<string, string> = {
@@ -106,15 +108,13 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
 
       const primaryConcern = concerns[0]
       const concernLabel = concernLabels[primaryConcern] || "운세"
-
       return `${concernLabel}에 대해서 나의 대운과 올해 세운을 기반으로 5줄로 설명해줘.`
     }
 
     const secondQuestion = generateConcernQuestion(concerns)
 
-    // 🔥 FIX: Ensure exactly 2 questions are returned
-    const questions = ["내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로", secondQuestion]
-
+    // 🔥 FIXED: 정확히 2개의 질문만 반환하고 로깅 추가
+    const questions = [firstQuestion, secondQuestion]
     console.log("🎯 Generated exactly 2 initial questions:", questions)
     return questions
   }
@@ -424,44 +424,47 @@ export default function SajuChat({
         setTransitionMessages(null)
       }
 
-      // Only handle initial questions if we're in initial questions mode and it's the first chat room
-      // AND the finished message is from the assistant (AI response completed)
+      // 🔥 FIXED: 더 안전한 초기 질문 처리 로직
       if (
         isInitialQuestionsMode &&
-        initialQuestionsToSend.length > 0 &&
+        initialQuestionsToSend.length === 2 && // 정확히 2개 질문만 처리
         isFirstChatRoom &&
         message.role === "assistant"
       ) {
-        console.log("🔄 AI response completed, checking for next question:", {
+        console.log("🔄 AI response completed:", {
           currentQuestionIndex,
           totalQuestions: initialQuestionsToSend.length,
-          isInitialQuestionsMode,
-          isFirstChatRoom,
           messageRole: message.role,
         })
 
-        // 🔥 FIX: Check if we need to send the next question (only send second question after first response)
-        if (currentQuestionIndex === 0 && initialQuestionsToSend.length > 1) {
+        // 첫 번째 AI 응답 후 두 번째 질문 전송
+        if (currentQuestionIndex === 0) {
+          console.log("📤 Sending second question after first AI response")
+          setCurrentQuestionIndex(1)
+
           // Clear any existing timeout
           if (nextQuestionTimeoutRef.current) {
             clearTimeout(nextQuestionTimeoutRef.current)
           }
 
-          // Increment to second question
-          setCurrentQuestionIndex(1)
-
-          // Send the second question after a short delay
           nextQuestionTimeoutRef.current = setTimeout(() => {
             const secondQuestion = initialQuestionsToSend[1]
-            console.log(`📤 Sending second question (2/2):`, secondQuestion)
+            console.log(`📤 Actually sending second question:`, secondQuestion)
             append({ role: "user", content: secondQuestion })
           }, 1000)
-        } else if (currentQuestionIndex === 1) {
-          // After second question response, end initial questions mode
-          console.log("✅ Both initial questions completed")
+        }
+        // 두 번째 AI 응답 후 초기 질문 모드 종료
+        else if (currentQuestionIndex === 1) {
+          console.log("✅ Second AI response completed - ending initial questions mode")
           setIsInitialQuestionsMode(false)
           setInitialQuestionsToSend([])
           setCurrentQuestionIndex(0)
+
+          // Clear any existing timeout
+          if (nextQuestionTimeoutRef.current) {
+            clearTimeout(nextQuestionTimeoutRef.current)
+            nextQuestionTimeoutRef.current = null
+          }
         }
       } else if (isInitialQuestionsMode && !isFirstChatRoom && message.role === "assistant") {
         // For non-first chat rooms, just end the initial questions mode after first response
@@ -469,6 +472,11 @@ export default function SajuChat({
         setIsInitialQuestionsMode(false)
         setInitialQuestionsToSend([])
         setCurrentQuestionIndex(0)
+
+        if (nextQuestionTimeoutRef.current) {
+          clearTimeout(nextQuestionTimeoutRef.current)
+          nextQuestionTimeoutRef.current = null
+        }
       }
     },
     onError: (error) => {
