@@ -123,6 +123,8 @@ export default function SajuChat({
   const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
   const [transitionMessages, setTransitionMessages] = useState<any[] | null>(null)
   const isPersistingRef = useRef(false)
+  const scrollPositionRef = useRef<number>(0)
+  const isTransitioningRef = useRef<boolean>(false)
 
   // Get sessionId from localStorage - memoized and stable
   const sessionId = useMemo(() => {
@@ -392,6 +394,12 @@ export default function SajuChat({
             `Transitioning from temp room ${effectiveChatRoomId} to persisted room ${result.persistedChatRoomId}`,
           )
 
+          // Save current scroll position before transition
+          if (chatContainerRef.current) {
+            scrollPositionRef.current = chatContainerRef.current.scrollTop
+            isTransitioningRef.current = true
+          }
+
           // 1. Preserve the current messages for the next render
           setTransitionMessages(messages)
 
@@ -428,6 +436,28 @@ export default function SajuChat({
     onChatRoomPersisted,
   ])
 
+  // Restore scroll position after chat room transition
+  useEffect(() => {
+    if (isTransitioningRef.current && chatContainerRef.current && transitionMessages === null) {
+      // Transition is complete, restore scroll position
+      const container = chatContainerRef.current
+
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (scrollPositionRef.current > 0) {
+          container.scrollTop = scrollPositionRef.current
+        } else {
+          // If we were at the bottom, stay at the bottom
+          container.scrollTop = container.scrollHeight
+        }
+
+        // Reset transition state
+        isTransitioningRef.current = false
+        scrollPositionRef.current = 0
+      })
+    }
+  }, [transitionMessages])
+
   const handleSuggestedQuestionClick = (question: string) => {
     if (isLoading) return
     setInput(question)
@@ -456,9 +486,9 @@ export default function SajuChat({
     }
   }
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive (기존 useEffect 수정)
   useEffect(() => {
-    if (chatContainerRef.current) {
+    if (chatContainerRef.current && !isTransitioningRef.current) {
       const container = chatContainerRef.current
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
 
