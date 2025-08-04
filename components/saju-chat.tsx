@@ -516,8 +516,21 @@ export default function SajuChat({
     )
   }
 
-  const shouldShowSajuDiagram = (index: number) => index === 1 && messages[index].role === "assistant"
-  const shouldShowDaeunDiagram = (index: number) => index === 3 && messages[index].role === "assistant"
+  const shouldShowSajuDiagram = (index: number) => {
+    // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
+    if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
+      return true
+    }
+    // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
+    if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
+      return true
+    }
+    return false
+  }
+  const shouldShowDaeunDiagram = (index: number) => {
+    // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (네 번째 메시지)
+    return isFirstChatRoom && index === 3 && messages[index].role === "assistant"
+  }
 
   return (
     <div className="flex h-screen bg-white">
