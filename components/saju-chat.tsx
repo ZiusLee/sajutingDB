@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
+import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from 'lucide-react'
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -82,7 +82,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
-    const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘 3줄정도로"
+    const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘"
 
     const generateConcernQuestion = (concerns: string[]): string => {
       const concernLabels: Record<string, string> = {
@@ -102,12 +102,12 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
       }
 
       if (concerns.length === 0) {
-        return "연애운에 대해서 나의 대운과 올해 세운을 기반으로 5줄로 설명해줘."
+        return "연애운에 대해서 나의 대운과 올해 세운을 기반으로 설명해줘."
       }
 
       const primaryConcern = concerns[0]
       const concernLabel = concernLabels[primaryConcern] || "운세"
-      return `${concernLabel}에 대해서 나의 대운과 올해 세운을 기반으로 5줄로 설명해줘.`
+      return `${concernLabel}에 대해서 나의 대운과 올해 세운을 기반으로 설명해줘.`
     }
 
     const secondQuestion = generateConcernQuestion(concerns)
@@ -286,27 +286,14 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
-          if (shouldSendInitialQuestions) {
-            if (isFirstRoom) {
-              // 첫 번째 채팅룸: 사용자 질문 2개 자동 전송
-              const questions = getInitialUserQuestions(name, roomType, stableConcerns)
-              setInitialQuestionsToSend(questions)
-              setIsInitialQuestionsMode(true)
-            } else {
-              // 첫 번째가 아닌 채팅룸: 어시스턴트 메시지로 시작
-              const assistantWelcomeMessage = {
-                id: generateUUID(),
-                role: "assistant" as const,
-                content: "안녕하세요! 오늘은 무엇이 궁금하신가요?",
-                createdAt: new Date().toISOString(),
-              }
-              setChatData((prev) => ({
-                ...prev,
-                initialMessages: [assistantWelcomeMessage],
-              }))
-              setLastSavedMessageCount(1)
-            }
+          // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
+          if (shouldSendInitialQuestions && isFirstRoom) {
+            const questions = getInitialUserQuestions(name, roomType, stableConcerns)
+            setInitialQuestionsToSend(questions)
+            setIsInitialQuestionsMode(true)
           }
+          // 로그인한 사용자의 새로운 채팅방(첫 번째가 아닌)에서는 자동 질문 비활성화
+          // shouldSendInitialQuestions가 true이지만 isFirstRoom이 false인 경우는 아무것도 하지 않음
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
@@ -628,8 +615,126 @@ export default function SajuChat({
                         />
                       </div>
                     )}
-                    <div className="text-foreground text-base sm:text-lg leading-relaxed prose prose-sm sm:prose-lg max-w-none break-words [&>p]:mb-3 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base sm:[&>h3]:text-lg [&>ul]:mb-3 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2 [&>ul]:pl-3 sm:[&>ul]:pl-4 [&>li]:text-base sm:[&>li]:text-lg">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    <div className="ai-response-content">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          // 제목들 스타일링
+                          h1: ({ children }) => (
+                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 mt-8 pb-3 border-b-2 border-gray-200 first:mt-0">
+                              {children}
+                            </h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 mt-6 pb-2 border-b border-gray-200">
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5">
+                              {children}
+                            </h3>
+                          ),
+                          h4: ({ children }) => (
+                            <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">
+                              {children}
+                            </h4>
+                          ),
+                          // 단락 스타일링
+                          p: ({ children }) => (
+                            <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
+                              {children}
+                            </p>
+                          ),
+                          // 구분선 스타일링
+                          hr: () => (
+                            <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+                          ),
+                          // 리스트 스타일링
+                          ul: ({ children }) => (
+                            <ul className="space-y-2 mb-4 pl-0">
+                              {children}
+                            </ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="space-y-2 mb-4 pl-0 counter-reset-item">
+                              {children}
+                            </ol>
+                          ),
+                          li: ({ children, ordered }) => (
+                            <li className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
+                              ordered 
+                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
+                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
+                            }`}>
+                              <span className="flex-1">{children}</span>
+                            </li>
+                          ),
+                          // 강조 텍스트 스타일링
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
+                              {children}
+                            </strong>
+                          ),
+                          em: ({ children }) => (
+                            <em className="italic text-gray-600 font-medium">
+                              {children}
+                            </em>
+                          ),
+                          // 코드 블록 스타일링
+                          code: ({ children, className }) => {
+                            const isInline = !className
+                            if (isInline) {
+                              return (
+                                <code className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono">
+                                  {children}
+                                </code>
+                              )
+                            }
+                            return (
+                              <code className="block bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm font-mono overflow-x-auto mb-4">
+                                {children}
+                              </code>
+                            )
+                          },
+                          pre: ({ children }) => (
+                            <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-x-auto mb-4">
+                              {children}
+                            </pre>
+                          ),
+                          // 인용문 스타일링
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 my-4 italic text-gray-700">
+                              {children}
+                            </blockquote>
+                          ),
+                          // 테이블 스타일링
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto mb-4">
+                              <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+                                {children}
+                              </table>
+                            </div>
+                          ),
+                          thead: ({ children }) => (
+                            <thead className="bg-gray-50">
+                              {children}
+                            </thead>
+                          ),
+                          th: ({ children }) => (
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-200">
+                              {children}
+                            </th>
+                          ),
+                          td: ({ children }) => (
+                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
+                              {children}
+                            </td>
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
                     </div>
                     <MessageFeedbackButtons
                       messageId={message.id || `temp-${index}`}
