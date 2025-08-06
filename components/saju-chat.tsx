@@ -171,13 +171,16 @@ export default function SajuChat({
         const keyboardHeight = windowHeight - visualViewport.height
         setKeyboardHeight(keyboardHeight)
         setIsKeyboardOpen(keyboardHeight > 150)
-        
+      
+        // Use visual viewport height for more accurate calculations
         document.documentElement.style.setProperty('--vh', `${visualViewport.height * 0.01}px`)
         document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
+        document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
       } else {
         setKeyboardHeight(0)
         setIsKeyboardOpen(false)
         document.documentElement.style.setProperty('--vh', `${windowHeight * 0.01}px`)
+        document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
       }
     }
 
@@ -192,12 +195,22 @@ export default function SajuChat({
       setTimeout(updateViewport, 100)
     })
 
+    // Additional iOS Safari specific handling
+    const handleScroll = () => {
+      if (window.innerHeight !== document.documentElement.clientHeight) {
+        updateViewport()
+      }
+    }
+  
+    window.addEventListener('scroll', handleScroll, { passive: true })
+
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', updateViewport)
       }
       window.removeEventListener('resize', updateViewport)
       window.removeEventListener('orientationchange', updateViewport)
+      window.removeEventListener('scroll', handleScroll)
     }
   }, [])
 
@@ -543,16 +556,17 @@ export default function SajuChat({
       <div 
         className="flex-1 flex flex-col min-w-0 relative"
         style={{
-          height: isKeyboardOpen ? `calc(100vh - ${keyboardHeight}px)` : '100vh',
-          transition: 'height 0.3s ease-in-out'
+          height: 'calc(var(--vh, 1vh) * 100)',
+          minHeight: 'calc(var(--vh, 1vh) * 100)',
         }}
       >
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
           style={{ 
-            paddingBottom: isKeyboardOpen ? '8px' : '0px',
-            transition: 'padding-bottom 0.3s ease-in-out'
+            paddingBottom: isKeyboardOpen ? '8px' : 'max(8px, var(--safe-area-bottom, 0px))',
+            transition: 'padding-bottom 0.3s ease-in-out',
+            height: isKeyboardOpen ? `calc(100% - ${keyboardHeight}px)` : '100%',
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
@@ -573,6 +587,16 @@ export default function SajuChat({
                   <div className="space-y-3 sm:space-y-4">
                     {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
                       <div className="flex flex-col lg:flex-row gap-4 max-w-full">
+                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
+                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
+                            <DaeunDiagram
+                              daeun={chatData.calculatedDaeun.pillars || []}
+                              birthInfo={chatData.stableBirthInfo}
+                              name={name}
+                              gender={gender}
+                            />
+                          </div>
+                        )}
                         {shouldShowSajuDiagram(index) && (
                           <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
                             <SajuDiagram
@@ -590,16 +614,6 @@ export default function SajuChat({
                               lunarMonth={chatData.stableBirthInfo?.lunarMonth}
                               lunarDay={chatData.stableBirthInfo?.lunarDay}
                               location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
-                            />
-                          </div>
-                        )}
-                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
-                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
-                            <DaeunDiagram
-                              daeun={chatData.calculatedDaeun.pillars || []}
-                              birthInfo={chatData.stableBirthInfo}
-                              name={name}
-                              gender={gender}
                             />
                           </div>
                         )}
@@ -741,8 +755,13 @@ export default function SajuChat({
           className="border-t bg-white flex-shrink-0 relative"
           style={{
             padding: '12px 16px',
-            paddingBottom: isKeyboardOpen ? '12px' : 'max(12px, env(safe-area-inset-bottom))',
-            transition: 'padding-bottom 0.3s ease-in-out'
+            paddingBottom: isKeyboardOpen 
+              ? '12px' 
+              : 'max(12px, calc(var(--safe-area-bottom, 0px) + 12px))',
+            transition: 'padding-bottom 0.3s ease-in-out',
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 10,
           }}
         >
           {showScrollButton && (
@@ -756,7 +775,7 @@ export default function SajuChat({
             </Button>
           )}
           <div className="space-y-2">
-            {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
+            {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
