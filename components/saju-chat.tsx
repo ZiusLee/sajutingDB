@@ -132,6 +132,7 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
+  const [viewportHeight, setViewportHeight] = useState<number>(0)
 
   const sessionId = useMemo(() => {
     try {
@@ -159,6 +160,41 @@ export default function SajuChat({
     initialMessages: [],
     isInitialized: false,
   })
+
+  // iOS Safari viewport height fix
+  useEffect(() => {
+    const updateViewportHeight = () => {
+      // Use the smaller of window.innerHeight and visual viewport height
+      const height = window.visualViewport?.height || window.innerHeight
+      setViewportHeight(height)
+      
+      // Update CSS custom property for iOS Safari
+      document.documentElement.style.setProperty('--vh', `${height * 0.01}px`)
+    }
+
+    // Initial calculation
+    updateViewportHeight()
+
+    // Listen for viewport changes
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight)
+    }
+    
+    // Fallback for older browsers
+    window.addEventListener('resize', updateViewportHeight)
+    window.addEventListener('orientationchange', () => {
+      // Delay to ensure orientation change is complete
+      setTimeout(updateViewportHeight, 100)
+    })
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight)
+      }
+      window.removeEventListener('resize', updateViewportHeight)
+      window.removeEventListener('orientationchange', updateViewportHeight)
+    }
+  }, [])
 
   const stableSaju = useMemo(() => (saju ? JSON.parse(JSON.stringify(saju)) : null), [JSON.stringify(saju)])
   const stableBirthInfo = useMemo(
@@ -438,7 +474,7 @@ useEffect(() => {
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="flex items-center justify-center bg-background" style={{ height: viewportHeight || '100vh' }}>
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           채팅을 불러오는 중...
@@ -449,7 +485,7 @@ useEffect(() => {
 
   if (!stableSaju || !aiChatBody.compressedSaju) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background p-4 text-center">
+      <div className="flex items-center justify-center bg-background p-4 text-center" style={{ height: viewportHeight || '100vh' }}>
         <div>
           <h2 className="text-xl font-semibold">오류</h2>
           <p className="text-muted-foreground mt-2">
@@ -482,8 +518,10 @@ const shouldShowDaeunDiagram = (index: number) => {
   return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
 }
 
+  const containerHeight = viewportHeight || (typeof window !== 'undefined' ? window.innerHeight : 800)
+
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex bg-white" style={{ height: containerHeight }}>
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -512,11 +550,11 @@ const shouldShowDaeunDiagram = (index: number) => {
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen">
+      <div className="flex-1 flex flex-col min-w-0" style={{ height: containerHeight }}>
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
-          style={{ height: "calc(100dvh - 140px)", minHeight: 0 }}
+          style={{ height: containerHeight - 140, minHeight: 0 }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
@@ -537,7 +575,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                     {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
                       <div className="flex flex-col lg:flex-row gap-4 max-w-full">
                         {shouldShowSajuDiagram(index) && (
-                          <div className="flex-1 max-w-md mx-auto lg:mx-0">
+                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
                             <SajuDiagram
                               saju={stableSaju}
                               name={name}
@@ -557,7 +595,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                           </div>
                         )}
                         {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
-                          <div className="flex-1 max-w-md mx-auto lg:mx-0">
+                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
                             <DaeunDiagram
                               daeun={chatData.calculatedDaeun.pillars || []}
                               birthInfo={chatData.stableBirthInfo}
