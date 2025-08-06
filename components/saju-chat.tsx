@@ -132,9 +132,7 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
-  const [isInputFocused, setIsInputFocused] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(0)
 
   const sessionId = useMemo(() => {
     try {
@@ -165,21 +163,10 @@ export default function SajuChat({
 
   useEffect(() => {
     const updateViewport = () => {
-      const visualViewport = window.visualViewport
-      const windowHeight = window.innerHeight
-      
-      if (visualViewport) {
-        const keyboardHeight = Math.max(0, windowHeight - visualViewport.height)
-        setKeyboardHeight(keyboardHeight)
-        setIsKeyboardOpen(keyboardHeight > 100) // 임계값을 100으로 낮춤
-      
-        // CSS 변수 설정
-        document.documentElement.style.setProperty('--vh', `${visualViewport.height * 0.01}px`)
-        document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height)
       } else {
-        setKeyboardHeight(0)
-        setIsKeyboardOpen(false)
-        document.documentElement.style.setProperty('--vh', `${windowHeight * 0.01}px`)
+        setViewportHeight(window.innerHeight)
       }
     }
 
@@ -513,7 +500,7 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex bg-white h-screen overflow-hidden">
+    <div className="flex bg-white overflow-hidden" style={{ height: `${viewportHeight}px` }}>
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -542,25 +529,12 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-      <div 
-        className="flex-1 flex flex-col min-w-0 relative"
-        style={{
-          height: 'calc(var(--vh, 1vh) * 100)',
-          minHeight: 'calc(var(--vh, 1vh) * 100)',
-        }}
-      >
+      <div className="flex-1 flex flex-col min-w-0 relative">
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
           style={{ 
             paddingBottom: '8px',
-            height: isKeyboardOpen 
-              ? `calc(100vh - ${keyboardHeight + 100}px)` // 100px는 입력 영역 높이
-              : 'calc(100vh - 100px)',
-            maxHeight: isKeyboardOpen 
-              ? `calc(100vh - ${keyboardHeight + 100}px)` 
-              : 'calc(100vh - 100px)',
-            transition: 'height 0.3s ease-in-out',
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
@@ -745,23 +719,7 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div 
-          className="border-t bg-white flex-shrink-0 relative"
-          style={{
-            padding: '12px 16px',
-            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-            position: 'fixed',
-            bottom: isKeyboardOpen ? `${keyboardHeight}px` : '0px',
-            left: '0',
-            right: '0',
-            zIndex: 50,
-            height: '100px', // 고정 높이 설정
-            display: 'flex',
-            alignItems: 'center',
-            transition: 'bottom 0.3s ease-in-out',
-            boxShadow: isKeyboardOpen ? '0 -4px 6px -1px rgba(0, 0, 0, 0.1)' : 'none',
-          }}
-        >
+        <div className="border-t bg-white flex-shrink-0 relative p-3 sm:p-4">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
@@ -793,8 +751,6 @@ export default function SajuChat({
                 <Input
                   value={input}
                   onChange={handleInputChange}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
                   placeholder="무엇이든 물어보세요"
                   className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
                   disabled={isLoading || isInitialQuestionsMode}
