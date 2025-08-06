@@ -132,7 +132,7 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
-  const [viewportHeight, setViewportHeight] = useState(0)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   const sessionId = useMemo(() => {
     try {
@@ -162,31 +162,35 @@ export default function SajuChat({
   })
 
   useEffect(() => {
-    const updateViewport = () => {
-      if (window.visualViewport) {
-        setViewportHeight(window.visualViewport.height)
+    const updateKeyboardHeight = () => {
+      const windowHeight = window.innerHeight
+      const visualViewport = window.visualViewport
+      
+      if (visualViewport) {
+        const keyboardHeight = Math.max(0, windowHeight - visualViewport.height)
+        setKeyboardHeight(keyboardHeight)
       } else {
-        setViewportHeight(window.innerHeight)
+        setKeyboardHeight(0)
       }
     }
 
-    updateViewport()
+    updateKeyboardHeight()
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewport)
+      window.visualViewport.addEventListener('resize', updateKeyboardHeight)
     }
     
-    window.addEventListener('resize', updateViewport)
+    window.addEventListener('resize', updateKeyboardHeight)
     window.addEventListener('orientationchange', () => {
-      setTimeout(updateViewport, 100)
+      setTimeout(updateKeyboardHeight, 100)
     })
 
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewport)
+        window.visualViewport.removeEventListener('resize', updateKeyboardHeight)
       }
-      window.removeEventListener('resize', updateViewport)
-      window.removeEventListener('orientationchange', updateViewport)
+      window.removeEventListener('resize', updateKeyboardHeight)
+      window.removeEventListener('orientationchange', updateKeyboardHeight)
     }
   }, [])
 
@@ -500,7 +504,7 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex bg-white overflow-hidden" style={{ height: `${viewportHeight}px` }}>
+    <div className="flex bg-white h-screen overflow-hidden">
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -534,7 +538,7 @@ export default function SajuChat({
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
           style={{ 
-            paddingBottom: '8px',
+            paddingBottom: keyboardHeight > 0 ? `${keyboardHeight + 120}px` : '120px',
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
@@ -719,7 +723,19 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div className="border-t bg-white flex-shrink-0 relative p-3 sm:p-4">
+        <div 
+          className="border-t bg-white flex-shrink-0 relative"
+          style={{
+            position: 'fixed',
+            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0px',
+            left: '0',
+            right: '0',
+            zIndex: 50,
+            padding: '12px 16px',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            transition: 'bottom 0.3s ease-in-out',
+          }}
+        >
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
