@@ -10,7 +10,7 @@ import type { BirthInfo } from "@/types/birth-date"
 import { toast } from "sonner"
 import DaeunDiagram from "@/components/daeun-diagram"
 import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
+import remarkGfm from "remark-markdown"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
@@ -564,9 +564,14 @@ export default function SajuChat({
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
           style={{ 
-            paddingBottom: isKeyboardOpen ? '8px' : 'max(8px, var(--safe-area-bottom, 0px))',
+            paddingBottom: isKeyboardOpen 
+              ? '80px' // 입력 필드 높이만큼
+              : 'max(80px, calc(var(--safe-area-bottom, 0px) + 80px))',
             transition: 'padding-bottom 0.3s ease-in-out',
-            height: isKeyboardOpen ? `calc(100% - ${keyboardHeight}px)` : '100%',
+            height: isKeyboardOpen 
+              ? `calc(100% - ${keyboardHeight + 80}px)` // 키보드 높이 + 입력 필드 높이
+              : 'calc(100% - 80px)', // 입력 필드 높이만큼 빼기
+            marginBottom: isKeyboardOpen ? '0' : '80px', // 입력 필드를 위한 여백
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
@@ -759,9 +764,12 @@ export default function SajuChat({
               ? '12px' 
               : 'max(12px, calc(var(--safe-area-bottom, 0px) + 12px))',
             transition: 'padding-bottom 0.3s ease-in-out',
-            position: 'sticky',
-            bottom: 0,
-            zIndex: 10,
+            position: 'fixed',
+            bottom: isKeyboardOpen ? `${keyboardHeight}px` : '0',
+            left: '0',
+            right: '0',
+            zIndex: 50,
+            transform: isKeyboardOpen ? 'translateY(0)' : 'translateY(0)',
           }}
         >
           {showScrollButton && (
@@ -769,7 +777,12 @@ export default function SajuChat({
               onClick={scrollToBottom}
               variant="outline"
               size="sm"
-              className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
+              className="fixed right-4 sm:right-6 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-40"
+              style={{
+                bottom: isKeyboardOpen 
+                  ? `${keyboardHeight + 100}px` // 키보드 + 입력 필드 + 여백
+                  : '100px' // 입력 필드 + 여백
+              }}
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
