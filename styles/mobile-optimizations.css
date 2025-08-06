@@ -1,31 +1,99 @@
-/* Mobile optimizations - Simplified */
-@media screen and (max-width: 768px) {
-  /* Prevent zoom on input focus */
-  input, textarea, select {
-    font-size: 16px !important;
+/* iOS Safari viewport height fixes */
+:root {
+  --vh: 1vh;
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Dynamic viewport height calculation for iOS */
+.min-h-screen-mobile {
+  min-height: 100vh;
+  min-height: calc(var(--vh, 1vh) * 100);
+}
+
+.h-screen-mobile {
+  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+/* Chat container specific height for iOS Safari */
+.chat-container-height {
+  height: calc(100vh - 140px);
+  height: calc(var(--vh, 1vh) * 100 - 140px);
+  min-height: 0;
+}
+
+/* Mobile scroll optimization */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+}
+
+/* Prevent zoom on input focus for iOS */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+  font-size: 16px !important;
+  transform: translateZ(0);
+  -webkit-appearance: none;
+}
+
+/* iOS keyboard handling - prevent double adjustment */
+.ios-keyboard-adjust {
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+/* Ensure proper stacking for fixed elements */
+.chat-input-container {
+  position: relative;
+  z-index: 10;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .chat-container-height {
+    height: calc(100vh - 140px);
+    height: calc(var(--vh, 1vh) * 100 - 140px);
   }
   
-  /* Touch-friendly scrolling */
-  .mobile-scroll {
+  /* Prevent bounce scrolling on chat container */
+  .chat-messages-container {
+    position: relative;
+    overflow: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-  
-  /* Safe area support - minimal padding */
-  .pb-safe {
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
-  }
-  
-  /* Dynamic viewport height support */
-  .min-h-screen-mobile {
-    min-height: 100vh;
-    min-height: 100dvh;
   }
 }
 
-/* iOS specific improvements */
-@supports (-webkit-touch-callout: none) {
-  .mobile-scroll {
-    transform: translate3d(0, 0, 0);
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .chat-container-height {
+    height: calc(100vh - 120px);
+    height: calc(var(--vh, 1vh) * 100 - 120px);
+  }
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ensure proper touch targets on mobile */
+@media (max-width: 768px) {
+  button, .button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
   }
 }

@@ -47,7 +47,6 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-    --vh: 1vh; /* iOS Safari viewport height fix */
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -114,7 +113,7 @@ body {
   input[type="email"],
   input[type="password"],
   textarea {
-    font-size: 16px !important;
+    font-size: 16px;
   }
 }
 
@@ -122,22 +121,4 @@ body {
 .mobile-scroll-container {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-}
-
-/* iOS Safari specific fixes */
-@supports (-webkit-touch-callout: none) {
-  /* iOS Safari only */
-  .ios-safari-fix {
-    height: calc(var(--vh, 1vh) * 100);
-    min-height: calc(var(--vh, 1vh) * 100);
-  }
-  
-  /* Fix for input fields being covered by virtual keyboard */
-  .ios-input-fix {
-    position: fixed;
-    bottom: env(safe-area-inset-bottom, 0);
-    left: 0;
-    right: 0;
-    z-index: 50;
-  }
 }

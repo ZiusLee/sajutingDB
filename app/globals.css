@@ -130,52 +130,6 @@ body {
     transition: transform 0.3s ease-in-out;
   }
 
-  /* Mobile keyboard optimizations */
-  .keyboard-aware {
-    height: calc(var(--vh, 1vh) * 100);
-    transition: height 0.3s ease-in-out;
-  }
-
-  .keyboard-aware.keyboard-open {
-    height: calc((var(--vh, 1vh) * 100) - var(--keyboard-height, 0px));
-  }
-
-  /* Prevent input zoom and improve focus behavior */
-  @media (max-width: 768px) {
-    input:focus,
-    textarea:focus {
-      font-size: 16px !important;
-      transform: translateZ(0);
-      -webkit-appearance: none;
-    }
-
-    /* Better input positioning when keyboard is open */
-    .mobile-input-container {
-      position: sticky;
-      bottom: 0;
-      background: white;
-      z-index: 10;
-    }
-
-    /* Smooth keyboard transitions */
-    .keyboard-transition {
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    /* Fix for iOS Safari input field positioning */
-    @supports (-webkit-touch-callout: none) {
-      .ios-input-fix {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        border-top: 1px solid hsl(var(--border));
-        z-index: 50;
-      }
-    }
-  }
-
   /* AI Response Content Styling */
   .ai-response-content {
     @apply text-base sm:text-lg leading-relaxed max-w-none break-words;

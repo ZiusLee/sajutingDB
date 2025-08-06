@@ -7,48 +7,71 @@ export function useMobileKeyboard() {
   const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    // Set CSS custom property for viewport height
+    const setVH = () => {
+      const vh = window.innerHeight * 0.01
+      document.documentElement.style.setProperty('--vh', `${vh}px`)
+    }
 
+    // Initial set
+    setVH()
+
+    // iOS Safari keyboard detection
     const handleResize = () => {
-      // Check if we're on mobile
-      if (window.innerWidth > 768) return
-
-      const viewportHeight = window.visualViewport?.height || window.innerHeight
-      const windowHeight = window.innerHeight
-
-      // If viewport height is significantly smaller than window height, keyboard is likely open
-      const heightDifference = windowHeight - viewportHeight
-      const isOpen = heightDifference > 150 // Threshold for keyboard detection
-
-      setIsKeyboardOpen(isOpen)
-      setKeyboardHeight(isOpen ? heightDifference : 0)
-
-      // Add class to body for CSS targeting
-      if (isOpen) {
-        document.body.classList.add("keyboard-open")
-      } else {
-        document.body.classList.remove("keyboard-open")
+      setVH()
+      
+      // Only apply keyboard detection on mobile devices
+      if (window.innerWidth <= 768) {
+        const currentHeight = window.innerHeight
+        const currentWidth = window.innerWidth
+        
+        // Detect keyboard by significant height reduction
+        const heightReduction = window.screen.height - currentHeight
+        const isLandscape = currentWidth > currentHeight
+        
+        // Adjust thresholds based on orientation
+        const keyboardThreshold = isLandscape ? 200 : 300
+        
+        if (heightReduction > keyboardThreshold) {
+          setIsKeyboardOpen(true)
+          setKeyboardHeight(heightReduction)
+        } else {
+          setIsKeyboardOpen(false)
+          setKeyboardHeight(0)
+        }
       }
     }
 
-    // Listen to visual viewport changes (better for keyboard detection)
+    // Visual viewport API for better keyboard detection (iOS Safari 13+)
     if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleResize)
+      const handleVisualViewportChange = () => {
+        setVH()
+        
+        if (window.innerWidth <= 768) {
+          const heightDiff = window.innerHeight - window.visualViewport.height
+          
+          if (heightDiff > 150) {
+            setIsKeyboardOpen(true)
+            setKeyboardHeight(heightDiff)
+          } else {
+            setIsKeyboardOpen(false)
+            setKeyboardHeight(0)
+          }
+        }
+      }
+
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange)
+      
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange)
+      }
     } else {
       // Fallback for older browsers
-      window.addEventListener("resize", handleResize)
-    }
-
-    // Initial check
-    handleResize()
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", handleResize)
-      } else {
-        window.removeEventListener("resize", handleResize)
+      window.addEventListener('resize', handleResize)
+      
+      return () => {
+        window.removeEventListener('resize', handleResize)
       }
-      document.body.classList.remove("keyboard-open")
     }
   }, [])
 
