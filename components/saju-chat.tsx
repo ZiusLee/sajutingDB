@@ -124,7 +124,7 @@ export default function SajuChat({
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
-  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [showScrollButton, setShowScrollButton] = useState(showScrollButton)
   const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
   const [transitionMessages, setTransitionMessages] = useState<any[] | null>(null)
   const isPersistingRef = useRef(false)
@@ -582,7 +582,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                             </h1>
                           ),
                           h2: ({ children }) => (
-                            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 mt-6 pb-2 border-b border-gray-200">
+                            <h2 className="text-xl font-semibold text-gray-800 mb-4 mt-6">
                               {children}
                             </h2>
                           ),
@@ -598,13 +598,13 @@ const shouldShowDaeunDiagram = (index: number) => {
                           ),
                           // 단락 스타일링
                           p: ({ children }) => (
-                            <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
+                            <p className="text-base leading-relaxed text-gray-700 mb-4 last:mb-0">
                               {children}
                             </p>
                           ),
                           // 구분선 스타일링
                           hr: () => (
-                            <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+                            <div className="my-6"></div>
                           ),
                           // 리스트 스타일링
                           ul: ({ children }) => (
@@ -618,10 +618,10 @@ const shouldShowDaeunDiagram = (index: number) => {
                             </ol>
                           ),
                           li: ({ children, ordered }) => (
-                            <li className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
+                            <li className={`flex items-start gap-3 leading-relaxed text-gray-700 ${
                               ordered 
-                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
-                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
+                                ? "text-xl counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
+                                : "text-base before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
                             }`}>
                               <span className="flex-1">{children}</span>
                             </li>
