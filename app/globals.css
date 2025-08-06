@@ -129,6 +129,30 @@ body {
   .keyboard-adjust {
     transition: transform 0.3s ease-in-out;
   }
+
+  /* AI Response Content Styling */
+  .ai-response-content {
+    @apply text-base sm:text-lg leading-relaxed max-w-none break-words;
+  }
+
+  /* Counter for ordered lists */
+  .counter-reset-item {
+    counter-reset: item;
+  }
+
+  .counter-increment-item {
+    counter-increment: item;
+  }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer base {
@@ -239,5 +263,42 @@ body {
 @media screen and (max-width: 768px) and (orientation: portrait) {
   .android-keyboard-adjust {
     height: calc(100vh - env(keyboard-inset-height, 0px));
+  }
+}
+
+/* Enhanced AI Response Styling */
+.ai-response-content h1 {
+  @apply scroll-mt-20;
+}
+
+.ai-response-content h2 {
+  @apply scroll-mt-16;
+}
+
+.ai-response-content h3 {
+  @apply scroll-mt-12;
+}
+
+/* Better focus states for accessibility */
+.ai-response-content a:focus,
+.ai-response-content button:focus {
+  @apply outline-2 outline-offset-2 outline-blue-500;
+}
+
+/* Print styles for better printing */
+@media print {
+  .ai-response-content {
+    @apply text-black bg-white;
+  }
+  
+  .ai-response-content h1,
+  .ai-response-content h2,
+  .ai-response-content h3 {
+    @apply break-after-avoid;
+  }
+  
+  .ai-response-content pre,
+  .ai-response-content blockquote {
+    @apply break-inside-avoid;
   }
 }

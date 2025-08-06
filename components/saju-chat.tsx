@@ -615,8 +615,126 @@ export default function SajuChat({
                         />
                       </div>
                     )}
-                    <div className="text-foreground text-base sm:text-lg leading-relaxed prose prose-sm sm:prose-lg max-w-none break-words [&>p]:mb-3 sm:[&>p]:mb-4 [&>h1]:text-lg sm:[&>h1]:text-xl [&>h2]:text-base sm:[&>h2]:text-lg [&>h3]:text-base sm:[&>h3]:text-lg [&>ul]:mb-3 sm:[&>ul]:mb-4 [&>li]:mb-1 sm:[&>li]:mb-2 [&>ul]:pl-3 sm:[&>ul]:pl-4 [&>li]:text-base sm:[&>li]:text-lg">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    <div className="ai-response-content">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          // 제목들 스타일링
+                          h1: ({ children }) => (
+                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 mt-8 pb-3 border-b-2 border-gray-200 first:mt-0">
+                              {children}
+                            </h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 mt-6 pb-2 border-b border-gray-200">
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5">
+                              {children}
+                            </h3>
+                          ),
+                          h4: ({ children }) => (
+                            <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">
+                              {children}
+                            </h4>
+                          ),
+                          // 단락 스타일링
+                          p: ({ children }) => (
+                            <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
+                              {children}
+                            </p>
+                          ),
+                          // 구분선 스타일링
+                          hr: () => (
+                            <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+                          ),
+                          // 리스트 스타일링
+                          ul: ({ children }) => (
+                            <ul className="space-y-2 mb-4 pl-0">
+                              {children}
+                            </ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="space-y-2 mb-4 pl-0 counter-reset-item">
+                              {children}
+                            </ol>
+                          ),
+                          li: ({ children, ordered }) => (
+                            <li className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
+                              ordered 
+                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
+                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
+                            }`}>
+                              <span className="flex-1">{children}</span>
+                            </li>
+                          ),
+                          // 강조 텍스트 스타일링
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
+                              {children}
+                            </strong>
+                          ),
+                          em: ({ children }) => (
+                            <em className="italic text-gray-600 font-medium">
+                              {children}
+                            </em>
+                          ),
+                          // 코드 블록 스타일링
+                          code: ({ children, className }) => {
+                            const isInline = !className
+                            if (isInline) {
+                              return (
+                                <code className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono">
+                                  {children}
+                                </code>
+                              )
+                            }
+                            return (
+                              <code className="block bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm font-mono overflow-x-auto mb-4">
+                                {children}
+                              </code>
+                            )
+                          },
+                          pre: ({ children }) => (
+                            <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-x-auto mb-4">
+                              {children}
+                            </pre>
+                          ),
+                          // 인용문 스타일링
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 my-4 italic text-gray-700">
+                              {children}
+                            </blockquote>
+                          ),
+                          // 테이블 스타일링
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto mb-4">
+                              <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+                                {children}
+                              </table>
+                            </div>
+                          ),
+                          thead: ({ children }) => (
+                            <thead className="bg-gray-50">
+                              {children}
+                            </thead>
+                          ),
+                          th: ({ children }) => (
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-200">
+                              {children}
+                            </th>
+                          ),
+                          td: ({ children }) => (
+                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
+                              {children}
+                            </td>
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
                     </div>
                     <MessageFeedbackButtons
                       messageId={message.id || `temp-${index}`}
