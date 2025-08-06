@@ -169,19 +169,17 @@ export default function SajuChat({
       const windowHeight = window.innerHeight
       
       if (visualViewport) {
-        const keyboardHeight = windowHeight - visualViewport.height
+        const keyboardHeight = Math.max(0, windowHeight - visualViewport.height)
         setKeyboardHeight(keyboardHeight)
-        setIsKeyboardOpen(keyboardHeight > 150)
+        setIsKeyboardOpen(keyboardHeight > 100) // 임계값을 100으로 낮춤
       
-        // Use visual viewport height for more accurate calculations
+        // CSS 변수 설정
         document.documentElement.style.setProperty('--vh', `${visualViewport.height * 0.01}px`)
         document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
-        document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
       } else {
         setKeyboardHeight(0)
         setIsKeyboardOpen(false)
         document.documentElement.style.setProperty('--vh', `${windowHeight * 0.01}px`)
-        document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
       }
     }
 
@@ -196,22 +194,12 @@ export default function SajuChat({
       setTimeout(updateViewport, 100)
     })
 
-    // Additional iOS Safari specific handling
-    const handleScroll = () => {
-      if (window.innerHeight !== document.documentElement.clientHeight) {
-        updateViewport()
-      }
-    }
-  
-    window.addEventListener('scroll', handleScroll, { passive: true })
-
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', updateViewport)
       }
       window.removeEventListener('resize', updateViewport)
       window.removeEventListener('orientationchange', updateViewport)
-      window.removeEventListener('scroll', handleScroll)
     }
   }, [])
 
@@ -565,10 +553,14 @@ export default function SajuChat({
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
           style={{ 
-            paddingBottom: isKeyboardOpen ? '8px' : 'max(8px, var(--safe-area-bottom, 0px))',
-            transition: 'padding-bottom 0.3s ease-in-out',
-            height: isKeyboardOpen ? `calc(100% - ${keyboardHeight + 80}px)` : 'calc(100% - 80px)', // 80px는 입력 필드 영역 높이
-            maxHeight: isKeyboardOpen ? `calc(100% - ${keyboardHeight + 80}px)` : 'calc(100% - 80px)',
+            paddingBottom: '8px',
+            height: isKeyboardOpen 
+              ? `calc(100vh - ${keyboardHeight + 100}px)` // 100px는 입력 영역 높이
+              : 'calc(100vh - 100px)',
+            maxHeight: isKeyboardOpen 
+              ? `calc(100vh - ${keyboardHeight + 100}px)` 
+              : 'calc(100vh - 100px)',
+            transition: 'height 0.3s ease-in-out',
           }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
@@ -757,16 +749,17 @@ export default function SajuChat({
           className="border-t bg-white flex-shrink-0 relative"
           style={{
             padding: '12px 16px',
-            paddingBottom: isKeyboardOpen 
-              ? '12px' 
-              : 'max(12px, calc(var(--safe-area-bottom, 0px) + 12px))',
-            transition: 'all 0.3s ease-in-out',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
             position: 'fixed',
             bottom: isKeyboardOpen ? `${keyboardHeight}px` : '0px',
             left: '0',
             right: '0',
             zIndex: 50,
-            transform: isKeyboardOpen && isInputFocused ? 'translateY(0)' : 'translateY(0)',
+            height: '100px', // 고정 높이 설정
+            display: 'flex',
+            alignItems: 'center',
+            transition: 'bottom 0.3s ease-in-out',
+            boxShadow: isKeyboardOpen ? '0 -4px 6px -1px rgba(0, 0, 0, 0.1)' : 'none',
           }}
         >
           {showScrollButton && (
