@@ -275,9 +275,13 @@ export function MemoryDashboard() {
                     memories.map((memory) => (
                       <Card key={memory.id} className="relative">
                         <CardContent className="pt-4">
-                          {/* 데스크탑: 왼쪽에 버튼, 오른쪽에 텍스트 */}
-                          <div className="hidden md:flex items-start gap-3">
-                            <div className="flex flex-col gap-1 pt-1">
+                          {/* 데스크탑: 텍스트와 버튼이 같은 라인에 */}
+                          <div className="hidden md:flex items-start justify-between gap-4">
+                            <p className="text-sm leading-relaxed flex-1">
+                              {memory.content}
+                            </p>
+                            
+                            <div className="flex items-center gap-1 flex-shrink-0">
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -325,10 +329,6 @@ export function MemoryDashboard() {
                                 </AlertDialogContent>
                               </AlertDialog>
                             </div>
-                            
-                            <p className="text-sm leading-relaxed flex-1">
-                              {memory.content}
-                            </p>
                           </div>
 
                           {/* 모바일: 텍스트 위, 버튼 아래 */}
