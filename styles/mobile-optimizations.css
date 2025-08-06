@@ -13,18 +13,7 @@
   
   /* Safe area support */
   .pb-safe {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-  
-  /* Dynamic viewport height support */
-  .min-h-screen-mobile {
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
-  
-  /* Keyboard handling - simple approach */
-  .keyboard-adjust {
-    transition: transform 0.3s ease-in-out;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 }
 

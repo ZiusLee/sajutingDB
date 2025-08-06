@@ -160,56 +160,6 @@ export default function SajuChat({
     isInitialized: false,
   })
 
-  useEffect(() => {
-    const updateViewport = () => {
-      const visualViewport = window.visualViewport
-      const windowHeight = window.innerHeight
-      
-      if (visualViewport) {
-        const keyboardHeight = windowHeight - visualViewport.height
-        
-      
-        // Use visual viewport height for more accurate calculations
-        document.documentElement.style.setProperty('--vh', `${visualViewport.height * 0.01}px`)
-        document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
-        document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
-      } else {
-        
-        document.documentElement.style.setProperty('--vh', `${windowHeight * 0.01}px`)
-        document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
-      }
-    }
-
-    updateViewport()
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewport)
-    }
-    
-    window.addEventListener('resize', updateViewport)
-    window.addEventListener('orientationchange', () => {
-      setTimeout(updateViewport, 100)
-    })
-
-    // Additional iOS Safari specific handling
-    const handleScroll = () => {
-      if (window.innerHeight !== document.documentElement.clientHeight) {
-        updateViewport()
-      }
-    }
-  
-    window.addEventListener('scroll', handleScroll, { passive: true })
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewport)
-      }
-      window.removeEventListener('resize', updateViewport)
-      window.removeEventListener('orientationchange', updateViewport)
-      window.removeEventListener('scroll', handleScroll)
-    }
-  }, [])
-
   const stableSaju = useMemo(() => (saju ? JSON.parse(JSON.stringify(saju)) : null), [JSON.stringify(saju)])
   const stableBirthInfo = useMemo(
     () => (birthInfo ? JSON.parse(JSON.stringify(birthInfo)) : null),
@@ -478,7 +428,7 @@ export default function SajuChat({
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
-      <div className="flex items-center justify-center bg-background" style={{ height: '100vh' }}>
+      <div className="flex items-center justify-center bg-background h-screen">
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           채팅을 불러오는 중...
@@ -489,7 +439,7 @@ export default function SajuChat({
 
   if (!stableSaju || !aiChatBody.compressedSaju) {
     return (
-      <div className="flex items-center justify-center bg-background p-4 text-center" style={{ height: '100vh' }}>
+      <div className="flex items-center justify-center bg-background p-4 text-center h-screen">
         <div>
           <h2 className="text-xl font-semibold">오류</h2>
           <p className="text-muted-foreground mt-2">
@@ -549,16 +499,13 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-      <div 
-        className="flex-1 flex flex-col min-w-0 relative mobile-chat-layout"
-        style={{
-          height: 'calc(100dvh - 140px)', // 고정 높이
-          minHeight: 'calc(100dvh - 140px)',
-        }}
-      >
+      <div className="flex-1 flex flex-col min-w-0 relative h-full">
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto mobile-scroll pb-safe"
+          className="flex-1 overflow-y-auto"
+          style={{ 
+            paddingBottom: '8px',
+          }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
@@ -742,13 +689,7 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div 
-          className="border-t bg-white flex-shrink-0 mobile-input-fixed"
-          style={{
-            padding: '12px 16px',
-            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-          }}
-        >
+        <div className="border-t bg-white flex-shrink-0 p-3 sm:p-4 pb-safe">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
