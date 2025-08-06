@@ -101,11 +101,6 @@ body {
   }
 }
 
-/* iOS Safari viewport height fix */
-.ios-vh-fix {
-  height: calc(var(--vh, 1vh) * 100);
-}
-
 /* Safe area insets for mobile devices */
 @supports (padding: max(0px)) {
   .safe-area-bottom {
@@ -119,7 +114,7 @@ body {
   input[type="email"],
   input[type="password"],
   textarea {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 

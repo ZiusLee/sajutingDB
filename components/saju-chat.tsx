@@ -132,8 +132,6 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
 
   const sessionId = useMemo(() => {
     try {
@@ -161,45 +159,6 @@ export default function SajuChat({
     initialMessages: [],
     isInitialized: false,
   })
-
-  useEffect(() => {
-    const updateViewport = () => {
-      const visualViewport = window.visualViewport
-      const windowHeight = window.innerHeight
-      
-      if (visualViewport) {
-        const keyboardHeight = windowHeight - visualViewport.height
-        setKeyboardHeight(keyboardHeight)
-        setIsKeyboardOpen(keyboardHeight > 150)
-        
-        document.documentElement.style.setProperty('--vh', `${visualViewport.height * 0.01}px`)
-        document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
-      } else {
-        setKeyboardHeight(0)
-        setIsKeyboardOpen(false)
-        document.documentElement.style.setProperty('--vh', `${windowHeight * 0.01}px`)
-      }
-    }
-
-    updateViewport()
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewport)
-    }
-    
-    window.addEventListener('resize', updateViewport)
-    window.addEventListener('orientationchange', () => {
-      setTimeout(updateViewport, 100)
-    })
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewport)
-      }
-      window.removeEventListener('resize', updateViewport)
-      window.removeEventListener('orientationchange', updateViewport)
-    }
-  }, [])
 
   const stableSaju = useMemo(() => (saju ? JSON.parse(JSON.stringify(saju)) : null), [JSON.stringify(saju)])
   const stableBirthInfo = useMemo(
@@ -469,7 +428,7 @@ export default function SajuChat({
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
-      <div className="flex items-center justify-center bg-background" style={{ height: '100vh' }}>
+      <div className="flex items-center justify-center bg-background h-screen">
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           채팅을 불러오는 중...
@@ -480,7 +439,7 @@ export default function SajuChat({
 
   if (!stableSaju || !aiChatBody.compressedSaju) {
     return (
-      <div className="flex items-center justify-center bg-background p-4 text-center" style={{ height: '100vh' }}>
+      <div className="flex items-center justify-center bg-background p-4 text-center h-screen">
         <div>
           <h2 className="text-xl font-semibold">오류</h2>
           <p className="text-muted-foreground mt-2">
@@ -540,20 +499,11 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-      <div 
-        className="flex-1 flex flex-col min-w-0 relative"
-        style={{
-          height: isKeyboardOpen ? `calc(100vh - ${keyboardHeight}px)` : '100vh',
-          transition: 'height 0.3s ease-in-out'
-        }}
-      >
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
-          style={{ 
-            paddingBottom: isKeyboardOpen ? '8px' : '0px',
-            transition: 'padding-bottom 0.3s ease-in-out'
-          }}
+          style={{ paddingBottom: '8px' }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
@@ -573,6 +523,16 @@ export default function SajuChat({
                   <div className="space-y-3 sm:space-y-4">
                     {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
                       <div className="flex flex-col lg:flex-row gap-4 max-w-full">
+                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
+                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
+                            <DaeunDiagram
+                              daeun={chatData.calculatedDaeun.pillars || []}
+                              birthInfo={chatData.stableBirthInfo}
+                              name={name}
+                              gender={gender}
+                            />
+                          </div>
+                        )}
                         {shouldShowSajuDiagram(index) && (
                           <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
                             <SajuDiagram
@@ -590,16 +550,6 @@ export default function SajuChat({
                               lunarMonth={chatData.stableBirthInfo?.lunarMonth}
                               lunarDay={chatData.stableBirthInfo?.lunarDay}
                               location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
-                            />
-                          </div>
-                        )}
-                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
-                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
-                            <DaeunDiagram
-                              daeun={chatData.calculatedDaeun.pillars || []}
-                              birthInfo={chatData.stableBirthInfo}
-                              name={name}
-                              gender={gender}
                             />
                           </div>
                         )}
@@ -737,14 +687,7 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div 
-          className="border-t bg-white flex-shrink-0 relative"
-          style={{
-            padding: '12px 16px',
-            paddingBottom: isKeyboardOpen ? '12px' : 'max(12px, env(safe-area-inset-bottom))',
-            transition: 'padding-bottom 0.3s ease-in-out'
-          }}
-        >
+        <div className="border-t bg-white flex-shrink-0 p-3 sm:p-4 pb-safe">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
