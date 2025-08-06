@@ -619,63 +619,65 @@ export default function SajuChat({
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={{
-                          // 제목들 스타일링 - 크기 차이를 줄이고 letter spacing 추가
+                          // 제목들 스타일링
                           h1: ({ children }) => (
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 mt-6 first:mt-0 tracking-tight leading-tight">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 mt-8 pb-3 border-b-2 border-gray-200 first:mt-0">
                               {children}
                             </h1>
                           ),
                           h2: ({ children }) => (
-                            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5 tracking-tight leading-tight">
+                            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 mt-6 pb-2 border-b border-gray-200">
                               {children}
                             </h2>
                           ),
                           h3: ({ children }) => (
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 mt-4 tracking-tight leading-tight">
+                            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5">
                               {children}
                             </h3>
                           ),
                           h4: ({ children }) => (
-                            <h4 className="text-base font-medium text-gray-700 mb-2 mt-3 tracking-tight leading-tight">
+                            <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">
                               {children}
                             </h4>
                           ),
-                          // 단락 스타일링 - letter spacing과 line height 개선
+                          // 단락 스타일링
                           p: ({ children }) => (
-                            <p className="text-sm sm:text-base leading-relaxed text-gray-700 mb-3 last:mb-0 tracking-wide">
+                            <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
                               {children}
                             </p>
                           ),
-                          // 구분선 제거 - hr 태그를 빈 div로 대체하거나 아예 제거
-                          hr: () => null,
-                          // 리스트 스타일링 - 간격과 letter spacing 조정
+                          // 구분선 스타일링
+                          hr: () => (
+                            <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+                          ),
+                          // 리스트 스타일링
                           ul: ({ children }) => (
-                            <ul className="space-y-1.5 mb-3 pl-0">
+                            <ul className="space-y-2 mb-4 pl-0">
                               {children}
                             </ul>
                           ),
                           ol: ({ children }) => (
-                            <ol className="space-y-1.5 mb-3 pl-0 counter-reset-item">
+                            <ol className="space-y-2 mb-4 pl-0 counter-reset-item">
                               {children}
                             </ol>
                           ),
                           li: ({ children, ordered }) => (
-                            <li className={`flex items-start gap-2.5 text-sm sm:text-base leading-relaxed text-gray-700 tracking-wide ${
+                            <li className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
                               ordered 
-                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-xs before:font-medium before:rounded-full before:w-5 before:h-5 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
-                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-base before:flex-shrink-0 before:w-3 before:mt-1"
+                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
+                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
                             }`}>
                               <span className="flex-1">{children}</span>
                             </li>
                           ),
-                          // 강조 텍스트 스타일링 - 배경색 제거하고 단순하게
+                          // 강조 텍스트 스타일링
                           strong: ({ children }) => (
-                            <strong className="font-semibold text-gray-900 tracking-tight">
+                            <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
                               {children}
                             </strong>
                           ),
                           em: ({ children }) => (
-                            <em className="italic text-gray-600 font-medium tracking-wide">
+                            <em className="italic text-gray-600 font-medium">
                               {children}
                             </em>
                           ),
@@ -684,31 +686,31 @@ export default function SajuChat({
                             const isInline = !className
                             if (isInline) {
                               return (
-                                <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-xs font-mono tracking-tight">
+                                <code className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono">
                                   {children}
                                 </code>
                               )
                             }
                             return (
-                              <code className="block bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs font-mono overflow-x-auto mb-3 tracking-tight">
+                              <code className="block bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm font-mono overflow-x-auto mb-4">
                                 {children}
                               </code>
                             )
                           },
                           pre: ({ children }) => (
-                            <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-x-auto mb-3">
+                            <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-x-auto mb-4">
                               {children}
                             </pre>
                           ),
                           // 인용문 스타일링
                           blockquote: ({ children }) => (
-                            <blockquote className="border-l-3 border-blue-400 bg-blue-50 pl-3 py-2 my-3 italic text-gray-700 tracking-wide">
+                            <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 my-4 italic text-gray-700">
                               {children}
                             </blockquote>
                           ),
                           // 테이블 스타일링
                           table: ({ children }) => (
-                            <div className="overflow-x-auto mb-3">
+                            <div className="overflow-x-auto mb-4">
                               <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
                                 {children}
                               </table>
@@ -720,12 +722,12 @@ export default function SajuChat({
                             </thead>
                           ),
                           th: ({ children }) => (
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-900 border-b border-gray-200 tracking-tight">
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-200">
                               {children}
                             </th>
                           ),
                           td: ({ children }) => (
-                            <td className="px-3 py-2 text-xs text-gray-700 border-b border-gray-100 tracking-wide">
+                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
                               {children}
                             </td>
                           ),
