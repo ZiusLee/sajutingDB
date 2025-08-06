@@ -120,7 +120,6 @@ export default function SajuChat({
   const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
   const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
   const chatContainerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -133,15 +132,8 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
-  const [viewportHeight, setViewportHeight] = useState<number>(0)
-  const [keyboardHeight, setKeyboardHeight] = useState<number>(0)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
-  
-  // 스크롤 제어를 위한 새로운 상태들
-  const [lastUserMessageIndex, setLastUserMessageIndex] = useState<number>(-1)
-  const [hasScrolledToUserMessage, setHasScrolledToUserMessage] = useState(false)
-  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true)
-  const lastMessageCountRef = useRef(0)
 
   const sessionId = useMemo(() => {
     try {
@@ -170,63 +162,42 @@ export default function SajuChat({
     isInitialized: false,
   })
 
-  // Enhanced iOS Safari viewport and keyboard handling
   useEffect(() => {
-    const updateViewportHeight = () => {
+    const updateViewport = () => {
+      const visualViewport = window.visualViewport
       const windowHeight = window.innerHeight
-      const visualHeight = window.visualViewport?.height || windowHeight
-      const keyboardHeightCalc = Math.max(0, windowHeight - visualHeight)
       
-      setViewportHeight(visualHeight)
-      setKeyboardHeight(keyboardHeightCalc)
-      setIsKeyboardOpen(keyboardHeightCalc > 50) // Consider keyboard open if height difference > 50px
-      
-      // Update CSS custom property
-      document.documentElement.style.setProperty('--vh', `${visualHeight * 0.01}px`)
-      document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeightCalc}px`)
+      if (visualViewport) {
+        const keyboardHeight = windowHeight - visualViewport.height
+        setKeyboardHeight(keyboardHeight)
+        setIsKeyboardOpen(keyboardHeight > 150)
+        
+        document.documentElement.style.setProperty('--vh', `${visualViewport.height * 0.01}px`)
+        document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
+      } else {
+        setKeyboardHeight(0)
+        setIsKeyboardOpen(false)
+        document.documentElement.style.setProperty('--vh', `${windowHeight * 0.01}px`)
+      }
     }
 
-    // Initial calculation
-    updateViewportHeight()
+    updateViewport()
 
-    // Listen for viewport changes
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewportHeight)
+      window.visualViewport.addEventListener('resize', updateViewport)
     }
     
-    // Fallback for older browsers
-    window.addEventListener('resize', updateViewportHeight)
+    window.addEventListener('resize', updateViewport)
     window.addEventListener('orientationchange', () => {
-      setTimeout(updateViewportHeight, 100)
+      setTimeout(updateViewport, 100)
     })
-
-    // Handle input focus/blur for better keyboard handling
-    const handleInputFocus = () => {
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
-          })
-        }
-      }, 300) // Wait for keyboard animation
-    }
-
-    const inputElement = inputRef.current
-    if (inputElement) {
-      inputElement.addEventListener('focus', handleInputFocus)
-    }
 
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewportHeight)
+        window.visualViewport.removeEventListener('resize', updateViewport)
       }
-      window.removeEventListener('resize', updateViewportHeight)
-      window.removeEventListener('orientationchange', updateViewportHeight)
-      
-      if (inputElement) {
-        inputElement.removeEventListener('focus', handleInputFocus)
-      }
+      window.removeEventListener('resize', updateViewport)
+      window.removeEventListener('orientationchange', updateViewport)
     }
   }, [])
 
@@ -329,16 +300,12 @@ export default function SajuChat({
           })
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
-          lastMessageCountRef.current = pastMessages.length
 
-          // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
           if (shouldSendInitialQuestions && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
           }
-          // 로그인한 사용자의 새로운 채팅방(첫 번째가 아닌)에서는 자동 질문 비활성화
-          // shouldSendInitialQuestions가 true이지만 isFirstRoom이 false인 경우는 아무것도 하지 않음
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
@@ -359,17 +326,12 @@ export default function SajuChat({
     onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
-      // AI 응답이 완료되면 자동 스크롤을 다시 활성화
-      setIsAutoScrollEnabled(true)
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
-      setIsAutoScrollEnabled(true)
     },
   })
-
-  // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
 
   useEffect(() => {
     if (
@@ -385,24 +347,19 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-// Remove the second question useEffect completely
-
-useEffect(() => {
-  const endInitialMode = () => {
-    console.log("✅ [Flow] Ending initial questions mode.")
-    setIsInitialQuestionsMode(false)
-    setInitialQuestionsToSend([])
-  }
-
-  if (isInitialQuestionsMode && !isLoading) {
-    // End after first response for both first room and non-first room
-    if (messages.length === 2 && messages[1].role === "assistant") {
-      endInitialMode()
+  useEffect(() => {
+    const endInitialMode = () => {
+      console.log("✅ [Flow] Ending initial questions mode.")
+      setIsInitialQuestionsMode(false)
+      setInitialQuestionsToSend([])
     }
-  }
-}, [isInitialQuestionsMode, isLoading, messages])
 
-  // --- End of fundamental fix ---
+    if (isInitialQuestionsMode && !isLoading) {
+      if (messages.length === 2 && messages[1].role === "assistant") {
+        endInitialMode()
+      }
+    }
+  }, [isInitialQuestionsMode, isLoading, messages])
 
   useEffect(() => {
     const saveNewMessages = async () => {
@@ -465,58 +422,6 @@ useEffect(() => {
     }
   }, [transitionMessages])
 
-  // 새로운 스크롤 로직: ChatGPT 스타일
-  useEffect(() => {
-    if (!chatContainerRef.current || isTransitioningRef.current) return
-
-    const container = chatContainerRef.current
-    const currentMessageCount = messages.length
-    const previousMessageCount = lastMessageCountRef.current
-
-    // 메시지가 새로 추가된 경우
-    if (currentMessageCount > previousMessageCount) {
-      const newMessages = messages.slice(previousMessageCount)
-      const lastNewMessage = newMessages[newMessages.length - 1]
-
-      if (lastNewMessage?.role === "user") {
-        // 유저 메시지가 추가된 경우: 해당 메시지를 화면 상단에 위치시킴
-        const userMessageIndex = currentMessageCount - 1
-        setLastUserMessageIndex(userMessageIndex)
-        setHasScrolledToUserMessage(false)
-        setIsAutoScrollEnabled(false) // AI 응답 중에는 자동 스크롤 비활성화
-
-        // 유저 메시지 요소를 찾아서 상단으로 스크롤
-        setTimeout(() => {
-          const messageElements = container.querySelectorAll('[data-message-index]')
-          const userMessageElement = messageElements[userMessageIndex] as HTMLElement
-          
-          if (userMessageElement) {
-            const containerRect = container.getBoundingClientRect()
-            const messageRect = userMessageElement.getBoundingClientRect()
-            const scrollTop = container.scrollTop + messageRect.top - containerRect.top - 20 // 20px 여백
-            
-            container.scrollTo({
-              top: scrollTop,
-              behavior: 'smooth'
-            })
-            setHasScrolledToUserMessage(true)
-          }
-        }, 100)
-      } else if (lastNewMessage?.role === "assistant" && isAutoScrollEnabled) {
-        // AI 응답이 완료된 후에만 자동 스크롤 (onFinish에서 isAutoScrollEnabled가 true로 설정됨)
-        const { scrollHeight, scrollTop, clientHeight } = container
-        if (scrollHeight - scrollTop - clientHeight < 100) {
-          container.scrollTo({
-            top: scrollHeight,
-            behavior: 'smooth'
-          })
-        }
-      }
-    }
-
-    lastMessageCountRef.current = currentMessageCount
-  }, [messages, isAutoScrollEnabled])
-
   const handleSuggestedQuestionClick = (question: string) => {
     if (isLoading) return
     setInput(question)
@@ -533,27 +438,25 @@ useEffect(() => {
   }
 
   const scrollToBottom = () => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({ 
-        top: chatContainerRef.current.scrollHeight, 
-        behavior: "smooth" 
-      })
-      setIsAutoScrollEnabled(true) // 수동 스크롤 후 자동 스크롤 재활성화
-    }
+    if (chatContainerRef.current)
+      chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: "smooth" })
   }
+
+  useEffect(() => {
+    if (chatContainerRef.current && !isTransitioningRef.current) {
+      const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current
+      if (scrollHeight - scrollTop - clientHeight < 100 || messages.length === 1) {
+        scrollToBottom()
+      }
+    }
+  }, [messages])
 
   useEffect(() => {
     const container = chatContainerRef.current
     if (!container) return
     const handleScroll = () => {
       const { scrollHeight, scrollTop, clientHeight } = container
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-      setShowScrollButton(!isNearBottom && messages.length > 1)
-      
-      // 사용자가 수동으로 스크롤하면 자동 스크롤 재활성화
-      if (isNearBottom) {
-        setIsAutoScrollEnabled(true)
-      }
+      setShowScrollButton(scrollHeight - scrollTop - clientHeight >= 100 && messages.length > 1)
     }
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
@@ -566,7 +469,7 @@ useEffect(() => {
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
-      <div className="flex items-center justify-center bg-background" style={{ height: viewportHeight || '100vh' }}>
+      <div className="flex items-center justify-center bg-background" style={{ height: '100vh' }}>
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           채팅을 불러오는 중...
@@ -577,7 +480,7 @@ useEffect(() => {
 
   if (!stableSaju || !aiChatBody.compressedSaju) {
     return (
-      <div className="flex items-center justify-center bg-background p-4 text-center" style={{ height: viewportHeight || '100vh' }}>
+      <div className="flex items-center justify-center bg-background p-4 text-center" style={{ height: '100vh' }}>
         <div>
           <h2 className="text-xl font-semibold">오류</h2>
           <p className="text-muted-foreground mt-2">
@@ -593,30 +496,22 @@ useEffect(() => {
     )
   }
 
-const shouldShowSajuDiagram = (index: number) => {
-  // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
-  if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
-    return true
+  const shouldShowSajuDiagram = (index: number) => {
+    if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
+      return true
+    }
+    if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
+      return true
+    }
+    return false
   }
-  // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
-  if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
-    return true
+
+  const shouldShowDaeunDiagram = (index: number) => {
+    return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
   }
-  return false
-}
-
-const shouldShowDaeunDiagram = (index: number) => {
-  // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
-  return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
-}
-
-  // Calculate heights based on keyboard state
-  const containerHeight = viewportHeight || (typeof window !== 'undefined' ? window.innerHeight : 800)
-  const inputAreaHeight = isKeyboardOpen ? 80 : 140 // Reduced height when keyboard is open
-  const chatAreaHeight = containerHeight - inputAreaHeight
 
   return (
-    <div className="flex bg-white" style={{ height: containerHeight }}>
+    <div className="flex bg-white h-screen overflow-hidden">
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -645,11 +540,20 @@ const shouldShowDaeunDiagram = (index: number) => {
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0" style={{ height: containerHeight }}>
+      <div 
+        className="flex-1 flex flex-col min-w-0 relative"
+        style={{
+          height: isKeyboardOpen ? `calc(100vh - ${keyboardHeight}px)` : '100vh',
+          transition: 'height 0.3s ease-in-out'
+        }}
+      >
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
-          style={{ height: chatAreaHeight, minHeight: 0 }}
+          style={{ 
+            paddingBottom: isKeyboardOpen ? '8px' : '0px',
+            transition: 'padding-bottom 0.3s ease-in-out'
+          }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
@@ -658,7 +562,7 @@ const shouldShowDaeunDiagram = (index: number) => {
               </div>
             )}
             {messages.map((message, index) => (
-              <div key={message.id || index} data-message-index={index}>
+              <div key={message.id || index}>
                 {message.role === "user" ? (
                   <div className="flex justify-end">
                     <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base leading-relaxed">
@@ -705,7 +609,6 @@ const shouldShowDaeunDiagram = (index: number) => {
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={{
-                          // 제목들 스타일링
                           h1: ({ children }) => (
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 mt-8 pb-3 border-b-2 border-gray-200 first:mt-0">
                               {children}
@@ -726,17 +629,14 @@ const shouldShowDaeunDiagram = (index: number) => {
                               {children}
                             </h4>
                           ),
-                          // 단락 스타일링
                           p: ({ children }) => (
                             <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
                               {children}
                             </p>
                           ),
-                          // 구분선 스타일링
                           hr: () => (
                             <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                           ),
-                          // 리스트 스타일링
                           ul: ({ children }) => (
                             <ul className="space-y-2 mb-4 pl-0">
                               {children}
@@ -756,7 +656,6 @@ const shouldShowDaeunDiagram = (index: number) => {
                               <span className="flex-1">{children}</span>
                             </li>
                           ),
-                          // 강조 텍스트 스타일링
                           strong: ({ children }) => (
                             <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
                               {children}
@@ -767,7 +666,6 @@ const shouldShowDaeunDiagram = (index: number) => {
                               {children}
                             </em>
                           ),
-                          // 코드 블록 스타일링
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {
@@ -788,13 +686,11 @@ const shouldShowDaeunDiagram = (index: number) => {
                               {children}
                             </pre>
                           ),
-                          // 인용문 스타일링
                           blockquote: ({ children }) => (
                             <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 my-4 italic text-gray-700">
                               {children}
                             </blockquote>
                           ),
-                          // 테이블 스타일링
                           table: ({ children }) => (
                             <div className="overflow-x-auto mb-4">
                               <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
@@ -842,13 +738,11 @@ const shouldShowDaeunDiagram = (index: number) => {
           </div>
         </div>
         <div 
-          className="border-t bg-white flex-shrink-0 transition-all duration-300 ease-in-out"
-          style={{ 
-            height: inputAreaHeight,
-            paddingBottom: isKeyboardOpen ? '8px' : 'max(12px, env(safe-area-inset-bottom))',
-            paddingTop: '12px',
-            paddingLeft: '12px',
-            paddingRight: '12px'
+          className="border-t bg-white flex-shrink-0 relative"
+          style={{
+            padding: '12px 16px',
+            paddingBottom: isKeyboardOpen ? '12px' : 'max(12px, env(safe-area-inset-bottom))',
+            transition: 'padding-bottom 0.3s ease-in-out'
           }}
         >
           {showScrollButton && (
@@ -856,15 +750,12 @@ const shouldShowDaeunDiagram = (index: number) => {
               onClick={scrollToBottom}
               variant="outline"
               size="sm"
-              className="absolute right-4 sm:right-6 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
-              style={{ 
-                bottom: isKeyboardOpen ? `${inputAreaHeight + 8}px` : `${inputAreaHeight + 16}px`
-              }}
+              className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
           )}
-          <div className="space-y-2 h-full flex flex-col justify-end">
+          <div className="space-y-2">
             {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
@@ -883,7 +774,6 @@ const shouldShowDaeunDiagram = (index: number) => {
             <form onSubmit={handleSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
-                  ref={inputRef}
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"

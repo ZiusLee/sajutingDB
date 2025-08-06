@@ -45,10 +45,6 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 240 5.9% 90%;
     --sidebar-ring: 240 5.9% 10%;
-
-    /* iOS Safari viewport fixes */
-    --vh: 1vh;
-    --keyboard-height: 0px;
   }
 
   .dark {
@@ -93,12 +89,12 @@ body {
   /* Mobile viewport optimizations */
   .min-h-screen-mobile {
     min-height: 100vh;
-    min-height: calc(var(--vh, 1vh) * 100); /* Use CSS custom property */
+    min-height: 100dvh; /* Dynamic viewport height for mobile */
   }
 
   .h-screen-mobile {
     height: 100vh;
-    height: calc(var(--vh, 1vh) * 100); /* Use CSS custom property */
+    height: 100dvh; /* Dynamic viewport height for mobile */
   }
 
   /* Safe area utilities */
@@ -134,13 +130,50 @@ body {
     transition: transform 0.3s ease-in-out;
   }
 
-  /* Keyboard-aware input positioning */
-  .keyboard-aware-input {
-    transition: all 0.3s ease-in-out;
+  /* Mobile keyboard optimizations */
+  .keyboard-aware {
+    height: calc(var(--vh, 1vh) * 100);
+    transition: height 0.3s ease-in-out;
   }
 
-  .keyboard-aware-input.keyboard-open {
-    transform: translateY(calc(-1 * var(--keyboard-height, 0px) * 0.1));
+  .keyboard-aware.keyboard-open {
+    height: calc((var(--vh, 1vh) * 100) - var(--keyboard-height, 0px));
+  }
+
+  /* Prevent input zoom and improve focus behavior */
+  @media (max-width: 768px) {
+    input:focus,
+    textarea:focus {
+      font-size: 16px !important;
+      transform: translateZ(0);
+      -webkit-appearance: none;
+    }
+
+    /* Better input positioning when keyboard is open */
+    .mobile-input-container {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      z-index: 10;
+    }
+
+    /* Smooth keyboard transitions */
+    .keyboard-transition {
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Fix for iOS Safari input field positioning */
+    @supports (-webkit-touch-callout: none) {
+      .ios-input-fix {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 1px solid hsl(var(--border));
+        z-index: 50;
+      }
+    }
   }
 
   /* AI Response Content Styling */
@@ -208,16 +241,6 @@ body {
     appearance: none;
     @apply no-zoom;
   }
-
-  /* iOS Safari specific input handling */
-  input:focus,
-  textarea:focus {
-    /* Prevent viewport jumping */
-    transform: translateZ(0);
-    /* Ensure proper positioning */
-    position: relative;
-    z-index: 1;
-  }
 }
 
 .blurry-gradient-background {
@@ -280,20 +303,6 @@ body {
   .ios-safe-top {
     padding-top: calc(env(safe-area-inset-top) + 1rem);
   }
-
-  /* iOS Safari keyboard handling */
-  .ios-keyboard-adjust {
-    height: calc(100vh - var(--keyboard-height, 0px));
-    transition: height 0.3s ease-in-out;
-  }
-
-  /* Better input focus handling on iOS */
-  input:focus {
-    /* Prevent zoom but maintain focus */
-    font-size: 16px;
-    /* Smooth transition */
-    transition: all 0.3s ease-in-out;
-  }
 }
 
 /* Android specific optimizations */
@@ -337,38 +346,5 @@ body {
   .ai-response-content pre,
   .ai-response-content blockquote {
     @apply break-inside-avoid;
-  }
-}
-
-/* Mobile-specific keyboard optimizations */
-@media (max-width: 768px) {
-  /* Ensure input area stays visible when keyboard opens */
-  .mobile-input-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    border-top: 1px solid hsl(var(--border));
-    z-index: 50;
-    transition: all 0.3s ease-in-out;
-  }
-
-  /* Adjust for keyboard height */
-  .mobile-input-container.keyboard-open {
-    bottom: var(--keyboard-height, 0px);
-  }
-
-  /* Better touch targets on mobile */
-  button,
-  input,
-  textarea {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
-  /* Prevent horizontal scroll */
-  body {
-    overflow-x: hidden;
   }
 }
