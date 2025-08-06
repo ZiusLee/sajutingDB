@@ -81,11 +81,6 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 }
 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
-  // 자동 질문 기능 일시 비활성화 - 나중에 push notification으로 대체 예정
-  return []
-  
-  // 기존 코드는 주석 처리
-  /*
   if (roomType === "sajuping") {
     const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘"
 
@@ -121,7 +116,6 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
     return questions
   }
   return []
-  */
 }
 
 function generateUUID() {
@@ -277,9 +271,7 @@ export default function SajuChat({
             .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
             .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
         } else {
-          // shouldSendInitialQuestions 로직을 비활성화
-          // shouldSendInitialQuestions = true
-          shouldSendInitialQuestions = false // 자동 질문 비활성화
+          shouldSendInitialQuestions = true
           const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
           isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
         }
@@ -294,15 +286,14 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
-          /*
-          if (shouldSendInitialQuestions) {
-            const questions = isFirstRoom
-              ? getInitialUserQuestions(name, roomType, stableConcerns)
-              : ["오늘의 날짜를 사주로 계산해서 오늘 운세를 알려주세요"]
+          // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
+          if (shouldSendInitialQuestions && isFirstRoom) {
+            const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
           }
-          */
+          // 로그인한 사용자의 새로운 채팅방(첫 번째가 아닌)에서는 자동 질문 비활성화
+          // shouldSendInitialQuestions가 true이지만 isFirstRoom이 false인 경우는 아무것도 하지 않음
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
