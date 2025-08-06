@@ -756,7 +756,7 @@ export default function SajuChat({
             </Button>
           )}
           <div className="space-y-2">
-            {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
+            {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
