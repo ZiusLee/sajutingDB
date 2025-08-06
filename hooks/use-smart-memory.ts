@@ -1,326 +1,227 @@
-import { useState, useCallback, useEffect } from 'react'
-import { smartMemoryClient } from '@/lib/smart-memory-client'
-import { toast } from '@/hooks/use-toast'
-import type { SmartContext, MemorySearchResult, MemoryStats } from '@/types/memory'
+"use client"
 
-interface UseSmartMemoryReturn {
-  memories: SmartContext[]
-  searchResults: MemorySearchResult[]
-  stats: MemoryStats | null
-  loading: boolean
-  error: string | null
-  
-  // Actions
-  loadUserMemories: (options?: {
-    limit?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-    type?: string
-  }) => Promise<void>
-  
-  searchMemories: (query: string, options?: {
-    limit?: number
-    types?: string[]
-    minQuality?: number
-  }) => Promise<void>
-  
-  loadStats: () => Promise<void>
-  
-  saveMemory: (content: string, type: string, options?: {
-    importance?: number
-    keywords?: string[]
-  }) => Promise<boolean>
-  
-  updateMemory: (id: string, updates: Partial<SmartContext>) => Promise<void>
-  
-  deleteMemory: (id: string) => Promise<void>
-  
-  deleteAllMemories: () => Promise<void>
-  
-  deleteLowQualityMemories: () => Promise<{ success: boolean; deletedCount: number; message: string }>
-  
-  provideFeedback: (memoryId: string, helpful: boolean, feedbackType?: string) => Promise<void>
-  
-  processConversation: (
-    userMessage: string,
-    assistantResponse: string,
-    conversationId?: string
-  ) => Promise<any>
-  
-  updateMemoryQuality: (memoryId: string, newScore: number) => Promise<void>
+import { useState, useEffect } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { smartMemoryClient } from "@/lib/smart-memory-client"
+
+interface SmartMemory {
+  id: string
+  user_id: string
+  content: string
+  type: string
+  keywords: string[]
+  importance_score: number
+  reference_count: number
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+  first_mentioned?: string
+  last_referenced?: string
+  source_context?: string
 }
 
-export function useSmartMemory(): UseSmartMemoryReturn {
-  const [memories, setMemories] = useState<SmartContext[]>([])
-  const [searchResults, setSearchResults] = useState<MemorySearchResult[]>([])
-  const [stats, setStats] = useState<MemoryStats | null>(null)
+export function useSmartMemory(userId?: string) {
+  const [memories, setMemories] = useState<SmartMemory[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  const handleError = useCallback((error: any, message: string) => {
-    console.error(message, error)
-    setError(error.message || message)
-    toast({
-      title: "오류",
-      description: error.message || message,
-      variant: "destructive",
-    })
-  }, [])
+  const fetchMemories = async (search?: string, options?: { limit?: number; types?: string[] }) => {
+    if (!userId) return
 
-  const loadUserMemories = useCallback(async (options?: {
-    limit?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-    type?: string
-  }) => {
+    setLoading(true)
+    setError(null)
+
     try {
-      setLoading(true)
-      setError(null)
-      const data = await smartMemoryClient.getAllMemories(options)
-      setMemories(data)
-    } catch (error) {
-      handleError(error, "메모리를 불러오는데 실패했습니다")
+      if (search) {
+        // V2 검색 사용
+        const result = await smartMemoryClient.searchMemories(userId, search, {
+          limit: options?.limit || 20,
+          types: options?.types,
+        })
+        setMemories(result.data || [])
+      } else {
+        // 전체 메모리 조회 - 인증된 사용자 기준으로 조회
+        const url = new URL("/api/smart-memory", window.location.origin)
+        if (options?.limit) {
+          url.searchParams.set("limit", options.limit.toString())
+        }
+
+        console.log("📋 전체 메모리 조회 중...")
+        const response = await fetch(url.toString())
+        const data = await response.json()
+
+        console.log("📋 API 응답:", { ok: response.ok, status: response.status, data })
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch memories")
+        }
+
+        setMemories(data.data || [])
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      setError(errorMessage)
+      toast({
+        title: "오류",
+        description: "메모리를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
-  }, [handleError])
+  }
 
-  const searchMemories = useCallback(async (query: string, options?: {
-    limit?: number
-    types?: string[]
-    minQuality?: number
-  }) => {
+  const updateMemory = async (id: string, updates: Partial<SmartMemory>) => {
     try {
-      setLoading(true)
-      setError(null)
-      const data = await smartMemoryClient.searchMemories(query, options)
-      setSearchResults(data)
-    } catch (error) {
-      handleError(error, "메모리 검색에 실패했습니다")
-    } finally {
-      setLoading(false)
-    }
-  }, [handleError])
+      const response = await fetch("/api/smart-memory", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id, ...updates }),
+      })
 
-  const loadStats = useCallback(async () => {
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update memory")
+      }
+
+      setMemories((prev) => prev.map((memory) => (memory.id === id ? data.data : memory)))
+
+      toast({
+        title: "성공",
+        description: "메모리가 업데이트되었습니다.",
+      })
+
+      return data.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      toast({
+        title: "오류",
+        description: "메모리 업데이트에 실패했습니다.",
+        variant: "destructive",
+      })
+      throw err
+    }
+  }
+
+  const deleteMemory = async (id: string) => {
     try {
-      setError(null)
-      const data = await smartMemoryClient.getMemoryStats()
-      setStats(data)
-    } catch (error) {
-      handleError(error, "통계를 불러오는데 실패했습니다")
-    }
-  }, [handleError])
+      await smartMemoryClient.deleteMemory(userId!, id)
+      setMemories((prev) => prev.filter((memory) => memory.id !== id))
 
-  const saveMemory = useCallback(async (content: string, type: string, options?: {
+      toast({
+        title: "성공",
+        description: "메모리가 삭제되었습니다.",
+      })
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      toast({
+        title: "오류",
+        description: "메모리 삭제에 실패했습니다.",
+        variant: "destructive",
+      })
+      throw err
+    }
+  }
+
+  const deleteAllMemories = async () => {
+    try {
+      const response = await fetch(`/api/smart-memory?deleteAll=true`, {
+        method: "DELETE",
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete all memories")
+      }
+
+      setMemories([])
+
+      toast({
+        title: "성공",
+        description: "모든 메모리가 삭제되었습니다.",
+      })
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      toast({
+        title: "오류",
+        description: "메모리 삭제에 실패했습니다.",
+        variant: "destructive",
+      })
+      throw err
+    }
+  }
+
+  const togglePin = async (id: string, isPinned: boolean) => {
+    await updateMemory(id, { is_pinned: isPinned })
+  }
+
+  // V2 features
+  const saveMemory = async (memory: {
+    type: string
+    content: string
     importance?: number
     keywords?: string[]
-  }): Promise<boolean> => {
+  }) => {
     try {
-      setLoading(true)
-      setError(null)
-      const success = await smartMemoryClient.saveMemory(content, type, options)
-      if (success) {
-        toast({
-          title: "성공",
-          description: "메모리가 저장되었습니다",
-        })
-        // Refresh memories
-        await loadUserMemories()
-        await loadStats()
-      }
-      return success
-    } catch (error) {
-      handleError(error, "메모리 저장에 실패했습니다")
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }, [handleError, loadUserMemories, loadStats])
-
-  const updateMemory = useCallback(async (id: string, updates: Partial<SmartContext>) => {
-    try {
-      setLoading(true)
-      setError(null)
-      await smartMemoryClient.updateMemory(id, updates)
+      const result = await smartMemoryClient.saveMemory(userId!, memory)
+      
+      // 메모리 목록 새로고침
+      await fetchMemories()
+      
       toast({
         title: "성공",
-        description: "메모리가 업데이트되었습니다",
+        description: "메모리가 저장되었습니다.",
       })
-      // Refresh memories
-      await loadUserMemories()
-      await loadStats()
-    } catch (error) {
-      handleError(error, "메모리 업데이트에 실패했습니다")
-    } finally {
-      setLoading(false)
-    }
-  }, [handleError, loadUserMemories, loadStats])
-
-  const deleteMemory = useCallback(async (id: string) => {
-    try {
-      setLoading(true)
-      setError(null)
-      await smartMemoryClient.deleteMemory(id)
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
       toast({
-        title: "성공",
-        description: "메모리가 삭제되었습니다",
+        title: "오류",
+        description: "메모리 저장에 실패했습니다.",
+        variant: "destructive",
       })
-      // Remove from local state
-      setMemories(prev => prev.filter(m => m.id !== id))
-      setSearchResults(prev => prev.filter(m => m.id !== id))
-      await loadStats()
-    } catch (error) {
-      handleError(error, "메모리 삭제에 실패했습니다")
-    } finally {
-      setLoading(false)
+      throw err
     }
-  }, [handleError, loadStats])
+  }
 
-  const deleteAllMemories = useCallback(async () => {
+  const getMemoryStats = async () => {
     try {
-      setLoading(true)
-      setError(null)
-      await smartMemoryClient.deleteAllMemories()
-      toast({
-        title: "성공",
-        description: "모든 메모리가 삭제되었습니다",
-      })
-      setMemories([])
-      setSearchResults([])
-      await loadStats()
-    } catch (error) {
-      handleError(error, "메모리 삭제에 실패했습니다")
-    } finally {
-      setLoading(false)
-    }
-  }, [handleError, loadStats])
-
-  const deleteLowQualityMemories = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const result = await smartMemoryClient.deleteLowQualityMemories()
-      toast({
-        title: "정리 완료",
-        description: result.message,
-      })
-      await loadUserMemories()
-      await loadStats()
-      return result
-    } catch (error) {
-      handleError(error, "저품질 메모리 삭제에 실패했습니다")
-      return { success: false, deletedCount: 0, message: "삭제 실패" }
-    } finally {
-      setLoading(false)
-    }
-  }, [handleError, loadUserMemories, loadStats])
-
-  const provideFeedback = useCallback(async (memoryId: string, helpful: boolean, feedbackType?: string) => {
-    try {
-      setError(null)
-      await smartMemoryClient.provideFeedback(memoryId, helpful, feedbackType)
-      
-      // Update local state
-      const updateMemoryScore = (memories: any[]) => 
-        memories.map(memory => 
-          memory.id === memoryId 
-            ? { 
-                ...memory, 
-                quality_score: helpful 
-                  ? Math.min(0.95, (memory.quality_score || 0.5) + 0.1)
-                  : Math.max(0.1, (memory.quality_score || 0.5) - 0.15),
-                user_feedback_score: helpful ? 1 : -1
-              }
-            : memory
-        )
-
-      setMemories(updateMemoryScore)
-      setSearchResults(updateMemoryScore)
-      
-      toast({
-        title: "피드백 완료",
-        description: helpful ? "메모리 품질이 향상되었습니다" : "메모리 품질이 조정되었습니다",
-      })
-      
-      await loadStats()
-    } catch (error) {
-      handleError(error, "피드백 처리에 실패했습니다")
-    }
-  }, [handleError, loadStats])
-
-  const processConversation = useCallback(async (
-    userMessage: string,
-    assistantResponse: string,
-    conversationId?: string
-  ) => {
-    try {
-      setError(null)
-      const result = await smartMemoryClient.processConversation(
-        userMessage,
-        assistantResponse,
-        conversationId
-      )
-      
-      if (result.savedMemories && result.savedMemories.length > 0) {
-        toast({
-          title: "메모리 저장됨",
-          description: `${result.savedMemories.length}개의 새로운 정보가 기억되었습니다`,
-        })
-        await loadUserMemories()
-        await loadStats()
-      }
-      
-      return result
-    } catch (error) {
-      handleError(error, "대화 처리에 실패했습니다")
+      return await smartMemoryClient.getMemoryStats(userId!)
+    } catch (err) {
+      console.error("Failed to get memory stats:", err)
       return null
     }
-  }, [handleError, loadUserMemories, loadStats])
+  }
 
-  const updateMemoryQuality = useCallback(async (memoryId: string, newScore: number) => {
-    try {
-      setError(null)
-      await smartMemoryClient.updateMemory(memoryId, { quality_score: newScore })
-      
-      // Update local state
-      const updateScore = (memories: any[]) => 
-        memories.map(memory => 
-          memory.id === memoryId 
-            ? { ...memory, quality_score: newScore }
-            : memory
-        )
+  // 검색 기능 개선
+  const searchMemories = async (query: string, options?: { limit?: number; types?: string[] }) => {
+    return fetchMemories(query, options)
+  }
 
-      setMemories(updateScore)
-      setSearchResults(updateScore)
-      
-      toast({
-        title: "품질 점수 업데이트",
-        description: `메모리 품질 점수가 ${newScore.toFixed(2)}로 변경되었습니다`,
-      })
-      
-      await loadStats()
-    } catch (error) {
-      handleError(error, "품질 점수 업데이트에 실패했습니다")
+  useEffect(() => {
+    if (userId) {
+      fetchMemories()
     }
-  }, [handleError, loadStats])
+  }, [userId])
 
   return {
     memories,
-    searchResults,
-    stats,
     loading,
     error,
-    loadUserMemories,
-    searchMemories,
-    loadStats,
-    saveMemory,
+    fetchMemories,
     updateMemory,
     deleteMemory,
     deleteAllMemories,
-    deleteLowQualityMemories,
-    provideFeedback,
-    processConversation,
-    updateMemoryQuality,
+    togglePin,
+    saveMemory,
+    searchMemories,
+    getMemoryStats,
+    refetch: () => fetchMemories(),
   }
 }
