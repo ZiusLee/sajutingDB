@@ -116,25 +116,15 @@ export function MemoryDashboard() {
     setEditingMemory(null)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Brain className="h-8 w-8 text-blue-600" />
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+            <Brain className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
             스마트 메모리 대시보드
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
             AI가 기억하는 당신의 모든 정보를 관리하세요
           </p>
         </div>
@@ -142,7 +132,7 @@ export function MemoryDashboard() {
 
       {/* 통계 카드 */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">전체 메모리</CardTitle>
@@ -204,7 +194,7 @@ export function MemoryDashboard() {
       )}
 
       <Tabs defaultValue="memories" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="memories">메모리 관리</TabsTrigger>
           <TabsTrigger value="add">새 메모리 추가</TabsTrigger>
           <TabsTrigger value="analytics">분석</TabsTrigger>
@@ -217,24 +207,23 @@ export function MemoryDashboard() {
               <CardTitle className="text-lg">메모리 검색 및 필터</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="메모리 검색..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    />
-                    <Button onClick={handleSearch} disabled={loading}>
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </div>
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="메모리 검색..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleSearch} disabled={loading}>
+                    <Search className="h-4 w-4" />
+                  </Button>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={selectedType} onValueChange={setSelectedType}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -248,7 +237,7 @@ export function MemoryDashboard() {
                   </Select>
 
                   <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -259,7 +248,7 @@ export function MemoryDashboard() {
                   </Select>
 
                   <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-                    <SelectTrigger className="w-24">
+                    <SelectTrigger className="w-full sm:w-24">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -291,130 +280,111 @@ export function MemoryDashboard() {
                       <p className="text-muted-foreground">저장된 메모리가 없습니다.</p>
                     </div>
                   ) : (
-                    memories.map((memory) => {
-                      const typeInfo = getMemoryTypeInfo(memory.type)
-                      const qualityLevel = getQualityLevel(memory.quality_score)
+                    memories.map((memory) => (
+                      <Card key={memory.id} className="relative">
+                        <CardContent className="pt-4">
+                          <div className="space-y-3">
+                            {/* 메모리 내용 */}
+                            <p className="text-sm leading-relaxed">
+                              {memory.content}
+                            </p>
+                            
+                            {/* 액션 버튼들 - 모바일에서도 잘 보이도록 아래쪽에 배치 */}
+                            <div className="flex items-center justify-center gap-2 pt-2 border-t">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleFeedback(memory.id, true)}
+                                className="text-green-600 hover:text-green-700 flex items-center gap-1"
+                              >
+                                <ThumbsUp className="h-4 w-4" />
+                                <span className="hidden sm:inline">좋아요</span>
+                              </Button>
+                              
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleFeedback(memory.id, false)}
+                                className="text-red-600 hover:text-red-700 flex items-center gap-1"
+                              >
+                                <ThumbsDown className="h-4 w-4" />
+                                <span className="hidden sm:inline">싫어요</span>
+                              </Button>
 
-                      return (
-                        <Card key={memory.id} className="relative">
-                          <CardContent className="pt-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge className={typeInfo.color}>
-                                    {typeInfo.label}
-                                  </Badge>
-                                  <Badge variant="outline" className={qualityLevel.color}>
-                                    품질: {qualityLevel.label} ({(memory.quality_score * 100).toFixed(0)}%)
-                                  </Badge>
-                                  <Badge variant="secondary">
-                                    사용: {memory.usage_count}회
-                                  </Badge>
-                                </div>
-                                
-                                <p className="text-sm mb-3 leading-relaxed">
-                                  {memory.content}
-                                </p>
-                                
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                  <span>생성: {formatDate(memory.created_at)}</span>
-                                  {memory.last_referenced && (
-                                    <span>마지막 사용: {formatDate(memory.last_referenced)}</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-1 ml-4">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleFeedback(memory.id, true)}
-                                  className="text-green-600 hover:text-green-700"
-                                >
-                                  <ThumbsUp className="h-4 w-4" />
-                                </Button>
-                                
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleFeedback(memory.id, false)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <ThumbsDown className="h-4 w-4" />
-                                </Button>
-
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setEditingMemory(memory)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>품질 점수 수정</DialogTitle>
-                                      <DialogDescription>
-                                        이 메모리의 품질 점수를 조정하세요 (0.0 - 1.0)
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <label className="text-sm font-medium">현재 점수: {memory.quality_score.toFixed(2)}</label>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          max="1"
-                                          step="0.1"
-                                          defaultValue={memory.quality_score}
-                                          onChange={(e) => {
-                                            const newScore = parseFloat(e.target.value)
-                                            if (newScore >= 0 && newScore <= 1) {
-                                              handleQualityUpdate(memory.id, newScore)
-                                            }
-                                          }}
-                                        />
-                                      </div>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingMemory(memory)}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                    <span className="hidden sm:inline">수정</span>
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>품질 점수 수정</DialogTitle>
+                                    <DialogDescription>
+                                      이 메모리의 품질 점수를 조정하세요 (0.0 - 1.0)
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <label className="text-sm font-medium">현재 점수: {memory.quality_score.toFixed(2)}</label>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max="1"
+                                        step="0.1"
+                                        defaultValue={memory.quality_score}
+                                        onChange={(e) => {
+                                          const newScore = parseFloat(e.target.value)
+                                          if (newScore >= 0 && newScore <= 1) {
+                                            handleQualityUpdate(memory.id, newScore)
+                                          }
+                                        }}
+                                      />
                                     </div>
-                                  </DialogContent>
-                                </Dialog>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
 
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="text-red-600 hover:text-red-700"
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-600 hover:text-red-700 flex items-center gap-1"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="hidden sm:inline">삭제</span>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>메모리 삭제</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      이 메모리를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>취소</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(memory.id)}
+                                      className="bg-red-600 hover:bg-red-700"
                                     >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>메모리 삭제</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        이 메모리를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>취소</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDelete(memory.id)}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        삭제
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
+                                      삭제
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
                   )}
                 </div>
               </ScrollArea>
@@ -457,7 +427,7 @@ export function MemoryDashboard() {
                 />
               </div>
 
-              <Button onClick={handleSaveMemory} disabled={loading || !newMemoryContent.trim()}>
+              <Button onClick={handleSaveMemory} disabled={loading || !newMemoryContent.trim()} className="w-full">
                 {loading ? '저장 중...' : '메모리 저장'}
               </Button>
             </CardContent>
