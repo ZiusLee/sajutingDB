@@ -162,9 +162,9 @@ export default function SajuChat({
   })
 
   useEffect(() => {
-    const updateKeyboardHeight = () => {
-      const windowHeight = window.innerHeight
+    const updateViewport = () => {
       const visualViewport = window.visualViewport
+      const windowHeight = window.innerHeight
       
       if (visualViewport) {
         const keyboardHeight = Math.max(0, windowHeight - visualViewport.height)
@@ -174,23 +174,23 @@ export default function SajuChat({
       }
     }
 
-    updateKeyboardHeight()
+    updateViewport()
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateKeyboardHeight)
+      window.visualViewport.addEventListener('resize', updateViewport)
     }
     
-    window.addEventListener('resize', updateKeyboardHeight)
+    window.addEventListener('resize', updateViewport)
     window.addEventListener('orientationchange', () => {
-      setTimeout(updateKeyboardHeight, 100)
+      setTimeout(updateViewport, 100)
     })
 
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateKeyboardHeight)
+        window.visualViewport.removeEventListener('resize', updateViewport)
       }
-      window.removeEventListener('resize', updateKeyboardHeight)
-      window.removeEventListener('orientationchange', updateKeyboardHeight)
+      window.removeEventListener('resize', updateViewport)
+      window.removeEventListener('orientationchange', updateViewport)
     }
   }, [])
 
@@ -723,19 +723,7 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div 
-          className="border-t bg-white flex-shrink-0 relative"
-          style={{
-            position: 'fixed',
-            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0px',
-            left: '0',
-            right: '0',
-            zIndex: 50,
-            padding: '12px 16px',
-            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-            transition: 'bottom 0.3s ease-in-out',
-          }}
-        >
+        <div className="border-t bg-white flex-shrink-0 fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4" style={{ paddingBottom: `max(12px, env(safe-area-inset-bottom))` }}>
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
