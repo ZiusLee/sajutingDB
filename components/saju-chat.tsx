@@ -18,6 +18,7 @@ import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
+import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 
 interface SajuChatProps {
   saju: any
@@ -116,6 +117,7 @@ export default function SajuChat({
   onChatRoomPersisted,
 }: SajuChatProps) {
   const { user } = useAuth()
+  const { isKeyboardOpen, keyboardHeight } = useMobileKeyboard()
   const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
   const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
   const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
@@ -438,7 +440,7 @@ useEffect(() => {
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="flex h-screen-mobile items-center justify-center bg-background">
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           채팅을 불러오는 중...
@@ -449,7 +451,7 @@ useEffect(() => {
 
   if (!stableSaju || !aiChatBody.compressedSaju) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background p-4 text-center">
+      <div className="flex h-screen-mobile items-center justify-center bg-background p-4 text-center">
         <div>
           <h2 className="text-xl font-semibold">오류</h2>
           <p className="text-muted-foreground mt-2">
@@ -483,7 +485,7 @@ const shouldShowDaeunDiagram = (index: number) => {
 }
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen-mobile bg-white">
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -512,11 +514,10 @@ const shouldShowDaeunDiagram = (index: number) => {
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen">
+      <div className="flex-1 flex flex-col min-w-0 h-screen-mobile">
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto"
-          style={{ height: "calc(100dvh - 140px)", minHeight: 0 }}
+          className="flex-1 overflow-y-auto chat-messages-container chat-container-height"
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
@@ -536,8 +537,20 @@ const shouldShowDaeunDiagram = (index: number) => {
                   <div className="space-y-3 sm:space-y-4">
                     {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
                       <div className="flex flex-col lg:flex-row gap-4 max-w-full">
+                        {/* 대운 다이어그램을 왼쪽에 배치 */}
+                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
+                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0 order-1 lg:order-1">
+                            <DaeunDiagram
+                              daeun={chatData.calculatedDaeun.pillars || []}
+                              birthInfo={chatData.stableBirthInfo}
+                              name={name}
+                              gender={gender}
+                            />
+                          </div>
+                        )}
+                        {/* 사주 다이어그램을 오른쪽에 배치 */}
                         {shouldShowSajuDiagram(index) && (
-                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
+                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0 order-2 lg:order-2">
                             <SajuDiagram
                               saju={stableSaju}
                               name={name}
@@ -553,16 +566,6 @@ const shouldShowDaeunDiagram = (index: number) => {
                               lunarMonth={chatData.stableBirthInfo?.lunarMonth}
                               lunarDay={chatData.stableBirthInfo?.lunarDay}
                               location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
-                            />
-                          </div>
-                        )}
-                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
-                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
-                            <DaeunDiagram
-                              daeun={chatData.calculatedDaeun.pillars || []}
-                              birthInfo={chatData.stableBirthInfo}
-                              name={name}
-                              gender={gender}
                             />
                           </div>
                         )}
@@ -708,7 +711,12 @@ const shouldShowDaeunDiagram = (index: number) => {
             )}
           </div>
         </div>
-        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4">
+        <div 
+          className={`border-t bg-white p-3 sm:p-4 flex-shrink-0 chat-input-container ${
+            isKeyboardOpen ? 'ios-keyboard-adjust' : 'pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4'
+          }`}
+          style={isKeyboardOpen ? { paddingBottom: `max(12px, ${keyboardHeight}px)` } : {}}
+        >
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
