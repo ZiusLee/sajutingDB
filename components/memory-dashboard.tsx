@@ -56,29 +56,21 @@ export function MemoryDashboard() {
   } = useSmartMemory()
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedType, setSelectedType] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<'created_at' | 'quality_score' | 'usage_count'>('created_at')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [newMemoryContent, setNewMemoryContent] = useState('')
   const [newMemoryType, setNewMemoryType] = useState('personal_info')
 
   useEffect(() => {
-    loadUserMemories({ sortBy, sortOrder })
+    loadUserMemories({})
     loadStats()
-  }, [loadUserMemories, loadStats, sortBy, sortOrder])
+  }, [loadUserMemories, loadStats])
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      await loadUserMemories({ 
-        type: selectedType === 'all' ? undefined : selectedType,
-        sortBy, 
-        sortOrder 
-      })
+      await loadUserMemories({})
       return
     }
 
     await searchMemories(searchQuery, {
-      types: selectedType === 'all' ? undefined : [selectedType],
       minQuality: 0.0,
       limit: 50
     })
@@ -186,69 +178,29 @@ export function MemoryDashboard() {
       )}
 
       <Tabs defaultValue="memories" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="memories">메모리 관리</TabsTrigger>
           <TabsTrigger value="add">새 메모리 추가</TabsTrigger>
-          <TabsTrigger value="analytics">분석</TabsTrigger>
         </TabsList>
 
         <TabsContent value="memories" className="space-y-4">
-          {/* 검색 및 필터 */}
+          {/* 검색 */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">메모리 검색 및 필터</CardTitle>
+              <CardTitle className="text-lg">메모리 검색</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col gap-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="메모리 검색..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleSearch} disabled={loading}>
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={selectedType} onValueChange={setSelectedType}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">모든 타입</SelectItem>
-                      {MEMORY_TYPES.map(type => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="created_at">생성일</SelectItem>
-                      <SelectItem value="quality_score">품질</SelectItem>
-                      <SelectItem value="usage_count">사용량</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-                    <SelectTrigger className="w-full sm:w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desc">내림차순</SelectItem>
-                      <SelectItem value="asc">오름차순</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="메모리 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  className="flex-1"
+                />
+                <Button onClick={handleSearch} disabled={loading}>
+                  <Search className="h-4 w-4" />
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -436,80 +388,6 @@ export function MemoryDashboard() {
               </Button>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {stats && (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>타입별 분포</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {Object.entries(stats.memories_by_type || {}).map(([type, count]) => {
-                        const typeInfo = getMemoryTypeInfo(type)
-                        const percentage = (Number(count) / Number(stats.total_memories)) * 100
-                        
-                        return (
-                          <div key={type} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Badge className={typeInfo.color} variant="secondary">
-                                {typeInfo.label}
-                              </Badge>
-                              <span className="text-sm">{count}개</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Progress value={percentage} className="w-20 h-2" />
-                              <span className="text-xs text-muted-foreground w-12">
-                                {percentage.toFixed(1)}%
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>품질 분포</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {Object.entries(stats.quality_distribution || {}).map(([level, count]) => {
-                        const percentage = (Number(count) / Number(stats.total_memories)) * 100
-                        const levelInfo = level === 'high' ? 
-                          { label: '고품질', color: 'text-green-600' } :
-                          level === 'medium' ?
-                          { label: '보통', color: 'text-yellow-600' } :
-                          { label: '낮음', color: 'text-red-600' }
-                        
-                        return (
-                          <div key={level} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-medium ${levelInfo.color}`}>
-                                {levelInfo.label}
-                              </span>
-                              <span className="text-sm">{count}개</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Progress value={percentage} className="w-20 h-2" />
-                              <span className="text-xs text-muted-foreground w-12">
-                                {percentage.toFixed(1)}%
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-          </div>
         </TabsContent>
       </Tabs>
     </div>
