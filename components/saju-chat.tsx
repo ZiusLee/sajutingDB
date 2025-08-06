@@ -83,36 +83,10 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
     const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘"
-
-    const generateConcernQuestion = (concerns: string[]): string => {
-      const concernLabels: Record<string, string> = {
-        love: "연애운",
-        breakup: "이별 후 회복",
-        health: "건강운",
-        marriage: "결혼운",
-        money: "재물운",
-        work: "학업운",
-        relationship: "인간관계",
-        career: "직업운",
-        job: "취업운",
-        future: "미래 방향성",
-        workplace: "직장 생활",
-        friend: "인간관계",
-        family: "가족운",
-      }
-
-      if (concerns.length === 0) {
-        return "연애운에 대해서 나의 대운과 올해 세운을 기반으로 설명해줘."
-      }
-
-      const primaryConcern = concerns[0]
-      const concernLabel = concernLabels[primaryConcern] || "운세"
-      return `${concernLabel}에 대해서 나의 대운과 올해 세운을 기반으로 설명해줘.`
-    }
-
-    const secondQuestion = generateConcernQuestion(concerns)
-    const questions = [firstQuestion, secondQuestion]
-    console.log("🎯 Generated exactly 2 initial questions:", questions)
+    
+    // 첫 번째 질문만 반환
+    const questions = [firstQuestion]
+    console.log("🎯 Generated exactly 1 initial question:", questions)
     return questions
   }
   return []
@@ -337,48 +311,22 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-  useEffect(() => {
-    if (
-      isInitialQuestionsMode &&
-      isFirstChatRoom &&
-      !isLoading &&
-      messages.length === 2 &&
-      messages[1].role === "assistant" &&
-      initialQuestionsToSend.length > 1 &&
-      !initialQuestionsSent.q2
-    ) {
-      console.log("📤 [Flow] Received first answer. Sending second question...")
-      const timeoutId = setTimeout(() => {
-        setInitialQuestionsSent((prev) => ({ ...prev, q2: true }))
-        append({ role: "user", content: initialQuestionsToSend[1] })
-      }, 1000)
-      return () => clearTimeout(timeoutId)
-    }
-  }, [
-    isInitialQuestionsMode,
-    isFirstChatRoom,
-    isLoading,
-    messages,
-    initialQuestionsToSend,
-    append,
-    initialQuestionsSent.q2,
-  ])
+// Remove the second question useEffect completely
 
-  useEffect(() => {
-    const endInitialMode = () => {
-      console.log("✅ [Flow] Ending initial questions mode.")
-      setIsInitialQuestionsMode(false)
-      setInitialQuestionsToSend([])
-    }
+useEffect(() => {
+  const endInitialMode = () => {
+    console.log("✅ [Flow] Ending initial questions mode.")
+    setIsInitialQuestionsMode(false)
+    setInitialQuestionsToSend([])
+  }
 
-    if (isInitialQuestionsMode && !isLoading) {
-      if (isFirstChatRoom && messages.length === 4 && messages[3].role === "assistant") {
-        endInitialMode()
-      } else if (!isFirstChatRoom && messages.length === 2 && messages[1].role === "assistant") {
-        endInitialMode()
-      }
+  if (isInitialQuestionsMode && !isLoading) {
+    // End after first response for both first room and non-first room
+    if (messages.length === 2 && messages[1].role === "assistant") {
+      endInitialMode()
     }
-  }, [isInitialQuestionsMode, isFirstChatRoom, isLoading, messages])
+  }
+}, [isInitialQuestionsMode, isLoading, messages])
 
   // --- End of fundamental fix ---
 
@@ -517,21 +465,22 @@ export default function SajuChat({
     )
   }
 
-  const shouldShowSajuDiagram = (index: number) => {
-    // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
-    if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
-      return true
-    }
-    // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
-    if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
-      return true
-    }
-    return false
+const shouldShowSajuDiagram = (index: number) => {
+  // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
+  if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
+    return true
   }
-  const shouldShowDaeunDiagram = (index: number) => {
-    // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (네 번째 메시지)
-    return isFirstChatRoom && index === 3 && messages[index].role === "assistant"
+  // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
+  if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
+    return true
   }
+  return false
+}
+
+const shouldShowDaeunDiagram = (index: number) => {
+  // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
+  return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
+}
 
   return (
     <div className="flex h-screen bg-white">
@@ -585,34 +534,38 @@ export default function SajuChat({
                   </div>
                 ) : (
                   <div className="space-y-3 sm:space-y-4">
-                    {shouldShowSajuDiagram(index) && (
-                      <div className="max-w-md mx-auto">
-                        <SajuDiagram
-                          saju={stableSaju}
-                          name={name}
-                          gender={gender}
-                          variant="card"
-                          solarYear={chatData.stableBirthInfo?.solarYear}
-                          solarMonth={chatData.stableBirthInfo?.solarMonth}
-                          solarDay={chatData.stableBirthInfo?.solarDay}
-                          hour={chatData.stableBirthInfo?.solarHour}
-                          minute={chatData.stableBirthInfo?.solarMinute}
-                          timeUnknown={chatData.stableBirthInfo?.timeUnknown}
-                          lunarYear={chatData.stableBirthInfo?.lunarYear}
-                          lunarMonth={chatData.stableBirthInfo?.lunarMonth}
-                          lunarDay={chatData.stableBirthInfo?.lunarDay}
-                          location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
-                        />
-                      </div>
-                    )}
-                    {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
-                      <div className="max-w-md mx-auto">
-                        <DaeunDiagram
-                          daeun={chatData.calculatedDaeun.pillars || []}
-                          birthInfo={chatData.stableBirthInfo}
-                          name={name}
-                          gender={gender}
-                        />
+                    {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
+                      <div className="flex flex-col lg:flex-row gap-4 max-w-full">
+                        {shouldShowSajuDiagram(index) && (
+                          <div className="flex-1 max-w-md mx-auto lg:mx-0">
+                            <SajuDiagram
+                              saju={stableSaju}
+                              name={name}
+                              gender={gender}
+                              variant="card"
+                              solarYear={chatData.stableBirthInfo?.solarYear}
+                              solarMonth={chatData.stableBirthInfo?.solarMonth}
+                              solarDay={chatData.stableBirthInfo?.solarDay}
+                              hour={chatData.stableBirthInfo?.solarHour}
+                              minute={chatData.stableBirthInfo?.solarMinute}
+                              timeUnknown={chatData.stableBirthInfo?.timeUnknown}
+                              lunarYear={chatData.stableBirthInfo?.lunarYear}
+                              lunarMonth={chatData.stableBirthInfo?.lunarMonth}
+                              lunarDay={chatData.stableBirthInfo?.lunarDay}
+                              location={chatData.stableBirthInfo?.birthCityId ? "서울특별시" : undefined}
+                            />
+                          </div>
+                        )}
+                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
+                          <div className="flex-1 max-w-md mx-auto lg:mx-0">
+                            <DaeunDiagram
+                              daeun={chatData.calculatedDaeun.pillars || []}
+                              birthInfo={chatData.stableBirthInfo}
+                              name={name}
+                              gender={gender}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="ai-response-content">
