@@ -260,11 +260,14 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
+          // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
           if (shouldSendInitialQuestions && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
           }
+          // 로그인한 사용자의 새로운 채팅방(첫 번째가 아닌)에서는 자동 질문 비활성화
+          // shouldSendInitialQuestions가 true이지만 isFirstRoom이 false인 경우는 아무것도 하지 않음
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
@@ -292,6 +295,8 @@ export default function SajuChat({
     },
   })
 
+  // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
+
   useEffect(() => {
     if (
       isInitialQuestionsMode &&
@@ -306,19 +311,24 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-  useEffect(() => {
-    const endInitialMode = () => {
-      console.log("✅ [Flow] Ending initial questions mode.")
-      setIsInitialQuestionsMode(false)
-      setInitialQuestionsToSend([])
-    }
+// Remove the second question useEffect completely
 
-    if (isInitialQuestionsMode && !isLoading) {
-      if (messages.length === 2 && messages[1].role === "assistant") {
-        endInitialMode()
-      }
+useEffect(() => {
+  const endInitialMode = () => {
+    console.log("✅ [Flow] Ending initial questions mode.")
+    setIsInitialQuestionsMode(false)
+    setInitialQuestionsToSend([])
+  }
+
+  if (isInitialQuestionsMode && !isLoading) {
+    // End after first response for both first room and non-first room
+    if (messages.length === 2 && messages[1].role === "assistant") {
+      endInitialMode()
     }
-  }, [isInitialQuestionsMode, isLoading, messages])
+  }
+}, [isInitialQuestionsMode, isLoading, messages])
+
+  // --- End of fundamental fix ---
 
   useEffect(() => {
     const saveNewMessages = async () => {
@@ -428,7 +438,7 @@ export default function SajuChat({
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
-      <div className="flex items-center justify-center bg-background h-screen">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           채팅을 불러오는 중...
@@ -439,7 +449,7 @@ export default function SajuChat({
 
   if (!stableSaju || !aiChatBody.compressedSaju) {
     return (
-      <div className="flex items-center justify-center bg-background p-4 text-center h-screen">
+      <div className="flex h-screen items-center justify-center bg-background p-4 text-center">
         <div>
           <h2 className="text-xl font-semibold">오류</h2>
           <p className="text-muted-foreground mt-2">
@@ -455,22 +465,25 @@ export default function SajuChat({
     )
   }
 
-  const shouldShowSajuDiagram = (index: number) => {
-    if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
-      return true
-    }
-    if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
-      return true
-    }
-    return false
+const shouldShowSajuDiagram = (index: number) => {
+  // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
+  if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
+    return true
   }
+  // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
+  if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
+    return true
+  }
+  return false
+}
 
-  const shouldShowDaeunDiagram = (index: number) => {
-    return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
-  }
+const shouldShowDaeunDiagram = (index: number) => {
+  // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
+  return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
+}
 
   return (
-    <div className="flex bg-white h-screen overflow-hidden">
+    <div className="flex h-screen bg-white">
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -499,13 +512,11 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 relative h-full">
+      <div className="flex-1 flex flex-col min-w-0 h-screen">
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto"
-          style={{ 
-            paddingBottom: '8px',
-          }}
+          style={{ height: "calc(100dvh - 140px)", minHeight: 0 }}
         >
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
@@ -525,16 +536,6 @@ export default function SajuChat({
                   <div className="space-y-3 sm:space-y-4">
                     {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
                       <div className="flex flex-col lg:flex-row gap-4 max-w-full">
-                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
-                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
-                            <DaeunDiagram
-                              daeun={chatData.calculatedDaeun.pillars || []}
-                              birthInfo={chatData.stableBirthInfo}
-                              name={name}
-                              gender={gender}
-                            />
-                          </div>
-                        )}
                         {shouldShowSajuDiagram(index) && (
                           <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
                             <SajuDiagram
@@ -555,12 +556,23 @@ export default function SajuChat({
                             />
                           </div>
                         )}
+                        {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
+                          <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0">
+                            <DaeunDiagram
+                              daeun={chatData.calculatedDaeun.pillars || []}
+                              birthInfo={chatData.stableBirthInfo}
+                              name={name}
+                              gender={gender}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="ai-response-content">
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={{
+                          // 제목들 스타일링
                           h1: ({ children }) => (
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 mt-8 pb-3 border-b-2 border-gray-200 first:mt-0">
                               {children}
@@ -581,14 +593,17 @@ export default function SajuChat({
                               {children}
                             </h4>
                           ),
+                          // 단락 스타일링
                           p: ({ children }) => (
                             <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
                               {children}
                             </p>
                           ),
+                          // 구분선 스타일링
                           hr: () => (
                             <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                           ),
+                          // 리스트 스타일링
                           ul: ({ children }) => (
                             <ul className="space-y-2 mb-4 pl-0">
                               {children}
@@ -608,6 +623,7 @@ export default function SajuChat({
                               <span className="flex-1">{children}</span>
                             </li>
                           ),
+                          // 강조 텍스트 스타일링
                           strong: ({ children }) => (
                             <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
                               {children}
@@ -618,6 +634,7 @@ export default function SajuChat({
                               {children}
                             </em>
                           ),
+                          // 코드 블록 스타일링
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {
@@ -638,11 +655,13 @@ export default function SajuChat({
                               {children}
                             </pre>
                           ),
+                          // 인용문 스타일링
                           blockquote: ({ children }) => (
                             <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 my-4 italic text-gray-700">
                               {children}
                             </blockquote>
                           ),
+                          // 테이블 스타일링
                           table: ({ children }) => (
                             <div className="overflow-x-auto mb-4">
                               <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
@@ -689,7 +708,7 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div className="border-t bg-white flex-shrink-0 p-3 sm:p-4 pb-safe">
+        <div className="border-t bg-white p-3 sm:p-4 flex-shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
@@ -701,7 +720,7 @@ export default function SajuChat({
             </Button>
           )}
           <div className="space-y-2">
-            {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
+            {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
