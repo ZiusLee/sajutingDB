@@ -290,6 +290,7 @@ class SmartMemoryServiceV2 {
     threshold: number
   ): Promise<any> {
     try {
+      // Try to use the stored function first
       const { data, error } = await this.supabase.rpc("find_similar_memory", {
         p_user_id: userId,
         p_query_embedding: embedding,
@@ -297,12 +298,43 @@ class SmartMemoryServiceV2 {
         p_similarity_threshold: threshold,
       })
 
-      if (error) {
-        console.error("Same-type semantic search error:", error)
+      if (!error && data && data.length > 0) {
+        return data[0]
+      }
+
+      // Fallback: if function doesn't exist, use vector similarity with manual query
+      console.log("🔄 Stored function not available, using fallback vector search")
+      
+      const { data: memories, error: queryError } = await this.supabase
+        .from("smart_contexts")
+        .select("*, relevance_embedding")
+        .eq("user_id", userId)
+        .eq("type", type)
+        .gte("quality_score", 0.3)
+        .limit(20)
+
+      if (queryError || !memories || memories.length === 0) {
         return null
       }
 
-      return data && data.length > 0 ? data[0] : null
+      // Calculate cosine similarity manually
+      let bestMatch = null
+      let bestSimilarity = 0
+
+      for (const memory of memories) {
+        if (memory.relevance_embedding) {
+          const similarity = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
+          if (similarity >= threshold && similarity > bestSimilarity) {
+            bestSimilarity = similarity
+            bestMatch = {
+              ...memory,
+              similarity
+            }
+          }
+        }
+      }
+
+      return bestMatch
     } catch (error) {
       console.error("Same-type semantic match failed:", error)
       return null
@@ -318,9 +350,10 @@ class SmartMemoryServiceV2 {
   ): Promise<any> {
     try {
       const contradictionTypes = this.getContradictionTypes(currentType)
-      
+    
       if (contradictionTypes.length === 0) return null
 
+      // Try to use the stored function first
       const { data, error } = await this.supabase.rpc("find_cross_type_duplicate", {
         p_user_id: userId,
         p_query_embedding: embedding,
@@ -329,12 +362,43 @@ class SmartMemoryServiceV2 {
         p_similarity_threshold: 0.88,
       })
 
-      if (error) {
-        console.error("Cross-type contradiction search error:", error)
+      if (!error && data && data.length > 0) {
+        return data[0]
+      }
+
+      // Fallback: if function doesn't exist, use vector similarity with manual query
+      console.log("🔄 Stored function not available, using fallback vector search")
+
+      const { data: memories, error: queryError } = await this.supabase
+        .from("smart_contexts")
+        .select("*, relevance_embedding")
+        .eq("user_id", userId)
+        .in("type", contradictionTypes)
+        .gte("quality_score", 0.3)
+        .limit(10)
+
+      if (queryError || !memories || memories.length === 0) {
         return null
       }
 
-      return data && data.length > 0 ? data[0] : null
+      // Calculate cosine similarity manually
+      let bestMatch = null
+      let bestSimilarity = 0
+
+      for (const memory of memories) {
+        if (memory.relevance_embedding) {
+          const similarity = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
+          if (similarity >= 0.88 && similarity > bestSimilarity) {
+            bestSimilarity = similarity
+            bestMatch = {
+              ...memory,
+              similarity
+            }
+          }
+        }
+      }
+
+      return bestMatch
     } catch (error) {
       console.error("Cross-type contradiction check failed:", error)
       return null
@@ -771,8 +835,9 @@ AI: ${assistantResponse}
     embedding: number[],
     understanding: any,
     limit: number,
-  ): Promise<any[]> {
-    // High-quality search first
+): Promise<any[]> {
+  try {
+    // Try to use the stored function first
     const { data: highQualityResults, error: hqError } = await this.supabase.rpc("find_quality_memories", {
       p_user_id: userId,
       p_query_embedding: embedding,
@@ -782,47 +847,81 @@ AI: ${assistantResponse}
       p_result_limit: limit * 2,
     })
 
-    let results: any[] = []
-    if (!hqError && highQualityResults) {
-      results = highQualityResults
+    if (!hqError && highQualityResults && highQualityResults.length > 0) {
       console.log(`🔍 High-quality search results: ${highQualityResults.length}개`)
+      
+      const scoredResults = highQualityResults.map(result => ({
+        ...result,
+        effective_score: this.calculateEffectiveScore(
+          result.relevance_score || 0,
+          result.quality_score || 0.5,
+          result.importance_score || 0.5,
+          result.usage_count || 0
+        ),
+      }))
+
+      scoredResults.sort((a, b) => b.effective_score - a.effective_score)
+      return scoredResults.slice(0, limit)
     }
 
-    // Medium-quality search if needed
-    if (results.length < limit) {
-      const { data: mediumQualityResults } = await this.supabase.rpc("find_quality_memories", {
-        p_user_id: userId,
-        p_query_embedding: embedding,
-        p_memory_types: understanding.memoryTypes?.length > 0 ? understanding.memoryTypes : null,
-        p_min_quality_score: 0.3,
-        p_similarity_threshold: 0.1,
-        p_result_limit: limit * 3,
+    // Fallback: if function doesn't exist, use manual vector search
+    console.log("🔄 Stored function not available, using fallback vector search")
+
+    let dbQuery = this.supabase
+      .from("smart_contexts")
+      .select("*, relevance_embedding")
+      .eq("user_id", userId)
+      .gte("quality_score", 0.3)
+      .order("quality_score", { ascending: false })
+      .limit(limit * 3)
+
+    // Add type filter if specified
+    if (understanding.memoryTypes?.length > 0) {
+      dbQuery = dbQuery.in("type", understanding.memoryTypes)
+    }
+
+    const { data, error } = await dbQuery
+
+    if (error || !data || data.length === 0) {
+      console.error("Fallback vector search error:", error)
+      return []
+    }
+
+    // Calculate relevance scores using cosine similarity
+    const scoredResults = data
+      .map(memory => {
+        if (!memory.relevance_embedding) {
+          return null
+        }
+
+        const relevanceScore = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
+        
+        // Apply similarity threshold
+        if (relevanceScore < 0.1) {
+          return null
+        }
+
+        return {
+          ...memory,
+          relevance_score: relevanceScore,
+          effective_score: this.calculateEffectiveScore(
+            relevanceScore,
+            memory.quality_score || 0.5,
+            memory.importance_score || 0.5,
+            memory.usage_count || 0
+          ),
+        }
       })
+      .filter(Boolean)
+      .sort((a, b) => b.effective_score - a.effective_score)
 
-      if (mediumQualityResults) {
-        const existingIds = new Set(results.map(r => r.id))
-        const newResults = mediumQualityResults.filter(r => !existingIds.has(r.id))
-        results.push(...newResults)
-        console.log(`🔍 Medium-quality search results: ${newResults.length}개 추가`)
-      }
-    }
-
-    // Calculate effective scores
-    const scoredResults = results.map(result => ({
-      ...result,
-      effective_score: this.calculateEffectiveScore(
-        result.relevance_score || 0,
-        result.quality_score || 0.5,
-        result.importance_score || 0.5,
-        result.usage_count || 0
-      ),
-    }))
-
-    scoredResults.sort((a, b) => b.effective_score - a.effective_score)
-
-    console.log(`🔍 최종 정제된 결과: ${scoredResults.length}개`)
+    console.log(`🔍 Fallback vector search results: ${scoredResults.length}개`)
     return scoredResults.slice(0, limit)
+  } catch (error) {
+    console.error("Quality-aware vector search failed:", error)
+    return []
   }
+}
 
   // Calculate effective score
   private calculateEffectiveScore(
@@ -1136,6 +1235,29 @@ AI: ${assistantResponse}
       console.error("🚨 Memory processing failed with error:", error)
       throw error
     }
+  }
+
+  // Calculate cosine similarity between two vectors
+  private calculateCosineSimilarity(vectorA: number[], vectorB: number[]): number {
+    if (!vectorA || !vectorB || vectorA.length !== vectorB.length) {
+      return 0
+    }
+
+    let dotProduct = 0
+    let normA = 0
+    let normB = 0
+
+    for (let i = 0; i < vectorA.length; i++) {
+      dotProduct += vectorA[i] * vectorB[i]
+      normA += vectorA[i] * vectorA[i]
+      normB += vectorB[i] * vectorB[i]
+    }
+
+    if (normA === 0 || normB === 0) {
+      return 0
+    }
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
   }
 }
 
