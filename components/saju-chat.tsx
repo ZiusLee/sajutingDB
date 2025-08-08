@@ -19,6 +19,7 @@ import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
+import { SiteHeader } from "@/components/site-header"
 
 interface SajuChatProps {
   saju: any
@@ -486,6 +487,12 @@ const shouldShowDaeunDiagram = (index: number) => {
 
   return (
     <div className="flex h-screen-mobile bg-white">
+    {/* Mobile Header - only show on mobile */}
+    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
+      <SiteHeader />
+    </div>
+    
+    {/* Sidebar for desktop */}
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -514,7 +521,7 @@ const shouldShowDaeunDiagram = (index: number) => {
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen-mobile">
+      <div className="flex-1 flex flex-col min-w-0 h-screen-mobile pt-16 lg:pt-0">
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto chat-messages-container chat-container-height"
