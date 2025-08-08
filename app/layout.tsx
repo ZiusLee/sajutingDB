@@ -8,6 +8,7 @@ import { ChatProvider } from "@/contexts/chat-context"
 import ClientLayout from "./client-layout"
 import AnalyticsWrapper from "@/components/analytics-wrapper"
 import { GoogleAnalytics } from '@next/third-parties/google'
+import { Suspense } from 'react'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -95,9 +96,11 @@ export default function RootLayout({
           <AuthProvider>
             <ChatProvider>
               <AnalyticsWrapper>
-                <ClientLayout>
-                  {children}
-                </ClientLayout>
+                <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                  <ClientLayout>
+                    {children}
+                  </ClientLayout>
+                </Suspense>
               </AnalyticsWrapper>
               <Toaster />
             </ChatProvider>
