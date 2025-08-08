@@ -23,6 +23,22 @@ const ENABLE_GPT_PARSING = process.env.ENABLE_GPT_PARSING !== "false" // 기본�
 // 🚀 스마트 메모리 설정
 const ENABLE_SMART_MEMORY = process.env.ENABLE_SMART_MEMORY !== "false" // 기본값: true
 
+// 🚀 모델 설정
+const MODEL_NAME = process.env.MODEL_NAME || "gpt-5"
+const MODEL_REASONING_EFFORT = (process.env.MODEL_REASONING_EFFORT || "minimal") as "minimal" | "low" | "medium" | "high"
+const MODEL_TEXT_VERBOSITY = (process.env.MODEL_TEXT_VERBOSITY || "low") as "low" | "medium" | "high"
+const CONTINUE_MODEL_REASONING_EFFORT = (process.env.CONTINUE_MODEL_REASONING_EFFORT || MODEL_REASONING_EFFORT) as "minimal" | "low" | "medium" | "high"
+
+// Helper to build provider options for OpenAI (Responses API style controls)
+function buildProviderOptions(reasoningEffort: "minimal" | "low" | "medium" | "high") {
+  return {
+    openai: {
+      reasoning: { effort: reasoningEffort },
+      text: { verbosity: MODEL_TEXT_VERBOSITY },
+    },
+  }
+}
+
 // 🚀 로그 최적화: 현재 날짜 정보를 가져오는 함수
 function getCurrentDateInfo() {
   const now = new Date()
@@ -264,6 +280,13 @@ export async function POST(req: Request) {
       name,
       gender,
     })
+
+    console.log("🧠 Model config:", {
+      MODEL_NAME,
+      MODEL_REASONING_EFFORT,
+      MODEL_TEXT_VERBOSITY,
+      CONTINUE_MODEL_REASONING_EFFORT,
+    })
     
     // 🚀 브라우저별 차이 디버깅
     console.log("🔍 [DEBUG] Request details for browser compatibility:", {
@@ -344,9 +367,10 @@ export async function POST(req: Request) {
         try {
           const result = await streamText({
             messages: apiMessages,
-            model: openai("gpt-4.1"),
+            model: openai(MODEL_NAME),
             temperature: 0.8,
             maxTokens: 2048,
+            providerOptions: buildProviderOptions(CONTINUE_MODEL_REASONING_EFFORT),
           })
 
           return result.toDataStreamResponse()
@@ -370,6 +394,22 @@ export async function POST(req: Request) {
     const latestMessage = messages[messages.length - 1]?.content || ""
     const userMessageVar = latestMessage
 
+    // 🚀 스마트 메모리 컨텍스트 가져오기
+    const memoryContext = await getMemoryContext(userId, userMessageVar, roomType)
+
+    // 🚀 메모리 컨텍스트와 최신 메시지를 함께 파싱
+    let combinedParsingText = latestMessage
+    if (memoryContext && memoryContext.trim().length > 0) {
+      // 메모리 컨텍스트에서 생년월일이나 파트너 정보가 있는지 확인
+      const hasDateInfo = /\d{4}년|\d{1,2}월|\d{1,2}일|생년월일|태어난|출생/i.test(memoryContext)
+      const hasPartnerInfo = /여자친구|남자친구|연인|상대방|파트너|궁합/i.test(memoryContext)
+      
+      if (hasDateInfo || hasPartnerInfo) {
+        console.log("🧠 메모리 컨텍스트에서 날짜/파트너 정보 감지, GPT 파싱에 포함")
+        combinedParsingText = `${latestMessage}\n\n[메모리에서 불러온 관련 정보]\n${memoryContext}`
+      }
+    }
+
     // 이전 메시지들에서 기존 파트너 정보 확인 (컨텍스트 유지)
     let existingPartnerContext = ""
     const recentMessages = messages.slice(-5) // 최근 5개 메시지 확인
@@ -387,8 +427,8 @@ export async function POST(req: Request) {
     let parsedInfo
     try {
       parsedInfo = ENABLE_GPT_PARSING
-        ? await parseMessageWithGPT(latestMessage)
-        : parseMessageForDatesAndBirth(latestMessage)
+        ? await parseMessageWithGPT(combinedParsingText)
+        : parseMessageForDatesAndBirth(combinedParsingText)
     } catch (parseError) {
       console.error("메시지 파싱 오류:", parseError)
       parsedInfo = { dates: [], eventContext: [], needsFollowUp: [] }
@@ -410,13 +450,10 @@ export async function POST(req: Request) {
 
     console.log("🔍 파싱된 메시지 정보:", JSON.stringify(parsedInfo, null, 2))
 
-    // 🚀 스마트 메모리 컨텍스트 가져오기
-    const memoryContext = await getMemoryContext(userId, userMessageVar, roomType)
-
     // 🚀 성능 최적화: 간소화된 메시지 최적화
     const optimizedMessages = await processMessagesForContext(messages, compressedSaju, name, roomType)
 
-    // 🚀 메모리 컨텍스트를 시스템 메시지로 추가
+    // 🚀 메모리 컨텍스트를 시스템 메시지로 추가 (파싱 후에 추가)
     if (memoryContext) {
       optimizedMessages.unshift({
         role: "system",
@@ -645,10 +682,11 @@ ${index + 1}. **${person.name}**
       // 🚨 CRITICAL: DO NOT CHANGE THESE MODEL SETTINGS - SEE docs/MODEL_CONFIGURATION.md
       const result = await streamText({
         messages: apiMessages,
-        model: openai("gpt-4.1"),
-        temperature: 1.0,
+        model: openai(MODEL_NAME),
+        verbosity: low,
         maxTokens: 2048,
-        top_p: 1.0,
+        reasoningEffort: minimal,
+        providerOptions: buildProviderOptions(MODEL_REASONING_EFFORT),
       })
 
       // 🚀 스트리밍 응답과 함께 메모리 처리
@@ -784,7 +822,7 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 
 예시:
 
-"혹시 더 궁금한 점, 혹은 구체적으로 알고 싶은 영역(재물운, 연애운, 건강, 진로 등)이 있으시면 분야별로 자세히 해석해드릴 수 있습니다. 편하게 말씀해주세요. 언제나 사용자님의 현명한 나침반이 되어드리겠습니다!"
+"혹시 더 궁금한 점, 혹은 구체적으로 알고 싶은 영역(재물운, 연애운, 건강, 진로 등)이 있으시면 분야별로 자세하게 해석해드릴 수 있습니다. 편하게 말씀해주세요. 언제나 사용자님의 현명한 나침반이 되어드리겠습니다!"
 
 "평소 중요한 결정을 내릴 때, 어떠한 방식(주변 사람과 상의 vs 혼자만의 고민)으로 결정하시는 편인가요?"
 
@@ -879,7 +917,7 @@ ${sajuInfo}${compatibilityInfo}
 
 🔄 **대화 연속성 유지 지침:**
 - 이전 대화 요약이 제공되면 반드시 참고하여 일관성 있는 상담 진행
-- 사용자가 이전에 뽑은 카드들과 해석 내용을 기억하고 연결
+- 사용자가 이전에 언급한 내용들을 기억하고 연결하여 응답
 - 반복적인 기본 설명보다는 심화된 타로 해석과 조언 제공
 - 사용자의 변화하는 관심사와 질문 패턴을 파악하여 맞춤형 응답
 

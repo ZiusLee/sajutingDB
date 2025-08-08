@@ -5,9 +5,9 @@ import { SajuOnboardingFlow } from "@/components/saju-onboarding-flow"
 import { useRouter } from "next/navigation"
 import ScrollVelocity from "@/components/ScrollVelocity"
 import { useAuth } from "@/contexts/auth-context"
+import BusinessBar from "@/components/business-bar"
 
 const questionChips = [
-  // 기존 질문들
   { icon: "💼", text: "직장을 어떤 기준으로 선택하면 좋을까?" },
   { icon: "💕", text: "올해 나의 결혼운은 어때?" },
   { icon: "💰", text: "언제 재물운 들어오는지 알려줘" },
@@ -15,7 +15,6 @@ const questionChips = [
   { icon: "👤", text: "내 성격과 기질은 어때?" },
   { icon: "❤️", text: "연애운이 언제 좋아질까?" },
   { icon: "🏠", text: "이사는 언제 하는게 좋을까?" },
-  // 새로운 디테일한 질문들
   { icon: "😰", text: "불안감이 심한데 내 사주적 원인이 뭘까?" },
   { icon: "🤝", text: "상사와 자꾸 갈등이 생기는 이유는?" },
   { icon: "💔", text: "이별 후 언제쯤 새로운 사랑을 만날까?" },
@@ -45,7 +44,6 @@ export default function LandingPageClient() {
   const { isAuthenticated } = useAuth()
 
   const handleStartSaju = () => {
-    console.log("사주 프로필 생성하기 버튼 클릭됨")
     setShowOnboarding(true)
   }
 
@@ -53,17 +51,7 @@ export default function LandingPageClient() {
     setShowOnboarding(false)
   }
 
-  const handleLogoClick = () => {
-    router.push("/")
-  }
-
-  const handleLoginClick = () => {
-    console.log("로그인 버튼 클릭됨")
-    router.push("/login")
-  }
-
   const handleRegisterClick = () => {
-    console.log("회원가입 버튼 클릭됨")
     router.push("/register")
   }
 
@@ -72,157 +60,122 @@ export default function LandingPageClient() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white">
-      {/* Korean Wave Pattern Background - Transparent with lines only */}
-      <div
-        className="absolute inset-0 opacity-5"
-        style={{
-          backgroundImage: `url('/images/korean-wave-pattern.png')`,
-          backgroundSize: "300px 300px",
-          backgroundRepeat: "repeat",
-          filter: "grayscale(100%) contrast(200%)",
-        }}
-      />
+    <>
+      {/* 메인: 하단 고정 바가 가리지 않도록 패딩 추가 */}
+      <div className="min-h-screen relative overflow-hidden bg-white pb-16">
+        {/* 배경 wave pattern 및 하단 pattern 섹션 제거 */}
 
-      {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
-        {/* Main Question */}
-        <div className="mb-12">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight mb-6">
-            오늘은 어떤 것이
-            <br />
-            궁금하세요?
-          </h1>
-          <p className="text-lg md:text-xl text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
-        </div>
+        {/* 메인 콘텐츠 */}
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
+          <div className="mb-8">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black leading-tight mb-4">
+              오늘은 어떤 것이
+              <br />
+              궁금하세요?
+            </h1>
+            <p className="text-base md:text-lg text-gray-600">
+              사주를 바탕으로 나와 대화하는 AI Companion, 사주핑
+            </p>
+          </div>
 
-        {/* Scrolling Question Chips */}
-        <div className="mb-12 w-full relative">
-          {/* Left fade overlay - smaller on mobile */}
-          <div className="absolute left-0 top-0 bottom-0 w-4 md:w-20 bg-gradient-to-r from-white to-transparent z-20 pointer-events-none" />
-          {/* Right fade overlay - smaller on mobile */}
-          <div className="absolute right-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-l from-white to-transparent z-20 pointer-events-none" />
+          {/* 질문 칩 - 2줄 스크롤 애니메이션 */}
+          <div className="mb-8 w-full relative">
+            <div className="space-y-2">
+              <div className="h-14 overflow-hidden">
+                <ScrollVelocity
+                  velocity={30}
+                  parallaxStyle={{ height: "56px" }}
+                  scrollerStyle={{
+                    fontSize: "1rem",
+                    fontWeight: "500",
+                    letterSpacing: "normal",
+                    filter: "none",
+                    alignItems: "center",
+                    height: "56px",
+                    display: "flex",
+                  }}
+                  scrollerClassName="flex items-center h-14"
+                  numCopies={8}
+                >
+                  <div className="flex items-center gap-2">
+                    {questionChips.slice(0, 14).map((chip, index) => (
+                      <div
+                        key={index}
+                        className="bg-white text-black border border-gray-200 px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      >
+                        <span className="text-base md:text-lg">{chip.icon}</span>
+                        <span>{chip.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollVelocity>
+              </div>
 
-          <div className="space-y-2">
-            {/* First row - scrolling right */}
-            <div className="h-16 overflow-hidden">
-              <ScrollVelocity
-                velocity={30}
-                parallaxStyle={{ height: "64px" }}
-                scrollerStyle={{
-                  fontSize: "1rem",
-                  fontWeight: "500",
-                  letterSpacing: "normal",
-                  filter: "none",
-                  alignItems: "center",
-                  height: "64px",
-                  display: "flex",
-                }}
-                scrollerClassName="flex items-center h-16"
-                numCopies={10}
-              >
-                <div className="flex items-center gap-2">
-                  {questionChips.slice(0, 14).map((chip, index) => (
-                    <div
-                      key={index}
-                      className="bg-white text-black border-2 border-gray-200 px-3 py-2 md:px-4 md:py-3 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
-                    >
-                      <span className="text-base md:text-lg">{chip.icon}</span>
-                      <span>{chip.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </ScrollVelocity>
-            </div>
-
-            {/* Second row - scrolling left */}
-            <div className="h-16 overflow-hidden">
-              <ScrollVelocity
-                velocity={-25}
-                parallaxStyle={{ height: "64px" }}
-                scrollerStyle={{
-                  fontSize: "1rem",
-                  fontWeight: "500",
-                  letterSpacing: "normal",
-                  filter: "none",
-                  alignItems: "center",
-                  height: "64px",
-                  display: "flex",
-                }}
-                scrollerClassName="flex items-center h-16"
-                numCopies={10}
-              >
-                <div className="flex items-center gap-2">
-                  {questionChips.slice(14).map((chip, index) => (
-                    <div
-                      key={index + 14}
-                      className="bg-white text-black border-2 border-gray-200 px-3 py-2 md:px-4 md:py-3 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
-                    >
-                      <span className="text-base md:text-lg">{chip.icon}</span>
-                      <span>{chip.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </ScrollVelocity>
+              <div className="h-14 overflow-hidden">
+                <ScrollVelocity
+                  velocity={-25}
+                  parallaxStyle={{ height: "56px" }}
+                  scrollerStyle={{
+                    fontSize: "1rem",
+                    fontWeight: "500",
+                    letterSpacing: "normal",
+                    filter: "none",
+                    alignItems: "center",
+                    height: "56px",
+                    display: "flex",
+                  }}
+                  scrollerClassName="flex items-center h-14"
+                  numCopies={8}
+                >
+                  <div className="flex items-center gap-2">
+                    {questionChips.slice(14).map((chip, index) => (
+                      <div
+                        key={index + 14}
+                        className="bg-white text-black border border-gray-200 px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-sm flex items-center gap-1 md:gap-2 text-xs md:text-sm font-medium hover:scale-105 hover:shadow-md cursor-pointer transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                      >
+                        <span className="text-base md:text-lg">{chip.icon}</span>
+                        <span>{chip.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollVelocity>
+              </div>
             </div>
           </div>
+
+          {/* CTA */}
+          <div className="space-y-4 max-w-md w-full relative z-50">
+            <button
+              onClick={handleStartSaju}
+              className="w-[200px] h-[44px] mx-auto bg-gray-950 hover:bg-gray-800 text-white rounded-xl text-base md:text-lg font-medium flex items-center justify-center gap-2 shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer"
+            >
+              <span>사주 프로필 생성하기</span>
+              <span className="text-lg md:text-xl">→</span>
+            </button>
+
+            {!isAuthenticated && (
+              <div className="flex items-center justify-center space-x-2 text-xs md:text-sm">
+                <span className="text-gray-500">계정이 없으신가요?</span>
+                <button
+                  onClick={handleRegisterClick}
+                  className="text-black hover:underline font-medium hover:text-gray-700 transition-colors cursor-pointer z-50"
+                >
+                  회원가입
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-
-        {/* CTA Section */}
-        <div className="space-y-6 max-w-md w-full relative z-50">
-          <button
-            onClick={handleStartSaju}
-            className="w-[200px] h-[46px] mx-auto bg-gray-950 hover:bg-gray-800 text-white rounded-xl text-lg font-medium flex items-center justify-center gap-2 shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer"
-          >
-            <span>사주 프로필 생성하기</span>
-            <span className="text-xl">→</span>
-          </button>
-
-          {!isAuthenticated && (
-            <div className="flex items-center justify-center space-x-2 text-sm">
-              <span className="text-gray-500">계정이 없으신가요?</span>
-              <button
-                onClick={handleRegisterClick}
-                className="text-black hover:underline font-medium hover:text-gray-700 transition-colors cursor-pointer z-50"
-              >
-                회원가입
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Smooth transition fade out before wave pattern */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-amber-50/20 via-white/50 to-transparent z-5" />
-
-      {/* Oriental Wave Pattern at Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-48 md:h-64 lg:h-80 z-1">
-        <div
-          className="w-full h-full opacity-10"
-          style={{
-            backgroundImage: `url('/images/oriental-wave-pattern.png')`,
-            backgroundSize: "400px 200px",
-            backgroundRepeat: "repeat-x",
-            backgroundPosition: "bottom",
-          }}
-        />
-        {/* Gradient overlay to blend with background */}
-        <div className="absolute inset-0 bg-gradient-to-t from-amber-50/20 via-transparent to-transparent" />
-      </div>
-
-      {/* Additional subtle pattern overlay for depth */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 md:h-40 z-0">
-        <div
-          className="w-full h-full opacity-5"
-          style={{
-            backgroundImage: `url('/images/oriental-wave-pattern.png')`,
-            backgroundSize: "300px 150px",
-            backgroundRepeat: "repeat-x",
-            backgroundPosition: "bottom",
-            transform: "scaleY(-1)",
-          }}
-        />
-      </div>
-    </div>
+      {/* 하단 고정 사업자 정보 바 (작고 가로 레이아웃) */}
+      <BusinessBar
+        companyName="원테라피"
+        representative="이윤섭"
+        businessNumber="180-16-02886"
+        address="경기도 파주시 파주읍 약수골길 86"
+        phone="010-5614-4801"
+      />
+    </>
   )
 }

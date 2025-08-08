@@ -107,7 +107,7 @@ const testScenarios = [
     name: "기본 정보 추출",
     userMessage: "안녕하세요, 저는 서울에서 프론트엔드 개발자로 일하고 있는 김철수입니다.",
     assistantResponse: "안녕하세요 김철수님! 서울에서 프론트엔드 개발자로 일하고 계시는군요.",
-    expected: ["identity: 김철수", "identity: 서울 거주", "identity: 프론트엔드 개발자"],
+    expected: ["identity: 김철수", "identity: 서울 거주", "identity: 프론트���드 개발자"],
   },
   {
     name: "중복 정보 처리",

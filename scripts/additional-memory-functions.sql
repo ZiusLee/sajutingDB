@@ -1,16 +1,20 @@
--- Drop existing functions to avoid conflicts
+-- Drop existing functions with exact signatures to avoid conflicts
+DROP FUNCTION IF EXISTS find_quality_memories(uuid, vector, text[], double precision, double precision, integer) CASCADE;
 DROP FUNCTION IF EXISTS find_quality_memories(text, vector, text[], numeric, numeric, integer) CASCADE;
+DROP FUNCTION IF EXISTS find_similar_memory(uuid, vector, text, double precision) CASCADE;
 DROP FUNCTION IF EXISTS find_similar_memory(text, vector, text, numeric) CASCADE;
+DROP FUNCTION IF EXISTS find_cross_type_duplicate(uuid, vector, text[], text[], double precision) CASCADE;
 DROP FUNCTION IF EXISTS find_cross_type_duplicate(text, vector, text[], text[], numeric) CASCADE;
+DROP FUNCTION IF EXISTS get_enhanced_memory_stats(uuid) CASCADE;
 DROP FUNCTION IF EXISTS get_enhanced_memory_stats(text) CASCADE;
 
 -- Create enhanced memory search function with quality scoring
 CREATE OR REPLACE FUNCTION find_quality_memories(
-    p_user_id text,
+    p_user_id uuid,
     p_query_embedding vector(1536),
     p_memory_types text[] DEFAULT NULL,
-    p_min_quality_score numeric DEFAULT 0.0,
-    p_similarity_threshold numeric DEFAULT 0.1,
+    p_min_quality_score double precision DEFAULT 0.0,
+    p_similarity_threshold double precision DEFAULT 0.1,
     p_result_limit integer DEFAULT 20
 )
 RETURNS TABLE (
@@ -28,15 +32,15 @@ RETURNS TABLE (
     created_at timestamptz,
     updated_at timestamptz,
     last_referenced timestamptz,
-    relevance_score numeric
+    relevance_score double precision
 ) 
 LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
     SELECT 
-        sc.id,
-        sc.user_id,
+        sc.id::text,
+        sc.user_id::text,
         sc.type,
         sc.content,
         sc.source_context,
@@ -49,7 +53,7 @@ BEGIN
         sc.created_at,
         sc.updated_at,
         sc.last_referenced,
-        (1 - (sc.relevance_embedding <=> p_query_embedding)) as relevance_score
+        (1 - (sc.relevance_embedding <=> p_query_embedding))::double precision as relevance_score
     FROM smart_contexts sc
     WHERE sc.user_id = p_user_id
         AND (p_memory_types IS NULL OR sc.type = ANY(p_memory_types))
@@ -65,28 +69,32 @@ $$;
 
 -- Create function to find similar memories within same type
 CREATE OR REPLACE FUNCTION find_similar_memory(
-    p_user_id text,
+    p_user_id uuid,
     p_query_embedding vector(1536),
     p_memory_type text,
-    p_similarity_threshold numeric DEFAULT 0.85
+    p_similarity_threshold double precision DEFAULT 0.85
 )
 RETURNS TABLE (
     id text,
     content text,
     type text,
     quality_score numeric,
-    similarity numeric
+    similarity double precision,
+    reference_count integer,
+    usage_count integer
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
     SELECT 
-        sc.id,
+        sc.id::text,
         sc.content,
         sc.type,
         COALESCE(sc.quality_score, 0.5) as quality_score,
-        (1 - (sc.relevance_embedding <=> p_query_embedding)) as similarity
+        (1 - (sc.relevance_embedding <=> p_query_embedding))::double precision as similarity,
+        sc.reference_count,
+        COALESCE(sc.usage_count, 0) as usage_count
     FROM smart_contexts sc
     WHERE sc.user_id = p_user_id
         AND sc.type = p_memory_type
@@ -98,29 +106,33 @@ $$;
 
 -- Create function to find cross-type contradictions
 CREATE OR REPLACE FUNCTION find_cross_type_duplicate(
-    p_user_id text,
+    p_user_id uuid,
     p_query_embedding vector(1536),
     p_exclude_types text[],
     p_target_types text[],
-    p_similarity_threshold numeric DEFAULT 0.88
+    p_similarity_threshold double precision DEFAULT 0.88
 )
 RETURNS TABLE (
     id text,
     content text,
     type text,
     quality_score numeric,
-    similarity numeric
+    similarity double precision,
+    reference_count integer,
+    usage_count integer
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
     SELECT 
-        sc.id,
+        sc.id::text,
         sc.content,
         sc.type,
         COALESCE(sc.quality_score, 0.5) as quality_score,
-        (1 - (sc.relevance_embedding <=> p_query_embedding)) as similarity
+        (1 - (sc.relevance_embedding <=> p_query_embedding))::double precision as similarity,
+        sc.reference_count,
+        COALESCE(sc.usage_count, 0) as usage_count
     FROM smart_contexts sc
     WHERE sc.user_id = p_user_id
         AND NOT (sc.type = ANY(p_exclude_types))
@@ -132,7 +144,7 @@ END;
 $$;
 
 -- Create enhanced memory statistics function
-CREATE OR REPLACE FUNCTION get_enhanced_memory_stats(p_user_id text)
+CREATE OR REPLACE FUNCTION get_enhanced_memory_stats(p_user_id uuid)
 RETURNS TABLE (
     total_memories bigint,
     high_quality_count bigint,

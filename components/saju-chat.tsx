@@ -19,6 +19,7 @@ import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
+import { SiteHeader } from "@/components/site-header"
 
 interface SajuChatProps {
   saju: any
@@ -57,7 +58,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 
   const baseQuestions: Record<string, string[]> = {
     sajuping: [
-      "직업운 알려줘",
+      "오늘의 운세를 사주기반으로 알려줘",
       "연애운 알려줘",
       "건강운 알려줘",
       "재물운 알려줘",
@@ -124,7 +125,7 @@ export default function SajuChat({
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
-  const [showScrollButton, setShowScrollButton] = useState(showScrollButton)
+  const [showScrollButton, setShowScrollButton] = useState(false)
   const [persistedChatRoomId, setPersistedChatRoomId] = useState<string | null>(null)
   const [transitionMessages, setTransitionMessages] = useState<any[] | null>(null)
   const isPersistingRef = useRef(false)
@@ -486,6 +487,12 @@ const shouldShowDaeunDiagram = (index: number) => {
 
   return (
     <div className="flex h-screen-mobile bg-white">
+    {/* Mobile Header - only show on mobile */}
+    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
+      <SiteHeader />
+    </div>
+    
+    {/* Sidebar for desktop */}
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -514,7 +521,7 @@ const shouldShowDaeunDiagram = (index: number) => {
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen-mobile">
+      <div className="flex-1 flex flex-col min-w-0 h-screen-mobile pt-16 lg:pt-0">
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto chat-messages-container chat-container-height"
@@ -582,7 +589,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                             </h1>
                           ),
                           h2: ({ children }) => (
-                            <h2 className="text-xl font-semibold text-gray-800 mb-4 mt-6">
+                            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 mt-6 pb-2 border-b border-gray-200">
                               {children}
                             </h2>
                           ),
@@ -598,13 +605,13 @@ const shouldShowDaeunDiagram = (index: number) => {
                           ),
                           // 단락 스타일링
                           p: ({ children }) => (
-                            <p className="text-base leading-relaxed text-gray-700 mb-4 last:mb-0">
+                            <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
                               {children}
                             </p>
                           ),
                           // 구분선 스타일링
                           hr: () => (
-                            <div className="my-6"></div>
+                            <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                           ),
                           // 리스트 스타일링
                           ul: ({ children }) => (
@@ -618,10 +625,10 @@ const shouldShowDaeunDiagram = (index: number) => {
                             </ol>
                           ),
                           li: ({ children, ordered }) => (
-                            <li className={`flex items-start gap-3 leading-relaxed text-gray-700 ${
+                            <li className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
                               ordered 
-                                ? "text-xl counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
-                                : "text-base before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
+                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
+                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
                             }`}>
                               <span className="flex-1">{children}</span>
                             </li>
@@ -728,7 +735,7 @@ const shouldShowDaeunDiagram = (index: number) => {
             </Button>
           )}
           <div className="space-y-2">
-            {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
+            {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
