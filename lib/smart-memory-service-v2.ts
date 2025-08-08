@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { openai } from "@ai-sdk/openai"
-import { generateObject, generateText } from "ai"
+import { generateObject } from "ai"
 import { z } from "zod"
-import type { DuplicateCheckResult, QualityAssessment, SmartContext } from "@/types/memory"
+import type { DuplicateCheckResult, QualityAssessment } from "@/types/memory"
 
 // Environment variable validation
 function getSupabaseConfig() {
@@ -61,27 +61,48 @@ class SmartMemoryServiceV2 {
   private supabase: any
 
   constructor() {
-    try {
-      const { url, serviceKey } = getSupabaseConfig()
-      
-      this.supabase = createClient(url, serviceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
+    const { url, serviceKey } = getSupabaseConfig()
+    this.supabase = createClient(url, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      db: {
+        schema: "public",
+      },
+      global: {
+        headers: {
+          "x-client-info": "smart-memory-v2",
         },
-        db: {
-          schema: "public",
-        },
-        global: {
-          headers: {
-            "x-client-info": "smart-memory-v2",
-          },
-        },
-      })
-    } catch (error) {
-      console.error("SmartMemoryServiceV2 initialization failed:", error)
-      throw error
+      },
+    })
+  }
+
+  // --- Small helper to generate objects with model fallback ---
+  private async generateObjectWithFallback<T>({
+    schema,
+    prompt,
+    preferred = ["gpt-5", "gpt-4o-mini"],
+  }: {
+    schema: z.ZodType<T>
+    prompt: string
+    preferred?: string[]
+  }): Promise<T> {
+    let lastErr: any = null
+    for (const name of preferred) {
+      try {
+        const { object } = await generateObject({
+          model: openai(name as any),
+          schema,
+          prompt,
+        })
+        return object
+      } catch (err: any) {
+        lastErr = err
+        console.error(`generateObject failed with model "${name}":`, err?.message || err)
+      }
     }
+    throw lastErr
   }
 
   // Quality score calculation
@@ -284,7 +305,7 @@ class SmartMemoryServiceV2 {
   // Same type semantic matching
   private async findSameTypeSemanticMatch(
     userId: string,
-    content: string,
+    _content: string,
     embedding: number[],
     type: string,
     threshold: number
@@ -344,7 +365,7 @@ class SmartMemoryServiceV2 {
   // Cross-type contradiction detection
   private async findCrossTypeContradiction(
     userId: string,
-    content: string,
+    _content: string,
     embedding: number[],
     currentType: string
   ): Promise<any> {
@@ -510,8 +531,6 @@ class SmartMemoryServiceV2 {
         }
       }
 
-      const conversation = `사용자: ${userMessage}\nAI: ${assistantResponse}`
-
       // Previous memory context
       const memoryContext = previousMemories?.length
         ? `\n\n기존 정보:\n${previousMemories
@@ -522,8 +541,7 @@ class SmartMemoryServiceV2 {
 
       console.log("🧠 [EXTRACT 2] Calling GPT for memory extraction...")
 
-      const result = await generateObject({
-        model: openai(process.env.MODEL_NAME || "gpt-4o-mini"),
+      const result = await this.generateObjectWithFallback({
         schema: MemoryExtractionSchema,
         prompt: `사용자의 발언에서만 사용자에 대한 새로운 사실 정보를 추출하세요. AI의 발언은 사용자의 발언을 이해하기 위한 맥락으로만 사용하고, AI의 발언 내용 자체를 정보로 추출해서는 안 됩니다.${memoryContext}
 
@@ -553,7 +571,7 @@ AI: ${assistantResponse}
 - 인사말, 감사 인사`,
       })
 
-      return result.object
+      return result
     } catch (error) {
       console.error("🚨 [EXTRACT ERROR] 메모리 추출 실패:", error)
       return {
@@ -614,8 +632,7 @@ AI: ${assistantResponse}
   // Query understanding
   private async understandQuery(query: string): Promise<any> {
     try {
-      const result = await generateObject({
-        model: openai(process.env.MODEL_NAME || "gpt-4o-mini"),
+      const result = await this.generateObjectWithFallback({
         schema: QueryUnderstandingSchema,
         prompt: `다음 질문/메시지를 분석하여 메모리 검색에 필요한 정보를 추출하세요.
 
@@ -624,7 +641,7 @@ AI: ${assistantResponse}
 관련 키워드, 개체명, 시간적 맥락, 관련 메모리 타입을 추출하세요.`,
       })
 
-      return result.object
+      return result
     } catch (error) {
       console.error("쿼리 이해 실패:", error)
       return {
@@ -827,97 +844,97 @@ AI: ${assistantResponse}
   // Quality-aware vector search
   private async qualityAwareVectorSearch(
     userId: string,
-    query: string,
+    _query: string,
     embedding: number[],
     understanding: any,
     limit: number,
-): Promise<any[]> {
-  try {
-    // Try to use the stored function first
-    const { data: highQualityResults, error: hqError } = await this.supabase.rpc("find_quality_memories", {
-      p_user_id: userId,
-      p_query_embedding: embedding,
-      p_memory_types: understanding.memoryTypes?.length > 0 ? understanding.memoryTypes : null,
-      p_min_quality_score: 0.6,
-      p_similarity_threshold: 0.15,
-      p_result_limit: limit * 2,
-    })
+  ): Promise<any[]> {
+    try {
+      // Try to use the stored function first
+      const { data: highQualityResults, error: hqError } = await this.supabase.rpc("find_quality_memories", {
+        p_user_id: userId,
+        p_query_embedding: embedding,
+        p_memory_types: understanding.memoryTypes?.length > 0 ? understanding.memoryTypes : null,
+        p_min_quality_score: 0.6,
+        p_similarity_threshold: 0.15,
+        p_result_limit: limit * 2,
+      })
 
-    if (!hqError && highQualityResults && highQualityResults.length > 0) {
-      console.log(`🔍 High-quality search results: ${highQualityResults.length}개`)
-      
-      const scoredResults = highQualityResults.map(result => ({
-        ...result,
-        effective_score: this.calculateEffectiveScore(
-          result.relevance_score || 0,
-          result.quality_score || 0.5,
-          result.importance_score || 0.5,
-          result.usage_count || 0
-        ),
-      }))
+      if (!hqError && highQualityResults && highQualityResults.length > 0) {
+        console.log(`🔍 High-quality search results: ${highQualityResults.length}개`)
+        
+        const scoredResults = highQualityResults.map((result: any) => ({
+          ...result,
+          effective_score: this.calculateEffectiveScore(
+            result.relevance_score || 0,
+            result.quality_score || 0.5,
+            result.importance_score || 0.5,
+            result.usage_count || 0
+          ),
+        }))
 
-      scoredResults.sort((a, b) => b.effective_score - a.effective_score)
+        scoredResults.sort((a: any, b: any) => b.effective_score - a.effective_score)
+        return scoredResults.slice(0, limit)
+      }
+
+      // Fallback: if function doesn't exist, use manual vector search
+      console.log("🔄 Stored function not available, using fallback vector search")
+
+      let dbQuery = this.supabase
+        .from("smart_contexts")
+        .select("*, relevance_embedding")
+        .eq("user_id", userId)
+        .gte("quality_score", 0.3)
+        .order("quality_score", { ascending: false })
+        .limit(limit * 3)
+
+      // Add type filter if specified
+      if (understanding.memoryTypes?.length > 0) {
+        dbQuery = dbQuery.in("type", understanding.memoryTypes)
+      }
+
+      const { data, error } = await dbQuery
+
+      if (error || !data || data.length === 0) {
+        console.error("Fallback vector search error:", error)
+        return []
+      }
+
+      // Calculate relevance scores using cosine similarity
+      const scoredResults = data
+        .map((memory: any) => {
+          if (!memory.relevance_embedding) {
+            return null
+          }
+
+          const relevanceScore = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
+          
+          // Apply similarity threshold
+          if (relevanceScore < 0.1) {
+            return null
+          }
+
+          return {
+            ...memory,
+            relevance_score: relevanceScore,
+            effective_score: this.calculateEffectiveScore(
+              relevanceScore,
+              memory.quality_score || 0.5,
+              memory.importance_score || 0.5,
+              memory.usage_count || 0
+            ),
+          }
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => (b as any).effective_score - (a as any).effective_score)
+
+      console.log(`🔍 Fallback vector search results: ${scoredResults.length}개`)
       return scoredResults.slice(0, limit)
-    }
-
-    // Fallback: if function doesn't exist, use manual vector search
-    console.log("🔄 Stored function not available, using fallback vector search")
-
-    let dbQuery = this.supabase
-      .from("smart_contexts")
-      .select("*, relevance_embedding")
-      .eq("user_id", userId)
-      .gte("quality_score", 0.3)
-      .order("quality_score", { ascending: false })
-      .limit(limit * 3)
-
-    // Add type filter if specified
-    if (understanding.memoryTypes?.length > 0) {
-      dbQuery = dbQuery.in("type", understanding.memoryTypes)
-    }
-
-    const { data, error } = await dbQuery
-
-    if (error || !data || data.length === 0) {
-      console.error("Fallback vector search error:", error)
+    } catch (error) {
+      console.error("Quality-aware vector search failed:", error)
       return []
     }
-
-    // Calculate relevance scores using cosine similarity
-    const scoredResults = data
-      .map(memory => {
-        if (!memory.relevance_embedding) {
-          return null
-        }
-
-        const relevanceScore = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
-        
-        // Apply similarity threshold
-        if (relevanceScore < 0.1) {
-          return null
-        }
-
-        return {
-          ...memory,
-          relevance_score: relevanceScore,
-          effective_score: this.calculateEffectiveScore(
-            relevanceScore,
-            memory.quality_score || 0.5,
-            memory.importance_score || 0.5,
-            memory.usage_count || 0
-          ),
-        }
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.effective_score - a.effective_score)
-
-    console.log(`🔍 Fallback vector search results: ${scoredResults.length}개`)
-    return scoredResults.slice(0, limit)
-  } catch (error) {
-    console.error("Quality-aware vector search failed:", error)
-    return []
   }
-}
 
   // Calculate effective score
   private calculateEffectiveScore(
@@ -1029,7 +1046,7 @@ AI: ${assistantResponse}
       return ""
     }
 
-    const sortedMemories = memories.sort((a, b) => {
+    const sortedMemories = memories.sort((a: any, b: any) => {
       const scoreA = a.effective_score || a.quality_score || 0.5
       const scoreB = b.effective_score || b.quality_score || 0.5
       return scoreB - scoreA
@@ -1106,7 +1123,7 @@ AI: ${assistantResponse}
         throw error
       }
 
-      const scoredResults = (data || []).map(result => ({
+      const scoredResults = (data || []).map((result: any) => ({
         ...result,
         effective_score: this.calculateEffectiveScore(
           result.relevance_score || 0,
@@ -1116,7 +1133,7 @@ AI: ${assistantResponse}
         ),
       }))
 
-      scoredResults.sort((a, b) => b.effective_score - a.effective_score)
+      scoredResults.sort((a: any, b: any) => b.effective_score - a.effective_score)
 
       console.log("🔍 DB 검색 결과:", scoredResults.length, "개")
       return scoredResults
@@ -1262,12 +1279,7 @@ let _smartMemoryServiceV2: SmartMemoryServiceV2 | null = null
 
 export const smartMemoryServiceV2 = (() => {
   if (!_smartMemoryServiceV2) {
-    try {
-      _smartMemoryServiceV2 = new SmartMemoryServiceV2()
-    } catch (error) {
-      console.error("SmartMemoryServiceV2 초기화 실패:", error)
-      throw error
-    }
+    _smartMemoryServiceV2 = new SmartMemoryServiceV2()
   }
   return _smartMemoryServiceV2
 })()
