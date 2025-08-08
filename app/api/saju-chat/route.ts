@@ -370,6 +370,22 @@ export async function POST(req: Request) {
     const latestMessage = messages[messages.length - 1]?.content || ""
     const userMessageVar = latestMessage
 
+    // 🚀 스마트 메모리 컨텍스트 가져오기
+    const memoryContext = await getMemoryContext(userId, userMessageVar, roomType)
+
+    // 🚀 메모리 컨텍스트와 최신 메시지를 함께 파싱
+    let combinedParsingText = latestMessage
+    if (memoryContext && memoryContext.trim().length > 0) {
+      // 메모리 컨텍스트에서 생년월일이나 파트너 정보가 있는지 확인
+      const hasDateInfo = /\d{4}년|\d{1,2}월|\d{1,2}일|생년월일|태어난|출생/i.test(memoryContext)
+      const hasPartnerInfo = /여자친구|남자친구|연인|상대방|파트너|궁합/i.test(memoryContext)
+      
+      if (hasDateInfo || hasPartnerInfo) {
+        console.log("🧠 메모리 컨텍스트에서 날짜/파트너 정보 감지, GPT 파싱에 포함")
+        combinedParsingText = `${latestMessage}\n\n[메모리에서 불러온 관련 정보]\n${memoryContext}`
+      }
+    }
+
     // 이전 메시지들에서 기존 파트너 정보 확인 (컨텍스트 유지)
     let existingPartnerContext = ""
     const recentMessages = messages.slice(-5) // 최근 5개 메시지 확인
@@ -387,8 +403,8 @@ export async function POST(req: Request) {
     let parsedInfo
     try {
       parsedInfo = ENABLE_GPT_PARSING
-        ? await parseMessageWithGPT(latestMessage)
-        : parseMessageForDatesAndBirth(latestMessage)
+        ? await parseMessageWithGPT(combinedParsingText)
+        : parseMessageForDatesAndBirth(combinedParsingText)
     } catch (parseError) {
       console.error("메시지 파싱 오류:", parseError)
       parsedInfo = { dates: [], eventContext: [], needsFollowUp: [] }
@@ -410,13 +426,10 @@ export async function POST(req: Request) {
 
     console.log("🔍 파싱된 메시지 정보:", JSON.stringify(parsedInfo, null, 2))
 
-    // 🚀 스마트 메모리 컨텍스트 가져오기
-    const memoryContext = await getMemoryContext(userId, userMessageVar, roomType)
-
     // 🚀 성능 최적화: 간소화된 메시지 최적화
     const optimizedMessages = await processMessagesForContext(messages, compressedSaju, name, roomType)
 
-    // 🚀 메모리 컨텍스트를 시스템 메시지로 추가
+    // 🚀 메모리 컨텍스트를 시스템 메시지로 추가 (파싱 후에 추가)
     if (memoryContext) {
       optimizedMessages.unshift({
         role: "system",
@@ -879,7 +892,7 @@ ${sajuInfo}${compatibilityInfo}
 
 🔄 **대화 연속성 유지 지침:**
 - 이전 대화 요약이 제공되면 반드시 참고하여 일관성 있는 상담 진행
-- 사용자가 이전에 뽑은 카드들과 해석 내용을 기억하고 연결
+- 사용자가 이전에 언급한 내용들을 기억하고 연결하여 응답
 - 반복적인 기본 설명보다는 심화된 타로 해석과 조언 제공
 - 사용자의 변화하는 관심사와 질문 패턴을 파악하여 맞춤형 응답
 

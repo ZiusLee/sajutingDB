@@ -79,7 +79,9 @@ RETURNS TABLE (
     content text,
     type text,
     quality_score numeric,
-    similarity double precision
+    similarity double precision,
+    reference_count integer,
+    usage_count integer
 )
 LANGUAGE plpgsql
 AS $$
@@ -90,7 +92,9 @@ BEGIN
         sc.content,
         sc.type,
         COALESCE(sc.quality_score, 0.5) as quality_score,
-        (1 - (sc.relevance_embedding <=> p_query_embedding))::double precision as similarity
+        (1 - (sc.relevance_embedding <=> p_query_embedding))::double precision as similarity,
+        sc.reference_count,
+        COALESCE(sc.usage_count, 0) as usage_count
     FROM smart_contexts sc
     WHERE sc.user_id = p_user_id
         AND sc.type = p_memory_type
@@ -113,7 +117,9 @@ RETURNS TABLE (
     content text,
     type text,
     quality_score numeric,
-    similarity double precision
+    similarity double precision,
+    reference_count integer,
+    usage_count integer
 )
 LANGUAGE plpgsql
 AS $$
@@ -124,7 +130,9 @@ BEGIN
         sc.content,
         sc.type,
         COALESCE(sc.quality_score, 0.5) as quality_score,
-        (1 - (sc.relevance_embedding <=> p_query_embedding))::double precision as similarity
+        (1 - (sc.relevance_embedding <=> p_query_embedding))::double precision as similarity,
+        sc.reference_count,
+        COALESCE(sc.usage_count, 0) as usage_count
     FROM smart_contexts sc
     WHERE sc.user_id = p_user_id
         AND NOT (sc.type = ANY(p_exclude_types))

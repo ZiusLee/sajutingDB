@@ -614,25 +614,26 @@ AI: ${assistantResponse}
           console.log(`🔄 High-confidence duplicate found (${duplicateCheck.strategy}), updating existing.`)
           
           try {
+            const existingMemory = duplicateCheck.existingMemory!
             const { error: updateError } = await this.supabase
               .from("smart_contexts")
               .update({
-                reference_count: duplicateCheck.existingMemory!.reference_count + 1,
+                reference_count: (existingMemory.reference_count || 0) + 1,
                 last_referenced: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 quality_score: Math.max(
-                  duplicateCheck.existingMemory!.quality_score || 0.5,
+                  existingMemory.quality_score || 0.5,
                   qualityAssessment.score
                 ),
-                usage_count: (duplicateCheck.existingMemory!.usage_count || 0) + 1,
+                usage_count: (existingMemory.usage_count || 0) + 1,
               })
-              .eq("id", duplicateCheck.existingMemory!.id)
+              .eq("id", existingMemory.id)
 
             if (updateError) {
               console.error("❌ Failed to update existing memory:", updateError)
             } else {
               savedMemories.push({ 
-                ...duplicateCheck.existingMemory, 
+                ...existingMemory, 
                 action: "updated",
                 duplicate_strategy: duplicateCheck.strategy,
               })
