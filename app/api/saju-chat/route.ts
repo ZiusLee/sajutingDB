@@ -234,6 +234,28 @@ async function processMemoryImmediate(
   }
 }
 
+function buildSajuInfoString(compressed: any): string {
+  if (!compressed || !compressed.sajuPalja || !compressed.sibseong || !compressed.elements) {
+    return "사주 정보가 충분하지 않습니다."
+  }
+  const genderText = compressed.gender === "male" ? "남성" : compressed.gender === "female" ? "여성" : "미상"
+  const palja = compressed.sajuPalja
+  const sib = compressed.sibseong
+  const el = compressed.elements
+
+  const daeunText = compressed.daeun ? `\n대운: ${compressed.daeun}` : ""
+  const ageText = compressed.currentAge ? ` (현재 ${compressed.currentAge}세)` : ""
+
+  return `이름: ${compressed.name}
+생년월일시: ${compressed.birth}
+성별: ${genderText}
+사주팔자: ${palja.year.stem}${palja.year.branch}년 ${palja.month.stem}${palja.month.branch}월 ${palja.day.stem}${palja.day.branch}일 ${palja.hour.stem}${palja.hour.branch}시
+일간: ${compressed.dayMaster}
+십성: 년간(${sib.yearStem}) 년지(${sib.yearBranch}) 월간(${sib.monthStem}) 월지(${sib.monthBranch}) 일간(${sib.dayStem}) 일지(${sib.dayBranch}) 시간(${sib.hourStem}) 시지(${sib.hourBranch})
+오행분포: 목${el.목} 화${el.화} 토${el.토} 금${el.금} 수${el.수}
+특징: ${compressed.summary || ""}${daeunText}${ageText}`
+}
+
 export async function POST(req: Request) {
   console.log("==================================================")
   console.log("🚀🚀🚀 SAJU CHAT API CALLED 🚀🚀🚀")
@@ -338,15 +360,14 @@ export async function POST(req: Request) {
         const optimizedMessages = await processMessagesForContext(continueMessages, compressedSaju, name, roomType)
 
         // 시스템 메시지 설정 (기존과 동일)
-        const systemMessage = getSystemMessage(roomType, dateInfo, compressedSaju, name, gender, compatibilityData)
+        const sajuInfoForSystem = buildSajuInfoString(compressedSaju)
+        const systemMessage = getSystemMessage(roomType, dateInfo, sajuInfoForSystem, "")
         const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
         try {
           const result = await streamText({
             messages: apiMessages,
-            model: openai("gpt-5"),
-            reasoning_effort: minimal,
-            verbosity: low,
+            model: openai(process.env.MODEL_NAME || "gpt-4o-mini"),
             maxTokens: 2048,
           })
 
@@ -593,20 +614,7 @@ export async function POST(req: Request) {
     }
 
     // 사주 정보 문자열 생성 (추가 데이터 포함)
-    const sajuInfo = `
-이름: ${compressedSaju.name}
-생년월일시: ${compressedSaju.birth}
-성별: ${compressedSaju.gender === "male" ? "남성" : "여성"}
-사주팔자: ${compressedSaju.sajuPalja.year.stem}${compressedSaju.sajuPalja.year.branch}년 ${compressedSaju.sajuPalja.month.stem}${compressedSaju.sajuPalja.month.branch}월 ${compressedSaju.sajuPalja.day.stem}${compressedSaju.sajuPalja.day.branch}일 ${compressedSaju.sajuPalja.hour.stem}${compressedSaju.sajuPalja.hour.branch}시
-일간: ${compressedSaju.dayMaster}
-십성: 년간(${compressedSaju.sibseong.yearStem}) 년지(${compressedSaju.sibseong.yearBranch}) 월간(${compressedSaju.sibseong.monthStem}) 월지(${compressedSaju.sibseong.monthBranch}) 일간(${compressedSaju.sibseong.dayStem}) 일지(${compressedSaju.sibseong.dayBranch}) 시간(${compressedSaju.sibseong.hourStem}) 시지(${compressedSaju.sibseong.hourBranch})
-오행분포: 목${compressedSaju.elements.목} 화${compressedSaju.elements.화} 토${compressedSaju.elements.토} 금${compressedSaju.elements.금} 수${compressedSaju.elements.수}
-특징: ${compressedSaju.summary}${
-      compressedSaju.daeun
-        ? `
-대운: ${compressedSaju.daeun}`
-        : ""
-    }${compressedSaju.currentAge ? ` (현재 ${compressedSaju.currentAge}세)` : ""}${additionalSajuData}`
+    const sajuInfo = buildSajuInfoString(compressedSaju)
 
     console.log("🎯 GPT에 전송되는 최종 sajuInfo:")
     console.log("=".repeat(50))
@@ -659,10 +667,8 @@ ${index + 1}. **${person.name}**
       // 🚨 CRITICAL: DO NOT CHANGE THESE MODEL SETTINGS - SEE docs/MODEL_CONFIGURATION.md
       const result = await streamText({
         messages: apiMessages,
-        model: openai("gpt-5"),
-        verbosity: low,
+        model: openai(process.env.MODEL_NAME || "gpt-4o-mini"),
         maxTokens: 2048,
-        reasoning_effort: minimal,
       })
 
       // 🚀 스트리밍 응답과 함께 메모리 처리
@@ -692,7 +698,7 @@ ${index + 1}. **${person.name}**
         message: streamError.message,
         stack: streamError.stack,
         apiMessages: apiMessages?.length,
-        model: "gpt-5",
+        model: process.env.MODEL_NAME || "gpt-4o-mini",
       })
 
       return new Response(

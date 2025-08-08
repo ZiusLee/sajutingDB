@@ -523,11 +523,8 @@ class SmartMemoryServiceV2 {
       console.log("🧠 [EXTRACT 2] Calling GPT for memory extraction...")
 
       const result = await generateObject({
-        model: openai("gpt-5-mini"),
-        mode: 'tool',
+        model: openai(process.env.MODEL_NAME || "gpt-4o-mini"),
         schema: MemoryExtractionSchema,
-        reasoning_effort: minimal,
-        verbosity: low,
         prompt: `사용자의 발언에서만 사용자에 대한 새로운 사실 정보를 추출하세요. AI의 발언은 사용자의 발언을 이해하기 위한 맥락으로만 사용하고, AI의 발언 내용 자체를 정보로 추출해서는 안 됩니다.${memoryContext}
 
 대화:
@@ -618,11 +615,8 @@ AI: ${assistantResponse}
   private async understandQuery(query: string): Promise<any> {
     try {
       const result = await generateObject({
-        model: openai("gpt-5-mini"),
-        mode: 'tool',
+        model: openai(process.env.MODEL_NAME || "gpt-4o-mini"),
         schema: QueryUnderstandingSchema,
-        verbosity: low,
-        reasoning_effort: minimal,
         prompt: `다음 질문/메시지를 분석하여 메모리 검색에 필요한 정보를 추출하세요.
 
 메시지: "${query}"
