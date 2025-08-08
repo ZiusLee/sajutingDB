@@ -23,22 +23,6 @@ const ENABLE_GPT_PARSING = process.env.ENABLE_GPT_PARSING !== "false" // 기본�
 // 🚀 스마트 메모리 설정
 const ENABLE_SMART_MEMORY = process.env.ENABLE_SMART_MEMORY !== "false" // 기본값: true
 
-// 🚀 모델 설정
-const MODEL_NAME = process.env.MODEL_NAME || "gpt-5"
-const MODEL_REASONING_EFFORT = (process.env.MODEL_REASONING_EFFORT || "minimal") as "minimal" | "low" | "medium" | "high"
-const MODEL_TEXT_VERBOSITY = (process.env.MODEL_TEXT_VERBOSITY || "low") as "low" | "medium" | "high"
-const CONTINUE_MODEL_REASONING_EFFORT = (process.env.CONTINUE_MODEL_REASONING_EFFORT || MODEL_REASONING_EFFORT) as "minimal" | "low" | "medium" | "high"
-
-// Helper to build provider options for OpenAI (Responses API style controls)
-function buildProviderOptions(reasoningEffort: "minimal" | "low" | "medium" | "high") {
-  return {
-    openai: {
-      reasoning: { effort: reasoningEffort },
-      text: { verbosity: MODEL_TEXT_VERBOSITY },
-    },
-  }
-}
-
 // 🚀 로그 최적화: 현재 날짜 정보를 가져오는 함수
 function getCurrentDateInfo() {
   const now = new Date()
@@ -280,13 +264,6 @@ export async function POST(req: Request) {
       name,
       gender,
     })
-
-    console.log("🧠 Model config:", {
-      MODEL_NAME,
-      MODEL_REASONING_EFFORT,
-      MODEL_TEXT_VERBOSITY,
-      CONTINUE_MODEL_REASONING_EFFORT,
-    })
     
     // 🚀 브라우저별 차이 디버깅
     console.log("🔍 [DEBUG] Request details for browser compatibility:", {
@@ -367,10 +344,10 @@ export async function POST(req: Request) {
         try {
           const result = await streamText({
             messages: apiMessages,
-            model: openai(MODEL_NAME),
-            temperature: 0.8,
+            model: openai("gpt-5"),
+            reasoning_effort: minimal,
+            verbosity: low,
             maxTokens: 2048,
-            providerOptions: buildProviderOptions(CONTINUE_MODEL_REASONING_EFFORT),
           })
 
           return result.toDataStreamResponse()
@@ -682,11 +659,10 @@ ${index + 1}. **${person.name}**
       // 🚨 CRITICAL: DO NOT CHANGE THESE MODEL SETTINGS - SEE docs/MODEL_CONFIGURATION.md
       const result = await streamText({
         messages: apiMessages,
-        model: openai(MODEL_NAME),
+        model: openai("gpt-5"),
         verbosity: low,
         maxTokens: 2048,
-        reasoningEffort: minimal,
-        providerOptions: buildProviderOptions(MODEL_REASONING_EFFORT),
+        reasoning_effort: minimal,
       })
 
       // 🚀 스트리밍 응답과 함께 메모리 처리
@@ -716,7 +692,7 @@ ${index + 1}. **${person.name}**
         message: streamError.message,
         stack: streamError.stack,
         apiMessages: apiMessages?.length,
-        model: "gpt-4.1",
+        model: "gpt-5",
       })
 
       return new Response(
@@ -822,7 +798,7 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 
 예시:
 
-"혹시 더 궁금한 점, 혹은 구체적으로 알고 싶은 영역(재물운, 연애운, 건강, 진로 등)이 있으시면 분야별로 자세하게 해석해드릴 수 있습니다. 편하게 말씀해주세요. 언제나 사용자님의 현명한 나침반이 되어드리겠습니다!"
+"혹시 더 궁금한 점, 혹은 구체적으로 알고 싶은 영역(재물운, 연애운, 건강, 진로 등)이 있으시면 분야별로 자세히 해석해드릴 수 있습니다. 편하게 말씀해주세요. 언제나 사용자님의 현명한 나침반이 되어드리겠습니다!"
 
 "평소 중요한 결정을 내릴 때, 어떠한 방식(주변 사람과 상의 vs 혼자만의 고민)으로 결정하시는 편인가요?"
 
