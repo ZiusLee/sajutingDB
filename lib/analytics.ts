@@ -1,155 +1,212 @@
 import { sendGAEvent } from '@next/third-parties/google'
 
-// GA ID 상수
-export const GA_TRACKING_ID = 'G-YFCCKXZDEN'
+// 기본 이벤트 추적 함수
+export const trackEvent = (eventName: string, parameters?: Record<string, any>) => {
+  try {
+    if (typeof window !== 'undefined' && window.gtag) {
+      sendGAEvent('event', eventName, parameters)
+    }
+  } catch (error) {
+    console.error('Analytics tracking error:', error)
+  }
+}
 
 // 페이지 조회 추적
 export const trackPageView = (url: string, title?: string) => {
-  if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('config', GA_TRACKING_ID, {
-      page_location: url,
-      page_title: title,
-    })
-    console.log('Page view tracked:', { url, title })
-  }
+  trackEvent('page_view', {
+    page_location: url,
+    page_title: title,
+  })
 }
 
-// 사용자 행동 추적
-export const trackEvent = (
-  action: string,
-  category: string,
-  label?: string,
-  value?: number
-) => {
-  try {
-    sendGAEvent('event', action, {
-      event_category: category,
-      event_label: label,
-      value: value,
-    })
-    console.log('Event tracked:', { action, category, label, value })
-  } catch (error) {
-    console.error('GA Event tracking failed:', error)
-  }
-}
-
-// 사주 관련 이벤트들
+// 사주 관련 이벤트 추적
 export const trackSajuEvents = {
   // 사주 계산 시작
   startCalculation: (birthYear: number, gender: string) => {
-    trackEvent('start_saju_calculation', 'saju', `${gender}_${birthYear}`)
+    trackEvent('saju_calculation_start', {
+      event_category: 'saju',
+      birth_year: birthYear,
+      gender: gender,
+    })
   },
 
   // 사주 결과 조회
-  viewResult: (resultType: string) => {
-    trackEvent('view_saju_result', 'saju', resultType)
+  viewResult: (userId?: string) => {
+    trackEvent('saju_result_view', {
+      event_category: 'saju',
+      user_id: userId,
+    })
   },
 
   // 궁합 확인
-  checkCompatibility: (userGender: string, partnerGender: string) => {
-    trackEvent('check_compatibility', 'saju', `${userGender}_${partnerGender}`)
+  checkCompatibility: (gender1: string, gender2: string) => {
+    trackEvent('compatibility_check', {
+      event_category: 'saju',
+      gender1: gender1,
+      gender2: gender2,
+    })
   },
 
-  // 채팅 시작
-  startChat: (chatType: string) => {
-    trackEvent('start_chat', 'chat', chatType)
+  // 대운 분석
+  analyzeDaeun: (birthYear: number) => {
+    trackEvent('daeun_analysis', {
+      event_category: 'saju',
+      birth_year: birthYear,
+    })
   },
 
-  // 대운 분석 조회
-  viewDaeunAnalysis: (age: number) => {
-    trackEvent('view_daeun_analysis', 'saju', `age_${age}`)
-  },
-
-  // 일운 조회
-  viewDailyFortune: (date: string) => {
-    trackEvent('view_daily_fortune', 'saju', date)
+  // 오늘의 운세
+  checkDailyFortune: () => {
+    trackEvent('daily_fortune_check', {
+      event_category: 'saju',
+    })
   },
 }
 
-// 사용자 인증 이벤트
+// 인증 관련 이벤트 추적
 export const trackAuthEvents = {
-  // 회원가입
-  signUp: (method: string) => {
-    trackEvent('sign_up', 'auth', method)
-  },
-
   // 로그인
   signIn: (method: string) => {
-    trackEvent('login', 'auth', method)
+    trackEvent('login', {
+      method: method,
+    })
+  },
+
+  // 회원가입
+  signUp: (method: string) => {
+    trackEvent('sign_up', {
+      method: method,
+    })
   },
 
   // 로그아웃
   signOut: () => {
-    trackEvent('logout', 'auth')
+    trackEvent('logout', {
+      event_category: 'auth',
+    })
   },
 }
 
-// 사용자 참여 이벤트
-export const trackEngagementEvents = {
+// 채팅 관련 이벤트 추적
+export const trackChatEvents = {
+  // 채팅 시작
+  startChat: (roomType: string) => {
+    trackEvent('chat_start', {
+      event_category: 'chat',
+      room_type: roomType,
+    })
+  },
+
+  // 메시지 전송
+  sendMessage: (messageLength: number) => {
+    trackEvent('message_send', {
+      event_category: 'chat',
+      message_length: messageLength,
+    })
+  },
+
   // 피드백 제공
-  provideFeedback: (type: 'positive' | 'negative', context: string) => {
-    trackEvent('provide_feedback', 'engagement', `${type}_${context}`)
+  provideFeedback: (rating: 'positive' | 'negative') => {
+    trackEvent('chat_feedback', {
+      event_category: 'chat',
+      rating: rating,
+    })
+  },
+}
+
+// 전자상거래 이벤트 추적
+export const trackEcommerceEvents = {
+  // 코인 구매 시작
+  beginCheckout: (coinAmount: number, price: number) => {
+    trackEvent('begin_checkout', {
+      event_category: 'ecommerce',
+      currency: 'KRW',
+      value: price,
+      items: [{
+        item_id: 'coin',
+        item_name: '사주핑 코인',
+        quantity: coinAmount,
+        price: price,
+      }],
+    })
   },
 
-  // 공유하기
-  shareContent: (contentType: string, method: string) => {
-    trackEvent('share_content', 'engagement', `${contentType}_${method}`)
+  // 구매 완료
+  purchase: (transactionId: string, coinAmount: number, price: number) => {
+    trackEvent('purchase', {
+      event_category: 'ecommerce',
+      transaction_id: transactionId,
+      currency: 'KRW',
+      value: price,
+      items: [{
+        item_id: 'coin',
+        item_name: '사주핑 코인',
+        quantity: coinAmount,
+        price: price,
+      }],
+    })
+  },
+}
+
+// 사용자 참여 이벤트 추적
+export const trackEngagementEvents = {
+  // 검색
+  search: (searchTerm: string) => {
+    trackEvent('search', {
+      search_term: searchTerm,
+    })
   },
 
-  // 검색 사용
-  search: (query: string) => {
-    trackEvent('search', 'engagement', query.substring(0, 50)) // 개인정보 보호를 위해 50자 제한
+  // 공유
+  share: (contentType: string, method: string) => {
+    trackEvent('share', {
+      content_type: contentType,
+      method: method,
+    })
+  },
+
+  // 파일 다운로드
+  fileDownload: (fileName: string) => {
+    trackEvent('file_download', {
+      file_name: fileName,
+    })
   },
 }
 
 // 성능 추적
-export const trackTiming = (name: string, value: number, category = 'performance') => {
-  try {
-    sendGAEvent('timing_complete', {
-      name: name,
-      value: value,
-      event_category: category,
+export const trackPerformance = {
+  // 페이지 로드 시간
+  pageLoadTime: (loadTime: number, pageName: string) => {
+    trackEvent('page_load_time', {
+      event_category: 'performance',
+      page_name: pageName,
+      load_time: loadTime,
     })
-    console.log('Timing tracked:', { name, value, category })
-  } catch (error) {
-    console.error('GA Timing tracking failed:', error)
-  }
+  },
+
+  // API 응답 시간
+  apiResponseTime: (endpoint: string, responseTime: number) => {
+    trackEvent('api_response_time', {
+      event_category: 'performance',
+      endpoint: endpoint,
+      response_time: responseTime,
+    })
+  },
 }
 
 // 오류 추적
-export const trackError = (error: string, fatal = false, context?: string) => {
-  try {
-    sendGAEvent('exception', {
-      description: `${context ? `[${context}] ` : ''}${error}`,
-      fatal: fatal,
-    })
-    console.log('Error tracked:', { error, fatal, context })
-  } catch (error) {
-    console.error('GA Error tracking failed:', error)
-  }
+export const trackError = (errorMessage: string, errorLocation: string) => {
+  trackEvent('exception', {
+    description: errorMessage,
+    fatal: false,
+    location: errorLocation,
+  })
 }
 
-// 사용자 속성 설정
-export const setUserProperties = (properties: Record<string, any>) => {
-  if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('config', GA_TRACKING_ID, {
-      custom_map: properties
-    })
-    console.log('User properties set:', properties)
-  }
-}
-
-// 전자상거래 이벤트 (코인 구매 등)
-export const trackPurchase = (transactionId: string, value: number, currency = 'KRW', items: any[] = []) => {
-  try {
-    sendGAEvent('purchase', {
-      transaction_id: transactionId,
-      value: value,
-      currency: currency,
-      items: items
-    })
-    console.log('Purchase tracked:', { transactionId, value, currency, items })
-  } catch (error) {
-    console.error('GA Purchase tracking failed:', error)
-  }
+// 사용자 정의 이벤트
+export const trackCustomEvent = (eventName: string, parameters: Record<string, any>) => {
+  trackEvent(eventName, {
+    event_category: 'custom',
+    ...parameters,
+  })
 }

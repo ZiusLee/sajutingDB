@@ -4,13 +4,13 @@ import { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Google Analytics 디버그 - 사주핑',
   description: 'Google Analytics 설정 상태를 확인하고 테스트합니다.',
-  robots: 'noindex, nofollow', // 검색엔진에서 제외
+  robots: 'noindex, nofollow',
 }
 
 export default function AnalyticsDebugPage() {
   return (
     <div className="container mx-auto py-8 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Google Analytics 디버그</h1>
           <p className="text-muted-foreground">
@@ -26,7 +26,7 @@ export default function AnalyticsDebugPage() {
             <li>
               <strong>실시간 보고서:</strong> 
               <a 
-                href="https://analytics.google.com/analytics/web/#/p123456789/reports/realtime" 
+                href="https://analytics.google.com/analytics/web/" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:underline ml-1"
