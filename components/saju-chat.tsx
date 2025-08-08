@@ -58,7 +58,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 
   const baseQuestions: Record<string, string[]> = {
     sajuping: [
-      "직업운 알려줘",
+      "오늘의 운세를 사주기반으로 알려줘",
       "연애운 알려줘",
       "건강운 알려줘",
       "재물운 알려줘",
@@ -735,7 +735,7 @@ const shouldShowDaeunDiagram = (index: number) => {
             </Button>
           )}
           <div className="space-y-2">
-            {!isLoading && messages.length >= 4 && !isInitialQuestionsMode && (
+            {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
