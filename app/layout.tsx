@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { AuthProvider } from "@/contexts/auth-context"
 import SiteHeader from "@/components/site-header"
+import AnalyticsWrapper from "@/components/analytics-wrapper"
 import { cn } from "@/lib/utils"
 import { GoogleAnalytics } from '@next/third-parties/google'
 
@@ -55,12 +56,14 @@ export default function RootLayout({
       <body className={cn("mobile-container bg-background font-sans antialiased", inter.className)}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <div className="flex flex-col min-h-screen-mobile">
-              <SiteHeader />
-              <main className="flex-1 mobile-scroll pb-safe">{children}</main>
-              <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || "G-XXXXXXXXXX"} />
-              <Toaster />
-            </div>
+            <AnalyticsWrapper>
+              <div className="flex flex-col min-h-screen-mobile">
+                <SiteHeader />
+                <main className="flex-1 mobile-scroll pb-safe">{children}</main>
+                <GoogleAnalytics gaId="G-YFCCKXZDEN" />
+                <Toaster />
+              </div>
+            </AnalyticsWrapper>
           </AuthProvider>
         </ThemeProvider>
       </body>
