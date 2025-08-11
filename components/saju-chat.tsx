@@ -429,6 +429,24 @@ export default function SajuChat({
       chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
   }
 
+  const scrollToLastUserMessage = () => {
+    if (!chatContainerRef.current) return
+    
+    // Find the last user message element
+    const container = chatContainerRef.current
+    const messageElements = container.querySelectorAll('[data-role="user"]')
+    const lastUserMessageElement = messageElements[messageElements.length - 1]
+    
+    if (lastUserMessageElement) {
+      // Scroll so the user message appears at the top of the viewport
+      const containerRect = container.getBoundingClientRect()
+      const messageRect = lastUserMessageElement.getBoundingClientRect()
+      const scrollTop = container.scrollTop + messageRect.top - containerRect.top
+      
+      container.scrollTo({ top: scrollTop, behavior: "smooth" })
+    }
+  }
+
   const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
     try {
       // Save current location for redirect after auth
@@ -481,14 +499,20 @@ export default function SajuChat({
     }
   }
 
+  const prevMessageCountRef = useRef(0)
+
   useEffect(() => {
-    // Scroll to top when user sends a message so their message appears at the top
-    if (chatContainerRef.current && messages.length > 0 && !isTransitioningRef.current) {
+    // Scroll to show new user message at the top when a NEW user message is sent
+    if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
       const lastMessage = messages[messages.length - 1]
       if (lastMessage && lastMessage.role === "user") {
-        scrollToTop()
+        // Use setTimeout to ensure DOM is updated first
+        setTimeout(() => {
+          scrollToLastUserMessage()
+        }, 100)
       }
     }
+    prevMessageCountRef.current = messages.length
   }, [messages])
 
   useEffect(() => {
@@ -654,7 +678,7 @@ export default function SajuChat({
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "user" ? (
-                  <div className="flex justify-end">
+                  <div className="flex justify-end" data-role="user">
                     <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base leading-relaxed">
                       {message.content}
                     </div>
