@@ -58,8 +58,16 @@ export default function AuthCallbackContent() {
                   description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
                 })
 
-                // Navigate directly to chat
-                router.push("/saju-chat/sajuping")
+                // Check for stored auth return URL (from saju-chat) to return to exact same room
+                const authReturnUrl = localStorage.getItem("auth_return_url")
+                if (authReturnUrl) {
+                  console.log("Returning to original chat room:", authReturnUrl)
+                  localStorage.removeItem("auth_return_url")
+                  router.push(authReturnUrl)
+                } else {
+                  // Fallback: Navigate to generic chat
+                  router.push("/saju-chat/sajuping")
+                }
                 return
               } else {
                 console.error("Failed to update auth_user_id for session:", sessionId)

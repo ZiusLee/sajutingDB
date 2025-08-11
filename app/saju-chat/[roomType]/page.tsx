@@ -63,17 +63,17 @@ export default function SajuChatPage() {
 
     const initializePage = async () => {
       try {
-        // 로그인 여부 확인 (localStorage flag 우선, 없으면 Supabase 세션)
-        const authed = localStorage.getItem("user_authenticated") === "true"
-        if (authed) {
-          setIsLoggedIn(true)
+        // 로그인 여부 확인 (Supabase 세션 확인)
+        const { data } = await supabase.auth.getSession()
+        const isAuthenticated = Boolean(data.session?.user)
+        setIsLoggedIn(isAuthenticated)
+        
+        if (isAuthenticated) {
+          console.log("User is authenticated:", data.session?.user.id)
+          localStorage.setItem("user_authenticated", "true")
         } else {
-          const { data } = await supabase.auth.getSession()
-          setIsLoggedIn(Boolean(data.session?.user))
-          if (data.session?.user) {
-            localStorage.setItem("user_authenticated", "true")
-            localStorage.setItem("user_id", data.session.user.id)
-          }
+          console.log("User is not authenticated")
+          localStorage.removeItem("user_authenticated")
         }
 
         // 로컬 스토리지에서 사주 데이터 가져오기
@@ -165,8 +165,11 @@ export default function SajuChatPage() {
   // Open signup dialog automatically if user has anonymous session
   useEffect(() => {
     const checkAnonymousSession = async () => {
-      if (!isLoggedIn) {
+      console.log("Checking anonymous session. isLoggedIn:", isLoggedIn)
+      
+      if (!isLoggedIn && !loading) {
         const sessionId = localStorage.getItem("saju_session_id")
+        console.log("Session ID from localStorage:", sessionId)
         
         // Check if user has an anonymous saju_session (sessionId exists but auth_user_id is null)
         if (sessionId) {
@@ -176,6 +179,8 @@ export default function SajuChatPage() {
               .select("auth_user_id")
               .eq("id", sessionId)
               .single()
+            
+            console.log("Database session check result:", { data, error })
             
             // If session exists but auth_user_id is null, it's anonymous
             if (!error && data && data.auth_user_id === null) {
@@ -187,6 +192,8 @@ export default function SajuChatPage() {
               }, 1500) // 1.5 second delay
               
               return () => clearTimeout(timer)
+            } else if (!error && data && data.auth_user_id) {
+              console.log("Session is already linked to authenticated user:", data.auth_user_id)
             }
           } catch (error) {
             console.error("Error checking saju_session:", error)
@@ -196,7 +203,7 @@ export default function SajuChatPage() {
     }
     
     checkAnonymousSession()
-  }, [isLoggedIn, supabase])
+  }, [isLoggedIn, loading, supabase])
 
   const handleBack = useCallback(() => {
     try {
