@@ -27,16 +27,18 @@ export function SignupDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg rounded-2xl shadow-xl p-0 overflow-hidden">
         <div className="p-6 sm:p-8">
-          <DialogHeader className="space-y-2">
+          <DialogHeader className="space-y-3">
             {isOverLimit ? (
               <>
-                <DialogTitle className="text-2xl sm:text-3xl font-bold leading-snug tracking-tight">
+                <DialogTitle className="text-xl sm:text-2xl font-bold leading-snug tracking-tight text-center">
                   게스트 이용 가능 횟수({maxCount}회)를 모두 사용하셨습니다
                 </DialogTitle>
-                <DialogDescription className="text-base text-muted-foreground">
+                <DialogDescription className="text-base text-muted-foreground text-center leading-relaxed">
                   계속 이용하시려면 간편 로그인을 진행해주세요.
                   <br />
-                  로그인하면 대화와 사주 기록이 안전하게 저장됩니다.
+                  <span className="text-sm text-green-600 font-medium">
+                    로그인하면 대화와 사주 기록이 안전하게 저장됩니다.
+                  </span>
                 </DialogDescription>
               </>
             ) : (
@@ -56,28 +58,43 @@ export function SignupDialog({
               <div className="h-px flex-1 bg-muted" />
             </div>
 
-            <div className="mt-6 sm:mt-8 grid grid-cols-3 gap-4 sm:gap-6 place-items-center">
+            <div className="mt-6 sm:mt-8 grid grid-cols-2 gap-4 sm:gap-6 place-items-center">
               {/* Kakao */}
-              <ProviderCircle
-                label="Kakao"
+              <ProviderButton
+                label="카카오로 로그인"
                 bgClass="bg-[#FEE500] hover:bg-[#E6CF00] text-black"
                 onClick={() => onSelectProvider("kakao")}
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="mr-2"
+                >
                   <path
                     d="M12 3C6.48 3 2 6.48 2 10.8C2 13.8 3.92 16.44 6.76 17.88L5.6 21.48C5.52 21.72 5.76 21.96 6 21.84L10.32 19.2C10.88 19.28 11.44 19.32 12 19.32C17.52 19.32 22 15.84 22 10.8C22 6.48 17.52 3 12 3Z"
                     fill="currentColor"
                   />
                 </svg>
-              </ProviderCircle>
+                카카오로 로그인
+              </ProviderButton>
 
               {/* Google */}
-              <ProviderCircle
-                label="Google"
+              <ProviderButton
+                label="구글로 로그인"
                 bgClass="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
                 onClick={() => onSelectProvider("google")}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="mr-2"
+                >
                   <path
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                     fill="#4285F4"
@@ -95,19 +112,8 @@ export function SignupDialog({
                     fill="#EA4335"
                   />
                 </svg>
-              </ProviderCircle>
-
-              {/* Apple (optional, disabled for now) */}
-              <ProviderCircle
-                label="Apple"
-                disabled
-                bgClass="bg-black/90 text-white opacity-60"
-                onClick={() => onSelectProvider("apple")}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-                </svg>
-              </ProviderCircle>
+                구글로 로그인
+              </ProviderButton>
             </div>
 
             {!isOverLimit && (
@@ -124,7 +130,7 @@ export function SignupDialog({
   )
 }
 
-function ProviderCircle({
+function ProviderButton({
   children,
   label,
   onClick,
@@ -144,9 +150,9 @@ function ProviderCircle({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "size-20 sm:size-24 rounded-full inline-flex items-center justify-center shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-black",
+        "w-full h-12 px-4 rounded-lg inline-flex items-center justify-center text-sm font-medium shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-black",
         bgClass,
-        disabled && "cursor-not-allowed",
+        disabled && "cursor-not-allowed opacity-50",
       )}
     >
       {children}
