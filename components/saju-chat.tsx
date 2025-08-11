@@ -1,5 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
+import type React from "react"
+
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
@@ -136,6 +138,8 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
+  const [userMessageCount, setUserMessageCount] = useState(0)
+  const shouldScrollToBottomRef = useRef(false)
 
   const sessionId = useMemo(() => {
     try {
@@ -173,7 +177,7 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
-  const { count, limit, isOverLimit, incrementOncePerVisit } = useGuestUsage(5)
+  const { count, limit, isOverLimit, incrementOnMessage } = useGuestUsage(5)
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
@@ -266,6 +270,10 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
+          // Count existing user messages for guest usage tracking
+          const existingUserMessages = pastMessages.filter((msg) => msg.role === "user").length
+          setUserMessageCount(existingUserMessages)
+
           // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
           if (shouldSendInitialQuestions && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
@@ -294,12 +302,34 @@ export default function SajuChat({
     onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
+      // Ensure we stay at bottom after streaming completes
+      if (shouldScrollToBottomRef.current) {
+        setTimeout(() => {
+          scrollToBottom()
+          shouldScrollToBottomRef.current = false
+        }, 100)
+      }
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
     },
   })
+
+  // Custom handleSubmit to track guest usage properly
+  const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+
+    // Increment guest usage counter when user sends a message
+    if (!user && input.trim()) {
+      incrementOnMessage()
+      setUserMessageCount((prev) => prev + 1)
+      shouldScrollToBottomRef.current = true
+    }
+
+    // Call the original handleSubmit
+    handleSubmit(e)
+  }
 
   // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
 
@@ -413,15 +443,29 @@ export default function SajuChat({
   }
 
   const scrollToBottom = () => {
-    if (chatContainerRef.current)
-      chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: "smooth" })
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      })
+    }
   }
 
+  // Improved scroll behavior - always scroll to bottom for new messages
   useEffect(() => {
     if (chatContainerRef.current && !isTransitioningRef.current) {
-      const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current
-      if (scrollHeight - scrollTop - clientHeight < 100 || messages.length === 1) {
-        scrollToBottom()
+      const container = chatContainerRef.current
+      const { scrollHeight, scrollTop, clientHeight } = container
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200
+
+      // Always scroll to bottom for new messages or if user is near bottom
+      if (messages.length === 1 || isNearBottom || shouldScrollToBottomRef.current) {
+        setTimeout(() => {
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: messages.length === 1 ? "auto" : "smooth",
+          })
+        }, 50)
       }
     }
   }, [messages])
@@ -436,16 +480,6 @@ export default function SajuChat({
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
-
-  useEffect(() => {
-    // Increment guest usage when user sends a message (not logged in)
-    if (!user && messages.length > 0) {
-      const userMessages = messages.filter((msg) => msg.role === "user")
-      if (userMessages.length > 0) {
-        incrementOncePerVisit()
-      }
-    }
-  }, [messages, user, incrementOncePerVisit])
 
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
@@ -740,7 +774,7 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+            <form onSubmit={customHandleSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
