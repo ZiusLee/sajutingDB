@@ -134,31 +134,29 @@ export default function AuthCallbackContent() {
             localStorage.removeItem("auth_return_url") // Clean up
           }
 
-          // Check if there's tempSajuData that needs to be saved
-          const tempSajuData = localStorage.getItem("tempSajuData")
-          if (tempSajuData && !linkedAnySession) {
-            console.log("Found tempSajuData, attempting to save to database...")
+          // Check if there's an existing anonymous saju_session that needs auth_user_id update
+          const sessionId = localStorage.getItem("saju_session_id")
+          if (sessionId && !linkedAnySession) {
+            console.log("Found existing saju_session ID, updating auth_user_id:", sessionId)
             
             try {
-              const userId = await syncLocalStorageToDatabase(authUserId)
-              if (userId) {
-                console.log("Successfully saved tempSajuData with session ID:", userId)
-                await updateAuthUserId(userId, authUserId)
-                
-                // Update current_saju with sessionId
-                const currentSaju = localStorage.getItem("current_saju")
-                if (currentSaju) {
-                  const parsedSaju = JSON.parse(currentSaju)
-                  parsedSaju.sessionId = userId
-                  localStorage.setItem("current_saju", JSON.stringify(parsedSaju))
-                }
-                
-                localStorage.setItem("user_id", userId)
-                localStorage.removeItem("tempSajuData")
+              // Update auth_user_id for existing session (MyPage style)
+              console.log("Updating auth_user_id for session:", sessionId, "with auth user:", authUserId)
+              const success = await updateAuthUserId(sessionId, authUserId)
+              
+              if (success) {
+                console.log("Successfully updated auth_user_id for saju session:", sessionId)
                 linkedAnySession = true
+                
+                // Clean up tempSajuData since session is now linked
+                localStorage.removeItem("tempSajuData")
+                
+                console.log("Session linking successful")
+              } else {
+                console.error("Failed to update auth_user_id for session:", sessionId)
               }
             } catch (error) {
-              console.error("Error saving tempSajuData:", error)
+              console.error("Error updating session auth_user_id:", error)
             }
           }
 

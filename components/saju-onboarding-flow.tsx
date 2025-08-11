@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
+import { syncLocalStorageToDatabase } from "@/lib/data-sync"
 import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } from "@/lib/city-timezone-data"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { SajuLogo } from "./saju-logo"
@@ -254,14 +255,44 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         },
       }
 
-      // Store saju data in localStorage and go directly to chat
-      localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+      // Store saju data in localStorage
       localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
 
-      // Go directly to saju-chat regardless of auth status
-      // The chat page will handle signup if needed
-      console.log("Saju calculation complete, navigating to chat")
-      router.push("/saju-chat/sajuping")
+      // Create saju_session with auth_user_id: null (for anonymous users)
+      try {
+        console.log("Creating saju_session with auth_user_id: null")
+        const userId = await syncLocalStorageToDatabase(null) // null = anonymous user
+
+        if (userId) {
+          console.log("Successfully created anonymous saju session with ID:", userId)
+          
+          // Update chat data with the session ID
+          const finalChatSajuData = {
+            ...chatSajuData,
+            sessionId: userId,
+          }
+
+          localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
+          localStorage.setItem("saju_session_id", userId)
+
+          console.log("Saju calculation complete, navigating to chat")
+          router.push("/saju-chat/sajuping")
+        } else {
+          console.error("Failed to create saju session")
+          toast({
+            title: "데이터 저장 실패",
+            description: "사주 정보 저장에 실패했습니다.",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error creating saju session:", error)
+        toast({
+          title: "오류 발생", 
+          description: "사주 세션 생성 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+      }
     } catch (error) {
       console.error("Error in saju calculation:", error)
       toast({ title: "사주 계산 중 오류가 발생했습니다.", variant: "destructive" })

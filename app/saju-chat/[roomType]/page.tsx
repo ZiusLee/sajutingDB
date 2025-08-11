@@ -106,8 +106,8 @@ export default function SajuChatPage() {
           // Get sessionId for chat room creation
           let sessionId = parsedSaju.sessionId
           if (!sessionId) {
-            const userId = localStorage.getItem("user_id")
-            sessionId = userId || `fallback-${Date.now()}`
+            const sajuSessionId = localStorage.getItem("saju_session_id")
+            sessionId = sajuSessionId || `fallback-${Date.now()}`
           }
 
           // Auto-create temporary chat room if no roomId is provided
@@ -174,12 +174,41 @@ export default function SajuChatPage() {
     }
   }, [loading, isLoggedIn, incrementOncePerVisit])
 
-  // Open signup dialog automatically if over limit and guest, OR if user just completed onboarding
+  // Open signup dialog automatically if user has anonymous session
   useEffect(() => {
-    if (!isLoggedIn && (isOverLimit || localStorage.getItem("tempSajuData"))) {
-      setSignupOpen(true)
+    const checkAnonymousSession = async () => {
+      if (!isLoggedIn) {
+        const sessionId = localStorage.getItem("saju_session_id")
+        
+        // Check if user has an anonymous saju_session (sessionId exists but auth_user_id is null)
+        if (sessionId) {
+          try {
+            const { data, error } = await supabase
+              .from("saju_sessions")
+              .select("auth_user_id")
+              .eq("id", sessionId)
+              .single()
+            
+            // If session exists but auth_user_id is null, it's anonymous
+            if (!error && data && data.auth_user_id === null) {
+              console.log("Found anonymous saju_session, showing signup dialog")
+              
+              // Add a small delay for better UX
+              const timer = setTimeout(() => {
+                setSignupOpen(true)
+              }, 1500) // 1.5 second delay
+              
+              return () => clearTimeout(timer)
+            }
+          } catch (error) {
+            console.error("Error checking saju_session:", error)
+          }
+        }
+      }
     }
-  }, [isLoggedIn, isOverLimit])
+    
+    checkAnonymousSession()
+  }, [isLoggedIn, supabase])
 
   const handleBack = useCallback(() => {
     try {
