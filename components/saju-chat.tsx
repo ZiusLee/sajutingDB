@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
-import { usePersistentChat } from "@/hooks/use-persistent-chat"
+import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
@@ -23,6 +23,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SignupDialog } from "@/components/signup-dialog"
 import { TermsDialog } from "@/components/terms-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useEffect as useEffectPersistent, useRef as useRefPersistent } from "react"
 
 interface SajuChatProps {
   saju: any
@@ -88,6 +89,8 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
     const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘"
+
+    // 첫 번째 질문만 반환
     const questions = [firstQuestion]
     console.log("🎯 Generated exactly 1 initial question:", questions)
     return questions
@@ -141,6 +144,24 @@ export default function SajuChat({
   const [providerLabel, setProviderLabel] = useState("")
   const [signupTimerStarted, setSignupTimerStarted] = useState(false)
   const supabase = createClientComponentClient()
+  const [chatStreamState, setChatStreamState] = useState<{
+    isStreaming: boolean
+    currentMessageId: string | null
+    pendingContent: string
+  }>({
+    isStreaming: false,
+    currentMessageId: null,
+    pendingContent: "",
+  })
+  const chatStreamRef = useRefPersistent<{
+    isStreaming: boolean
+    messageId: string | null
+    content: string
+  }>({
+    isStreaming: false,
+    messageId: null,
+    content: "",
+  })
 
   const sessionId = useMemo(() => {
     try {
@@ -313,30 +334,31 @@ export default function SajuChat({
     }
   }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId, stableConcerns])
 
-  // Use persistent chat hook instead of regular useChat
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    setInput,
-    reload,
-    append,
-    isReconnecting,
-    sessionStatus,
-  } = usePersistentChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
     api: "/api/saju-chat",
     id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
     initialMessages: transitionMessages ?? chatData.initialMessages,
     body: aiChatBody,
+    experimental_throttle: 50,
     onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
+
+      // Clear persistent streaming state
+      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+      localStorage.removeItem(streamKey)
+      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+
+      // Clear persistent streaming state on error
+      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+      localStorage.removeItem(streamKey)
+      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     },
   })
 
@@ -469,7 +491,7 @@ export default function SajuChat({
     }
   }
 
-  const handleSignupProvider = async (provider: "kakao" | "google") => {
+  const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
     try {
       localStorage.setItem("auth_return_url", window.location.href)
 
@@ -574,6 +596,139 @@ export default function SajuChat({
     [stableConcerns, roomType],
   )
 
+  useEffectPersistent(() => {
+    const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+
+    // Load persistent stream state on mount
+    const savedStreamState = localStorage.getItem(streamKey)
+    if (savedStreamState) {
+      try {
+        const parsedState = JSON.parse(savedStreamState)
+        if (parsedState.isStreaming && parsedState.messageId) {
+          console.log("🔄 Restoring persistent chat stream:", parsedState.messageId)
+          setChatStreamState(parsedState)
+          chatStreamRef.current = parsedState
+        }
+      } catch (error) {
+        console.error("❌ Error loading persistent stream state:", error)
+        localStorage.removeItem(streamKey)
+      }
+    }
+
+    // Save stream state when it changes
+    return () => {
+      if (chatStreamRef.current.isStreaming) {
+        localStorage.setItem(
+          streamKey,
+          JSON.stringify({
+            isStreaming: chatStreamRef.current.isStreaming,
+            messageId: chatStreamRef.current.messageId,
+            pendingContent: chatStreamRef.current.content,
+            timestamp: Date.now(),
+          }),
+        )
+      } else {
+        localStorage.removeItem(streamKey)
+      }
+    }
+  }, [effectiveChatRoomId, sessionId])
+
+  useEffectPersistent(() => {
+    const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+
+    if (isLoading && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && lastMessage.role === "assistant") {
+        const newStreamState = {
+          isStreaming: true,
+          messageId: lastMessage.id || `temp-${Date.now()}`,
+          pendingContent: lastMessage.content || "",
+          timestamp: Date.now(),
+        }
+
+        setChatStreamState({
+          isStreaming: true,
+          currentMessageId: newStreamState.messageId,
+          pendingContent: newStreamState.pendingContent,
+        })
+        chatStreamRef.current = {
+          isStreaming: true,
+          messageId: newStreamState.messageId,
+          content: newStreamState.pendingContent,
+        }
+
+        localStorage.setItem(streamKey, JSON.stringify(newStreamState))
+      }
+    } else if (!isLoading && chatStreamState.isStreaming) {
+      // Stream finished, clear persistent state
+      localStorage.removeItem(streamKey)
+      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
+    }
+  }, [isLoading, messages, effectiveChatRoomId, sessionId, chatStreamState.isStreaming])
+
+  useEffectPersistent(() => {
+    const handleBeforeUnload = () => {
+      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+      if (chatStreamRef.current.isStreaming) {
+        localStorage.setItem(
+          streamKey,
+          JSON.stringify({
+            isStreaming: chatStreamRef.current.isStreaming,
+            messageId: chatStreamRef.current.messageId,
+            pendingContent: chatStreamRef.current.content,
+            timestamp: Date.now(),
+          }),
+        )
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [effectiveChatRoomId, sessionId])
+
+  useEffectPersistent(() => {
+    // Check for interrupted streams on page load
+    const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+    const savedStream = localStorage.getItem(streamKey)
+
+    if (savedStream && chatData.isInitialized) {
+      try {
+        const streamState = JSON.parse(savedStream)
+        const timeDiff = Date.now() - (streamState.timestamp || 0)
+
+        // If stream is less than 5 minutes old, try to restore it
+        if (timeDiff < 5 * 60 * 1000 && streamState.isStreaming) {
+          console.log("🔄 Attempting to restore interrupted stream")
+
+          // Check if the message exists in current messages
+          const messageExists = messages.some((msg) => msg.id === streamState.messageId)
+
+          if (!messageExists && streamState.pendingContent) {
+            // Add the partially streamed message back
+            const restoredMessage = {
+              id: streamState.messageId,
+              role: "assistant" as const,
+              content: streamState.pendingContent,
+              createdAt: new Date().toISOString(),
+            }
+
+            // Trigger the AI to continue from where it left off
+            setTimeout(() => {
+              reload()
+            }, 1000)
+          }
+        } else {
+          // Clean up old stream state
+          localStorage.removeItem(streamKey)
+        }
+      } catch (error) {
+        console.error("❌ Error restoring stream state:", error)
+        localStorage.removeItem(streamKey)
+      }
+    }
+  }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
+
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
       <div className="flex h-screen-mobile items-center justify-center bg-background">
@@ -659,21 +814,6 @@ export default function SajuChat({
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
-
-            {/* Show reconnection status */}
-            {isReconnecting && (
-              <div className="text-center text-xs sm:text-sm text-blue-600 bg-blue-50 rounded-lg p-2 sm:p-3">
-                🔄 채팅 연결을 복구하는 중...
-              </div>
-            )}
-
-            {/* Show session status if available */}
-            {sessionStatus?.isStreaming && !isLoading && (
-              <div className="text-center text-xs sm:text-sm text-green-600 bg-green-50 rounded-lg p-2 sm:p-3">
-                ⚡ 백그라운드에서 응답이 계속 생성되고 있습니다...
-              </div>
-            )}
-
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "user" ? (

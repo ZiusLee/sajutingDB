@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -49,17 +49,18 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
     return (
       <Dialog open={open} onOpenChange={handleOpenChange} modal={true}>
         <DialogContent
-          className="sm:max-w-md"
+          className="sm:max-w-md max-w-[90vw] rounded-3xl border-none bg-white shadow-xl"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
         >
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle>개인정보 처리방침</DialogTitle>
+          <div className="flex flex-row items-center justify-between p-6 pb-0">
+            <h2 className="text-lg font-semibold">개인정보 처리방침</h2>
             <Button variant="ghost" size="icon" onClick={() => setShowPrivacyDetails(false)} className="h-6 w-6">
               <X className="h-4 w-4" />
             </Button>
-          </DialogHeader>
-          <ScrollArea className="h-96 w-full">
+          </div>
+          <ScrollArea className="h-96 w-full px-6">
             <div className="space-y-4 text-sm">
               <div>
                 <h4 className="font-semibold mb-2">1. 개인정보의 처리목적</h4>
@@ -156,6 +157,11 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
             </div>
           </ScrollArea>
+          <div className="p-6 pt-0">
+            <Button onClick={() => setShowPrivacyDetails(false)} className="w-full">
+              확인
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     )
@@ -165,18 +171,18 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
     return (
       <Dialog open={open} onOpenChange={handleOpenChange} modal={true}>
         <DialogContent
-          className="sm:max-w-md"
+          className="sm:max-w-md max-w-[90vw] rounded-3xl border-none bg-white shadow-xl"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
         >
-          <DialogHeader>
-            <DialogTitle>약관 동의</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-start space-x-2">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-center mb-6">약관 동의</h2>
+
+            <div className="space-y-4 mb-6">
+              <div className="flex items-start space-x-3">
                 <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={setAgreedToTerms} className="mt-1" />
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <label
                     htmlFor="terms"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -187,14 +193,14 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
                 </div>
               </div>
 
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-3">
                 <Checkbox
                   id="privacy"
                   checked={agreedToPrivacy}
                   onCheckedChange={setAgreedToPrivacy}
                   className="mt-1"
                 />
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <label
                     htmlFor="privacy"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -215,14 +221,20 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
             </div>
 
-            <Separator />
-
-            <div className="flex flex-col space-y-2">
-              <Button onClick={handleTermsAgree} disabled={!agreedToTerms || !agreedToPrivacy} className="w-full">
+            <div className="flex flex-col space-y-3">
+              <Button
+                onClick={handleTermsAgree}
+                disabled={!agreedToTerms || !agreedToPrivacy}
+                className="w-full py-3 rounded-full"
+              >
                 {selectedProvider === "kakao" && "카카오로 시작하기"}
                 {selectedProvider === "google" && "Google로 시작하기"}
               </Button>
-              <Button variant="outline" onClick={handleBackToProviders} className="w-full bg-transparent">
+              <Button
+                variant="outline"
+                onClick={handleBackToProviders}
+                className="w-full py-3 rounded-full bg-transparent"
+              >
                 이전
               </Button>
             </div>
@@ -232,57 +244,52 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
     )
   }
 
-  // Main signup dialog matching Figma design
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} modal={true}>
       <DialogContent
-        className="sm:max-w-lg max-w-[90vw] rounded-3xl p-8"
+        className="sm:max-w-md max-w-[90vw] rounded-3xl border-none bg-white shadow-xl"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
       >
-        <div className="space-y-8">
-          {/* Title matching Figma */}
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
+        <div className="p-8">
+          {/* Main heading */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 leading-tight">
               지금 계정을 연동하고
               <br />
               3초만에 사주 분석을 받아보세
               <br />
               요.
-            </h2>
+            </h1>
           </div>
 
-          {/* SNS LOGIN section with decorative lines */}
-          <div className="relative">
+          {/* SNS LOGIN separator */}
+          <div className="relative mb-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
+              <Separator className="w-full" />
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-6 text-gray-500 font-medium tracking-wider">SNS LOGIN</span>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-4 text-gray-400 font-medium tracking-wider">SNS LOGIN</span>
             </div>
           </div>
 
-          {/* Login buttons matching Figma design */}
-          <div className="flex justify-center gap-6">
+          {/* Social login buttons */}
+          <div className="flex justify-center items-center gap-8">
             {/* Kakao Talk Button */}
             <button
               onClick={() => handleProviderSelect("kakao")}
-              className="w-20 h-20 rounded-full bg-[#FEE500] hover:bg-[#FEE500]/90 transition-colors flex items-center justify-center group"
+              className="w-20 h-20 rounded-full bg-[#FEE500] flex items-center justify-center hover:bg-[#FEE500]/90 transition-colors shadow-lg"
             >
-              <div className="flex flex-col items-center">
-                <div className="w-8 h-6 bg-black rounded-lg flex items-center justify-center mb-1">
-                  <span className="text-[#FEE500] text-xs font-bold">TALK</span>
-                </div>
-                <div className="w-3 h-2 bg-black rounded-full relative">
-                  <div className="absolute -bottom-1 left-1 w-1 h-1 bg-black rounded-full"></div>
-                </div>
+              <div className="w-10 h-10 bg-[#3C1E1E] rounded-full flex items-center justify-center">
+                <span className="text-[#FEE500] text-xs font-bold">TALK</span>
               </div>
             </button>
 
             {/* Google Button */}
             <button
               onClick={() => handleProviderSelect("google")}
-              className="w-20 h-20 rounded-full bg-white hover:bg-gray-50 border border-gray-200 transition-colors flex items-center justify-center"
+              className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors shadow-lg"
             >
               <svg className="w-8 h-8" viewBox="0 0 24 24">
                 <path

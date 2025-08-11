@@ -6,10 +6,8 @@ import { solarToLunar } from "@/lib/lunar-calendar"
 import { parseMessageForDatesAndBirth, formatDateForDisplay, testMessageParsing } from "@/lib/message-parser"
 import { parseMessageWithGPT } from "@/lib/gpt-date-parser"
 import { smartMemoryServiceV2 } from "@/lib/smart-memory-service-v2"
-import type { NextRequest } from "next/server"
-import { persistentChatService } from "@/lib/persistent-chat-service"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 export const maxDuration = 60
 
 // 🚀 로그 레벨 설정
@@ -183,9 +181,9 @@ async function processMemoryAsync(
     NODE_ENV: process.env.NODE_ENV,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ? "✅ SET" : "❌ MISSING",
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ SET" : "❌ MISSING",
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ SET" : "❌ MISSING",
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ SET" : "❌ MISSING"
   })
-
+  
   if (!ENABLE_SMART_MEMORY) {
     console.log("🧠 Smart memory is disabled, skipping async memory processing.")
     return
@@ -214,40 +212,35 @@ async function processMemoryImmediate(
   userId: string,
   sessionId: string,
   userMessage: string,
-  assistantResponse: string,
+  assistantResponse: string
 ) {
   console.log("🧠 [DEBUG] processMemoryImmediate started")
   console.log("🧠 [DEBUG] Processing memory for user:", userId)
   console.log("🧠 [DEBUG] Session ID:", sessionId)
   console.log("🧠 [DEBUG] User message preview:", userMessage.slice(0, 100))
   console.log("🧠 [DEBUG] Assistant response preview:", assistantResponse.slice(0, 100))
-
+  
   const result = await smartMemoryServiceV2.processConversation(userId, sessionId, userMessage, assistantResponse)
 
   console.log("🧠 [DEBUG] Raw result:", JSON.stringify(result, null, 2))
 
   if (result && result.shouldSave) {
-    console.log(
-      `✅ [DEBUG] Memory processing completed: ${result.memories?.length || 0} memories extracted, ${result.savedMemories?.length || 0} saved`,
-    )
+    console.log(`✅ [DEBUG] Memory processing completed: ${result.memories?.length || 0} memories extracted, ${result.savedMemories?.length || 0} saved`)
     if (result.savedMemories?.length > 0) {
-      console.log(
-        "✅ [DEBUG] Saved memories:",
-        result.savedMemories.map((m: any) => ({ id: m.id, content: m.content?.slice(0, 50) })),
-      )
+      console.log("✅ [DEBUG] Saved memories:", result.savedMemories.map((m: any) => ({ id: m.id, content: m.content?.slice(0, 50) })))
     }
   } else {
     console.log("ℹ️ [DEBUG] No memorable information found:", result?.reasoning || "No reason provided")
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   console.log("==================================================")
   console.log("🚀🚀🚀 SAJU CHAT API CALLED 🚀🚀🚀")
   console.log("Time:", new Date().toISOString())
-  console.log("User-Agent:", req.headers.get("user-agent"))
+  console.log("User-Agent:", req.headers.get('user-agent'))
   console.log("==================================================")
-
+  
   try {
     const body = await req.json()
     const {
@@ -261,10 +254,6 @@ export async function POST(req: NextRequest) {
       compatibilityData,
       continueFromMessage,
       chatRoomId,
-      currentYear,
-      yearDescription,
-      birthInfo,
-      daeun,
     } = body
 
     console.log("🚀 Saju Chat API called with:", {
@@ -275,15 +264,15 @@ export async function POST(req: NextRequest) {
       name,
       gender,
     })
-
+    
     // 🚀 브라우저별 차이 디버깅
     console.log("🔍 [DEBUG] Request details for browser compatibility:", {
-      userAgent: req.headers.get("user-agent"),
-      referer: req.headers.get("referer"),
-      origin: req.headers.get("origin"),
+      userAgent: req.headers.get('user-agent'),
+      referer: req.headers.get('referer'),
+      origin: req.headers.get('origin'),
       hasUserId: !!userId,
       userIdType: typeof userId,
-      bodyKeys: Object.keys(body),
+      bodyKeys: Object.keys(body)
     })
 
     // Validate required fields with better error messages
@@ -377,18 +366,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Create a unique session ID for this chat
-    const sessionId = `${userId || "anonymous"}-${chatRoomId || "temp"}`
-
-    // Get or create persistent session
-    let session = persistentChatService.getSession(sessionId)
-    if (!session) {
-      session = persistentChatService.createSession(sessionId, messages)
-    }
-
-    // Update session with current messages
-    persistentChatService.updateSession(sessionId, messages, true)
-
     // 🚀 최신 메시지에서 날짜/생년월일 파싱 (GPT 우선, 패턴 기반 fallback)
     const latestMessage = messages[messages.length - 1]?.content || ""
     const userMessageVar = latestMessage
@@ -402,7 +379,7 @@ export async function POST(req: NextRequest) {
       // 메모리 컨텍스트에서 생년월일이나 파트너 정보가 있는지 확인
       const hasDateInfo = /\d{4}년|\d{1,2}월|\d{1,2}일|생년월일|태어난|출생/i.test(memoryContext)
       const hasPartnerInfo = /여자친구|남자친구|연인|상대방|파트너|궁합/i.test(memoryContext)
-
+      
       if (hasDateInfo || hasPartnerInfo) {
         console.log("🧠 메모리 컨텍스트에서 날짜/파트너 정보 감지, GPT 파싱에 포함")
         combinedParsingText = `${latestMessage}\n\n[메모리에서 불러온 관련 정보]\n${memoryContext}`
@@ -693,7 +670,7 @@ ${index + 1}. **${person.name}**
       console.log("UserId:", userId)
       console.log("ENABLE_SMART_MEMORY:", ENABLE_SMART_MEMORY)
       console.log("==================================================")
-
+      
       result.text
         .then((completeText) => {
           console.log("==================================================")
@@ -707,43 +684,7 @@ ${index + 1}. **${person.name}**
           console.error("❌❌❌ MEMORY PROCESSING FAILED:", error)
         })
 
-      // Create a transform stream to handle persistence
-      const transformStream = new TransformStream({
-        start(controller) {
-          persistentChatService.setStreamController(sessionId, controller)
-        },
-        transform(chunk, controller) {
-          // Forward the chunk to the client
-          controller.enqueue(chunk)
-
-          // Update session with streaming status
-          persistentChatService.updateSession(sessionId, messages, true)
-        },
-        flush() {
-          // Mark streaming as finished
-          persistentChatService.finishStreaming(sessionId)
-          console.log(`Finished streaming for session: ${sessionId}`)
-        },
-      })
-
-      // Return the stream with persistence handling
-      return result
-        .toDataStreamResponse({
-          headers: {
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-            "X-Session-Id": sessionId,
-          },
-        })
-        .then((response) => {
-          // Pipe through our transform stream for persistence
-          const readable = response.body?.pipeThrough(transformStream)
-          return new Response(readable, {
-            headers: response.headers,
-            status: response.status,
-            statusText: response.statusText,
-          })
-        })
+      return result.toDataStreamResponse()
     } catch (streamError) {
       console.error("❌ StreamText error details:", {
         error: streamError,
@@ -786,15 +727,7 @@ ${index + 1}. **${person.name}**
   }
 }
 
-function getSystemMessage(
-  roomType: string,
-  dateInfo: any,
-  sajuInfo: string,
-  compatibilityInfo = "",
-  name?: string,
-  gender?: string,
-  compatibilityData?: any,
-) {
+function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, compatibilityInfo = "") {
   switch (roomType) {
     case "sajuping":
       return `역할: 사주 전문가이자 다재다능하고 친근한 조언자
@@ -1019,31 +952,4 @@ ${sajuInfo}${compatibilityInfo}
 - 20개 메시지까지 유지, 최근 8개는 원본 보존
 - 간소화된 요약으로 응답 속도 향상`
   }
-}
-
-// Add endpoint to check session status
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url)
-  const sessionId = url.searchParams.get("sessionId")
-
-  if (!sessionId) {
-    return new Response(JSON.stringify({ error: "Session ID required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    })
-  }
-
-  const session = persistentChatService.getSession(sessionId)
-
-  return new Response(
-    JSON.stringify({
-      exists: !!session,
-      isStreaming: session?.isStreaming || false,
-      messageCount: session?.messages.length || 0,
-      lastActivity: session?.lastActivity,
-    }),
-    {
-      headers: { "Content-Type": "application/json" },
-    },
-  )
 }
