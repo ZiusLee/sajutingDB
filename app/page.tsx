@@ -43,13 +43,13 @@ export default function HomePage() {
             .order("created_at", { ascending: true }) // Get oldest first
 
           if (!sessions || sessions.length === 0) {
-            // No saju sessions found, redirect to onboarding
+            // No saju sessions found, redirecting to onboarding
             console.log("No saju sessions found, redirecting to onboarding")
             router.push("/?onboarding=true")
             return
           }
 
-          // Check if first session has only one message (incomplete first chat)
+          // Check if first session has incomplete first chat
           const firstSessionId = sessions[0].id
           const { data: chatRooms } = await supabase
             .from("chat_rooms")
@@ -67,12 +67,12 @@ export default function HomePage() {
               .select("*", { count: "exact" })
               .eq("chat_room_id", firstChatRoomId)
 
-            console.log(`First chat room has ${count} messages`)
+            console.log(`First chat room (${firstChatRoomId}) has ${count} messages`)
 
             // If first chat room has only 1 message (user message without AI response)
             // or is empty, redirect there to continue the conversation
-            if (count === 1 || count === 0) {
-              console.log("First chat room is incomplete, redirecting there")
+            if (count === 1) {
+              console.log("First chat room has incomplete conversation, redirecting there")
               const profileToUse = await getSajuProfileBySessionId(firstSessionId)
               if (profileToUse) {
                 await prepareSajuDataForChat(profileToUse)

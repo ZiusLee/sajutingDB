@@ -141,8 +141,11 @@ export default function SajuChat({
   const [showSignupDialog, setShowSignupDialog] = useState(false)
   const [showTermsDialog, setShowTermsDialog] = useState(false)
   const [providerLabel, setProviderLabel] = useState("")
-  const [signupTimerStarted, setSignupTimerStarted] = useState(false)
   const supabase = createClientComponentClient()
+
+  // Background streaming continuation state
+  const [backgroundStreamingActive, setBackgroundStreamingActive] = useState(false)
+  const backgroundStreamRef = useRef<any>(null)
 
   const sessionId = useMemo(() => {
     try {
@@ -180,32 +183,44 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
+  // Check if we should continue background streaming after auth
+  useEffect(() => {
+    const shouldContinueChat = localStorage.getItem("continue_chat_after_auth")
+    if (shouldContinueChat === "true" && user) {
+      console.log("🔄 Continuing chat after authentication")
+      localStorage.removeItem("continue_chat_after_auth")
+      setBackgroundStreamingActive(true)
+    }
+  }, [user])
+
   // Auto-show signup dialog after 4 seconds for non-authenticated users
   useEffect(() => {
-    if (!user && chatData.isInitialized && !signupTimerStarted) {
-      console.log("🕐 Starting 4-second signup timer...")
-      setSignupTimerStarted(true)
+    let timer: NodeJS.Timeout | null = null
 
-      const timer = setTimeout(() => {
+    if (!user && chatData.isInitialized && !showSignupDialog && !backgroundStreamingActive) {
+      console.log("🕐 Starting 4-second signup timer...")
+
+      timer = setTimeout(() => {
         console.log("🕐 4 seconds elapsed, showing signup dialog")
         setShowSignupDialog(true)
       }, 4000) // 4 seconds
+    }
 
-      return () => {
+    return () => {
+      if (timer) {
         console.log("🕐 Cleanup signup timer")
         clearTimeout(timer)
       }
     }
-  }, [user, chatData.isInitialized, signupTimerStarted])
+  }, [user, chatData.isInitialized, showSignupDialog, backgroundStreamingActive])
 
-  // Reset signup timer when user logs in
+  // Close signup dialog when user logs in
   useEffect(() => {
-    if (user && signupTimerStarted) {
-      console.log("🕐 User logged in, resetting signup timer")
-      setSignupTimerStarted(false)
+    if (user && showSignupDialog) {
+      console.log("🕐 User logged in, closing signup dialog")
       setShowSignupDialog(false)
     }
-  }, [user, signupTimerStarted])
+  }, [user, showSignupDialog])
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
@@ -299,7 +314,8 @@ export default function SajuChat({
           setIsFirstChatRoom(isFirstRoom)
 
           // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
-          if (shouldSendInitialQuestions && isFirstRoom) {
+          // But only if we're not continuing from background streaming
+          if (shouldSendInitialQuestions && isFirstRoom && !backgroundStreamingActive) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
@@ -313,7 +329,17 @@ export default function SajuChat({
     return () => {
       isMounted = false
     }
-  }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId, stableConcerns])
+  }, [
+    stableSaju,
+    stableBirthInfo,
+    gender,
+    name,
+    roomType,
+    effectiveChatRoomId,
+    sessionId,
+    stableConcerns,
+    backgroundStreamingActive,
+  ])
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
     api: "/api/saju-chat",
@@ -324,10 +350,20 @@ export default function SajuChat({
     onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
+
+      // If this was a background streaming completion, mark it as done
+      if (backgroundStreamingActive) {
+        setBackgroundStreamingActive(false)
+        console.log("🔄 Background streaming completed")
+      }
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+
+      if (backgroundStreamingActive) {
+        setBackgroundStreamingActive(false)
+      }
     },
   })
 
@@ -337,13 +373,22 @@ export default function SajuChat({
       !isLoading &&
       messages.length === 0 &&
       initialQuestionsToSend.length > 0 &&
-      !initialQuestionsSent.q1
+      !initialQuestionsSent.q1 &&
+      !backgroundStreamingActive
     ) {
       console.log("📤 [Flow] Sending first question...")
       setInitialQuestionsSent((prev) => ({ ...prev, q1: true }))
       append({ role: "user", content: initialQuestionsToSend[0] })
     }
-  }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
+  }, [
+    isInitialQuestionsMode,
+    isLoading,
+    messages.length,
+    initialQuestionsToSend,
+    append,
+    initialQuestionsSent.q1,
+    backgroundStreamingActive,
+  ])
 
   useEffect(() => {
     const endInitialMode = () => {
@@ -352,12 +397,12 @@ export default function SajuChat({
       setInitialQuestionsToSend([])
     }
 
-    if (isInitialQuestionsMode && !isLoading) {
+    if (isInitialQuestionsMode && !isLoading && !backgroundStreamingActive) {
       if (messages.length === 2 && messages[1].role === "assistant") {
         endInitialMode()
       }
     }
-  }, [isInitialQuestionsMode, isLoading, messages])
+  }, [isInitialQuestionsMode, isLoading, messages, backgroundStreamingActive])
 
   useEffect(() => {
     const saveNewMessages = async () => {
@@ -421,7 +466,7 @@ export default function SajuChat({
   }, [transitionMessages])
 
   const handleSuggestedQuestionClick = (question: string) => {
-    if (isLoading) return
+    if (isLoading || backgroundStreamingActive) return
     setInput(question)
     setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
   }
@@ -460,9 +505,24 @@ export default function SajuChat({
     }
   }
 
-  const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
+  const handleSignupProvider = async (provider: "kakao" | "google") => {
     try {
+      // Store current state for background continuation
       localStorage.setItem("auth_return_url", window.location.href)
+      localStorage.setItem("continue_chat_after_auth", "true")
+
+      // Store current chat state if there's an ongoing conversation
+      if (messages.length > 0) {
+        localStorage.setItem(
+          "background_chat_state",
+          JSON.stringify({
+            messages: messages,
+            sessionId: sessionId,
+            chatRoomId: effectiveChatRoomId,
+            isLoading: isLoading,
+          }),
+        )
+      }
 
       if (provider === "kakao") {
         window.location.href = `/api/auth/login?provider=kakao`
@@ -650,6 +710,13 @@ export default function SajuChat({
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
+
+            {backgroundStreamingActive && (
+              <div className="text-center text-xs sm:text-sm text-blue-600 bg-blue-50 rounded-lg p-2 sm:p-3">
+                🔄 로그인 후 대화를 이어가는 중입니다...
+              </div>
+            )}
+
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "user" ? (
@@ -797,7 +864,7 @@ export default function SajuChat({
                 )}
               </div>
             ))}
-            {isLoading && (
+            {(isLoading || backgroundStreamingActive) && (
               <div className="flex items-center gap-2 pt-2">
                 <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
                 <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
@@ -823,7 +890,7 @@ export default function SajuChat({
             </Button>
           )}
           <div className="space-y-2">
-            {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
+            {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && !backgroundStreamingActive && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
@@ -845,7 +912,7 @@ export default function SajuChat({
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
                   className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
-                  disabled={isLoading || isInitialQuestionsMode}
+                  disabled={isLoading || isInitialQuestionsMode || backgroundStreamingActive}
                 />
                 <Popover>
                   <PopoverTrigger asChild>
@@ -854,7 +921,7 @@ export default function SajuChat({
                       variant="ghost"
                       size="icon"
                       className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
-                      disabled={isInitialQuestionsMode}
+                      disabled={isInitialQuestionsMode || backgroundStreamingActive}
                     >
                       <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
@@ -873,7 +940,7 @@ export default function SajuChat({
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode || backgroundStreamingActive}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
