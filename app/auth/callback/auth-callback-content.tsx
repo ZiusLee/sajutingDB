@@ -42,10 +42,10 @@ export default function AuthCallbackContent() {
 
           if (pendingSajuDataStr) {
             console.log("Found pending saju data from onboarding, processing...")
-            
+
             try {
               const pendingSajuData = JSON.parse(pendingSajuDataStr)
-              
+
               // Save to database with authenticated user ID (like MyPage does)
               const userId = await syncLocalStorageToDatabase(authUserId)
 
@@ -63,7 +63,7 @@ export default function AuthCallbackContent() {
 
                 localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
                 localStorage.setItem("user_id", userId)
-                
+
                 // Clean up pending data
                 localStorage.removeItem("pending_saju_data")
                 localStorage.removeItem("tempSajuData")
@@ -96,7 +96,7 @@ export default function AuthCallbackContent() {
             if (success) {
               console.log("Successfully linked saju session to authenticated user")
               linkedAnySession = true
-              
+
               // Check if there's pending saju data to navigate to chat
               const currentSaju = localStorage.getItem("current_saju")
               if (currentSaju) {
@@ -135,25 +135,25 @@ export default function AuthCallbackContent() {
           }
 
           // Check if there's an existing anonymous saju_session that needs auth_user_id update
-          const sessionId = localStorage.getItem("saju_session_id")
-          if (sessionId && !linkedAnySession) {
-            console.log("Found existing saju_session ID, updating auth_user_id:", sessionId)
-            
+          const sajuSessionId = localStorage.getItem("saju_session_id")
+          if (sajuSessionId && !linkedAnySession) {
+            console.log("Found existing saju_session ID, updating auth_user_id:", sajuSessionId)
+
             try {
               // Update auth_user_id for existing session (MyPage style)
-              console.log("Updating auth_user_id for session:", sessionId, "with auth user:", authUserId)
-              const success = await updateAuthUserId(sessionId, authUserId)
-              
+              console.log("Updating auth_user_id for session:", sajuSessionId, "with auth user:", authUserId)
+              const success = await updateAuthUserId(sajuSessionId, authUserId)
+
               if (success) {
-                console.log("Successfully updated auth_user_id for saju session:", sessionId)
+                console.log("Successfully updated auth_user_id for saju session:", sajuSessionId)
                 linkedAnySession = true
-                
+
                 // Clean up tempSajuData since session is now linked
                 localStorage.removeItem("tempSajuData")
-                
+
                 console.log("Session linking successful")
               } else {
-                console.error("Failed to update auth_user_id for session:", sessionId)
+                console.error("Failed to update auth_user_id for session:", sajuSessionId)
               }
             } catch (error) {
               console.error("Error updating session auth_user_id:", error)
@@ -172,7 +172,7 @@ export default function AuthCallbackContent() {
               description: "성공적으로 로그인되었습니다.",
             })
           }
-          
+
           router.push(redirectUrl)
         } else {
           console.log("No session found after auth callback")
