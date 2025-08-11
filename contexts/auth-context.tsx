@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 사주 세션이 있는지 확인하는 함수
   const checkSajuSession = async (userId: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.from("saju_sessions").select("id").eq("user_id", userId).limit(1)
+      const { data, error } = await supabase.from("saju_sessions").select("id").eq("auth_user_id", userId).limit(1)
 
       if (error) {
         console.error("Error checking saju session:", error)
@@ -118,9 +118,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentPath = window.location.pathname
 
     // 이미 올바른 페이지에 있으면 리다이렉션하지 않음
-    if (currentPath === "/saju-chat/sajuping" || currentPath === "/" || currentPath.startsWith("/?")) return
+    if (
+      currentPath === "/saju-chat/sajuping" ||
+      currentPath.startsWith("/saju-chat") ||
+      currentPath === "/result" ||
+      currentPath === "/mypage"
+    )
+      return
 
-    const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list", "/auth"]
+    const excludedPaths = ["/saju-chat", "/result", "/chat-list", "/auth", "/mypage"]
     const shouldRedirect = !excludedPaths.some((p) => currentPath.startsWith(p))
     const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
 
@@ -135,9 +141,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (hasSajuSession) {
         // 사주 세션이 있으면 채팅으로
+        console.log("User has saju session, redirecting to chat")
+
+        // 기존 사주 데이터를 로드해서 current_saju에 설정
+        try {
+          const { data: sajuData, error } = await supabase
+            .from("saju_sessions")
+            .select("*")
+            .eq("auth_user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single()
+
+          if (!error && sajuData) {
+            // 사주 데이터를 current_saju 형태로 변환
+            const chatSajuData = {
+              saju: {
+                yearStem: sajuData.year_stem,
+                yearBranch: sajuData.year_branch,
+                monthStem: sajuData.month_stem,
+                monthBranch: sajuData.month_branch,
+                dayStem: sajuData.day_stem,
+                dayBranch: sajuData.day_branch,
+                timeStem: sajuData.time_stem,
+                timeBranch: sajuData.time_branch,
+              },
+              name: sajuData.name,
+              gender: sajuData.gender,
+              interpretation: "",
+              returnPath: "/",
+              timeStandard: sajuData.time_standard,
+              birthCityId: sajuData.birth_city_id,
+              concerns: sajuData.concerns || [],
+              sessionId: sajuData.id,
+              birthInfo: {
+                solarYear: sajuData.solar_year,
+                solarMonth: sajuData.solar_month,
+                solarDay: sajuData.solar_day,
+                solarHour: sajuData.solar_hour,
+                solarMinute: sajuData.solar_minute,
+                lunarYear: sajuData.lunar_year,
+                lunarMonth: sajuData.lunar_month,
+                lunarDay: sajuData.lunar_day,
+                timeUnknown: sajuData.time_unknown,
+                birthCityId: sajuData.birth_city_id,
+                timeStandard: sajuData.time_standard,
+              },
+            }
+
+            localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+            localStorage.setItem("saju_session_id", sajuData.id)
+          }
+        } catch (error) {
+          console.error("Error loading saju data:", error)
+        }
+
         router.push("/saju-chat/sajuping")
       } else {
         // 사주 세션이 없으면 온보딩으로 (홈페이지에서 온보딩 플로우 시작)
+        console.log("User has no saju session, redirecting to onboarding")
         router.push("/?showOnboarding=true")
       }
     }
@@ -250,6 +312,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("user_id")
       localStorage.removeItem("user_name")
       localStorage.removeItem("user_email")
+      localStorage.removeItem("current_saju")
+      localStorage.removeItem("saju_session_id")
 
       setUser(null)
       router.push("/")

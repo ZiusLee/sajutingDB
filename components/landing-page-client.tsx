@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import ScrollVelocity from "@/components/ScrollVelocity"
 import { useAuth } from "@/contexts/auth-context"
 import BusinessBar from "@/components/business-bar"
+import { Loader2 } from "lucide-react"
 
 const questionChips = [
   { icon: "💼", text: "직장을 어떤 기준으로 선택하면 좋을까?" },
@@ -42,17 +43,27 @@ export default function LandingPageClient() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
 
   // Check for showOnboarding query parameter
   useEffect(() => {
-    const shouldShowOnboarding = searchParams.get('showOnboarding')
-    if (shouldShowOnboarding === 'true') {
+    const shouldShowOnboarding = searchParams.get("showOnboarding")
+    if (shouldShowOnboarding === "true") {
       setShowOnboarding(true)
       // Clean up URL
-      router.replace('/', undefined)
+      router.replace("/", undefined)
     }
   }, [searchParams, router])
+
+  // 로그인된 사용자는 AuthContext에서 자동으로 리다이렉션 처리됨
+  // 여기서는 로딩 상태만 표시
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   const handleStartSaju = () => {
     setShowOnboarding(true)
@@ -84,9 +95,7 @@ export default function LandingPageClient() {
               <br />
               궁금하세요?
             </h1>
-            <p className="text-base md:text-lg text-gray-600">
-              사주를 바탕으로 나와 대화하는 AI Companion, 사주핑
-            </p>
+            <p className="text-base md:text-lg text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
           </div>
 
           {/* 질문 칩 - 2줄 스크롤 애니메이션 */}
