@@ -199,16 +199,16 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
-  // Auto-show signup dialog after 4 seconds for non-authenticated users
+  // Auto-show signup dialog after 3 seconds for non-authenticated users
   useEffect(() => {
     if (!user && chatData.isInitialized && !signupTimerStarted) {
-      console.log("🕐 Starting 4-second signup timer...")
+      console.log("🕐 Starting 3-second signup timer...")
       setSignupTimerStarted(true)
 
       const timer = setTimeout(() => {
-        console.log("🕐 4 seconds elapsed, showing signup dialog")
+        console.log("🕐 3 seconds elapsed, showing signup dialog")
         setShowSignupDialog(true)
-      }, 4000) // 4 seconds
+      }, 3000) // Changed from 4000ms to 3000ms (3 seconds)
 
       return () => {
         console.log("🕐 Cleanup signup timer")
