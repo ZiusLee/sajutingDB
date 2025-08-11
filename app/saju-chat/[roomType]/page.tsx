@@ -26,6 +26,7 @@ export default function SajuChatPage() {
   const [sessionKey, setSessionKey] = useState<string>("")
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [currentChatRoom, setCurrentChatRoom] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   // Guest usage limiter
   const { count, limit, isOverLimit, incrementOncePerVisit } = useGuestUsage(5)
@@ -237,24 +238,35 @@ export default function SajuChatPage() {
   }
 
   const startOAuth = async (provider: Provider) => {
-    const redirectBack = `${window.location.origin}/auth/callback?redirect_to=${encodeURIComponent(window.location.pathname + window.location.search)}`
-
     console.log(`🔐 Starting ${provider} OAuth...`)
-    console.log("Redirect URL:", redirectBack)
 
     try {
+      setIsLoading(true)
+
+      // Store current location for redirect back
+      const currentUrl = window.location.href
+      localStorage.setItem("auth_return_url", currentUrl)
+
+      const redirectTo = `${window.location.origin}/auth/callback`
+      console.log("Redirect URL:", redirectTo)
+
+      const options: any = {
+        redirectTo,
+      }
+
+      // Provider-specific options
+      if (provider === "google") {
+        options.queryParams = {
+          access_type: "offline",
+          prompt: "consent",
+        }
+      }
+
+      console.log(`OAuth options for ${provider}:`, options)
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: {
-          redirectTo: redirectBack,
-          // For Google, you might need to specify scopes
-          ...(provider === "google" && {
-            queryParams: {
-              access_type: "offline",
-              prompt: "consent",
-            },
-          }),
-        },
+        options,
       })
 
       if (error) {
@@ -267,7 +279,8 @@ export default function SajuChatPage() {
         throw error
       }
 
-      console.log(`✅ ${provider} OAuth initiated successfully:`, data)
+      console.log(`✅ ${provider} OAuth initiated successfully`)
+      // OAuth redirect will happen automatically
     } catch (e) {
       console.error(`❌ ${provider} OAuth start error:`, e)
       toast({
@@ -275,7 +288,8 @@ export default function SajuChatPage() {
         description: `${provider === "kakao" ? "카카오" : "구글"} 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.`,
         variant: "destructive",
       })
-      // keep the dialog open for retry
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -334,22 +348,24 @@ export default function SajuChatPage() {
             <div className="mt-6 flex flex-wrap gap-3">
               <Button
                 className="bg-[#FEE500] text-black hover:bg-[#E6CF00]"
+                disabled={isLoading}
                 onClick={() => {
                   setSelectedProvider("kakao")
                   setTermsOpen(true)
                 }}
               >
-                <LogIn className="mr-2 h-4 w-4" />
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
                 카카오로 로그인
               </Button>
               <Button
                 variant="outline"
+                disabled={isLoading}
                 onClick={() => {
                   setSelectedProvider("google")
                   setTermsOpen(true)
                 }}
               >
-                <LogIn className="mr-2 h-4 w-4" />
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
                 구글로 로그인
               </Button>
             </div>
