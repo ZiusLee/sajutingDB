@@ -9,10 +9,7 @@ import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { useGuestUsage } from "@/hooks/use-guest-usage"
 import { SignupDialog } from "@/components/signup-dialog"
-import { TermsDialog } from "@/components/terms-dialog"
 import { getSupabase } from "@/lib/supabase-client"
-
-type Provider = "kakao" | "google" | "apple"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -30,8 +27,6 @@ export default function SajuChatPage() {
   // Guest usage limiter
   const { count, limit, isOverLimit, incrementOncePerVisit } = useGuestUsage(5)
   const [signupOpen, setSignupOpen] = useState(false)
-  const [termsOpen, setTermsOpen] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
   const supabase = getSupabase()
 
   // Stabilize roomId and roomType to prevent infinite re-renders
@@ -228,15 +223,8 @@ export default function SajuChatPage() {
     [roomType],
   )
 
-  // Signup flow handlers
-  const onSelectProvider = (provider: Provider) => {
-    if (provider === "apple") return // currently disabled
-    setSelectedProvider(provider)
-    setSignupOpen(false)
-    setTermsOpen(true)
-  }
-
-  const startOAuth = async (provider: Provider) => {
+  // OAuth handler - simplified and unified
+  const handleOAuth = async (provider: "kakao" | "google") => {
     console.log(`🔐 Starting ${provider} OAuth...`)
 
     try {
@@ -259,6 +247,7 @@ export default function SajuChatPage() {
           access_type: "offline",
           prompt: "consent",
         }
+        options.scopes = "openid email profile"
       }
 
       console.log(`OAuth options for ${provider}:`, options)
@@ -335,24 +324,14 @@ export default function SajuChatPage() {
         onChatRoomPersisted={handleChatRoomPersisted}
       />
 
-      {/* Signup Dialog - 게스트 한도 초과 시 자동으로 열림 */}
+      {/* Unified Signup Dialog with Terms */}
       <SignupDialog
         open={signupOpen}
         onOpenChange={setSignupOpen}
-        onSelectProvider={onSelectProvider}
+        onSelectProvider={handleOAuth}
         isOverLimit={!isLoggedIn && isOverLimit}
         currentCount={count}
         maxCount={limit}
-      />
-
-      {/* Terms before OAuth */}
-      <TermsDialog
-        open={termsOpen}
-        onOpenChange={setTermsOpen}
-        providerLabel={selectedProvider === "kakao" ? "카카오" : selectedProvider === "google" ? "구글" : "Apple"}
-        onAgree={() => {
-          if (selectedProvider) startOAuth(selectedProvider)
-        }}
       />
     </div>
   )
