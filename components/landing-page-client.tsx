@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SajuOnboardingFlow } from "@/components/saju-onboarding-flow"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import ScrollVelocity from "@/components/ScrollVelocity"
 import { useAuth } from "@/contexts/auth-context"
 import BusinessBar from "@/components/business-bar"
@@ -41,7 +41,18 @@ const questionChips = [
 export default function LandingPageClient() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isAuthenticated } = useAuth()
+
+  // Check for showOnboarding query parameter
+  useEffect(() => {
+    const shouldShowOnboarding = searchParams.get('showOnboarding')
+    if (shouldShowOnboarding === 'true') {
+      setShowOnboarding(true)
+      // Clean up URL
+      router.replace('/', undefined)
+    }
+  }, [searchParams, router])
 
   const handleStartSaju = () => {
     setShowOnboarding(true)

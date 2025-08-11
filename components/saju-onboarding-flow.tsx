@@ -144,18 +144,65 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
   const handleSignupSuccess = async (provider: "kakao" | "google" | "apple") => {
     try {
-      console.log("Signup success, storing pending data for auth callback...")
+      console.log("Signup success, attempting to save saju data to database...")
 
-      // Store the pending saju data for auth callback to handle
-      if (pendingSajuData) {
-        localStorage.setItem("pendingSajuData", JSON.stringify(pendingSajuData))
-        console.log("Stored pending saju data for auth callback")
+      // Wait a bit for auth state to settle
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      const supabaseClient = getSupabase()
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabaseClient.auth.getSession()
+
+      if (sessionError || !session?.user) {
+        console.error("No authenticated session found after signup:", sessionError)
+        toast({
+          title: "로그인 확인 필요",
+          description: "로그인 상태를 확인할 수 없습니다. 다시 시도해주세요.",
+          variant: "destructive",
+        })
+        return
       }
 
-      // Close the dialog - auth callback will handle the rest
-      setShowSignupDialog(false)
+      const authUserId = session.user.id
+      console.log("Authenticated user ID:", authUserId)
 
-      // The auth callback will handle saving to database and navigation
+      // Now save the pending saju data to database with auth_user_id
+      if (pendingSajuData) {
+        console.log("Saving saju data to database with auth_user_id:", authUserId)
+
+        // Save to database with authenticated user ID
+        const userId = await syncLocalStorageToDatabase(authUserId)
+
+        if (userId) {
+          console.log("Successfully saved saju data with session ID:", userId)
+
+          // Update the chat data with the session ID
+          const chatSajuData = {
+            ...pendingSajuData,
+            sessionId: userId,
+          }
+
+          localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+          localStorage.setItem("user_id", userId)
+
+          toast({
+            title: "계정 연결 완료",
+            description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
+          })
+
+          // Navigate to chat
+          router.push("/saju-chat/sajuping")
+        } else {
+          console.error("Failed to save saju data to database")
+          toast({
+            title: "데이터 저장 실패",
+            description: "사주 정보 저장에 실패했습니다. 다시 시도해주세요.",
+            variant: "destructive",
+          })
+        }
+      }
     } catch (error) {
       console.error("Error in handleSignupSuccess:", error)
       toast({
@@ -163,6 +210,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         description: "계정 연결 중 오류가 발생했습니다.",
         variant: "destructive",
       })
+    } finally {
       setShowSignupDialog(false)
     }
   }
@@ -320,8 +368,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       } else {
         // User not logged in, show signup dialog
         console.log("User not authenticated, showing signup dialog")
-        // Store the chat data as pending for after signup
-        setPendingSajuData(chatSajuData)
         setShowSignupDialog(true)
       }
     } catch (error) {

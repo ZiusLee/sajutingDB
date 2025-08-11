@@ -60,6 +60,8 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
       auth_user_id: userId, // This can be null for anonymous users
     }
 
+    console.log("Creating saju session with data:", sessionData)
+
     const { data: sessionResult, error: sessionError } = await supabase
       .from("saju_sessions")
       .insert(sessionData)

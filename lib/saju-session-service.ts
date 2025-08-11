@@ -292,12 +292,37 @@ export async function findAndLinkSessions(): Promise<{ success: boolean; linkedC
 
     console.log(`Finding sessions for user ${authUserId} (${userEmail})`)
 
-    // Strategy 1: Check localStorage
+    // Strategy 1: Check localStorage for session ID
     const localStorageSessionId = localStorage.getItem("user_id")
     if (localStorageSessionId) {
       console.log(`Checking localStorage session ID: ${localStorageSessionId}`)
       const success = await linkSessionIfUnlinked(localStorageSessionId, authUserId)
       if (success) linkedCount++
+    }
+    
+    // Strategy 1.1: Check for recent saju sessions that might belong to this user
+    try {
+      console.log(`Looking for recent unlinked sessions that might belong to user ${authUserId}`)
+      const { data: recentSessions, error: recentError } = await supabase
+        .from("saju_sessions")
+        .select("id, name, auth_user_id, created_at")
+        .is("auth_user_id", null)
+        .gte("created_at", new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Last 30 minutes
+        .order("created_at", { ascending: false })
+        .limit(5)
+
+      if (!recentError && recentSessions && recentSessions.length > 0) {
+        console.log(`Found ${recentSessions.length} recent unlinked sessions`)
+        // Try to link the most recent session
+        const mostRecentSession = recentSessions[0]
+        const success = await linkSessionToUser(mostRecentSession.id)
+        if (success) {
+          console.log(`Successfully linked recent session ${mostRecentSession.id}`)
+          linkedCount++
+        }
+      }
+    } catch (error) {
+      console.error("Error checking recent sessions:", error)
     }
 
     // Strategy 2: Check if there's a session with matching email

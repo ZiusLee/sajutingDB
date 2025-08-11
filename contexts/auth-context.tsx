@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useRef, useMemo, type R
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import { getSupabase } from "@/lib/supabase-client"
+import { findAndLinkSessions } from "@/lib/saju-session-service"
 
 interface AuthContextType {
   user: User | null
@@ -163,8 +164,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("user_email", session.user.email)
           }
           
-          // 로그인 성공 시 리다이렉션 (비동기로 처리)
-          setTimeout(() => {
+          // 로그인 성공 시 세션 연결 시도 (비동기로 처리)
+          setTimeout(async () => {
+            try {
+              const { success, linkedCount } = await findAndLinkSessions()
+              if (success && linkedCount > 0) {
+                console.log(`Successfully linked ${linkedCount} sessions to user`)
+              }
+            } catch (error) {
+              console.error("Error linking sessions:", error)
+            }
+            // 세션 연결 시도 후 리다이렉션
             safeRedirect("/mypage")
           }, 100)
           

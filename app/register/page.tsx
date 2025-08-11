@@ -86,11 +86,11 @@ export default function RegisterPage() {
         // Store user name in localStorage for immediate use
         localStorage.setItem("user_name", name)
 
-        setSuccess("회원가입이 완료되었습니다! 이메일을 확인해주세요.")
+        setSuccess("회원가입이 완료되었습니다! 사주 프로필을 생성해주세요.")
 
-        // Redirect to home page after a short delay
+        // Redirect to home page with onboarding trigger after a short delay
         setTimeout(() => {
-          router.push("/")
+          router.push("/?showOnboarding=true")
         }, 2000)
       }
     } catch (err) {
