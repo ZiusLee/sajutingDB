@@ -201,21 +201,21 @@ export default function SajuChat({
 
   // Auto-show signup dialog after 3 seconds for non-authenticated users
   useEffect(() => {
-    if (!user && chatData.isInitialized && !signupTimerStarted) {
-      console.log("🕐 Starting 3-second signup timer...")
+    if (!user && !signupTimerStarted) {
+      console.log("🕐 Starting 3-second signup timer from page arrival...")
       setSignupTimerStarted(true)
 
       const timer = setTimeout(() => {
-        console.log("🕐 3 seconds elapsed, showing signup dialog")
+        console.log("🕐 3 seconds elapsed since page arrival, showing signup dialog")
         setShowSignupDialog(true)
-      }, 3000) // Changed from 4000ms to 3000ms (3 seconds)
+      }, 3000)
 
       return () => {
         console.log("🕐 Cleanup signup timer")
         clearTimeout(timer)
       }
     }
-  }, [user, chatData.isInitialized, signupTimerStarted])
+  }, [user, signupTimerStarted]) // Removed chatData.isInitialized dependency
 
   // Reset signup timer when user logs in
   useEffect(() => {
