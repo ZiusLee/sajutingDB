@@ -80,7 +80,6 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5",
-    "ui": "latest",
     "util": "latest",
     "uuid": "latest",
     "vaul": "latest",
