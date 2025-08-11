@@ -9,8 +9,6 @@ import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { SignupDialog } from "@/components/signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
-import { getSajuProfileBySessionId } from "@/lib/saju-session-service"
-import { calculateElementsFromSaju } from "@/lib/element-utils"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -25,7 +23,6 @@ export default function SajuChatPage() {
   const [currentChatRoom, setCurrentChatRoom] = useState(null)
   const [isLoadingOAuth, setIsLoadingOAuth] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
-  const [forceSignupOpen, setForceSignupOpen] = useState(false)
 
   const supabase = getSupabase()
 
@@ -56,130 +53,6 @@ export default function SajuChatPage() {
     }
   }, [handleSidebarToggle])
 
-  // 대표 사주 데이터를 가져오는 함수 (AuthContext와 동일한 로직)
-  const getDefaultSajuData = async (userId: string) => {
-    try {
-      // 먼저 is_default가 true인 세션 찾기
-      const { data: defaultSession, error: defaultError } = await supabase
-        .from("saju_sessions")
-        .select("id")
-        .eq("auth_user_id", userId)
-        .eq("is_default", true)
-        .single()
-
-      let sessionId = null
-
-      if (!defaultError && defaultSession) {
-        sessionId = defaultSession.id
-        console.log("Found default session:", sessionId)
-      } else {
-        // 대표 사주가 없으면 가장 최근 세션을 대표로 설정
-        const { data: recentSession, error: recentError } = await supabase
-          .from("saju_sessions")
-          .select("id")
-          .eq("auth_user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (!recentError && recentSession) {
-          sessionId = recentSession.id
-          console.log("Using most recent session as default:", sessionId)
-
-          // 대표 사주로 설정
-          await supabase
-            .from("saju_sessions")
-            .update({ is_default: true })
-            .eq("id", sessionId)
-            .eq("auth_user_id", userId)
-
-          console.log("Set session as default:", sessionId)
-        }
-      }
-
-      if (sessionId) {
-        // getSajuProfileBySessionId를 사용해서 완전한 프로필 데이터 가져오기
-        const profile = await getSajuProfileBySessionId(sessionId)
-
-        if (profile) {
-          console.log("Loaded default saju profile:", profile)
-
-          // 오행 데이터 확인 및 계산
-          let elementsData = profile.saju.elements
-          if (!elementsData) {
-            console.log("오행 데이터가 없어서 계산 중...")
-            elementsData = calculateElementsFromSaju(
-              profile.saju.yearStem,
-              profile.saju.yearBranch,
-              profile.saju.monthStem,
-              profile.saju.monthBranch,
-              profile.saju.dayStem,
-              profile.saju.dayBranch,
-              profile.saju.hourStem,
-              profile.saju.hourBranch,
-            )
-
-            // 계산된 오행 데이터를 DB에 저장
-            const { data: currentSaju } = await supabase
-              .from("saju_sessions")
-              .select("saju")
-              .eq("id", sessionId)
-              .single()
-
-            if (currentSaju) {
-              const updatedSaju = { ...currentSaju.saju, elements: elementsData }
-              await supabase.from("saju_sessions").update({ saju: updatedSaju }).eq("id", sessionId)
-
-              console.log("오행 데이터 계산 및 저장 완료:", elementsData)
-            }
-          }
-
-          // mypage에서 사용하는 것과 동일한 형태로 변환
-          const chatSajuData = {
-            sessionId: profile.id,
-            saju: {
-              ...profile.saju,
-              elements: elementsData || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
-              dayMaster: profile.saju.dayStem,
-              dayMasterHanja: profile.saju.dayStemHanja || "",
-            },
-            name: profile.name,
-            gender: profile.gender,
-            year: profile.birthYear,
-            month: profile.birthMonth,
-            day: profile.birthDay,
-            hour: profile.birthHour,
-            minute: profile.birthMinute,
-            lunarYear: profile.lunarYear || profile.birthYear,
-            lunarMonth: profile.lunarMonth || profile.birthMonth,
-            lunarDay: profile.lunarDay || profile.birthDay,
-            timeUnknown: profile.timeUnknown,
-            interpretation: "",
-            birthInfo: {
-              solarYear: Number.parseInt(profile.birthYear),
-              solarMonth: Number.parseInt(profile.birthMonth),
-              solarDay: Number.parseInt(profile.birthDay),
-              solarHour: Number.parseInt(profile.birthHour) || 0,
-              solarMinute: Number.parseInt(profile.birthMinute) || 0,
-              lunarYear: Number.parseInt(profile.lunarYear || profile.birthYear),
-              lunarMonth: Number.parseInt(profile.lunarMonth || profile.birthMonth),
-              lunarDay: Number.parseInt(profile.lunarDay || profile.birthDay),
-              timeUnknown: profile.timeUnknown,
-            },
-          }
-
-          console.log("SajuChat 페이지에서 생성한 기본 사주 데이터:", chatSajuData)
-          return chatSajuData
-        }
-      }
-
-      return null
-    } catch (error) {
-      console.error("Error getting default saju data:", error)
-      return null
-    }
-  }
-
   useEffect(() => {
     let isMounted = true
 
@@ -202,22 +75,7 @@ export default function SajuChatPage() {
           localStorage.removeItem("user_id")
         }
 
-        // 먼저 localStorage에서 사주 데이터 확인
-        let savedSaju = localStorage.getItem("current_saju")
-
-        // 로그인된 사용자이고 localStorage에 사주 데이터가 없으면 대표 사주 데이터 로드
-        if (!savedSaju && isAuthenticated && data.session?.user) {
-          console.log("No saju in localStorage, loading default saju data...")
-
-          const defaultSajuData = await getDefaultSajuData(data.session.user.id)
-
-          if (defaultSajuData) {
-            localStorage.setItem("current_saju", JSON.stringify(defaultSajuData))
-            localStorage.setItem("saju_session_id", defaultSajuData.sessionId)
-            savedSaju = JSON.stringify(defaultSajuData)
-            console.log("Loaded and saved default saju data:", defaultSajuData)
-          }
-        }
+        const savedSaju = localStorage.getItem("current_saju")
 
         if (!savedSaju) {
           if (isMounted) {
@@ -232,7 +90,37 @@ export default function SajuChatPage() {
         }
 
         const parsedSaju = JSON.parse(savedSaju)
-        console.log("Using saju data:", parsedSaju)
+
+        // 인증된 사용자인 경우, 현재 사용자의 데이터인지 확인
+        if (isAuthenticated && data.session?.user) {
+          const currentUserId = data.session.user.id
+          const sajuUserId = parsedSaju.userId || parsedSaju.authUserId
+
+          // 사주 데이터가 다른 사용자의 것이라면 삭제하고 홈으로 리다이렉트
+          if (sajuUserId && sajuUserId !== currentUserId) {
+            console.log("Saju data belongs to different user, clearing and redirecting")
+            localStorage.removeItem("current_saju")
+            localStorage.removeItem("tempSajuData")
+            localStorage.removeItem("saju_session_id")
+
+            if (isMounted) {
+              toast({
+                title: "사주 정보가 없습니다",
+                description: "새로운 사주를 입력해주세요.",
+                variant: "destructive",
+              })
+              router.push("/")
+            }
+            return
+          }
+
+          // 현재 사용자 ID를 사주 데이터에 추가
+          if (!sajuUserId) {
+            parsedSaju.userId = currentUserId
+            parsedSaju.authUserId = currentUserId
+            localStorage.setItem("current_saju", JSON.stringify(parsedSaju))
+          }
+        }
 
         if (isMounted) {
           setSaju(parsedSaju)
@@ -318,8 +206,7 @@ export default function SajuChatPage() {
 
               const timer = setTimeout(() => {
                 setSignupOpen(true)
-                setForceSignupOpen(true) // 강제로 열린 상태로 설정
-              }, 4000)
+              }, 1500)
 
               return () => clearTimeout(timer)
             } else if (!error && data && data.auth_user_id) {
@@ -474,17 +361,7 @@ export default function SajuChatPage() {
         onChatRoomPersisted={handleChatRoomPersisted}
       />
 
-      <SignupDialog
-        open={signupOpen}
-        onOpenChange={(open) => {
-          if (!forceSignupOpen) {
-            setSignupOpen(open)
-          }
-          // forceSignupOpen이 true면 닫을 수 없음
-        }}
-        onSelectProvider={handleOAuth}
-        forceOpen={forceSignupOpen}
-      />
+      <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
     </div>
   )
 }

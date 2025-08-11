@@ -146,7 +146,6 @@ export async function saveMessages(
 
         finalChatRoomId = persistedRoom.id
         persistedChatRoomId = persistedRoom.id
-        console.log("✅ Chat room persisted in saveMessages:", persistedRoom.id)
       } catch (error) {
         console.error("❌ Failed to persist temporary chat room:", error)
         // Continue without chat room ID if persistence fails
@@ -156,24 +155,12 @@ export async function saveMessages(
 
     // Don't save messages if we still have a temporary chat room ID
     if (finalChatRoomId?.startsWith("temp-")) {
-      console.log("⏸️ Skipping message save for temporary chat room:", finalChatRoomId)
       return {
         savedCount: 0,
         messageIds: [],
         persistedChatRoomId,
       }
     }
-
-    if (!finalChatRoomId) {
-      console.log("⏸️ No valid chat room ID, skipping message save")
-      return {
-        savedCount: 0,
-        messageIds: [],
-        persistedChatRoomId,
-      }
-    }
-
-    console.log("💾 Saving messages to chat room:", finalChatRoomId)
 
     const response = await fetch("/api/messages", {
       method: "POST",
@@ -189,20 +176,17 @@ export async function saveMessages(
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(`Failed to save messages: ${errorData.error}`)
+      throw new Error("Failed to save messages")
     }
 
     const data = await response.json()
-    console.log("✅ Messages saved successfully:", data)
-
     return {
       savedCount: data.savedCount || 0,
       messageIds: data.messageIds || [],
       persistedChatRoomId,
     }
   } catch (error) {
-    console.error("❌ Error saving messages:", error)
+    console.error("Error saving messages:", error)
     return { savedCount: 0, messageIds: [] }
   }
 }
@@ -249,20 +233,13 @@ export async function saveSingleMessage(
       chatRoomId,
     }
 
-    console.log("💾 Saving single message:", {
-      sessionId,
-      chatRoomId,
-      role: message.role,
-      messageOrder: finalMessageOrder,
-    })
-
     const result = await saveMessages(sessionId, [messageToSave], roomType, chatRoomId, temporaryChatRoom)
     return {
       messageId: result.messageIds[0] || null,
       persistedChatRoomId: result.persistedChatRoomId,
     }
   } catch (error) {
-    console.error("❌ Error saving single message:", error)
+    console.error("Error saving single message:", error)
     return { messageId: null }
   }
 }

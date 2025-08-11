@@ -1,6 +1,5 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
-import { calculateElementsFromSaju } from "@/lib/element-utils"
 
 /**
  * Get all saju profiles for the current authenticated user
@@ -31,7 +30,7 @@ export async function getUserSajuProfiles() {
       console.log(`Initial check found ${sessionCheck?.length || 0} sessions with auth_user_id ${authUserId}`)
     }
 
-    // Query saju_sessions with proper joins to get all related data including elements
+    // Query saju_sessions with proper joins to get all related data
     console.log("Executing full query with joins for auth_user_id:", authUserId)
     const { data: sessions, error: sessionsError } = await supabase
       .from("saju_sessions")
@@ -66,13 +65,6 @@ export async function getUserSajuProfiles() {
           day_branch,
           hour_stem,
           hour_branch
-        ),
-        elements (
-          wood,
-          fire,
-          earth,
-          metal,
-          water
         )
       `)
       .eq("auth_user_id", authUserId)
@@ -97,33 +89,7 @@ export async function getUserSajuProfiles() {
         // Get the first birth_info and saju_info records if they exist
         const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
         const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
-        const elementsInfo = session.elements && session.elements.length > 0 ? session.elements[0] : null
         const sajuJsonb = session.saju || {}
-
-        // 오행 데이터 우선순위: saju JSONB > elements 테이블 > 계산
-        let elementsData = sajuJsonb.elements
-        if (!elementsData && elementsInfo) {
-          elementsData = {
-            wood: elementsInfo.wood || 0,
-            fire: elementsInfo.fire || 0,
-            earth: elementsInfo.earth || 0,
-            metal: elementsInfo.metal || 0,
-            water: elementsInfo.water || 0,
-          }
-        }
-        if (!elementsData && sajuInfo) {
-          // 계산으로 오행 데이터 생성
-          elementsData = calculateElementsFromSaju(
-            sajuInfo.year_stem,
-            sajuInfo.year_branch,
-            sajuInfo.month_stem,
-            sajuInfo.month_branch,
-            sajuInfo.day_stem,
-            sajuInfo.day_branch,
-            sajuInfo.hour_stem,
-            sajuInfo.hour_branch,
-          )
-        }
 
         // 대운 데이터 확인 및 계산
         let daeunData = sajuJsonb.daeun
@@ -172,13 +138,9 @@ export async function getUserSajuProfiles() {
           }
         }
 
-        // 사주 JSONB에 오행과 대운 데이터가 없으면 업데이트
-        if (shouldUpdateDB || !sajuJsonb.elements) {
-          const updatedSajuJsonb = {
-            ...sajuJsonb,
-            daeun: daeunData,
-            elements: elementsData || sajuJsonb.elements,
-          }
+        // DB 업데이트를 비동기로 처리 (프로필 반환을 블록하지 않음)
+        if (shouldUpdateDB && daeunData) {
+          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
 
           // 비동기로 DB 업데이트 (await 하지 않음)
           supabase
@@ -187,9 +149,9 @@ export async function getUserSajuProfiles() {
             .eq("id", session.id)
             .then(({ error }) => {
               if (error) {
-                console.error(`Error updating saju data for session ${session.id}:`, error)
+                console.error(`Error updating daeun for session ${session.id}:`, error)
               } else {
-                console.log(`Successfully updated saju data for session ${session.id}`)
+                console.log(`Successfully updated daeun for session ${session.id}`)
               }
             })
         }
@@ -228,8 +190,6 @@ export async function getUserSajuProfiles() {
             monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
             dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
             hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-            // 오행 데이터 추가
-            elements: elementsData || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
             // 대운 데이터 추가
             daeun: daeunData,
           },
@@ -280,22 +240,11 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       return true
     }
 
-    // Check if this is the user's first saju session
-    const { data: existingSessions, error: countError } = await supabase
+    // Update the auth_user_id for the session
+    const { error: updateError } = await supabase
       .from("saju_sessions")
-      .select("id")
-      .eq("auth_user_id", authUserId)
-
-    const isFirstSession = !countError && (!existingSessions || existingSessions.length === 0)
-
-    // Update the auth_user_id for the session and set as default if it's the first session
-    const updateData: any = { auth_user_id: authUserId }
-    if (isFirstSession) {
-      updateData.is_default = true
-      console.log(`Setting session ${sessionId} as default (first session for user)`)
-    }
-
-    const { error: updateError } = await supabase.from("saju_sessions").update(updateData).eq("id", sessionId)
+      .update({ auth_user_id: authUserId })
+      .eq("id", sessionId)
 
     if (updateError) {
       console.error("Error linking session:", updateError)
@@ -305,7 +254,7 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
     // Verify the update was successful
     const { data: verifyData, error: verifyError } = await supabase
       .from("saju_sessions")
-      .select("id, auth_user_id, is_default")
+      .select("id, auth_user_id")
       .eq("id", sessionId)
       .single()
 
@@ -314,9 +263,7 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       return false
     }
 
-    console.log(
-      `Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}, is_default: ${verifyData.is_default}`,
-    )
+    console.log(`Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}`)
     return true
   } catch (error) {
     console.error("Error in linkSessionToUser:", error)
@@ -352,7 +299,7 @@ export async function findAndLinkSessions(): Promise<{ success: boolean; linkedC
       const success = await linkSessionIfUnlinked(localStorageSessionId, authUserId)
       if (success) linkedCount++
     }
-
+    
     // Strategy 1.1: Check for recent saju sessions that might belong to this user
     try {
       console.log(`Looking for recent unlinked sessions that might belong to user ${authUserId}`)
@@ -513,8 +460,7 @@ export async function getSajuDataByUuid(uuid: string) {
         `
         *,
         birth_info(*),
-        saju_info(*),
-        elements(*)
+        saju_info(*)
       `,
       )
       .eq("id", uuid)
@@ -530,8 +476,7 @@ export async function getSajuDataByUuid(uuid: string) {
           `
           *,
           saju_sessions(*),
-          saju_info!inner(*),
-          elements(*)
+          saju_info!inner(*)
         `,
         )
         .eq("id", uuid)
@@ -737,7 +682,7 @@ export async function getDefaultSajuSession(authUserId: string): Promise<any | n
 }
 
 /**
- * Get a saju profile by session ID with daeun calculation and elements
+ * Get a saju profile by session ID with daeun calculation
  */
 export async function getSajuProfileBySessionId(sessionId: string): Promise<any | null> {
   try {
@@ -782,13 +727,6 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
           hour_branch_hanja,
           day_master,
           day_master_hanja
-        ),
-        elements (
-          wood,
-          fire,
-          earth,
-          metal,
-          water
         )
       `)
       .eq("id", sessionId)
@@ -801,37 +739,9 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     const birthInfo = data?.birth_info?.[0] || {}
     const sajuInfo = data?.saju_info?.[0] || {}
-    const elementsInfo = data?.elements?.[0] || null
     const sajuJsonb = data?.saju || {}
 
     console.log("JSONB saju data from database:", sajuJsonb)
-    console.log("Elements data from database:", elementsInfo)
-
-    // 오행 데이터 우선순위: saju JSONB > elements 테이블 > 계산
-    let elementsData = sajuJsonb.elements
-    if (!elementsData && elementsInfo) {
-      elementsData = {
-        wood: elementsInfo.wood || 0,
-        fire: elementsInfo.fire || 0,
-        earth: elementsInfo.earth || 0,
-        metal: elementsInfo.metal || 0,
-        water: elementsInfo.water || 0,
-      }
-    }
-    if (!elementsData && sajuInfo) {
-      // 계산으로 오행 데이터 생성
-      elementsData = calculateElementsFromSaju(
-        sajuInfo.year_stem,
-        sajuInfo.year_branch,
-        sajuInfo.month_stem,
-        sajuInfo.month_branch,
-        sajuInfo.day_stem,
-        sajuInfo.day_branch,
-        sajuInfo.hour_stem,
-        sajuInfo.hour_branch,
-      )
-      console.log("Calculated elements data:", elementsData)
-    }
 
     // 대운 데이터 확인 및 계산
     let daeunData = sajuJsonb.daeun
@@ -844,7 +754,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         daeunData.pillars.length > 0 &&
         daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
     ) {
-      console.log(`Session ${sessionId}: 대운 데이터가 없거나 잘못됨, 새로 계산합니다.`)
+      console.log(`Session ${sessionId}: 대운 데이터가 없거나 ���못됨, 새로 계산합니다.`)
 
       // 대운 계산에 필요한 데이터가 있는지 확인
       if (
@@ -873,12 +783,8 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
           console.log(`Session ${sessionId}: 새로 계산된 대운:`, daeunData)
 
-          // 계산된 대운과 오행 데이터를 DB에 비동기 업데이트 (반환을 블록하지 않음)
-          const updatedSajuJsonb = {
-            ...sajuJsonb,
-            daeun: daeunData,
-            elements: elementsData || sajuJsonb.elements,
-          }
+          // 계산된 대운을 DB에 비동기 업데이트 (반환을 블록하지 않음)
+          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
 
           supabase
             .from("saju_sessions")
@@ -886,9 +792,9 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
             .eq("id", sessionId)
             .then(({ error }) => {
               if (error) {
-                console.error(`Error updating saju data for session ${sessionId}:`, error)
+                console.error(`Error updating daeun for session ${sessionId}:`, error)
               } else {
-                console.log(`Successfully updated saju data for session ${sessionId}`)
+                console.log(`Successfully updated daeun for session ${sessionId}`)
               }
             })
         } catch (error) {
@@ -939,8 +845,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
         dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
         hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-        // 오행 데이터 추가
-        elements: elementsData || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+        elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
         // 대운 데이터 추가
         daeun: daeunData,
       },

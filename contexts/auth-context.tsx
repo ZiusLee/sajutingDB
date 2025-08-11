@@ -4,8 +4,7 @@ import { createContext, useContext, useState, useEffect, useRef, useMemo, type R
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import { getSupabase } from "@/lib/supabase-client"
-import { findAndLinkSessions, getSajuProfileBySessionId } from "@/lib/saju-session-service"
-import { calculateElementsFromSaju } from "@/lib/element-utils"
+import { findAndLinkSessions } from "@/lib/saju-session-service"
 
 interface AuthContextType {
   user: User | null
@@ -32,147 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 리다이렉션을 한 번만 실행하도록 추적
   const redirectedRef = useRef(false)
-
-  // 사주 세션이 있는지 확인하는 함수
-  const checkSajuSession = async (userId: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase.from("saju_sessions").select("id").eq("auth_user_id", userId).limit(1)
-
-      if (error) {
-        console.error("Error checking saju session:", error)
-        return false
-      }
-
-      return data && data.length > 0
-    } catch (error) {
-      console.error("Error checking saju session:", error)
-      return false
-    }
-  }
-
-  // 대표 사주 데이터를 가져오는 함수 (mypage와 동일한 로직)
-  const getDefaultSajuData = async (userId: string) => {
-    try {
-      // 먼저 is_default가 true인 세션 찾기
-      const { data: defaultSession, error: defaultError } = await supabase
-        .from("saju_sessions")
-        .select("id")
-        .eq("auth_user_id", userId)
-        .eq("is_default", true)
-        .single()
-
-      let sessionId = null
-
-      if (!defaultError && defaultSession) {
-        sessionId = defaultSession.id
-        console.log("Found default session:", sessionId)
-      } else {
-        // 대표 사주가 없으면 가장 최근 세션을 대표로 설정
-        const { data: recentSession, error: recentError } = await supabase
-          .from("saju_sessions")
-          .select("id")
-          .eq("auth_user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (!recentError && recentSession) {
-          sessionId = recentSession.id
-          console.log("Using most recent session as default:", sessionId)
-
-          // 대표 사주로 설정
-          await supabase
-            .from("saju_sessions")
-            .update({ is_default: true })
-            .eq("id", sessionId)
-            .eq("auth_user_id", userId)
-
-          console.log("Set session as default:", sessionId)
-        }
-      }
-
-      if (sessionId) {
-        // getSajuProfileBySessionId를 사용해서 완전한 프로필 데이터 가져오기
-        const profile = await getSajuProfileBySessionId(sessionId)
-
-        if (profile) {
-          console.log("Loaded default saju profile:", profile)
-
-          // 오행 데이터 확인 및 계산
-          let elementsData = profile.saju.elements
-          if (!elementsData) {
-            console.log("오행 데이터가 없어서 계산 중...")
-            elementsData = calculateElementsFromSaju(
-              profile.saju.yearStem,
-              profile.saju.yearBranch,
-              profile.saju.monthStem,
-              profile.saju.monthBranch,
-              profile.saju.dayStem,
-              profile.saju.dayBranch,
-              profile.saju.hourStem,
-              profile.saju.hourBranch,
-            )
-
-            // 계산된 오행 데이터를 DB에 저장
-            const { data: currentSaju } = await supabase
-              .from("saju_sessions")
-              .select("saju")
-              .eq("id", sessionId)
-              .single()
-
-            if (currentSaju) {
-              const updatedSaju = { ...currentSaju.saju, elements: elementsData }
-              await supabase.from("saju_sessions").update({ saju: updatedSaju }).eq("id", sessionId)
-
-              console.log("오행 데이터 계산 및 저장 완료:", elementsData)
-            }
-          }
-
-          // mypage에서 사용하는 것과 동일한 형태로 변환
-          const chatSajuData = {
-            sessionId: profile.id,
-            saju: {
-              ...profile.saju,
-              elements: elementsData || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
-              dayMaster: profile.saju.dayStem,
-              dayMasterHanja: profile.saju.dayStemHanja || "",
-            },
-            name: profile.name,
-            gender: profile.gender,
-            year: profile.birthYear,
-            month: profile.birthMonth,
-            day: profile.birthDay,
-            hour: profile.birthHour,
-            minute: profile.birthMinute,
-            lunarYear: profile.lunarYear || profile.birthYear,
-            lunarMonth: profile.lunarMonth || profile.birthMonth,
-            lunarDay: profile.lunarDay || profile.birthDay,
-            timeUnknown: profile.timeUnknown,
-            interpretation: "",
-            birthInfo: {
-              solarYear: Number.parseInt(profile.birthYear),
-              solarMonth: Number.parseInt(profile.birthMonth),
-              solarDay: Number.parseInt(profile.birthDay),
-              solarHour: Number.parseInt(profile.birthHour) || 0,
-              solarMinute: Number.parseInt(profile.birthMinute) || 0,
-              lunarYear: Number.parseInt(profile.lunarYear || profile.birthYear),
-              lunarMonth: Number.parseInt(profile.lunarMonth || profile.birthMonth),
-              lunarDay: Number.parseInt(profile.lunarDay || profile.birthDay),
-              timeUnknown: profile.timeUnknown,
-            },
-          }
-
-          console.log("AuthContext에서 생성한 기본 사주 데이터:", chatSajuData)
-          return chatSajuData
-        }
-      }
-
-      return null
-    } catch (error) {
-      console.error("Error getting default saju data:", error)
-      return null
-    }
-  }
 
   // Function to refresh user data
   const refreshUser = async () => {
@@ -237,21 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // 안전한 리다이렉션 함수
-  const safeRedirect = async (userId: string) => {
+  const safeRedirect = (path: string) => {
     if (redirectedRef.current) return
 
     const currentPath = window.location.pathname
+    if (currentPath === path) return
 
-    // 이미 올바른 페이지에 있으면 리다이렉션하지 않음
-    if (
-      currentPath === "/saju-chat/sajuping" ||
-      currentPath.startsWith("/saju-chat") ||
-      currentPath === "/result" ||
-      currentPath === "/mypage"
-    )
-      return
-
-    const excludedPaths = ["/saju-chat", "/result", "/chat-list", "/auth", "/mypage"]
+    const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list"]
     const shouldRedirect = !excludedPaths.some((p) => currentPath.startsWith(p))
     const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
 
@@ -261,33 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         redirectedRef.current = false
       }, 1000) // 1초 후 리다이렉션 가능하도록 리셋
 
-      // 사주 세션이 있는지 확인
-      const hasSajuSession = await checkSajuSession(userId)
-
-      if (hasSajuSession) {
-        // 사주 세션이 있으면 대표 사주 데이터로 채팅으로
-        console.log("User has saju session, loading default saju data...")
-
-        const defaultSajuData = await getDefaultSajuData(userId)
-
-        if (defaultSajuData) {
-          localStorage.setItem("current_saju", JSON.stringify(defaultSajuData))
-          localStorage.setItem("saju_session_id", defaultSajuData.sessionId)
-
-          console.log("Default saju data saved to localStorage:", defaultSajuData)
-
-          // 즉시 리다이렉션
-          router.push("/saju-chat/sajuping")
-        } else {
-          console.error("Failed to load default saju data")
-          // 데이터 로딩 실패 시 온보딩으로
-          router.push("/?showOnboarding=true")
-        }
-      } else {
-        // 사주 세션이 없으면 온보딩으로 (홈페이지에서 온보딩 플로우 시작)
-        console.log("User has no saju session, redirecting to onboarding")
-        router.push("/?showOnboarding=true")
-      }
+      router.push(path)
     }
   }
 
@@ -350,8 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (error) {
               console.error("Error linking sessions:", error)
             }
-            // 세션 연결 시도 후 리다이렉션 (사주 세션 확인 후 적절한 페이지로)
-            await safeRedirect(session.user.id)
+            // 세션 연결 시도 후 리다이렉션을 /saju-chat/sajuping으로 변경
+            safeRedirect("/saju-chat/sajuping")
           }, 100)
 
           return session.user
@@ -393,13 +217,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error
       }
 
-      // Clear localStorage
+      // Clear all user-related localStorage data including saju data
       localStorage.removeItem("user_authenticated")
       localStorage.removeItem("user_id")
       localStorage.removeItem("user_name")
       localStorage.removeItem("user_email")
+
+      // Clear saju-related data
       localStorage.removeItem("current_saju")
+      localStorage.removeItem("tempSajuData")
       localStorage.removeItem("saju_session_id")
+      localStorage.removeItem("last_chat_saju_data")
+      localStorage.removeItem("chat_return_path")
+      localStorage.removeItem("saved_partners")
+      localStorage.removeItem("saju_profiles")
+
+      // Clear any user-specific profile data
+      const keys = Object.keys(localStorage)
+      keys.forEach((key) => {
+        if (key.startsWith("user_profiles_")) {
+          localStorage.removeItem(key)
+        }
+      })
 
       setUser(null)
       router.push("/")

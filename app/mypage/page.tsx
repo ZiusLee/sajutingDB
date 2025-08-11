@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -15,6 +16,7 @@ import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession
 import BirthDateFormClient from "@/components/birth-date-form-client"
 import type { Saju } from "@/lib/saju" // Import Saju type
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
+import { SajuLogo } from "@/components/saju-logo"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -299,34 +301,12 @@ export default function MyPage() {
           }
         }
 
-        // 오행 정보 계산 (elements 테이블에서 가져오거나 계산)
-        let elementsData = dbSaju.elements
-        if (!elementsData) {
-          console.log("오행 데이터가 없어서 계산 중...")
-          elementsData = calculateElementsFromSaju(
-            dbSaju.yearStem || profileToUse.saju.yearStem,
-            dbSaju.yearBranch || profileToUse.saju.yearBranch,
-            dbSaju.monthStem || profileToUse.saju.monthStem,
-            dbSaju.monthBranch || profileToUse.saju.monthBranch,
-            dbSaju.dayStem || profileToUse.saju.dayStem,
-            dbSaju.dayBranch || profileToUse.saju.dayBranch,
-            dbSaju.hourStem || profileToUse.saju.hourStem,
-            dbSaju.hourBranch || profileToUse.saju.hourBranch,
-          )
-
-          // 계산된 오행 데이터를 DB에 저장
-          const updatedSaju = { ...dbSaju, elements: elementsData }
-          await supabase.from("saju_sessions").update({ saju: updatedSaju }).eq("id", profileToUse.id)
-
-          console.log("오행 데이터 계산 및 저장 완료:", elementsData)
-        }
-
         const finalSajuData = {
           sessionId: profileToUse.id, // 세션 ID 추가
           saju: {
             ...dbSaju,
             daeun: dbDaeun,
-            elements: elementsData,
+            elements: dbSaju.elements || profileToUse.saju.elements || elements,
             dayMaster: dbSaju.dayMaster || profileToUse.saju.dayStem,
             dayMasterHanja: dbSaju.dayMasterHanja || "",
           },
@@ -354,8 +334,6 @@ export default function MyPage() {
             timeUnknown: profileToUse.timeUnknown,
           },
         }
-
-        console.log("MyPage에서 전달하는 최종 사주 데이터:", finalSajuData)
 
         localStorage.setItem("current_saju", JSON.stringify(finalSajuData))
         sessionStorage.setItem("from_mypage", "true")
@@ -416,6 +394,7 @@ export default function MyPage() {
 
   return (
     <div className="container mx-auto pb-20">
+
       {defaultProfile && (
         <div className="px-4 pt-4 pb-6">
           <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">

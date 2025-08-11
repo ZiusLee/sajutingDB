@@ -40,6 +40,13 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
 
     console.log("Auth user ID:", userId)
 
+    // 현재 사용자 ID를 사주 데이터에 추가
+    if (userId) {
+      sajuData.userId = userId
+      sajuData.authUserId = userId
+      localStorage.setItem("tempSajuData", JSON.stringify(sajuData))
+    }
+
     // Prepare time data for database storage
     const timeData = {
       solar_hour: sajuData.timeUnknown ? null : sajuData.hour,
@@ -174,6 +181,20 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
         console.error("Error inserting interpretation:", interpretationError)
       } else {
         console.log("Interpretation inserted successfully")
+      }
+    }
+
+    // 동기화 완료 후 current_saju에도 사용자 정보 업데이트
+    const currentSaju = localStorage.getItem("current_saju")
+    if (currentSaju && userId) {
+      try {
+        const parsedCurrentSaju = JSON.parse(currentSaju)
+        parsedCurrentSaju.userId = userId
+        parsedCurrentSaju.authUserId = userId
+        parsedCurrentSaju.sessionId = sessionId
+        localStorage.setItem("current_saju", JSON.stringify(parsedCurrentSaju))
+      } catch (error) {
+        console.error("Error updating current_saju with user info:", error)
       }
     }
 
