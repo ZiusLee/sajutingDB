@@ -10,18 +10,43 @@ export interface SignupDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelectProvider: (provider: Provider) => void
+  isOverLimit?: boolean
+  currentCount?: number
+  maxCount?: number
 }
 
-export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDialogProps) {
+export function SignupDialog({
+  open,
+  onOpenChange,
+  onSelectProvider,
+  isOverLimit = false,
+  currentCount = 0,
+  maxCount = 5,
+}: SignupDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg rounded-2xl shadow-xl p-0 overflow-hidden">
         <div className="p-6 sm:p-8">
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-2xl sm:text-3xl font-bold leading-snug tracking-tight">
-              지금 계정을 연동하고 <span className="whitespace-nowrap">3초만에 사주 분석을 받아보세요.</span>
-            </DialogTitle>
-            <DialogDescription className="sr-only">카카오 또는 구글로 간편하게 로그인하세요.</DialogDescription>
+            {isOverLimit ? (
+              <>
+                <DialogTitle className="text-2xl sm:text-3xl font-bold leading-snug tracking-tight">
+                  게스트 이용 가능 횟수({maxCount}회)를 모두 사용하셨습니다
+                </DialogTitle>
+                <DialogDescription className="text-base text-muted-foreground">
+                  계속 이용하시려면 간편 로그인을 진행해주세요.
+                  <br />
+                  로그인하면 대화와 사주 기록이 안전하게 저장됩니다.
+                </DialogDescription>
+              </>
+            ) : (
+              <>
+                <DialogTitle className="text-2xl sm:text-3xl font-bold leading-snug tracking-tight">
+                  지금 계정을 연동하고 <span className="whitespace-nowrap">3초만에 사주 분석을 받아보세요.</span>
+                </DialogTitle>
+                <DialogDescription className="sr-only">카카오 또는 구글로 간편하게 로그인하세요.</DialogDescription>
+              </>
+            )}
           </DialogHeader>
 
           <div className="mt-6 sm:mt-8">
@@ -84,6 +109,14 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
                 </svg>
               </ProviderCircle>
             </div>
+
+            {!isOverLimit && (
+              <div className="mt-6 text-center">
+                <p className="text-xs text-muted-foreground">
+                  무료 체험 중이신가요? 남은 횟수: {Math.max(0, maxCount - currentCount)}/{maxCount}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>

@@ -4,13 +4,12 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import SajuChat from "@/components/saju-chat"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, LogIn } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { useGuestUsage } from "@/hooks/use-guest-usage"
 import { SignupDialog } from "@/components/signup-dialog"
 import { TermsDialog } from "@/components/terms-dialog"
-import { Button } from "@/components/ui/button"
 import { getSupabase } from "@/lib/supabase-client"
 
 type Provider = "kakao" | "google" | "apple"
@@ -315,8 +314,6 @@ export default function SajuChatPage() {
     )
   }
 
-  const showBlocker = !isLoggedIn && isOverLimit
-
   return (
     <div className="container mx-auto px-4 py-6 relative">
       {/* Chat */}
@@ -338,45 +335,15 @@ export default function SajuChatPage() {
         onChatRoomPersisted={handleChatRoomPersisted}
       />
 
-      {/* Usage blocker overlay */}
-      {showBlocker && (
-        <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
-          <div className="bg-background rounded-2xl shadow-xl p-6 sm:p-8 max-w-lg w-[92%]">
-            <h3 className="text-xl sm:text-2xl font-bold">게스트 이용 가능 횟수({limit}회)를 모두 사용하셨습니다</h3>
-            <p className="text-muted-foreground mt-2">계속 이용하시려면 간편 로그인을 진행해주세요.</p>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button
-                className="bg-[#FEE500] text-black hover:bg-[#E6CF00]"
-                disabled={isLoading}
-                onClick={() => {
-                  setSelectedProvider("kakao")
-                  setTermsOpen(true)
-                }}
-              >
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-                카카오로 로그인
-              </Button>
-              <Button
-                variant="outline"
-                disabled={isLoading}
-                onClick={() => {
-                  setSelectedProvider("google")
-                  setTermsOpen(true)
-                }}
-              >
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-                구글로 로그인
-              </Button>
-            </div>
-
-            <p className="text-xs text-muted-foreground mt-4">로그인하면 대화와 사주 기록이 안전하게 저장됩니다.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Signup prompt (auto-opens when hitting limit, can also be opened proactively if desired) */}
-      <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={onSelectProvider} />
+      {/* Signup Dialog - 게스트 한도 초과 시 자동으로 열림 */}
+      <SignupDialog
+        open={signupOpen}
+        onOpenChange={setSignupOpen}
+        onSelectProvider={onSelectProvider}
+        isOverLimit={!isLoggedIn && isOverLimit}
+        currentCount={count}
+        maxCount={limit}
+      />
 
       {/* Terms before OAuth */}
       <TermsDialog
