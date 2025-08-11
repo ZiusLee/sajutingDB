@@ -62,6 +62,13 @@ export async function persistTemporaryChatRoom(tempChatRoom: ChatRoom & { sessio
     throw new Error("Session ID is required to persist chat room")
   }
 
+  console.log("🔄 Persisting temporary chat room:", {
+    tempId: tempChatRoom.id,
+    sessionId,
+    title: tempChatRoom.title,
+    roomType: tempChatRoom.roomType,
+  })
+
   const response = await fetch("/api/chat-rooms", {
     method: "POST",
     headers: {
@@ -76,10 +83,12 @@ export async function persistTemporaryChatRoom(tempChatRoom: ChatRoom & { sessio
 
   if (!response.ok) {
     const error = await response.json()
+    console.error("❌ Failed to persist chat room:", error)
     throw new Error(error.error || "Failed to persist chat room")
   }
 
   const result = await response.json()
+  console.log("✅ Chat room persisted successfully:", result.chatRoom)
   return result.chatRoom
 }
 

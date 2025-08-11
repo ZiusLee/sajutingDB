@@ -1,5 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
+import type React from "react"
+
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
@@ -15,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
-import { getSessionMessages } from "@/lib/message-service"
+import { getSessionMessages, saveSingleMessage } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
@@ -23,6 +25,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SignupDialog } from "@/components/signup-dialog"
 import { TermsDialog } from "@/components/terms-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { persistTemporaryChatRoom, generateChatRoomTitle } from "@/lib/chat-room-service"
 
 interface SajuChatProps {
   saju: any
@@ -290,15 +293,135 @@ export default function SajuChat({
     initialMessages: transitionMessages ?? chatData.initialMessages,
     body: aiChatBody,
     experimental_throttle: 50,
-    onFinish: (message) => {
+    onFinish: async (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
+
+      // 메시지 저장 로직
+      try {
+        let finalChatRoomId = effectiveChatRoomId
+        let newPersistedChatRoomId: string | undefined
+
+        // 임시 채팅룸이고 assistant 메시지인 경우 채팅룸을 영구 저장
+        if (temporaryChatRoom?.isTemporary && message.role === "assistant" && !persistedChatRoomId) {
+          console.log("🔄 Persisting temporary chat room...")
+
+          // 첫 번째 사용자 메시지로 제목 생성
+          const firstUserMessage = messages.find((msg) => msg.role === "user")
+          const title = firstUserMessage ? generateChatRoomTitle(firstUserMessage.content) : "새로운 대화"
+
+          try {
+            const persistedRoom = await persistTemporaryChatRoom({
+              ...temporaryChatRoom,
+              sessionId: sessionId,
+              title,
+            })
+
+            finalChatRoomId = persistedRoom.id
+            newPersistedChatRoomId = persistedRoom.id
+            setPersistedChatRoomId(persistedRoom.id)
+
+            if (onChatRoomPersisted) {
+              onChatRoomPersisted(persistedRoom.id)
+            }
+
+            console.log("✅ Chat room persisted:", persistedRoom.id)
+          } catch (error) {
+            console.error("❌ Failed to persist chat room:", error)
+          }
+        }
+
+        // 메시지 저장
+        if (finalChatRoomId && !finalChatRoomId.startsWith("temp-")) {
+          const result = await saveSingleMessage(
+            sessionId,
+            {
+              sessionId,
+              chatRoomId: finalChatRoomId,
+              role: message.role,
+              content: message.content,
+            },
+            roomType,
+            undefined, // messageOrder는 자동 계산
+            finalChatRoomId,
+          )
+
+          console.log("✅ Message saved:", result.messageId)
+        }
+      } catch (error) {
+        console.error("❌ Error saving message:", error)
+      }
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
     },
   })
+
+  // 사용자 메시지 전송 시 저장 로직
+  const originalHandleSubmit = handleSubmit
+  const customHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+
+    if (!input.trim() || isLoading) return
+
+    const userMessage = input.trim()
+
+    try {
+      let finalChatRoomId = effectiveChatRoomId
+      let newPersistedChatRoomId: string | undefined
+
+      // 임시 채팅룸이고 첫 번째 사용자 메시지인 경우 채팅룸을 영구 저장
+      if (temporaryChatRoom?.isTemporary && !persistedChatRoomId) {
+        console.log("🔄 Persisting temporary chat room for user message...")
+
+        const title = generateChatRoomTitle(userMessage)
+
+        try {
+          const persistedRoom = await persistTemporaryChatRoom({
+            ...temporaryChatRoom,
+            sessionId: sessionId,
+            title,
+          })
+
+          finalChatRoomId = persistedRoom.id
+          newPersistedChatRoomId = persistedRoom.id
+          setPersistedChatRoomId(persistedRoom.id)
+
+          if (onChatRoomPersisted) {
+            onChatRoomPersisted(persistedRoom.id)
+          }
+
+          console.log("✅ Chat room persisted for user message:", persistedRoom.id)
+        } catch (error) {
+          console.error("❌ Failed to persist chat room for user message:", error)
+        }
+      }
+
+      // 사용자 메시지 저장
+      if (finalChatRoomId && !finalChatRoomId.startsWith("temp-")) {
+        const result = await saveSingleMessage(
+          sessionId,
+          {
+            sessionId,
+            chatRoomId: finalChatRoomId,
+            role: "user",
+            content: userMessage,
+          },
+          roomType,
+          undefined, // messageOrder는 자동 계산
+          finalChatRoomId,
+        )
+
+        console.log("✅ User message saved:", result.messageId)
+      }
+    } catch (error) {
+      console.error("❌ Error saving user message:", error)
+    }
+
+    // 원래 handleSubmit 실행
+    originalHandleSubmit(e)
+  }
 
   useEffect(() => {
     if (
@@ -757,7 +880,7 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+            <form onSubmit={customHandleSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
