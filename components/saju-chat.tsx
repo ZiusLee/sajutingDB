@@ -425,24 +425,23 @@ export default function SajuChat({
   }
 
   const scrollToTop = () => {
-    if (chatContainerRef.current)
-      chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
+    if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const scrollToLastUserMessage = () => {
     if (!chatContainerRef.current) return
-    
+
     // Find the last user message element
     const container = chatContainerRef.current
     const messageElements = container.querySelectorAll('[data-role="user"]')
     const lastUserMessageElement = messageElements[messageElements.length - 1]
-    
+
     if (lastUserMessageElement) {
       // Scroll so the user message appears at the top of the viewport
       const containerRect = container.getBoundingClientRect()
       const messageRect = lastUserMessageElement.getBoundingClientRect()
       const scrollTop = container.scrollTop + messageRect.top - containerRect.top
-      
+
       container.scrollTo({ top: scrollTop, behavior: "smooth" })
     }
   }
@@ -451,7 +450,7 @@ export default function SajuChat({
     try {
       // Save current location for redirect after auth
       localStorage.setItem("auth_return_url", window.location.href)
-      
+
       // Redirect to auth provider
       if (provider === "kakao") {
         window.location.href = `/api/auth/login?provider=kakao`
@@ -470,19 +469,15 @@ export default function SajuChat({
 
     try {
       // Get the current session from localStorage
-      const sessionId = localStorage.getItem("current_session_id") || 
-                       localStorage.getItem("user_id") ||
-                       user.id
+      const sessionId = localStorage.getItem("current_session_id") || localStorage.getItem("user_id") || user.id
 
       // Update saju_sessions table
-      const { error } = await supabase
-        .from("saju_sessions")
-        .upsert({
-          id: sessionId,
-          auth_user_id: user.id,
-          privacy: true,
-          updated_at: new Date().toISOString()
-        })
+      const { error } = await supabase.from("saju_sessions").upsert({
+        id: sessionId,
+        auth_user_id: user.id,
+        privacy: true,
+        updated_at: new Date().toISOString(),
+      })
 
       if (error) {
         console.error("Error updating saju_sessions:", error)
@@ -492,7 +487,6 @@ export default function SajuChat({
 
       setShowTermsDialog(false)
       toast.success("회원가입이 완료되었습니다!")
-      
     } catch (error) {
       console.error("Terms agreement error:", error)
       toast.error("약관 동의 처리 중 오류가 발생했습니다.")
@@ -537,7 +531,7 @@ export default function SajuChat({
   useEffect(() => {
     // Check if logged in user needs to agree to terms
     const checkTermsAgreement = async () => {
-      if (!user) return
+      if (!user) return // Don't show terms dialog for non-logged in users
 
       try {
         const { data: sessionData } = await supabase
@@ -565,10 +559,10 @@ export default function SajuChat({
     if (!user && messages.length > 0) {
       const userMessages = messages.filter((msg: any) => msg.role === "user")
       const currentUserMessageCount = userMessages.length
-      
+
       // localStorage에서 이전 메시지 개수 가져오기
-      const previousCount = parseInt(localStorage.getItem("previous_user_message_count") || "0", 10)
-      
+      const previousCount = Number.parseInt(localStorage.getItem("previous_user_message_count") || "0", 10)
+
       // 새로운 사용자 메시지가 있으면 카운트 증가 (자동 초기 메시지 포함)
       if (currentUserMessageCount > previousCount) {
         const newMessagesCount = currentUserMessageCount - previousCount
@@ -873,16 +867,19 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={(e) => {
-              // Check if user is over limit before submitting
-              const userMessageCount = messages.filter((msg: any) => msg.role === "user").length
-              if (!user && userMessageCount >= limit) {
-                e.preventDefault()
-                setShowSignupDialog(true)
-                return
-              }
-              handleSubmit(e)
-            }} className="flex gap-2 items-center">
+            <form
+              onSubmit={(e) => {
+                // Check if user is over limit before submitting - only for non-logged in users
+                const userMessageCount = messages.filter((msg: any) => msg.role === "user").length
+                if (!user && userMessageCount >= limit) {
+                  e.preventDefault()
+                  setShowSignupDialog(true)
+                  return
+                }
+                handleSubmit(e)
+              }}
+              className="flex gap-2 items-center"
+            >
               <div className="flex-1 relative">
                 <Input
                   value={input}
@@ -917,7 +914,12 @@ export default function SajuChat({
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode || (!user && messages.filter((msg: any) => msg.role === "user").length >= limit)}
+                disabled={
+                  !input.trim() ||
+                  isLoading ||
+                  isInitialQuestionsMode ||
+                  (!user && messages.filter((msg: any) => msg.role === "user").length >= limit)
+                }
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
@@ -927,8 +929,11 @@ export default function SajuChat({
               <div className="flex justify-center mt-2">
                 <div
                   className={`text-xs text-center ${
-                    messages.filter((msg: any) => msg.role === "user").length >= limit ? "text-red-600" : 
-                    messages.filter((msg: any) => msg.role === "user").length >= limit - 1 ? "text-orange-600" : "text-gray-500"
+                    messages.filter((msg: any) => msg.role === "user").length >= limit
+                      ? "text-red-600"
+                      : messages.filter((msg: any) => msg.role === "user").length >= limit - 1
+                        ? "text-orange-600"
+                        : "text-gray-500"
                   }`}
                 >
                   {/* Show remaining messages based on actual user message count */}
@@ -939,14 +944,14 @@ export default function SajuChat({
           </div>
         </div>
       </div>
-      
+
       {/* Signup Dialog */}
       <SignupDialog
         open={showSignupDialog}
         onOpenChange={setShowSignupDialog}
         onSelectProvider={handleSignupProvider}
       />
-      
+
       {/* Terms Dialog */}
       <TermsDialog
         open={showTermsDialog}
