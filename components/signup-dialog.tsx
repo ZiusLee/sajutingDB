@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getSupabase } from "@/lib/supabase-client"
+import { toast } from "@/hooks/use-toast"
 
 type Provider = "kakao" | "google" | "apple"
 
@@ -33,6 +35,7 @@ export function SignupDialog({
   const [serviceTermsChecked, setServiceTermsChecked] = useState(false)
   const [privacyChecked, setPrivacyChecked] = useState(false)
   const [showPrivacyDetails, setShowPrivacyDetails] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const canProceed = serviceTermsChecked && privacyChecked
 
@@ -42,10 +45,43 @@ export function SignupDialog({
     setShowTerms(true)
   }
 
-  const handleAgree = () => {
-    if (canProceed && selectedProvider) {
-      onSelectProvider(selectedProvider)
-      handleClose()
+  const handleAgree = async () => {
+    if (!canProceed || !selectedProvider) return
+
+    setIsLoading(true)
+    try {
+      const supabase = getSupabase()
+
+      // Perform OAuth login
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: selectedProvider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: selectedProvider === "google" ? "openid email profile" : undefined,
+        },
+      })
+
+      if (error) {
+        console.error("OAuth error:", error)
+        toast({
+          title: "로그인 실패",
+          description: "로그인 중 오류가 발생했습니다. 다시 시도해주세요.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // OAuth redirect will happen, so we don't need to call onSelectProvider here
+      // The callback will be handled in the auth callback page
+    } catch (error) {
+      console.error("Login error:", error)
+      toast({
+        title: "로그인 실패",
+        description: "로그인 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -57,6 +93,7 @@ export function SignupDialog({
     setServiceTermsChecked(false)
     setPrivacyChecked(false)
     setShowPrivacyDetails(false)
+    setIsLoading(false)
   }
 
   const providerLabel = selectedProvider === "kakao" ? "카카오" : selectedProvider === "google" ? "구글" : "Apple"
@@ -202,11 +239,11 @@ export function SignupDialog({
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent">
+            <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent" disabled={isLoading}>
               취소
             </Button>
-            <Button onClick={handleAgree} disabled={!canProceed} className="flex-1">
-              동의하고 {providerLabel} 로그인
+            <Button onClick={handleAgree} disabled={!canProceed || isLoading} className="flex-1">
+              {isLoading ? "로그인 중..." : `동의하고 ${providerLabel} 로그인`}
             </Button>
           </div>
         </DialogContent>

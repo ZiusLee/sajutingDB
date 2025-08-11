@@ -1,84 +1,113 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useSearchParams } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { getSupabase } from "@/lib/supabase-client"
+import { updateAuthUserId } from "@/lib/db-service"
+import { toast } from "@/hooks/use-toast"
 
 export default function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClientComponentClient()
+  const [isProcessing, setIsProcessing] = useState(true)
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log("🔄 Processing auth callback...")
-        console.log("Search params:", Object.fromEntries(searchParams.entries()))
+        const supabase = getSupabase()
 
-        const code = searchParams.get("code")
-        const error = searchParams.get("error")
-        const errorDescription = searchParams.get("error_description")
+        // Handle the auth callback
+        const { data, error } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("❌ OAuth error from provider:", error, errorDescription)
-          router.push(`/login?error=${encodeURIComponent(error)}`)
+          console.error("Auth callback error:", error)
+          toast({
+            title: "로그인 실패",
+            description: "로그인 처리 중 오류가 발생했습니다.",
+            variant: "destructive",
+          })
+          router.push("/")
           return
         }
 
-        if (code) {
-          console.log("✅ Auth code received, exchanging for session...")
+        if (data.session?.user) {
+          const authUserId = data.session.user.id
+          console.log("Auth callback successful, user ID:", authUserId)
 
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          // Check if there's a pending saju session to link
+          const sessionId = localStorage.getItem("user_id")
 
-          if (exchangeError) {
-            console.error("❌ Session exchange error:", exchangeError)
-            router.push(`/login?error=callback_error`)
-            return
+          if (sessionId) {
+            console.log("Found pending session to link:", sessionId)
+
+            // Link the session to the authenticated user
+            const success = await updateAuthUserId(sessionId, authUserId)
+
+            if (success) {
+              console.log("Successfully linked saju session to authenticated user")
+              toast({
+                title: "로그인 완료",
+                description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
+              })
+
+              // Check if there's pending saju data to navigate to chat
+              const currentSaju = localStorage.getItem("current_saju")
+              if (currentSaju) {
+                console.log("Found pending saju data, navigating to chat")
+                router.push("/saju-chat/sajuping")
+                return
+              }
+            } else {
+              console.error("Failed to link saju session")
+              toast({
+                title: "데이터 연결 실패",
+                description: "사주 정보 연결에 실패했습니다.",
+                variant: "destructive",
+              })
+            }
           }
 
-          if (data.user) {
-            console.log("✅ User authenticated:", data.user.id)
-
-            // Store user info in localStorage
-            localStorage.setItem("user_authenticated", "true")
-            localStorage.setItem("user_id", data.user.id)
-            if (data.user.email) {
-              localStorage.setItem("user_email", data.user.email)
-            }
-            if (data.user.user_metadata?.name) {
-              localStorage.setItem("user_name", data.user.user_metadata.name)
-            }
-
-            // Redirect to original destination
-            const returnUrl = localStorage.getItem("auth_return_url") || "/mypage"
-            localStorage.removeItem("auth_return_url")
-
-            console.log("🔄 Redirecting to:", returnUrl)
-            router.push(returnUrl)
-          } else {
-            console.error("❌ No user data received")
-            router.push("/login?error=no_user")
-          }
+          // Default redirect to mypage
+          toast({
+            title: "로그인 완료",
+            description: "성공적으로 로그인되었습니다.",
+          })
+          router.push("/mypage")
         } else {
-          console.error("❌ No auth code found in callback")
-          router.push("/login?error=no_code")
+          console.log("No session found after auth callback")
+          router.push("/")
         }
       } catch (error) {
-        console.error("❌ Auth callback error:", error)
-        router.push("/login?error=callback_error")
+        console.error("Error in auth callback:", error)
+        toast({
+          title: "로그인 오류",
+          description: "로그인 처리 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        router.push("/")
+      } finally {
+        setIsProcessing(false)
       }
     }
 
     handleAuthCallback()
-  }, [searchParams, router, supabase])
+  }, [router, searchParams])
+
+  if (isProcessing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">로그인 처리 중...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-        <h1 className="text-2xl font-bold text-white mb-2">인증 처리 중...</h1>
-        <p className="text-white/80">잠시만 기다려주세요</p>
+        <p className="text-muted-foreground">로그인 처리가 완료되었습니다.</p>
       </div>
     </div>
   )
