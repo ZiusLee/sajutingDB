@@ -130,7 +130,7 @@ export default function SearchPage() {
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">검색</h1>
 
-        {/* 검색 입력 */}
+        {/* 검색 입�� */}
         <div className="flex gap-2 mb-6">
           <Input
             placeholder="이름 또는 이메일로 검색"

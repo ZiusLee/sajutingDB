@@ -1723,7 +1723,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1991, month: 4, solarTerm: '청명', timestamp: '1991-04-05 16:00' },
   { year: 1991, month: 4, solarTerm: '곡우', timestamp: '1991-04-20 23:08' },
   { year: 1991, month: 5, solarTerm: '입하', timestamp: '1991-05-06 09:27' },
-  { year: 1991, month: 5, solarTerm: '소만', timestamp: '1991-05-21 22:20' },
+  { year: 1991, month: 5, solarTerm: '��만', timestamp: '1991-05-21 22:20' },
   { year: 1991, month: 6, solarTerm: '망종', timestamp: '1991-06-06 13:38' },
   { year: 1991, month: 6, solarTerm: '하지', timestamp: '1991-06-22 06:19' },
   { year: 1991, month: 7, solarTerm: '소서', timestamp: '1991-07-07 23:53' },

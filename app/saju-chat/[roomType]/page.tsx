@@ -7,7 +7,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
-import { useGuestUsage } from "@/hooks/use-guest-usage"
 import { SignupDialog } from "@/components/signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
 import { syncLocalStorageToDatabase } from "@/lib/data-sync"
@@ -26,8 +25,6 @@ export default function SajuChatPage() {
   const [currentChatRoom, setCurrentChatRoom] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Guest usage limiter
-  const { count, limit, isOverLimit, incrementOncePerVisit } = useGuestUsage(5)
   const [signupOpen, setSignupOpen] = useState(false)
   const supabase = getSupabase()
 
@@ -164,51 +161,24 @@ export default function SajuChatPage() {
     }
   }, [router, toast, roomType, roomId, supabase.auth])
 
-  // Increment guest usage on first mount of chat if not logged in
-  useEffect(() => {
-    if (!loading) {
-      const guest = !isLoggedIn
-      if (guest) {
-        incrementOncePerVisit()
-      }
-    }
-  }, [loading, isLoggedIn, incrementOncePerVisit])
 
-  // Open signup dialog automatically if user has anonymous session
+  // Open signup dialog automatically if user has tempSajuData (from onboarding)
   useEffect(() => {
-    const checkAnonymousSession = async () => {
-      if (!isLoggedIn) {
-        const sessionId = localStorage.getItem("saju_session_id")
+    if (!isLoggedIn) {
+      const tempSajuData = localStorage.getItem("tempSajuData")
+      
+      if (tempSajuData) {
+        console.log("Found tempSajuData from onboarding, showing signup dialog")
         
-        // Check if user has an anonymous saju_session (sessionId exists but auth_user_id is null)
-        if (sessionId) {
-          try {
-            const { data, error } = await supabase
-              .from("saju_sessions")
-              .select("auth_user_id")
-              .eq("id", sessionId)
-              .single()
-            
-            // If session exists but auth_user_id is null, it's anonymous
-            if (!error && data && data.auth_user_id === null) {
-              console.log("Found anonymous saju_session, showing signup dialog")
-              
-              // Add a small delay for better UX
-              const timer = setTimeout(() => {
-                setSignupOpen(true)
-              }, 1500) // 1.5 second delay
-              
-              return () => clearTimeout(timer)
-            }
-          } catch (error) {
-            console.error("Error checking saju_session:", error)
-          }
-        }
+        // Add a small delay for better UX
+        const timer = setTimeout(() => {
+          setSignupOpen(true)
+        }, 1500) // 1.5 second delay
+        
+        return () => clearTimeout(timer)
       }
     }
-    
-    checkAnonymousSession()
-  }, [isLoggedIn, supabase])
+  }, [isLoggedIn])
 
   const handleBack = useCallback(() => {
     try {
@@ -360,9 +330,9 @@ export default function SajuChatPage() {
         open={signupOpen}
         onOpenChange={setSignupOpen}
         onSelectProvider={handleOAuth}
-        isOverLimit={!isLoggedIn && isOverLimit}
-        currentCount={count}
-        maxCount={limit}
+        isOverLimit={false}
+        currentCount={0}
+        maxCount={0}
       />
     </div>
   )
