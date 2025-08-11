@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import { getSupabase } from "@/lib/supabase-client"
 import { findAndLinkSessions, getSajuProfileBySessionId } from "@/lib/saju-session-service"
+import { calculateElementsFromSaju } from "@/lib/element-utils"
 
 interface AuthContextType {
   user: User | null
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // 대표 사주 데이터를 가져오는 함수
+  // 대표 사주 데이터를 가져오는 함수 (mypage와 동일한 로직)
   const getDefaultSajuData = async (userId: string) => {
     try {
       // 먼저 is_default가 true인 세션 찾기
@@ -97,12 +98,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profile) {
           console.log("Loaded default saju profile:", profile)
 
+          // 오행 데이터 확인 및 계산
+          let elementsData = profile.saju.elements
+          if (!elementsData) {
+            console.log("오행 데이터가 없어서 계산 중...")
+            elementsData = calculateElementsFromSaju(
+              profile.saju.yearStem,
+              profile.saju.yearBranch,
+              profile.saju.monthStem,
+              profile.saju.monthBranch,
+              profile.saju.dayStem,
+              profile.saju.dayBranch,
+              profile.saju.hourStem,
+              profile.saju.hourBranch,
+            )
+
+            // 계산된 오행 데이터를 DB에 저장
+            const { data: currentSaju } = await supabase
+              .from("saju_sessions")
+              .select("saju")
+              .eq("id", sessionId)
+              .single()
+
+            if (currentSaju) {
+              const updatedSaju = { ...currentSaju.saju, elements: elementsData }
+              await supabase.from("saju_sessions").update({ saju: updatedSaju }).eq("id", sessionId)
+
+              console.log("오행 데이터 계산 및 저장 완료:", elementsData)
+            }
+          }
+
           // mypage에서 사용하는 것과 동일한 형태로 변환
           const chatSajuData = {
             sessionId: profile.id,
             saju: {
               ...profile.saju,
-              elements: profile.saju.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+              elements: elementsData || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
               dayMaster: profile.saju.dayStem,
               dayMasterHanja: profile.saju.dayStemHanja || "",
             },
@@ -131,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
           }
 
+          console.log("AuthContext에서 생성한 기본 사주 데이터:", chatSajuData)
           return chatSajuData
         }
       }

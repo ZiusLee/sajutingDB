@@ -1,5 +1,6 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
+import { calculateElementsFromSaju } from "@/lib/element-utils"
 
 /**
  * Get all saju profiles for the current authenticated user
@@ -30,7 +31,7 @@ export async function getUserSajuProfiles() {
       console.log(`Initial check found ${sessionCheck?.length || 0} sessions with auth_user_id ${authUserId}`)
     }
 
-    // Query saju_sessions with proper joins to get all related data
+    // Query saju_sessions with proper joins to get all related data including elements
     console.log("Executing full query with joins for auth_user_id:", authUserId)
     const { data: sessions, error: sessionsError } = await supabase
       .from("saju_sessions")
@@ -65,6 +66,13 @@ export async function getUserSajuProfiles() {
           day_branch,
           hour_stem,
           hour_branch
+        ),
+        elements (
+          wood,
+          fire,
+          earth,
+          metal,
+          water
         )
       `)
       .eq("auth_user_id", authUserId)
@@ -89,7 +97,33 @@ export async function getUserSajuProfiles() {
         // Get the first birth_info and saju_info records if they exist
         const birthInfo = session.birth_info && session.birth_info.length > 0 ? session.birth_info[0] : null
         const sajuInfo = session.saju_info && session.saju_info.length > 0 ? session.saju_info[0] : null
+        const elementsInfo = session.elements && session.elements.length > 0 ? session.elements[0] : null
         const sajuJsonb = session.saju || {}
+
+        // 오행 데이터 우선순위: saju JSONB > elements 테이블 > 계산
+        let elementsData = sajuJsonb.elements
+        if (!elementsData && elementsInfo) {
+          elementsData = {
+            wood: elementsInfo.wood || 0,
+            fire: elementsInfo.fire || 0,
+            earth: elementsInfo.earth || 0,
+            metal: elementsInfo.metal || 0,
+            water: elementsInfo.water || 0,
+          }
+        }
+        if (!elementsData && sajuInfo) {
+          // 계산으로 오행 데이터 생성
+          elementsData = calculateElementsFromSaju(
+            sajuInfo.year_stem,
+            sajuInfo.year_branch,
+            sajuInfo.month_stem,
+            sajuInfo.month_branch,
+            sajuInfo.day_stem,
+            sajuInfo.day_branch,
+            sajuInfo.hour_stem,
+            sajuInfo.hour_branch,
+          )
+        }
 
         // 대운 데이터 확인 및 계산
         let daeunData = sajuJsonb.daeun
@@ -138,9 +172,13 @@ export async function getUserSajuProfiles() {
           }
         }
 
-        // DB 업데이트를 비동기로 처리 (프로필 반환을 블록하지 않음)
-        if (shouldUpdateDB && daeunData) {
-          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
+        // 사주 JSONB에 오행과 대운 데이터가 없으면 업데이트
+        if (shouldUpdateDB || !sajuJsonb.elements) {
+          const updatedSajuJsonb = {
+            ...sajuJsonb,
+            daeun: daeunData,
+            elements: elementsData || sajuJsonb.elements,
+          }
 
           // 비동기로 DB 업데이트 (await 하지 않음)
           supabase
@@ -149,9 +187,9 @@ export async function getUserSajuProfiles() {
             .eq("id", session.id)
             .then(({ error }) => {
               if (error) {
-                console.error(`Error updating daeun for session ${session.id}:`, error)
+                console.error(`Error updating saju data for session ${session.id}:`, error)
               } else {
-                console.log(`Successfully updated daeun for session ${session.id}`)
+                console.log(`Successfully updated saju data for session ${session.id}`)
               }
             })
         }
@@ -190,6 +228,8 @@ export async function getUserSajuProfiles() {
             monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
             dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
             hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
+            // 오행 데이터 추가
+            elements: elementsData || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
             // 대운 데이터 추가
             daeun: daeunData,
           },
@@ -473,7 +513,8 @@ export async function getSajuDataByUuid(uuid: string) {
         `
         *,
         birth_info(*),
-        saju_info(*)
+        saju_info(*),
+        elements(*)
       `,
       )
       .eq("id", uuid)
@@ -489,7 +530,8 @@ export async function getSajuDataByUuid(uuid: string) {
           `
           *,
           saju_sessions(*),
-          saju_info!inner(*)
+          saju_info!inner(*),
+          elements(*)
         `,
         )
         .eq("id", uuid)
@@ -695,7 +737,7 @@ export async function getDefaultSajuSession(authUserId: string): Promise<any | n
 }
 
 /**
- * Get a saju profile by session ID with daeun calculation
+ * Get a saju profile by session ID with daeun calculation and elements
  */
 export async function getSajuProfileBySessionId(sessionId: string): Promise<any | null> {
   try {
@@ -740,6 +782,13 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
           hour_branch_hanja,
           day_master,
           day_master_hanja
+        ),
+        elements (
+          wood,
+          fire,
+          earth,
+          metal,
+          water
         )
       `)
       .eq("id", sessionId)
@@ -752,9 +801,37 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     const birthInfo = data?.birth_info?.[0] || {}
     const sajuInfo = data?.saju_info?.[0] || {}
+    const elementsInfo = data?.elements?.[0] || null
     const sajuJsonb = data?.saju || {}
 
     console.log("JSONB saju data from database:", sajuJsonb)
+    console.log("Elements data from database:", elementsInfo)
+
+    // 오행 데이터 우선순위: saju JSONB > elements 테이블 > 계산
+    let elementsData = sajuJsonb.elements
+    if (!elementsData && elementsInfo) {
+      elementsData = {
+        wood: elementsInfo.wood || 0,
+        fire: elementsInfo.fire || 0,
+        earth: elementsInfo.earth || 0,
+        metal: elementsInfo.metal || 0,
+        water: elementsInfo.water || 0,
+      }
+    }
+    if (!elementsData && sajuInfo) {
+      // 계산으로 오행 데이터 생성
+      elementsData = calculateElementsFromSaju(
+        sajuInfo.year_stem,
+        sajuInfo.year_branch,
+        sajuInfo.month_stem,
+        sajuInfo.month_branch,
+        sajuInfo.day_stem,
+        sajuInfo.day_branch,
+        sajuInfo.hour_stem,
+        sajuInfo.hour_branch,
+      )
+      console.log("Calculated elements data:", elementsData)
+    }
 
     // 대운 데이터 확인 및 계산
     let daeunData = sajuJsonb.daeun
@@ -796,8 +873,12 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
           console.log(`Session ${sessionId}: 새로 계산된 대운:`, daeunData)
 
-          // 계산된 대운을 DB에 비동기 업데이트 (반환을 블록하지 않음)
-          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
+          // 계산된 대운과 오행 데이터를 DB에 비동기 업데이트 (반환을 블록하지 않음)
+          const updatedSajuJsonb = {
+            ...sajuJsonb,
+            daeun: daeunData,
+            elements: elementsData || sajuJsonb.elements,
+          }
 
           supabase
             .from("saju_sessions")
@@ -805,9 +886,9 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
             .eq("id", sessionId)
             .then(({ error }) => {
               if (error) {
-                console.error(`Error updating daeun for session ${sessionId}:`, error)
+                console.error(`Error updating saju data for session ${sessionId}:`, error)
               } else {
-                console.log(`Successfully updated daeun for session ${sessionId}`)
+                console.log(`Successfully updated saju data for session ${sessionId}`)
               }
             })
         } catch (error) {
@@ -858,7 +939,8 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
         dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
         hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-        elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+        // 오행 데이터 추가
+        elements: elementsData || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
         // 대운 데이터 추가
         daeun: daeunData,
       },
