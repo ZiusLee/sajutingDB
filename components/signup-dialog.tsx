@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabase } from "@/lib/supabase-client"
 import { toast } from "@/hooks/use-toast"
@@ -75,15 +74,10 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
     }
   }
 
-  const handleClose = () => {
-    onOpenChange(false)
-    // Reset state
-    setShowTerms(false)
-    setSelectedProvider(null)
-    setServiceTermsChecked(false)
-    setPrivacyChecked(false)
-    setShowPrivacyDetails(false)
-    setIsLoading(false)
+  // Prevent dialog from closing - only allow programmatic closing after successful auth
+  const handleOpenChange = (newOpen: boolean) => {
+    // Don't allow closing the dialog
+    return
   }
 
   const providerLabel = selectedProvider === "kakao" ? "카카오" : selectedProvider === "google" ? "구글" : "Apple"
@@ -91,13 +85,16 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
   return (
     <>
       {/* Main signup dialog */}
-      <Dialog open={open && !showTerms && !showPrivacyDetails} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md rounded-2xl shadow-xl p-0 overflow-hidden">
+      <Dialog open={open && !showTerms && !showPrivacyDetails} onOpenChange={handleOpenChange} modal={true}>
+        <DialogContent
+          className="sm:max-w-md rounded-2xl shadow-xl p-0 overflow-hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <div className="p-6">
             <DialogHeader className="space-y-3 text-center">
               <DialogTitle className="text-xl font-bold leading-tight tracking-tight">
-                지금 계정을 연동하고
-3초만에 사주 분석을 받아보세요.
+                지금 계정을 연동하고 3초만에 사주 분석을 받아보세요.
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
                 로그인하면 더 많은 기능을 이용할 수 있습니다
@@ -154,8 +151,12 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
       </Dialog>
 
       {/* Terms agreement dialog */}
-      <Dialog open={showTerms && !showPrivacyDetails} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={showTerms && !showPrivacyDetails} onOpenChange={handleOpenChange} modal={true}>
+        <DialogContent
+          className="sm:max-w-md"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">{providerLabel} 로그인을 위한 약관 동의</DialogTitle>
             <DialogDescription>서비스 이용을 위해 다음 약관에 동의해주세요.</DialogDescription>
@@ -203,8 +204,13 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent" disabled={isLoading}>
-              취소
+            <Button
+              variant="outline"
+              onClick={() => setShowTerms(false)}
+              className="flex-1 bg-transparent"
+              disabled={isLoading}
+            >
+              이전
             </Button>
             <Button onClick={handleAgree} disabled={!canProceed || isLoading} className="flex-1">
               {isLoading ? "로그인 중..." : `동의하고 ${providerLabel} 로그인`}
@@ -219,7 +225,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle className="text-xl font-semibold">개인정보 처리방침</DialogTitle>
             <Button variant="ghost" size="icon" onClick={() => setShowPrivacyDetails(false)} className="h-6 w-6">
-              <X className="h-4 w-4" />
+              ✕
             </Button>
           </DialogHeader>
 
