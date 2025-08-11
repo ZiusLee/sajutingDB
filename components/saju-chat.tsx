@@ -146,6 +146,7 @@ export default function SajuChat({
   // Background streaming continuation state
   const [backgroundStreamingActive, setBackgroundStreamingActive] = useState(false)
   const backgroundStreamRef = useRef<any>(null)
+  const [shouldContinueInCurrentRoom, setShouldContinueInCurrentRoom] = useState(false)
 
   const sessionId = useMemo(() => {
     try {
@@ -186,12 +187,21 @@ export default function SajuChat({
   // Check if we should continue background streaming after auth
   useEffect(() => {
     const shouldContinueChat = localStorage.getItem("continue_chat_after_auth")
+    const returnChatRoomId = localStorage.getItem("auth_return_chat_room_id")
+
     if (shouldContinueChat === "true" && user) {
       console.log("🔄 Continuing chat after authentication")
       localStorage.removeItem("continue_chat_after_auth")
-      setBackgroundStreamingActive(true)
+
+      // Check if we should continue in the current room
+      if (returnChatRoomId && returnChatRoomId === effectiveChatRoomId) {
+        console.log("🔄 Continuing in the same chat room:", returnChatRoomId)
+        setShouldContinueInCurrentRoom(true)
+        setBackgroundStreamingActive(true)
+        localStorage.removeItem("auth_return_chat_room_id")
+      }
     }
-  }, [user])
+  }, [user, effectiveChatRoomId])
 
   // Auto-show signup dialog after 4 seconds for non-authenticated users
   useEffect(() => {
@@ -315,7 +325,7 @@ export default function SajuChat({
 
           // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
           // But only if we're not continuing from background streaming
-          if (shouldSendInitialQuestions && isFirstRoom && !backgroundStreamingActive) {
+          if (shouldSendInitialQuestions && isFirstRoom && !backgroundStreamingActive && !shouldContinueInCurrentRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
@@ -339,6 +349,7 @@ export default function SajuChat({
     sessionId,
     stableConcerns,
     backgroundStreamingActive,
+    shouldContinueInCurrentRoom,
   ])
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
@@ -354,6 +365,7 @@ export default function SajuChat({
       // If this was a background streaming completion, mark it as done
       if (backgroundStreamingActive) {
         setBackgroundStreamingActive(false)
+        setShouldContinueInCurrentRoom(false)
         console.log("🔄 Background streaming completed")
       }
     },
@@ -363,6 +375,7 @@ export default function SajuChat({
 
       if (backgroundStreamingActive) {
         setBackgroundStreamingActive(false)
+        setShouldContinueInCurrentRoom(false)
       }
     },
   })
@@ -374,7 +387,8 @@ export default function SajuChat({
       messages.length === 0 &&
       initialQuestionsToSend.length > 0 &&
       !initialQuestionsSent.q1 &&
-      !backgroundStreamingActive
+      !backgroundStreamingActive &&
+      !shouldContinueInCurrentRoom
     ) {
       console.log("📤 [Flow] Sending first question...")
       setInitialQuestionsSent((prev) => ({ ...prev, q1: true }))
@@ -388,6 +402,7 @@ export default function SajuChat({
     append,
     initialQuestionsSent.q1,
     backgroundStreamingActive,
+    shouldContinueInCurrentRoom,
   ])
 
   useEffect(() => {
@@ -397,12 +412,12 @@ export default function SajuChat({
       setInitialQuestionsToSend([])
     }
 
-    if (isInitialQuestionsMode && !isLoading && !backgroundStreamingActive) {
+    if (isInitialQuestionsMode && !isLoading && !backgroundStreamingActive && !shouldContinueInCurrentRoom) {
       if (messages.length === 2 && messages[1].role === "assistant") {
         endInitialMode()
       }
     }
-  }, [isInitialQuestionsMode, isLoading, messages, backgroundStreamingActive])
+  }, [isInitialQuestionsMode, isLoading, messages, backgroundStreamingActive, shouldContinueInCurrentRoom])
 
   useEffect(() => {
     const saveNewMessages = async () => {
@@ -510,6 +525,7 @@ export default function SajuChat({
       // Store current state for background continuation
       localStorage.setItem("auth_return_url", window.location.href)
       localStorage.setItem("continue_chat_after_auth", "true")
+      localStorage.setItem("auth_return_chat_room_id", effectiveChatRoomId || "")
 
       // Store current chat state if there's an ongoing conversation
       if (messages.length > 0) {
@@ -711,7 +727,7 @@ export default function SajuChat({
               </div>
             )}
 
-            {backgroundStreamingActive && (
+            {backgroundStreamingActive && shouldContinueInCurrentRoom && (
               <div className="text-center text-xs sm:text-sm text-blue-600 bg-blue-50 rounded-lg p-2 sm:p-3">
                 🔄 로그인 후 대화를 이어가는 중입니다...
               </div>
@@ -864,7 +880,7 @@ export default function SajuChat({
                 )}
               </div>
             ))}
-            {(isLoading || backgroundStreamingActive) && (
+            {(isLoading || (backgroundStreamingActive && shouldContinueInCurrentRoom)) && (
               <div className="flex items-center gap-2 pt-2">
                 <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
                 <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full [animation-delay:-0.15s]"></div>
@@ -912,7 +928,9 @@ export default function SajuChat({
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
                   className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
-                  disabled={isLoading || isInitialQuestionsMode || backgroundStreamingActive}
+                  disabled={
+                    isLoading || isInitialQuestionsMode || (backgroundStreamingActive && shouldContinueInCurrentRoom)
+                  }
                 />
                 <Popover>
                   <PopoverTrigger asChild>
@@ -921,7 +939,7 @@ export default function SajuChat({
                       variant="ghost"
                       size="icon"
                       className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
-                      disabled={isInitialQuestionsMode || backgroundStreamingActive}
+                      disabled={isInitialQuestionsMode || (backgroundStreamingActive && shouldContinueInCurrentRoom)}
                     >
                       <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
@@ -940,7 +958,12 @@ export default function SajuChat({
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode || backgroundStreamingActive}
+                disabled={
+                  !input.trim() ||
+                  isLoading ||
+                  isInitialQuestionsMode ||
+                  (backgroundStreamingActive && shouldContinueInCurrentRoom)
+                }
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
