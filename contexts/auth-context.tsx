@@ -20,15 +20,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  
+
   // Supabase 인스턴스를 ref로 안정화
   const supabaseRef = useRef(getSupabase())
   const supabase = supabaseRef.current
-  
+
   // 초기화 완료 여부를 추적
   const [isInitialized, setIsInitialized] = useState(false)
   const initRef = useRef(false)
-  
+
   // 리다이렉션을 한 번만 실행하도록 추적
   const redirectedRef = useRef(false)
 
@@ -57,9 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (userData?.user) {
           console.log("User authenticated:", userData.user.id)
-          
+
           // 이전 사용자와 동일한지 확인 후에만 업데이트
-          setUser(prevUser => {
+          setUser((prevUser) => {
             if (prevUser?.id !== userData.user.id) {
               // 새로운 사용자인 경우에만 localStorage 업데이트
               localStorage.setItem("user_authenticated", "true")
@@ -97,20 +97,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 안전한 리다이렉션 함수
   const safeRedirect = (path: string) => {
     if (redirectedRef.current) return
-    
+
     const currentPath = window.location.pathname
     if (currentPath === path) return
-    
+
     const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list"]
     const shouldRedirect = !excludedPaths.some((p) => currentPath.startsWith(p))
     const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
-    
+
     if (shouldRedirect && !fromMyPage) {
       redirectedRef.current = true
       setTimeout(() => {
         redirectedRef.current = false
       }, 1000) // 1초 후 리다이렉션 가능하도록 리셋
-      
+
       router.push(path)
     }
   }
@@ -119,9 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (initRef.current) return
     initRef.current = true
-    
+
     let mounted = true
-    
+
     const checkAuth = async () => {
       try {
         await refreshUser()
@@ -144,16 +144,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
-      
+
       console.log("Auth state changed:", event, session?.user?.id)
-      
+
       if (session?.user) {
-        setUser(prevUser => {
+        setUser((prevUser) => {
           // 동일한 사용자인 경우 상태 업데이트 방지
           if (prevUser?.id === session.user.id) {
             return prevUser
           }
-          
+
           // 새로운 사용자인 경우에만 localStorage 업데이트
           localStorage.setItem("user_authenticated", "true")
           localStorage.setItem("user_id", session.user.id)
@@ -163,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (session.user.email) {
             localStorage.setItem("user_email", session.user.email)
           }
-          
+
           // 로그인 성공 시 세션 연결 시도 (비동기로 처리)
           setTimeout(async () => {
             try {
@@ -174,26 +174,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (error) {
               console.error("Error linking sessions:", error)
             }
-            // 세션 연결 시도 후 리다이렉션
-            safeRedirect("/mypage")
+            // 세션 연결 시도 후 리다이렉션을 /saju-chat/sajuping으로 변경
+            safeRedirect("/saju-chat/sajuping")
           }, 100)
-          
+
           return session.user
         })
       } else {
-        setUser(prevUser => {
+        setUser((prevUser) => {
           if (prevUser === null) return prevUser // 이미 null인 경우 업데이트 방지
-          
+
           // 로그아웃 시에만 localStorage 클리어
           localStorage.removeItem("user_authenticated")
           localStorage.removeItem("user_id")
           localStorage.removeItem("user_name")
           localStorage.removeItem("user_email")
-          
+
           return null
         })
       }
-      
+
       setIsLoading(false)
     })
 
@@ -207,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 로그아웃 함수
   const logout = async () => {
     if (isLoading) return // 이미 로딩 중이면 중복 실행 방지
-    
+
     setIsLoading(true)
     try {
       console.log("Logging out...")
@@ -233,34 +233,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // Context 값을 메모화하여 불필요한 re-render 방지
-  const contextValue = useMemo(() => ({
-    user,
-    isAuthenticated: !!user,
-    isLoading,
-    logout,
-    refreshUser,
-  }), [user, isLoading]) // logout과 refreshUser는 함수이므로 의존성에서 제외
+  const contextValue = useMemo(
+    () => ({
+      user,
+      isAuthenticated: !!user,
+      isLoading,
+      logout,
+      refreshUser,
+    }),
+    [user, isLoading],
+  ) // logout과 refreshUser는 함수이므로 의존성에서 제외
 
   // 초기화가 완료될 때까지 로딩 상태 유지
   if (!isInitialized) {
     return (
-      <AuthContext.Provider value={{
-        user: null,
-        isAuthenticated: false,
-        isLoading: true,
-        logout,
-        refreshUser,
-      }}>
+      <AuthContext.Provider
+        value={{
+          user: null,
+          isAuthenticated: false,
+          isLoading: true,
+          logout,
+          refreshUser,
+        }}
+      >
         {children}
       </AuthContext.Provider>
     )
   }
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

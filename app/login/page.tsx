@@ -61,7 +61,7 @@ export default function LoginPage() {
 
         if (data.session) {
           console.log("User already logged in, redirecting...")
-          router.push("/mypage")
+          router.push("/saju-chat/sajuping")
         } else {
           console.log("No active session found")
         }
@@ -84,7 +84,7 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/saju-chat/sajuping`,
         },
       })
 
@@ -112,7 +112,7 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/saju-chat/sajuping`,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -175,7 +175,7 @@ export default function LoginPage() {
         localStorage.setItem("user_name", userName)
       }
 
-      router.push("/mypage")
+      router.push("/saju-chat/sajuping")
     } catch (err) {
       console.error("이메일 로그인 오류:", err)
       setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다. 이메일과 비밀번호를 확인해주세요.")

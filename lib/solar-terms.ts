@@ -2231,7 +2231,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 2012, month: 6, solarTerm: '망종', timestamp: '2012-06-06 18:36' },
   { year: 2012, month: 6, solarTerm: '하지', timestamp: '2012-06-21 22:08' },
   { year: 2012, month: 7, solarTerm: '소서', timestamp: '2012-07-07 01:40' },
-  { year: 2012, month: 7, solarTerm: '대서', timestamp: '2012-07-22 19:00' },
+  { year: 2012, month: 7, solarTerm: '대���', timestamp: '2012-07-22 19:00' },
   { year: 2012, month: 8, solarTerm: '입추', timestamp: '2012-08-07 11:30' },
   { year: 2012, month: 8, solarTerm: '처서', timestamp: '2012-08-23 02:06' },
   { year: 2012, month: 9, solarTerm: '백로', timestamp: '2012-09-07 14:28' },

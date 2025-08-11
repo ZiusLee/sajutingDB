@@ -17,19 +17,9 @@ export interface SignupDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelectProvider: (provider: Provider) => void
-  isOverLimit?: boolean
-  currentCount?: number
-  maxCount?: number
 }
 
-export function SignupDialog({
-  open,
-  onOpenChange,
-  onSelectProvider,
-  isOverLimit = false,
-  currentCount = 0,
-  maxCount = 5,
-}: SignupDialogProps) {
+export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDialogProps) {
   const [showTerms, setShowTerms] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
   const [serviceTermsChecked, setServiceTermsChecked] = useState(false)
@@ -105,27 +95,13 @@ export function SignupDialog({
         <DialogContent className="sm:max-w-md rounded-2xl shadow-xl p-0 overflow-hidden">
           <div className="p-6">
             <DialogHeader className="space-y-3 text-center">
-              {isOverLimit ? (
-                <>
-                  <DialogTitle className="text-lg font-bold leading-tight tracking-tight">
-                    게스트 이용 가능 횟수({maxCount}회)를 모두 사용하셨습니다
-                  </DialogTitle>
-                  <DialogDescription className="text-base text-muted-foreground">
-                    간편하게 로그인하고 대화를 이어나가세요
-                    <br />
-                    <span className="text-sm">로그인하면 대화와 사주 기록이 안전하게 저장됩니다.</span>
-                  </DialogDescription>
-                </>
-              ) : (
-                <>
-                  <DialogTitle className="text-xl font-bold leading-tight tracking-tight">
-                    간편하게 로그인하고 대화를 이어나가세요
-                  </DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground">
-                    로그인하면 더 많은 기능을 이용할 수 있습니다
-                  </DialogDescription>
-                </>
-              )}
+              <DialogTitle className="text-xl font-bold leading-tight tracking-tight">
+                지금 계정을 연동하고
+3초만에 사주 분석을 받아보세요.
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                로그인하면 더 많은 기능을 이용할 수 있습니다
+              </DialogDescription>
             </DialogHeader>
 
             <div className="mt-8">
@@ -171,18 +147,6 @@ export function SignupDialog({
                   </svg>
                   <span className="ml-2 text-sm font-medium">구글</span>
                 </ProviderButton>
-              </div>
-
-              {/* Bottom message */}
-              <div className="mt-6 text-center space-y-2">
-                {isOverLimit && (
-                  <p className="text-xs text-muted-foreground">계속 이용하시려면 간편 로그인을 진행해주세요</p>
-                )}
-                {!isOverLimit && (
-                  <p className="text-xs text-muted-foreground">
-                    무료 체험 중 · 남은 횟수: {Math.max(0, maxCount - currentCount)}/{maxCount}
-                  </p>
-                )}
               </div>
             </div>
           </div>
