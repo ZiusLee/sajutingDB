@@ -357,6 +357,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       // Save to database without auth user ID first
       const userId = await syncLocalStorageToDatabase(null)
 
+      // After saving to database and getting userId
       if (userId) {
         const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
         storedData.userId = userId
@@ -403,15 +404,23 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         } = await supabaseClient.auth.getSession()
 
         if (session?.user) {
-          // User is already logged in, link immediately
+          // User is already logged in, link immediately and go to chat
+          console.log("User already authenticated, linking session and proceeding to chat")
           const success = await updateAuthUserId(userId, session.user.id)
           if (success) {
             console.log("Successfully linked existing session")
             localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
             router.push("/saju-chat/sajuping")
+          } else {
+            toast({
+              title: "데이터 연결 실패",
+              description: "사주 정보 연결에 실패했습니다.",
+              variant: "destructive",
+            })
           }
         } else {
           // User not logged in, show signup dialog
+          console.log("User not authenticated, showing signup dialog")
           setShowSignupDialog(true)
         }
       } else {
