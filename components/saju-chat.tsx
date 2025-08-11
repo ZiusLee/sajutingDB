@@ -141,6 +141,7 @@ export default function SajuChat({
   const [showSignupDialog, setShowSignupDialog] = useState(false)
   const [showTermsDialog, setShowTermsDialog] = useState(false)
   const [providerLabel, setProviderLabel] = useState("")
+  const [signupTimerStarted, setSignupTimerStarted] = useState(false)
   const supabase = createClientComponentClient()
 
   const sessionId = useMemo(() => {
@@ -181,14 +182,30 @@ export default function SajuChat({
 
   // Auto-show signup dialog after 4 seconds for non-authenticated users
   useEffect(() => {
-    if (!user && chatData.isInitialized) {
+    if (!user && chatData.isInitialized && !signupTimerStarted) {
+      console.log("🕐 Starting 4-second signup timer...")
+      setSignupTimerStarted(true)
+
       const timer = setTimeout(() => {
+        console.log("🕐 4 seconds elapsed, showing signup dialog")
         setShowSignupDialog(true)
       }, 4000) // 4 seconds
 
-      return () => clearTimeout(timer)
+      return () => {
+        console.log("🕐 Cleanup signup timer")
+        clearTimeout(timer)
+      }
     }
-  }, [user, chatData.isInitialized])
+  }, [user, chatData.isInitialized, signupTimerStarted])
+
+  // Reset signup timer when user logs in
+  useEffect(() => {
+    if (user && signupTimerStarted) {
+      console.log("🕐 User logged in, resetting signup timer")
+      setSignupTimerStarted(false)
+      setShowSignupDialog(false)
+    }
+  }, [user, signupTimerStarted])
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
