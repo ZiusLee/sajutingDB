@@ -167,6 +167,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // 로그인 성공 시 세션 연결 시도 (비동기로 처리)
           setTimeout(async () => {
             try {
+              // 먼저 pending session이 있는지 확인
+              const pendingSessionId = localStorage.getItem("pending_session_link")
+              if (pendingSessionId) {
+                console.log(`Linking pending session ${pendingSessionId} to user ${session.user.id}`)
+
+                const { error } = await supabase
+                  .from("saju_sessions")
+                  .update({ auth_user_id: session.user.id })
+                  .eq("id", pendingSessionId)
+                  .eq("auth_user_id", null) // null인 경우에만 업데이트
+
+                if (error) {
+                  console.error("Error linking pending session:", error)
+                } else {
+                  console.log(`Successfully linked pending session ${pendingSessionId}`)
+                  localStorage.removeItem("pending_session_link")
+                  localStorage.removeItem("anonymous_session_created")
+                }
+              }
+
+              // 일반적인 세션 연결 시도
               const { success, linkedCount } = await findAndLinkSessions()
               if (success && linkedCount > 0) {
                 console.log(`Successfully linked ${linkedCount} sessions to user`)
@@ -174,8 +195,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (error) {
               console.error("Error linking sessions:", error)
             }
-            // 세션 연결 시도 후 리다이렉션을 /saju-chat/sajuping으로 변경
-            safeRedirect("/saju-chat/sajuping")
+
+            // 세션 연결 후 원래 URL로 리다이렉션
+            const returnUrl = localStorage.getItem("auth_return_url")
+            if (returnUrl && returnUrl !== window.location.href) {
+              localStorage.removeItem("auth_return_url")
+              window.location.href = returnUrl
+            }
           }, 100)
 
           return session.user
@@ -189,6 +215,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("user_id")
           localStorage.removeItem("user_name")
           localStorage.removeItem("user_email")
+          localStorage.removeItem("pending_session_link")
+          localStorage.removeItem("anonymous_session_created")
 
           return null
         })

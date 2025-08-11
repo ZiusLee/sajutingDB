@@ -138,7 +138,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     return { hour: 12, minute: 0 }
   }
 
-
   const handleSubmit = async () => {
     if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlaceId || !birthInfo.birthDate) {
       toast({ title: "필수 정보를 입력해주세요", variant: "destructive" })
@@ -265,7 +264,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
         if (userId) {
           console.log("Successfully created anonymous saju session with ID:", userId)
-          
+
           // Update chat data with the session ID
           const finalChatSajuData = {
             ...chatSajuData,
@@ -274,6 +273,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
           localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
           localStorage.setItem("saju_session_id", userId)
+          localStorage.setItem("anonymous_session_created", "true") // 익명 세션 생성 플래그
 
           console.log("Saju calculation complete, navigating to chat")
           router.push("/saju-chat/sajuping")
@@ -288,7 +288,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       } catch (error) {
         console.error("Error creating saju session:", error)
         toast({
-          title: "오류 발생", 
+          title: "오류 발생",
           description: "사주 세션 생성 중 오류가 발생했습니다.",
           variant: "destructive",
         })
@@ -539,7 +539,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           {renderStepContent()}
         </main>
       </div>
-
     </>
   )
 }

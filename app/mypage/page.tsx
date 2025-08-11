@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -16,7 +15,6 @@ import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession
 import BirthDateFormClient from "@/components/birth-date-form-client"
 import type { Saju } from "@/lib/saju" // Import Saju type
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
-import { SajuLogo } from "@/components/saju-logo"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -76,10 +74,43 @@ export default function MyPage() {
         setAuthUserId(userId)
         setUserName(userData.user.user_metadata?.name || userData.user.email?.split("@")[0] || "사용자")
         setUserEmail(userData.user.email || "")
+
+        console.log("Current user:", userData.user.email, "ID:", userId)
       }
 
+      console.log("Calling getUserSajuProfiles...")
       const { profiles } = await getUserSajuProfiles()
-      const sortedProfiles = profiles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      console.log("Raw profiles from getUserSajuProfiles:", profiles)
+      console.log("Number of profiles:", profiles.length)
+
+      // 강화된 중복 제거 및 유효성 검사
+      const seenIds = new Set()
+      const validProfiles = profiles.filter((profile) => {
+        // 기본 유효성 검사
+        if (!profile || !profile.id || !profile.name) {
+          console.warn("Invalid profile found:", profile)
+          return false
+        }
+
+        // 중복 검사
+        if (seenIds.has(profile.id)) {
+          console.warn("Duplicate profile ID found:", profile.id)
+          return false
+        }
+
+        seenIds.add(profile.id)
+        return true
+      })
+
+      console.log("Valid unique profiles after filtering:", validProfiles.length)
+      console.log(
+        "Profile IDs:",
+        validProfiles.map((p) => p.id),
+      )
+
+      const sortedProfiles = validProfiles.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       setSajuProfiles(sortedProfiles)
 
       if (userData.user) {
@@ -394,7 +425,6 @@ export default function MyPage() {
 
   return (
     <div className="container mx-auto pb-20">
-
       {defaultProfile && (
         <div className="px-4 pt-4 pb-6">
           <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
@@ -429,7 +459,14 @@ export default function MyPage() {
 
       <div className="px-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">등록된 사주 정보 ({sajuProfiles.length}명)</h3>
+          <h3 className="text-lg font-semibold">
+            등록된 사주 정보 ({sajuProfiles.length}명)
+            {process.env.NODE_ENV === "development" && (
+              <span className="text-xs text-gray-500 ml-2">
+                (디버그: {sajuProfiles.map((p) => p.id.slice(0, 8)).join(", ")})
+              </span>
+            )}
+          </h3>
           {hasMoreProfiles && (
             <Button
               variant="ghost"

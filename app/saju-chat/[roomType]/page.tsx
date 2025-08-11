@@ -183,47 +183,6 @@ export default function SajuChatPage() {
     }
   }, [router, toast, roomType, roomId, supabase])
 
-  useEffect(() => {
-    const checkAnonymousSession = async () => {
-      console.log("Checking anonymous session. isLoggedIn:", isLoggedIn)
-
-      if (!isLoggedIn && !loading) {
-        const sessionId = localStorage.getItem("saju_session_id")
-        console.log("Session ID from localStorage:", sessionId)
-
-        if (sessionId) {
-          try {
-            const { data, error } = await supabase
-              .from("saju_sessions")
-              .select("auth_user_id")
-              .eq("id", sessionId)
-              .single()
-
-            console.log("Database session check result:", { data, error })
-
-            if (!error && data && data.auth_user_id === null) {
-              console.log("Found anonymous saju_session, showing signup dialog")
-
-              const timer = setTimeout(() => {
-                setSignupOpen(true)
-              }, 1500)
-
-              return () => clearTimeout(timer)
-            } else if (!error && data && data.auth_user_id) {
-              console.log("Session is already linked to authenticated user:", data.auth_user_id)
-            }
-          } catch (error) {
-            console.error("Error checking saju_session:", error)
-          }
-        }
-      } else if (isLoggedIn) {
-        console.log("User is logged in, skipping anonymous session check")
-      }
-    }
-
-    checkAnonymousSession()
-  }, [isLoggedIn, loading, supabase])
-
   const handleBack = useCallback(() => {
     try {
       const savedReturnPath = localStorage.getItem("chat_return_path")
@@ -269,8 +228,14 @@ export default function SajuChatPage() {
       try {
         setIsLoadingOAuth(true)
 
+        // 현재 URL과 세션 정보를 저장
         const currentUrl = window.location.href
+        const sessionId = localStorage.getItem("saju_session_id")
+
         localStorage.setItem("auth_return_url", currentUrl)
+        if (sessionId) {
+          localStorage.setItem("pending_session_link", sessionId)
+        }
 
         const redirectTo = `${window.location.origin}/auth/callback`
         console.log("Redirect URL:", redirectTo)
@@ -305,6 +270,7 @@ export default function SajuChatPage() {
         }
 
         console.log(`✅ ${provider} OAuth initiated successfully`)
+        setSignupOpen(false) // signup dialog 닫기
       } catch (e) {
         console.error(`❌ ${provider} OAuth start error:`, e)
         toast({
@@ -318,6 +284,53 @@ export default function SajuChatPage() {
     },
     [supabase, toast],
   )
+
+  const checkAnonymousSession = useCallback(async () => {
+    console.log("Checking anonymous session. isLoggedIn:", isLoggedIn)
+
+    if (!isLoggedIn && !loading) {
+      const sessionId = localStorage.getItem("saju_session_id")
+      const anonymousSessionCreated = localStorage.getItem("anonymous_session_created")
+
+      console.log("Session ID from localStorage:", sessionId)
+      console.log("Anonymous session created flag:", anonymousSessionCreated)
+
+      if (sessionId && anonymousSessionCreated === "true") {
+        try {
+          const { data, error } = await supabase
+            .from("saju_sessions")
+            .select("auth_user_id, name")
+            .eq("id", sessionId)
+            .single()
+
+          console.log("Database session check result:", { data, error })
+
+          if (!error && data && data.auth_user_id === null) {
+            console.log("Found anonymous saju_session, showing signup dialog after delay")
+
+            const timer = setTimeout(() => {
+              setSignupOpen(true)
+            }, 2000) // 2초 후 signup dialog 표시
+
+            return () => clearTimeout(timer)
+          } else if (!error && data && data.auth_user_id) {
+            console.log("Session is already linked to authenticated user:", data.auth_user_id)
+            // 이미 연결된 세션이면 플래그 제거
+            localStorage.removeItem("anonymous_session_created")
+          }
+        } catch (error) {
+          console.error("Error checking saju_session:", error)
+        }
+      }
+    } else if (isLoggedIn) {
+      console.log("User is logged in, removing anonymous session flag")
+      localStorage.removeItem("anonymous_session_created")
+    }
+  }, [isLoggedIn, loading, supabase])
+
+  useEffect(() => {
+    checkAnonymousSession()
+  }, [isLoggedIn, loading, supabase])
 
   if (loading) {
     return (
