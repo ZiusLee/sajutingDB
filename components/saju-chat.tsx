@@ -23,6 +23,7 @@ import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SiteHeader } from "@/components/site-header"
 import { useGuestUsage } from "@/hooks/use-guest-usage"
+import { SignupDialog } from "@/components/signup-dialog"
 
 interface SajuChatProps {
   saju: any
@@ -140,6 +141,7 @@ export default function SajuChat({
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
   const [userMessageCount, setUserMessageCount] = useState(0)
   const shouldScrollToBottomRef = useRef(false)
+  const [showSignupDialog, setShowSignupDialog] = useState(false)
 
   const sessionId = useMemo(() => {
     try {
@@ -316,9 +318,15 @@ export default function SajuChat({
     },
   })
 
-  // Custom handleSubmit to track guest usage properly
+  // Custom handleSubmit to track guest usage properly and show signup dialog
   const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    // Check if guest user is over limit
+    if (!user && isOverLimit) {
+      setShowSignupDialog(true)
+      return
+    }
 
     // Increment guest usage counter when user sends a message
     if (!user && input.trim()) {
@@ -329,6 +337,20 @@ export default function SajuChat({
 
     // Call the original handleSubmit
     handleSubmit(e)
+  }
+
+  // Handle suggested question clicks for guests
+  const handleSuggestedQuestionClick = (question: string) => {
+    if (isLoading) return
+
+    // Check if guest user is over limit
+    if (!user && isOverLimit) {
+      setShowSignupDialog(true)
+      return
+    }
+
+    setInput(question)
+    setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
   }
 
   // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
@@ -426,12 +448,6 @@ export default function SajuChat({
       })
     }
   }, [transitionMessages])
-
-  const handleSuggestedQuestionClick = (question: string) => {
-    if (isLoading) return
-    setInput(question)
-    setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
-  }
 
   const handleChatRoomSelect = (chatRoomId: string) => {
     if (window.innerWidth < 1024) setSidebarOpen(false)
@@ -809,7 +825,7 @@ export default function SajuChat({
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode || (!user && isOverLimit)}
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
@@ -829,6 +845,9 @@ export default function SajuChat({
           </div>
         </div>
       </div>
+
+      {/* Signup Dialog */}
+      <SignupDialog open={showSignupDialog} onOpenChange={setShowSignupDialog} trigger="message_limit" />
     </div>
   )
 }
