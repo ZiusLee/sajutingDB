@@ -32,6 +32,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 리다이렉션을 한 번만 실행하도록 추적
   const redirectedRef = useRef(false)
 
+  // 사주 세션이 있는지 확인하는 함수
+  const checkSajuSession = async (userId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.from("saju_sessions").select("id").eq("user_id", userId).limit(1)
+
+      if (error) {
+        console.error("Error checking saju session:", error)
+        return false
+      }
+
+      return data && data.length > 0
+    } catch (error) {
+      console.error("Error checking saju session:", error)
+      return false
+    }
+  }
+
   // Function to refresh user data
   const refreshUser = async () => {
     try {
@@ -95,13 +112,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // 안전한 리다이렉션 함수
-  const safeRedirect = (path: string) => {
+  const safeRedirect = async (userId: string) => {
     if (redirectedRef.current) return
 
     const currentPath = window.location.pathname
-    if (currentPath === path) return
 
-    const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list"]
+    // 이미 올바른 페이지에 있으면 리다이렉션하지 않음
+    if (currentPath === "/saju-chat/sajuping" || currentPath === "/" || currentPath.startsWith("/?")) return
+
+    const excludedPaths = ["/mypage", "/saju-chat", "/result", "/chat-list", "/auth"]
     const shouldRedirect = !excludedPaths.some((p) => currentPath.startsWith(p))
     const fromMyPage = sessionStorage.getItem("from_mypage") === "true"
 
@@ -111,7 +130,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         redirectedRef.current = false
       }, 1000) // 1초 후 리다이렉션 가능하도록 리셋
 
-      router.push(path)
+      // 사주 세션이 있는지 확인
+      const hasSajuSession = await checkSajuSession(userId)
+
+      if (hasSajuSession) {
+        // 사주 세션이 있으면 채팅으로
+        router.push("/saju-chat/sajuping")
+      } else {
+        // 사주 세션이 없으면 온보딩으로 (홈페이지에서 온보딩 플로우 시작)
+        router.push("/?showOnboarding=true")
+      }
     }
   }
 
@@ -174,8 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (error) {
               console.error("Error linking sessions:", error)
             }
-            // 세션 연결 시도 후 리다이렉션을 /saju-chat/sajuping으로 변경
-            safeRedirect("/saju-chat/sajuping")
+            // 세션 연결 시도 후 리다이렉션 (사주 세션 확인 후 적절한 페이지로)
+            await safeRedirect(session.user.id)
           }, 100)
 
           return session.user
