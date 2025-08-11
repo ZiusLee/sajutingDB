@@ -162,23 +162,41 @@ export default function SajuChatPage() {
   }, [router, toast, roomType, roomId, supabase.auth])
 
 
-  // Open signup dialog automatically if user has tempSajuData (from onboarding)
+  // Open signup dialog automatically if user has anonymous session
   useEffect(() => {
-    if (!isLoggedIn) {
-      const tempSajuData = localStorage.getItem("tempSajuData")
-      
-      if (tempSajuData) {
-        console.log("Found tempSajuData from onboarding, showing signup dialog")
+    const checkAnonymousSession = async () => {
+      if (!isLoggedIn) {
+        const sessionId = localStorage.getItem("saju_session_id")
         
-        // Add a small delay for better UX
-        const timer = setTimeout(() => {
-          setSignupOpen(true)
-        }, 1500) // 1.5 second delay
-        
-        return () => clearTimeout(timer)
+        // Check if user has an anonymous saju_session (sessionId exists but auth_user_id is null)
+        if (sessionId) {
+          try {
+            const { data, error } = await supabase
+              .from("saju_sessions")
+              .select("auth_user_id")
+              .eq("id", sessionId)
+              .single()
+            
+            // If session exists but auth_user_id is null, it's anonymous
+            if (!error && data && data.auth_user_id === null) {
+              console.log("Found anonymous saju_session, showing signup dialog")
+              
+              // Add a small delay for better UX
+              const timer = setTimeout(() => {
+                setSignupOpen(true)
+              }, 1500) // 1.5 second delay
+              
+              return () => clearTimeout(timer)
+            }
+          } catch (error) {
+            console.error("Error checking saju_session:", error)
+          }
+        }
       }
     }
-  }, [isLoggedIn])
+    
+    checkAnonymousSession()
+  }, [isLoggedIn, supabase])
 
   const handleBack = useCallback(() => {
     try {

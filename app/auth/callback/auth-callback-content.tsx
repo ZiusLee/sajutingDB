@@ -4,8 +4,6 @@ import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getSupabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
-import { findAndLinkSessions } from "@/lib/saju-session-service"
-import { syncLocalStorageToDatabase } from "@/lib/data-sync"
 import { toast } from "@/hooks/use-toast"
 
 export default function AuthCallbackContent() {
@@ -36,47 +34,38 @@ export default function AuthCallbackContent() {
           const authUserId = data.session.user.id
           console.log("Auth callback successful, user ID:", authUserId)
 
-          // Check if there's tempSajuData from onboarding flow
-          const tempSajuDataStr = localStorage.getItem("tempSajuData")
+          // Check if there's an existing anonymous saju_session that needs auth_user_id update
+          const sessionId = localStorage.getItem("saju_session_id")
           let linkedAnySession = false
 
-          if (tempSajuDataStr) {
-            console.log("Found tempSajuData from onboarding, processing...")
+          if (sessionId) {
+            console.log("Found existing saju_session ID, updating auth_user_id:", sessionId)
             
             try {
-              // Save to database with authenticated user ID
-              const userId = await syncLocalStorageToDatabase(authUserId)
-
-              if (userId) {
-                console.log("Successfully saved saju data with session ID:", userId)
-
-                // Update the current_saju data with the session ID
-                const currentSajuStr = localStorage.getItem("current_saju")
-                if (currentSajuStr) {
-                  const currentSaju = JSON.parse(currentSajuStr)
-                  currentSaju.sessionId = userId
-                  localStorage.setItem("current_saju", JSON.stringify(currentSaju))
-                }
-
-                localStorage.setItem("saju_session_id", userId)
+              // Update auth_user_id for existing session
+              console.log("Updating auth_user_id for session:", sessionId, "with auth user:", authUserId)
+              const success = await updateAuthUserId(sessionId, authUserId)
+              
+              if (success) {
+                console.log("Successfully updated auth_user_id for saju session:", sessionId)
+                linkedAnySession = true
                 
-                // Clean up temp data
+                // Clean up tempSajuData since session is now linked
                 localStorage.removeItem("tempSajuData")
-
+                
                 toast({
                   title: "로그인 완료",
                   description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
                 })
-                linkedAnySession = true
 
                 // Navigate directly to chat
                 router.push("/saju-chat/sajuping")
                 return
               } else {
-                console.error("Failed to save saju data to database")
+                console.error("Failed to update auth_user_id for session:", sessionId)
               }
             } catch (error) {
-              console.error("Error processing tempSajuData:", error)
+              console.error("Error updating session auth_user_id:", error)
             }
           }
 

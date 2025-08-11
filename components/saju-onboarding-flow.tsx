@@ -260,7 +260,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
       // Create saju_session with auth_user_id: null (for anonymous users)
       try {
-        console.log("Creating saju_session with auth_user_id: null")
+        console.log("Creating anonymous saju_session with auth_user_id: null")
         const userId = await syncLocalStorageToDatabase(null) // null = anonymous user
 
         if (userId) {
