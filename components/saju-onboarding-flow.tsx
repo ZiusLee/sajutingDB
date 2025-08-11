@@ -9,13 +9,10 @@ import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
-import { syncLocalStorageToDatabase } from "@/lib/data-sync"
-import { getSupabase } from "@/lib/supabase-client"
 import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } from "@/lib/city-timezone-data"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { SajuLogo } from "./saju-logo"
 import { Checkbox } from "@/components/ui/checkbox"
-import { SignupDialog } from "./signup-dialog"
 
 interface SajuOnboardingFlowProps {
   onClose: () => void
@@ -51,8 +48,6 @@ const concernOptions = [
 export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
-  const [showSignupDialog, setShowSignupDialog] = useState(false)
-  const [pendingSajuData, setPendingSajuData] = useState<any>(null)
   const [birthInfo, setBirthInfo] = useState<BirthInfo>({
     name: "",
     gender: "",
@@ -142,78 +137,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     return { hour: 12, minute: 0 }
   }
 
-  const handleSignupSuccess = async (provider: "kakao" | "google" | "apple") => {
-    try {
-      console.log("Signup success, attempting to save saju data to database...")
-
-      // Wait a bit for auth state to settle
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const supabaseClient = getSupabase()
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabaseClient.auth.getSession()
-
-      if (sessionError || !session?.user) {
-        console.error("No authenticated session found after signup:", sessionError)
-        toast({
-          title: "로그인 확인 필요",
-          description: "로그인 상태를 확인할 수 없습니다. 다시 시도해주세요.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const authUserId = session.user.id
-      console.log("Authenticated user ID:", authUserId)
-
-      // Now save the pending saju data to database with auth_user_id
-      if (pendingSajuData) {
-        console.log("Saving saju data to database with auth_user_id:", authUserId)
-
-        // Save to database with authenticated user ID
-        const userId = await syncLocalStorageToDatabase(authUserId)
-
-        if (userId) {
-          console.log("Successfully saved saju data with session ID:", userId)
-
-          // Update the chat data with the session ID
-          const chatSajuData = {
-            ...pendingSajuData,
-            sessionId: userId,
-          }
-
-          localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
-          localStorage.setItem("user_id", userId)
-
-          toast({
-            title: "계정 연결 완료",
-            description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
-          })
-
-          // Navigate to chat
-          router.push("/saju-chat/sajuping")
-        } else {
-          console.error("Failed to save saju data to database")
-          toast({
-            title: "데이터 저장 실패",
-            description: "사주 정보 저장에 실패했습니다. 다시 시도해주세요.",
-            variant: "destructive",
-          })
-        }
-      }
-    } catch (error) {
-      console.error("Error in handleSignupSuccess:", error)
-      toast({
-        title: "오류 발생",
-        description: "계정 연결 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowSignupDialog(false)
-    }
-  }
 
   const handleSubmit = async () => {
     if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlaceId || !birthInfo.birthDate) {
@@ -331,45 +254,14 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         },
       }
 
-      // Store pending data for after signup
-      setPendingSajuData(chatSajuData)
+      // Store saju data in localStorage and go directly to chat
+      localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+      localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
 
-      // Check if user is already authenticated
-      const supabaseClient = getSupabase()
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession()
-
-      if (session?.user) {
-        // User is already logged in, save to database immediately
-        console.log("User already authenticated, saving to database immediately")
-
-        const userId = await syncLocalStorageToDatabase(session.user.id)
-
-        if (userId) {
-          console.log("Successfully saved saju data with session ID:", userId)
-
-          const finalChatSajuData = {
-            ...chatSajuData,
-            sessionId: userId,
-          }
-
-          localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
-          localStorage.setItem("user_id", userId)
-
-          router.push("/saju-chat/sajuping")
-        } else {
-          toast({
-            title: "데이터 저장 실패",
-            description: "사주 정보 저장에 실패했습니다.",
-            variant: "destructive",
-          })
-        }
-      } else {
-        // User not logged in, show signup dialog
-        console.log("User not authenticated, showing signup dialog")
-        setShowSignupDialog(true)
-      }
+      // Go directly to saju-chat regardless of auth status
+      // The chat page will handle signup if needed
+      console.log("Saju calculation complete, navigating to chat")
+      router.push("/saju-chat/sajuping")
     } catch (error) {
       console.error("Error in saju calculation:", error)
       toast({ title: "사주 계산 중 오류가 발생했습니다.", variant: "destructive" })
@@ -617,14 +509,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         </main>
       </div>
 
-      <SignupDialog
-        open={showSignupDialog}
-        onOpenChange={setShowSignupDialog}
-        onSelectProvider={handleSignupSuccess}
-        isOverLimit={false}
-        currentCount={0}
-        maxCount={5}
-      />
     </>
   )
 }

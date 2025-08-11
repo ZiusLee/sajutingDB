@@ -10,6 +10,8 @@ import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { useGuestUsage } from "@/hooks/use-guest-usage"
 import { SignupDialog } from "@/components/signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
+import { syncLocalStorageToDatabase } from "@/lib/data-sync"
+import { updateAuthUserId } from "@/lib/db-service"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -172,9 +174,9 @@ export default function SajuChatPage() {
     }
   }, [loading, isLoggedIn, incrementOncePerVisit])
 
-  // Open signup dialog automatically if over limit and guest
+  // Open signup dialog automatically if over limit and guest, OR if user just completed onboarding
   useEffect(() => {
-    if (!isLoggedIn && isOverLimit) {
+    if (!isLoggedIn && (isOverLimit || localStorage.getItem("tempSajuData"))) {
       setSignupOpen(true)
     }
   }, [isLoggedIn, isOverLimit])

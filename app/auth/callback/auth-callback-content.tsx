@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { getSupabase } from "@/lib/supabase-client"
 import { updateAuthUserId } from "@/lib/db-service"
 import { findAndLinkSessions } from "@/lib/saju-session-service"
+import { syncLocalStorageToDatabase } from "@/lib/data-sync"
 import { toast } from "@/hooks/use-toast"
 
 export default function AuthCallbackContent() {
@@ -35,9 +36,56 @@ export default function AuthCallbackContent() {
           const authUserId = data.session.user.id
           console.log("Auth callback successful, user ID:", authUserId)
 
-          // Check if there's a pending saju session to link
-          const sessionId = localStorage.getItem("user_id")
+          // Check if there's pending saju data from onboarding flow
+          const pendingSajuDataStr = localStorage.getItem("pending_saju_data")
           let linkedAnySession = false
+
+          if (pendingSajuDataStr) {
+            console.log("Found pending saju data from onboarding, processing...")
+            
+            try {
+              const pendingSajuData = JSON.parse(pendingSajuDataStr)
+              
+              // Save to database with authenticated user ID (like MyPage does)
+              const userId = await syncLocalStorageToDatabase(authUserId)
+
+              if (userId) {
+                console.log("Successfully saved saju data with session ID:", userId)
+
+                // Update the auth_user_id like MyPage does
+                await updateAuthUserId(userId, authUserId)
+
+                // Update the chat data with the session ID
+                const chatSajuData = {
+                  ...pendingSajuData,
+                  sessionId: userId,
+                }
+
+                localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+                localStorage.setItem("user_id", userId)
+                
+                // Clean up pending data
+                localStorage.removeItem("pending_saju_data")
+                localStorage.removeItem("tempSajuData")
+
+                toast({
+                  title: "로그인 완료",
+                  description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
+                })
+
+                // Navigate directly to chat
+                router.push("/saju-chat/sajuping")
+                return
+              } else {
+                console.error("Failed to save saju data to database")
+              }
+            } catch (error) {
+              console.error("Error processing pending saju data:", error)
+            }
+          }
+
+          // Fallback: Check if there's a pending saju session to link (old method)
+          const sessionId = localStorage.getItem("user_id")
 
           if (sessionId) {
             console.log("Found pending session to link:", sessionId)
@@ -76,7 +124,45 @@ export default function AuthCallbackContent() {
             console.error("Error in findAndLinkSessions:", error)
           }
 
-          // Default redirect to mypage with appropriate message
+          // Check for stored auth return URL (from saju-chat)
+          const authReturnUrl = localStorage.getItem("auth_return_url")
+          let redirectUrl = "/mypage" // default
+
+          if (authReturnUrl) {
+            console.log("Found auth return URL:", authReturnUrl)
+            redirectUrl = authReturnUrl
+            localStorage.removeItem("auth_return_url") // Clean up
+          }
+
+          // Check if there's tempSajuData that needs to be saved
+          const tempSajuData = localStorage.getItem("tempSajuData")
+          if (tempSajuData && !linkedAnySession) {
+            console.log("Found tempSajuData, attempting to save to database...")
+            
+            try {
+              const userId = await syncLocalStorageToDatabase(authUserId)
+              if (userId) {
+                console.log("Successfully saved tempSajuData with session ID:", userId)
+                await updateAuthUserId(userId, authUserId)
+                
+                // Update current_saju with sessionId
+                const currentSaju = localStorage.getItem("current_saju")
+                if (currentSaju) {
+                  const parsedSaju = JSON.parse(currentSaju)
+                  parsedSaju.sessionId = userId
+                  localStorage.setItem("current_saju", JSON.stringify(parsedSaju))
+                }
+                
+                localStorage.setItem("user_id", userId)
+                localStorage.removeItem("tempSajuData")
+                linkedAnySession = true
+              }
+            } catch (error) {
+              console.error("Error saving tempSajuData:", error)
+            }
+          }
+
+          // Default redirect with appropriate message
           if (linkedAnySession) {
             toast({
               title: "로그인 완료",
@@ -88,7 +174,8 @@ export default function AuthCallbackContent() {
               description: "성공적으로 로그인되었습니다.",
             })
           }
-          router.push("/mypage")
+          
+          router.push(redirectUrl)
         } else {
           console.log("No session found after auth callback")
           router.push("/")
