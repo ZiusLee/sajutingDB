@@ -49,15 +49,17 @@ export default function AuthCallback() {
             }
           }
 
-          // 원래 URL로 리다이렉션
+          // 원래 URL로 리다이렉션 또는 기본 사주 채팅으로 이동
           const returnUrl = localStorage.getItem("auth_return_url")
-          if (returnUrl) {
-            console.log("🔄 Redirecting to:", returnUrl)
+          if (returnUrl && returnUrl.includes("/saju-chat/")) {
+            console.log("🔄 Redirecting to original saju chat:", returnUrl)
             localStorage.removeItem("auth_return_url")
             window.location.href = returnUrl
           } else {
-            console.log("🔄 Redirecting to saju chat")
-            router.push("/saju-chat/sajuping")
+            console.log("🔄 Redirecting to home (will auto-redirect to default saju chat)")
+            localStorage.removeItem("auth_return_url")
+            // Redirect to home page, which will automatically redirect authenticated users to default saju chat
+            router.push("/")
           }
         } else {
           console.log("❌ No user session found")

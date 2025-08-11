@@ -46,11 +46,11 @@ export default function LandingPageClient() {
 
   // Check for showOnboarding query parameter
   useEffect(() => {
-    const shouldShowOnboarding = searchParams.get('showOnboarding')
-    if (shouldShowOnboarding === 'true') {
+    const shouldShowOnboarding = searchParams.get("showOnboarding")
+    if (shouldShowOnboarding === "true") {
       setShowOnboarding(true)
       // Clean up URL
-      router.replace('/', undefined)
+      router.replace("/", undefined)
     }
   }, [searchParams, router])
 
@@ -84,9 +84,7 @@ export default function LandingPageClient() {
               <br />
               궁금하세요?
             </h1>
-            <p className="text-base md:text-lg text-gray-600">
-              사주를 바탕으로 나와 대화하는 AI Companion, 사주핑
-            </p>
+            <p className="text-base md:text-lg text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
           </div>
 
           {/* 질문 칩 - 2줄 스크롤 애니메이션 */}
