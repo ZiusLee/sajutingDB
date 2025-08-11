@@ -48,9 +48,8 @@ export async function parseMessageWithGPT(message: string): Promise<GPTDateParse
     console.log("🤖 GPT 기반 날짜 파싱 시작:", message.substring(0, 50) + "...")
 
     const { text } = await generateText({
-      model: openai("gpt-5-mini"),
-      verbosity: low,
-      reasoning_effort: minimal,
+      model: openai("gpt-4o-mini"),
+      temperature: 0.1,
       maxTokens: 1000,
       prompt: `
 당신은 한국어 메시지에서 날짜와 시간 정보를 정확히 추출하는 전문가입니다.

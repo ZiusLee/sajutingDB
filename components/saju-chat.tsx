@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from 'lucide-react'
+import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -20,6 +20,7 @@ import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SiteHeader } from "@/components/site-header"
+import { useGuestUsage } from "@/hooks/use-guest-usage"
 
 interface SajuChatProps {
   saju: any
@@ -85,7 +86,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
     const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘"
-    
+
     // 첫 번째 질문만 반환
     const questions = [firstQuestion]
     console.log("🎯 Generated exactly 1 initial question:", questions)
@@ -171,6 +172,8 @@ export default function SajuChat({
   const stableConcerns = useMemo(() => (concerns ? [...concerns] : []), [JSON.stringify(concerns)])
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
+
+  const { count, limit, isOverLimit, incrementOncePerVisit } = useGuestUsage(5)
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
@@ -314,22 +317,22 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-// Remove the second question useEffect completely
+  // Remove the second question useEffect completely
 
-useEffect(() => {
-  const endInitialMode = () => {
-    console.log("✅ [Flow] Ending initial questions mode.")
-    setIsInitialQuestionsMode(false)
-    setInitialQuestionsToSend([])
-  }
-
-  if (isInitialQuestionsMode && !isLoading) {
-    // End after first response for both first room and non-first room
-    if (messages.length === 2 && messages[1].role === "assistant") {
-      endInitialMode()
+  useEffect(() => {
+    const endInitialMode = () => {
+      console.log("✅ [Flow] Ending initial questions mode.")
+      setIsInitialQuestionsMode(false)
+      setInitialQuestionsToSend([])
     }
-  }
-}, [isInitialQuestionsMode, isLoading, messages])
+
+    if (isInitialQuestionsMode && !isLoading) {
+      // End after first response for both first room and non-first room
+      if (messages.length === 2 && messages[1].role === "assistant") {
+        endInitialMode()
+      }
+    }
+  }, [isInitialQuestionsMode, isLoading, messages])
 
   // --- End of fundamental fix ---
 
@@ -434,6 +437,16 @@ useEffect(() => {
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
 
+  useEffect(() => {
+    // Increment guest usage when user sends a message (not logged in)
+    if (!user && messages.length > 0) {
+      const userMessages = messages.filter((msg) => msg.role === "user")
+      if (userMessages.length > 0) {
+        incrementOncePerVisit()
+      }
+    }
+  }, [messages, user, incrementOncePerVisit])
+
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
     [stableConcerns, roomType],
@@ -468,31 +481,31 @@ useEffect(() => {
     )
   }
 
-const shouldShowSajuDiagram = (index: number) => {
-  // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
-  if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
-    return true
+  const shouldShowSajuDiagram = (index: number) => {
+    // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
+    if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
+      return true
+    }
+    // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
+    if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
+      return true
+    }
+    return false
   }
-  // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
-  if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
-    return true
-  }
-  return false
-}
 
-const shouldShowDaeunDiagram = (index: number) => {
-  // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
-  return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
-}
+  const shouldShowDaeunDiagram = (index: number) => {
+    // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
+    return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
+  }
 
   return (
     <div className="flex h-screen-mobile bg-white">
-    {/* Mobile Header - only show on mobile */}
-    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
-      <SiteHeader />
-    </div>
-    
-    {/* Sidebar for desktop */}
+      {/* Mobile Header - only show on mobile */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
+        <SiteHeader />
+      </div>
+
+      {/* Sidebar for desktop */}
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -522,10 +535,7 @@ const shouldShowDaeunDiagram = (index: number) => {
         </SheetContent>
       </Sheet>
       <div className="flex-1 flex flex-col min-w-0 h-screen-mobile pt-16 lg:pt-0">
-        <div
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto chat-messages-container chat-container-height"
-        >
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
@@ -579,7 +589,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                       </div>
                     )}
                     <div className="ai-response-content">
-                      <ReactMarkdown 
+                      <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
                           // 제목들 스타일링
@@ -594,14 +604,10 @@ const shouldShowDaeunDiagram = (index: number) => {
                             </h2>
                           ),
                           h3: ({ children }) => (
-                            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5">
-                              {children}
-                            </h3>
+                            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5">{children}</h3>
                           ),
                           h4: ({ children }) => (
-                            <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">
-                              {children}
-                            </h4>
+                            <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">{children}</h4>
                           ),
                           // 단락 스타일링
                           p: ({ children }) => (
@@ -614,22 +620,16 @@ const shouldShowDaeunDiagram = (index: number) => {
                             <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                           ),
                           // 리스트 스타일링
-                          ul: ({ children }) => (
-                            <ul className="space-y-2 mb-4 pl-0">
-                              {children}
-                            </ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="space-y-2 mb-4 pl-0 counter-reset-item">
-                              {children}
-                            </ol>
-                          ),
+                          ul: ({ children }) => <ul className="space-y-2 mb-4 pl-0">{children}</ul>,
+                          ol: ({ children }) => <ol className="space-y-2 mb-4 pl-0 counter-reset-item">{children}</ol>,
                           li: ({ children, ordered }) => (
-                            <li className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
-                              ordered 
-                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
-                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
-                            }`}>
+                            <li
+                              className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
+                                ordered
+                                  ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5"
+                                  : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
+                              }`}
+                            >
                               <span className="flex-1">{children}</span>
                             </li>
                           ),
@@ -639,11 +639,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                               {children}
                             </strong>
                           ),
-                          em: ({ children }) => (
-                            <em className="italic text-gray-600 font-medium">
-                              {children}
-                            </em>
-                          ),
+                          em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
                           // 코드 블록 스타일링
                           code: ({ children, className }) => {
                             const isInline = !className
@@ -679,20 +675,14 @@ const shouldShowDaeunDiagram = (index: number) => {
                               </table>
                             </div>
                           ),
-                          thead: ({ children }) => (
-                            <thead className="bg-gray-50">
-                              {children}
-                            </thead>
-                          ),
+                          thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
                           th: ({ children }) => (
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-200">
                               {children}
                             </th>
                           ),
                           td: ({ children }) => (
-                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
-                              {children}
-                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">{children}</td>
                           ),
                         }}
                       >
@@ -718,9 +708,9 @@ const shouldShowDaeunDiagram = (index: number) => {
             )}
           </div>
         </div>
-        <div 
+        <div
           className={`border-t bg-white p-3 sm:p-4 flex-shrink-0 chat-input-container ${
-            isKeyboardOpen ? 'ios-keyboard-adjust' : 'pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4'
+            isKeyboardOpen ? "ios-keyboard-adjust" : "pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4"
           }`}
           style={isKeyboardOpen ? { paddingBottom: `max(12px, ${keyboardHeight}px)` } : {}}
         >
@@ -785,11 +775,23 @@ const shouldShowDaeunDiagram = (index: number) => {
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode || (!user && isOverLimit)}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </form>
+            {/* Message counter for guests - positioned below input like ChatGPT */}
+            {!user && (
+              <div className="flex justify-center mt-2">
+                <div
+                  className={`text-xs text-center ${
+                    isOverLimit ? "text-red-600" : count >= limit - 1 ? "text-orange-600" : "text-gray-500"
+                  }`}
+                >
+                  무료 메시지 {Math.max(0, limit - count)}/{limit}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

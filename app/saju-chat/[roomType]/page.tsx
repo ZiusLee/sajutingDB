@@ -4,9 +4,16 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import SajuChat from "@/components/saju-chat"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+import { Loader2, LogIn } from "lucide-react"
 import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
+import { useGuestUsage } from "@/hooks/use-guest-usage"
+import { SignupDialog } from "@/components/signup-dialog"
+import { TermsDialog } from "@/components/terms-dialog"
+import { Button } from "@/components/ui/button"
+import { getSupabase } from "@/lib/supabase-client"
+
+type Provider = "kakao" | "google" | "apple"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -20,13 +27,19 @@ export default function SajuChatPage() {
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [currentChatRoom, setCurrentChatRoom] = useState<any>(null)
 
+  // Guest usage limiter
+  const { count, limit, isOverLimit, incrementOncePerVisit } = useGuestUsage(5)
+  const [signupOpen, setSignupOpen] = useState(false)
+  const [termsOpen, setTermsOpen] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
+  const supabase = getSupabase()
+
   // Stabilize roomId and roomType to prevent infinite re-renders
   const roomId = useMemo(() => searchParams.get("roomId"), [searchParams])
   const roomType = useMemo(() => params.roomType as string, [params.roomType])
 
   // Validate room type
   const validRoomTypes = ["sajuping", "tarot", "general"]
-
   useEffect(() => {
     if (roomType && !validRoomTypes.includes(roomType)) {
       router.push("/")
@@ -56,6 +69,19 @@ export default function SajuChatPage() {
 
     const initializePage = async () => {
       try {
+        // 로그인 여부 확인 (localStorage flag 우선, 없으면 Supabase 세션)
+        const authed = localStorage.getItem("user_authenticated") === "true"
+        if (authed) {
+          setIsLoggedIn(true)
+        } else {
+          const { data } = await supabase.auth.getSession()
+          setIsLoggedIn(Boolean(data.session?.user))
+          if (data.session?.user) {
+            localStorage.setItem("user_authenticated", "true")
+            localStorage.setItem("user_id", data.session.user.id)
+          }
+        }
+
         // 로컬 스토리지에서 사주 데이터 가져오기
         const savedSaju = localStorage.getItem("current_saju")
 
@@ -116,13 +142,8 @@ export default function SajuChatPage() {
           // 마이페이지에서 왔는지 확인 (한 번만 체크하고 플래그 제거)
           const fromMyPage = sessionStorage.getItem("from_mypage")
           if (fromMyPage === "true") {
-            // 플래그 제거하여 무한 로그 방지
             sessionStorage.removeItem("from_mypage")
           }
-
-          // 로그인 상태 확인
-          const userToken = localStorage.getItem("user_token")
-          setIsLoggedIn(!!userToken)
 
           setLoading(false)
         }
@@ -144,7 +165,24 @@ export default function SajuChatPage() {
     return () => {
       isMounted = false
     }
-  }, [router, toast, roomType, roomId])
+  }, [router, toast, roomType, roomId, supabase.auth])
+
+  // Increment guest usage on first mount of chat if not logged in
+  useEffect(() => {
+    if (!loading) {
+      const guest = !isLoggedIn
+      if (guest) {
+        incrementOncePerVisit()
+      }
+    }
+  }, [loading, isLoggedIn, incrementOncePerVisit])
+
+  // Open signup dialog automatically if over limit and guest
+  useEffect(() => {
+    if (!isLoggedIn && isOverLimit) {
+      setSignupOpen(true)
+    }
+  }, [isLoggedIn, isOverLimit])
 
   const handleBack = useCallback(() => {
     try {
@@ -156,7 +194,6 @@ export default function SajuChatPage() {
         if (saju) {
           // URL 유틸리티 함수를 사용하여 사주 데이터를 URL에 추가
           const urlWithSaju = addSajuToUrl(savedReturnPath, saju.saju, saju.name, saju.gender)
-
           router.push(urlWithSaju)
         } else {
           router.push(savedReturnPath)
@@ -180,7 +217,7 @@ export default function SajuChatPage() {
   const handleChatRoomPersisted = useCallback(
     (newChatRoomId: string) => {
       // Update the current chat room when it gets persisted
-      setCurrentChatRoom((prev) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
+      setCurrentChatRoom((prev: any) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
 
       // Update URL with the persisted room ID without triggering re-render
       const newUrl = `/saju-chat/${roomType}?roomId=${newChatRoomId}`
@@ -190,6 +227,31 @@ export default function SajuChatPage() {
     },
     [roomType],
   )
+
+  // Signup flow handlers
+  const onSelectProvider = (provider: Provider) => {
+    if (provider === "apple") return // currently disabled
+    setSelectedProvider(provider)
+    setSignupOpen(false)
+    setTermsOpen(true)
+  }
+
+  const startOAuth = async (provider: Provider) => {
+    const redirectBack = `${window.location.origin}/auth/callback?redirect_to=${encodeURIComponent(window.location.pathname + window.location.search)}`
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectBack,
+          // You can request extra scopes here if needed
+        } as any,
+      })
+      if (error) throw error
+    } catch (e) {
+      console.error("OAuth start error:", e)
+      // keep the dialog open for retry
+    }
+  }
 
   if (loading) {
     return (
@@ -213,8 +275,11 @@ export default function SajuChatPage() {
     )
   }
 
+  const showBlocker = !isLoggedIn && isOverLimit
+
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-6 relative">
+      {/* Chat */}
       <SajuChat
         saju={saju.saju}
         name={saju.name || "사용자"}
@@ -231,6 +296,54 @@ export default function SajuChatPage() {
         currentChatRoomId={currentChatRoom?.id}
         temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
         onChatRoomPersisted={handleChatRoomPersisted}
+      />
+
+      {/* Usage blocker overlay */}
+      {showBlocker && (
+        <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+          <div className="bg-background rounded-2xl shadow-xl p-6 sm:p-8 max-w-lg w-[92%]">
+            <h3 className="text-xl sm:text-2xl font-bold">게스트 이용 가능 횟수({limit}회)를 모두 사용하셨습니다</h3>
+            <p className="text-muted-foreground mt-2">계속 이용하시려면 간편 로그인을 진행해주세요.</p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button
+                className="bg-[#FEE500] text-black hover:bg-[#E6CF00]"
+                onClick={() => {
+                  setSelectedProvider("kakao")
+                  setTermsOpen(true)
+                }}
+              >
+                <LogIn className="mr-2 h-4 w-4" />
+                카카오로 로그인
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedProvider("google")
+                  setTermsOpen(true)
+                }}
+              >
+                <LogIn className="mr-2 h-4 w-4" />
+                구글로 로그인
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-4">로그인하면 대화와 사주 기록이 안전하게 저장됩니다.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Signup prompt (auto-opens when hitting limit, can also be opened proactively if desired) */}
+      <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={onSelectProvider} />
+
+      {/* Terms before OAuth */}
+      <TermsDialog
+        open={termsOpen}
+        onOpenChange={setTermsOpen}
+        providerLabel={selectedProvider === "kakao" ? "카카오" : selectedProvider === "google" ? "구글" : "Apple"}
+        onAgree={() => {
+          if (selectedProvider) startOAuth(selectedProvider)
+        }}
       />
     </div>
   )

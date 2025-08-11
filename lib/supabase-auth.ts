@@ -1,13 +1,15 @@
+"use client"
+
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-export async function signInWithSocial(provider: "kakao" | "google" | "facebook" | "apple") {
+export async function signInWithSocial(provider: "kakao" | "google" | "facebook" | "apple", redirectTo?: string) {
   try {
     const supabase = createClientComponentClient()
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectTo || `${window.location.origin}/auth/callback`,
       },
     })
 

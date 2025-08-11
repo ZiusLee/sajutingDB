@@ -5,9 +5,9 @@
 **NEVER CHANGE THESE SETTINGS WITHOUT EXPLICIT PERMISSION**
 
 ### Primary Chat Model (saju-chat API)
-- **Model**: `gpt-5` 
-- **verbosity**: `low`
-- **reasoning effort**: `minimal`
+- **Model**: `gpt-4.1` 
+- **Temperature**: `1.0`
+- **Top P**: `1.0`
 - **Max Tokens**: `2048`
 
 ### Configuration Location
@@ -18,12 +18,25 @@
 \`\`\`typescript
 const result = await streamText({
   messages: apiMessages,
-  model: openai("gpt-5"),
-  verbosity: low,
+  model: openai("gpt-4.1"),
+  temperature: 1.0,
   maxTokens: 2048,
-  reasoning_effort: minimal,
+  top_p: 1.0,
 })
 \`\`\`
+
+## Why These Settings Matter
+
+1. **gpt-4.1**: Specifically chosen for Korean saju interpretation quality
+2. **Temperature 1.0**: Provides creative and varied responses for personalized advice
+3. **Top P 1.0**: Ensures full vocabulary range for nuanced Korean expressions
+4. **Max Tokens 2048**: Balanced response length for detailed saju analysis
+
+## Other Model Usage
+
+- **Continue Generation**: Uses same model with temperature 0.8
+- **Message Parsing**: May use different models as needed
+- **Memory Processing**: Uses separate model configurations
 
 ## Emergency Contact
 
