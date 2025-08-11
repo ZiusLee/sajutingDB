@@ -240,11 +240,22 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       return true
     }
 
-    // Update the auth_user_id for the session
-    const { error: updateError } = await supabase
+    // Check if this is the user's first saju session
+    const { data: existingSessions, error: countError } = await supabase
       .from("saju_sessions")
-      .update({ auth_user_id: authUserId })
-      .eq("id", sessionId)
+      .select("id")
+      .eq("auth_user_id", authUserId)
+
+    const isFirstSession = !countError && (!existingSessions || existingSessions.length === 0)
+
+    // Update the auth_user_id for the session and set as default if it's the first session
+    const updateData: any = { auth_user_id: authUserId }
+    if (isFirstSession) {
+      updateData.is_default = true
+      console.log(`Setting session ${sessionId} as default (first session for user)`)
+    }
+
+    const { error: updateError } = await supabase.from("saju_sessions").update(updateData).eq("id", sessionId)
 
     if (updateError) {
       console.error("Error linking session:", updateError)
@@ -254,7 +265,7 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
     // Verify the update was successful
     const { data: verifyData, error: verifyError } = await supabase
       .from("saju_sessions")
-      .select("id, auth_user_id")
+      .select("id, auth_user_id, is_default")
       .eq("id", sessionId)
       .single()
 
@@ -263,7 +274,9 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       return false
     }
 
-    console.log(`Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}`)
+    console.log(
+      `Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}, is_default: ${verifyData.is_default}`,
+    )
     return true
   } catch (error) {
     console.error("Error in linkSessionToUser:", error)
@@ -299,7 +312,7 @@ export async function findAndLinkSessions(): Promise<{ success: boolean; linkedC
       const success = await linkSessionIfUnlinked(localStorageSessionId, authUserId)
       if (success) linkedCount++
     }
-    
+
     // Strategy 1.1: Check for recent saju sessions that might belong to this user
     try {
       console.log(`Looking for recent unlinked sessions that might belong to user ${authUserId}`)
@@ -754,7 +767,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         daeunData.pillars.length > 0 &&
         daeunData.pillars.every((p: any) => p.stem === "갑" && p.branch === "자"))
     ) {
-      console.log(`Session ${sessionId}: 대운 데이터가 없거나 ���못됨, 새로 계산합니다.`)
+      console.log(`Session ${sessionId}: 대운 데이터가 없거나 잘못됨, 새로 계산합니다.`)
 
       // 대운 계산에 필요한 데이터가 있는지 확인
       if (
