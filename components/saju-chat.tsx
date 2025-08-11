@@ -20,7 +20,6 @@ import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SiteHeader } from "@/components/site-header"
-import { useGuestUsage } from "@/hooks/use-guest-usage"
 import { SignupDialog } from "@/components/signup-dialog"
 import { TermsDialog } from "@/components/terms-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
@@ -180,8 +179,6 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
-  const { count, limit, isOverLimit, increment, reset } = useGuestUsage(5)
-
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
     const compressedSajuObject =
@@ -279,8 +276,6 @@ export default function SajuChat({
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
           }
-          // 로그인한 사용자의 새로운 채팅방(첫 번째가 아닌)에서는 자동 질문 비활성화
-          // shouldSendInitialQuestions가 true이지만 isFirstRoom이 false인 경우는 아무것도 하지 않음
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
@@ -308,8 +303,6 @@ export default function SajuChat({
     },
   })
 
-  // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
-
   useEffect(() => {
     if (
       isInitialQuestionsMode &&
@@ -324,8 +317,6 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-  // Remove the second question useEffect completely
-
   useEffect(() => {
     const endInitialMode = () => {
       console.log("✅ [Flow] Ending initial questions mode.")
@@ -334,14 +325,11 @@ export default function SajuChat({
     }
 
     if (isInitialQuestionsMode && !isLoading) {
-      // End after first response for both first room and non-first room
       if (messages.length === 2 && messages[1].role === "assistant") {
         endInitialMode()
       }
     }
   }, [isInitialQuestionsMode, isLoading, messages])
-
-  // --- End of fundamental fix ---
 
   useEffect(() => {
     const saveNewMessages = async () => {
@@ -431,13 +419,11 @@ export default function SajuChat({
   const scrollToLastUserMessage = () => {
     if (!chatContainerRef.current) return
 
-    // Find the last user message element
     const container = chatContainerRef.current
     const messageElements = container.querySelectorAll('[data-role="user"]')
     const lastUserMessageElement = messageElements[messageElements.length - 1]
 
     if (lastUserMessageElement) {
-      // Scroll so the user message appears at the top of the viewport
       const containerRect = container.getBoundingClientRect()
       const messageRect = lastUserMessageElement.getBoundingClientRect()
       const scrollTop = container.scrollTop + messageRect.top - containerRect.top
@@ -448,10 +434,8 @@ export default function SajuChat({
 
   const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
     try {
-      // Save current location for redirect after auth
       localStorage.setItem("auth_return_url", window.location.href)
 
-      // Redirect to auth provider
       if (provider === "kakao") {
         window.location.href = `/api/auth/login?provider=kakao`
       } else if (provider === "google") {
@@ -468,10 +452,8 @@ export default function SajuChat({
     if (!user) return
 
     try {
-      // Get the current session from localStorage
       const sessionId = localStorage.getItem("current_session_id") || localStorage.getItem("user_id") || user.id
 
-      // Update saju_sessions table
       const { error } = await supabase.from("saju_sessions").upsert({
         id: sessionId,
         auth_user_id: user.id,
@@ -496,11 +478,9 @@ export default function SajuChat({
   const prevMessageCountRef = useRef(0)
 
   useEffect(() => {
-    // Scroll to show new user message at the top when a NEW user message is sent
     if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
       const lastMessage = messages[messages.length - 1]
       if (lastMessage && lastMessage.role === "user") {
-        // Use setTimeout to ensure DOM is updated first
         setTimeout(() => {
           scrollToLastUserMessage()
         }, 100)
@@ -521,17 +501,8 @@ export default function SajuChat({
   }, [messages.length])
 
   useEffect(() => {
-    // Reset guest usage when user logs in
-    if (user) {
-      reset()
-      localStorage.removeItem("previous_user_message_count")
-    }
-  }, [user, reset])
-
-  useEffect(() => {
-    // Check if logged in user needs to agree to terms
     const checkTermsAgreement = async () => {
-      if (!user) return // Don't show terms dialog for non-logged in users
+      if (!user) return
 
       try {
         const { data: sessionData } = await supabase
@@ -541,10 +512,17 @@ export default function SajuChat({
           .single()
 
         if (!sessionData || sessionData.privacy !== true) {
-          // Determine provider label
-          const provider = user.app_metadata?.provider || "unknown"
-          setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
-          setShowTermsDialog(true)
+          const { data: existingData } = await supabase
+            .from("saju_sessions")
+            .select("id")
+            .eq("auth_user_id", user.id)
+            .limit(1)
+
+          if (!existingData || existingData.length === 0) {
+            const provider = user.app_metadata?.provider || "unknown"
+            setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
+            setShowTermsDialog(true)
+          }
         }
       } catch (error) {
         console.error("Error checking terms agreement:", error)
@@ -553,26 +531,6 @@ export default function SajuChat({
 
     checkTermsAgreement()
   }, [user, supabase])
-
-  useEffect(() => {
-    // Increment guest usage when user sends a message (not logged in)
-    if (!user && messages.length > 0) {
-      const userMessages = messages.filter((msg: any) => msg.role === "user")
-      const currentUserMessageCount = userMessages.length
-
-      // localStorage에서 이전 메시지 개수 가져오기
-      const previousCount = Number.parseInt(localStorage.getItem("previous_user_message_count") || "0", 10)
-
-      // 새로운 사용자 메시지가 있으면 카운트 증가 (자동 초기 메시지 포함)
-      if (currentUserMessageCount > previousCount) {
-        const newMessagesCount = currentUserMessageCount - previousCount
-        for (let i = 0; i < newMessagesCount; i++) {
-          increment()
-        }
-        localStorage.setItem("previous_user_message_count", currentUserMessageCount.toString())
-      }
-    }
-  }, [messages, user, increment])
 
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
@@ -609,11 +567,9 @@ export default function SajuChat({
   }
 
   const shouldShowSajuDiagram = (index: number) => {
-    // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
     if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
       return true
     }
-    // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
     if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
       return true
     }
@@ -621,18 +577,15 @@ export default function SajuChat({
   }
 
   const shouldShowDaeunDiagram = (index: number) => {
-    // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
     return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
   }
 
   return (
     <div className="flex h-screen-mobile bg-white">
-      {/* Mobile Header - only show on mobile */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
         <SiteHeader />
       </div>
 
-      {/* Sidebar for desktop */}
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -681,7 +634,6 @@ export default function SajuChat({
                   <div className="space-y-3 sm:space-y-4">
                     {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
                       <div className="flex flex-col lg:flex-row gap-4 max-w-full">
-                        {/* 대운 다이어그램을 왼쪽에 배치 */}
                         {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
                           <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0 order-1 lg:order-1">
                             <DaeunDiagram
@@ -692,7 +644,6 @@ export default function SajuChat({
                             />
                           </div>
                         )}
-                        {/* 사주 다이어그램을 오른쪽에 배치 */}
                         {shouldShowSajuDiagram(index) && (
                           <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0 order-2 lg:order-2">
                             <SajuDiagram
@@ -719,7 +670,6 @@ export default function SajuChat({
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
-                          // 제목들 스타일링
                           h1: ({ children }) => (
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 mt-8 pb-3 border-b-2 border-gray-200 first:mt-0">
                               {children}
@@ -736,17 +686,14 @@ export default function SajuChat({
                           h4: ({ children }) => (
                             <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">{children}</h4>
                           ),
-                          // 단락 스타일링
                           p: ({ children }) => (
                             <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
                               {children}
                             </p>
                           ),
-                          // 구분선 스타일링
                           hr: () => (
                             <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                           ),
-                          // 리스트 스타일링
                           ul: ({ children }) => <ul className="space-y-2 mb-4 pl-0">{children}</ul>,
                           ol: ({ children }) => <ol className="space-y-2 mb-4 pl-0 counter-reset-item">{children}</ol>,
                           li: ({ children, ordered }) => (
@@ -760,14 +707,12 @@ export default function SajuChat({
                               <span className="flex-1">{children}</span>
                             </li>
                           ),
-                          // 강조 텍스트 스타일링
                           strong: ({ children }) => (
                             <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
                               {children}
                             </strong>
                           ),
                           em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
-                          // 코드 블록 스타일링
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {
@@ -788,13 +733,11 @@ export default function SajuChat({
                               {children}
                             </pre>
                           ),
-                          // 인용문 스타일링
                           blockquote: ({ children }) => (
                             <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 my-4 italic text-gray-700">
                               {children}
                             </blockquote>
                           ),
-                          // 테이블 스타일링
                           table: ({ children }) => (
                             <div className="overflow-x-auto mb-4">
                               <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
@@ -867,19 +810,7 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form
-              onSubmit={(e) => {
-                // Check if user is over limit before submitting - only for non-logged in users
-                const userMessageCount = messages.filter((msg: any) => msg.role === "user").length
-                if (!user && userMessageCount >= limit) {
-                  e.preventDefault()
-                  setShowSignupDialog(true)
-                  return
-                }
-                handleSubmit(e)
-              }}
-              className="flex gap-2 items-center"
-            >
+            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
@@ -914,45 +845,21 @@ export default function SajuChat({
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={
-                  !input.trim() ||
-                  isLoading ||
-                  isInitialQuestionsMode ||
-                  (!user && messages.filter((msg: any) => msg.role === "user").length >= limit)
-                }
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </form>
-            {/* Message counter for guests - positioned below input like ChatGPT */}
-            {!user && (
-              <div className="flex justify-center mt-2">
-                <div
-                  className={`text-xs text-center ${
-                    messages.filter((msg: any) => msg.role === "user").length >= limit
-                      ? "text-red-600"
-                      : messages.filter((msg: any) => msg.role === "user").length >= limit - 1
-                        ? "text-orange-600"
-                        : "text-gray-500"
-                  }`}
-                >
-                  {/* Show remaining messages based on actual user message count */}
-                  무료 메시지 {Math.max(0, limit - messages.filter((msg: any) => msg.role === "user").length)}/{limit}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Signup Dialog */}
       <SignupDialog
         open={showSignupDialog}
         onOpenChange={setShowSignupDialog}
         onSelectProvider={handleSignupProvider}
       />
 
-      {/* Terms Dialog */}
       <TermsDialog
         open={showTermsDialog}
         onOpenChange={setShowTermsDialog}
