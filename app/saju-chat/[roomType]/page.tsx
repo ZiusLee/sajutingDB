@@ -6,10 +6,9 @@ import SajuChat from "@/components/saju-chat"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
-import { createTemporaryChatRoom, getChatRooms } from "@/lib/chat-room-service"
+import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { SignupDialog } from "@/components/signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
-import { getSessionMessages } from "@/lib/message-service"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -53,37 +52,6 @@ export default function SajuChatPage() {
       }
     }
   }, [handleSidebarToggle])
-
-  // Helper function to find the best chat room to redirect to
-  const findBestChatRoom = async (sessionId: string) => {
-    try {
-      const chatRooms = await getChatRooms(sessionId)
-
-      if (chatRooms.length === 0) {
-        return null // No existing chat rooms
-      }
-
-      // Sort by creation date (oldest first)
-      const sortedRooms = chatRooms.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-
-      // Check the first (oldest) chat room
-      const firstRoom = sortedRooms[0]
-      const messages = await getSessionMessages(sessionId, firstRoom.id)
-
-      // If the first room has only 1 message (the initial auto-generated message)
-      // or is empty, redirect to it
-      if (messages.length <= 1) {
-        console.log(`Found first chat room with ${messages.length} messages, redirecting to:`, firstRoom.id)
-        return firstRoom.id
-      }
-
-      // Otherwise, create a new temporary chat room
-      return null
-    } catch (error) {
-      console.error("Error finding best chat room:", error)
-      return null
-    }
-  }
 
   useEffect(() => {
     let isMounted = true
@@ -167,30 +135,18 @@ export default function SajuChatPage() {
           }
 
           let chatRoom = null
-
           if (!roomId) {
-            // No roomId specified, find the best chat room to use
-            const bestRoomId = await findBestChatRoom(sessionId)
+            chatRoom = createTemporaryChatRoom({
+              sessionId,
+              title: "새로운 대화",
+              roomType: roomType || "sajuping",
+              isTemporary: true,
+            })
 
-            if (bestRoomId) {
-              // Redirect to the existing chat room
-              const newUrl = `/saju-chat/${roomType}?roomId=${bestRoomId}`
-              window.history.replaceState({}, "", newUrl)
-              setCurrentChatRoom({ id: bestRoomId, isTemporary: false })
-            } else {
-              // Create a new temporary chat room
-              chatRoom = createTemporaryChatRoom({
-                sessionId,
-                title: "새로운 대화",
-                roomType: roomType || "sajuping",
-                isTemporary: true,
-              })
+            setCurrentChatRoom(chatRoom)
 
-              setCurrentChatRoom(chatRoom)
-
-              const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
-              window.history.replaceState({}, "", newUrl)
-            }
+            const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+            window.history.replaceState({}, "", newUrl)
           } else {
             setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
           }
@@ -276,10 +232,7 @@ export default function SajuChatPage() {
         const currentUrl = window.location.href
         const sessionId = localStorage.getItem("saju_session_id")
 
-        // Store chat streaming state to continue after login
         localStorage.setItem("auth_return_url", currentUrl)
-        localStorage.setItem("continue_chat_after_auth", "true")
-
         if (sessionId) {
           localStorage.setItem("pending_session_link", sessionId)
         }
