@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from 'lucide-react'
+import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -20,6 +20,10 @@ import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SiteHeader } from "@/components/site-header"
+import { useGuestUsage } from "@/hooks/use-guest-usage"
+import { SignupDialog } from "@/components/signup-dialog"
+import { TermsDialog } from "@/components/terms-dialog"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface SajuChatProps {
   saju: any
@@ -85,7 +89,7 @@ const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): 
 const getInitialUserQuestions = (name: string, roomType: string, concerns: string[] = []): string[] => {
   if (roomType === "sajuping") {
     const firstQuestion = "내 사주팔자의 성격과 기질을 오행과 일주를 바탕으로 분석해줘"
-    
+
     // 첫 번째 질문만 반환
     const questions = [firstQuestion]
     console.log("🎯 Generated exactly 1 initial question:", questions)
@@ -135,6 +139,10 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
+  const [showSignupDialog, setShowSignupDialog] = useState(false)
+  const [showTermsDialog, setShowTermsDialog] = useState(false)
+  const [providerLabel, setProviderLabel] = useState("")
+  const supabase = createClientComponentClient()
 
   const sessionId = useMemo(() => {
     try {
@@ -171,6 +179,8 @@ export default function SajuChat({
   const stableConcerns = useMemo(() => (concerns ? [...concerns] : []), [JSON.stringify(concerns)])
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
+
+  const { count, limit, isOverLimit, increment, reset } = useGuestUsage(5)
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
@@ -314,22 +324,22 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-// Remove the second question useEffect completely
+  // Remove the second question useEffect completely
 
-useEffect(() => {
-  const endInitialMode = () => {
-    console.log("✅ [Flow] Ending initial questions mode.")
-    setIsInitialQuestionsMode(false)
-    setInitialQuestionsToSend([])
-  }
-
-  if (isInitialQuestionsMode && !isLoading) {
-    // End after first response for both first room and non-first room
-    if (messages.length === 2 && messages[1].role === "assistant") {
-      endInitialMode()
+  useEffect(() => {
+    const endInitialMode = () => {
+      console.log("✅ [Flow] Ending initial questions mode.")
+      setIsInitialQuestionsMode(false)
+      setInitialQuestionsToSend([])
     }
-  }
-}, [isInitialQuestionsMode, isLoading, messages])
+
+    if (isInitialQuestionsMode && !isLoading) {
+      // End after first response for both first room and non-first room
+      if (messages.length === 2 && messages[1].role === "assistant") {
+        endInitialMode()
+      }
+    }
+  }, [isInitialQuestionsMode, isLoading, messages])
 
   // --- End of fundamental fix ---
 
@@ -414,13 +424,95 @@ useEffect(() => {
       chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: "smooth" })
   }
 
+  const scrollToTop = () => {
+    if (chatContainerRef.current)
+      chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const scrollToLastUserMessage = () => {
+    if (!chatContainerRef.current) return
+    
+    // Find the last user message element
+    const container = chatContainerRef.current
+    const messageElements = container.querySelectorAll('[data-role="user"]')
+    const lastUserMessageElement = messageElements[messageElements.length - 1]
+    
+    if (lastUserMessageElement) {
+      // Scroll so the user message appears at the top of the viewport
+      const containerRect = container.getBoundingClientRect()
+      const messageRect = lastUserMessageElement.getBoundingClientRect()
+      const scrollTop = container.scrollTop + messageRect.top - containerRect.top
+      
+      container.scrollTo({ top: scrollTop, behavior: "smooth" })
+    }
+  }
+
+  const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
+    try {
+      // Save current location for redirect after auth
+      localStorage.setItem("auth_return_url", window.location.href)
+      
+      // Redirect to auth provider
+      if (provider === "kakao") {
+        window.location.href = `/api/auth/login?provider=kakao`
+      } else if (provider === "google") {
+        window.location.href = `/api/auth/login?provider=google`
+      }
+      setShowSignupDialog(false)
+    } catch (error) {
+      console.error("Signup error:", error)
+      toast.error("로그인 중 오류가 발생했습니다.")
+    }
+  }
+
+  const handleTermsAgree = async () => {
+    if (!user) return
+
+    try {
+      // Get the current session from localStorage
+      const sessionId = localStorage.getItem("current_session_id") || 
+                       localStorage.getItem("user_id") ||
+                       user.id
+
+      // Update saju_sessions table
+      const { error } = await supabase
+        .from("saju_sessions")
+        .upsert({
+          id: sessionId,
+          auth_user_id: user.id,
+          privacy: true,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) {
+        console.error("Error updating saju_sessions:", error)
+        toast.error("사용자 정보 업데이트 중 오류가 발생했습니다.")
+        return
+      }
+
+      setShowTermsDialog(false)
+      toast.success("회원가입이 완료되었습니다!")
+      
+    } catch (error) {
+      console.error("Terms agreement error:", error)
+      toast.error("약관 동의 처리 중 오류가 발생했습니다.")
+    }
+  }
+
+  const prevMessageCountRef = useRef(0)
+
   useEffect(() => {
-    if (chatContainerRef.current && !isTransitioningRef.current) {
-      const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current
-      if (scrollHeight - scrollTop - clientHeight < 100 || messages.length === 1) {
-        scrollToBottom()
+    // Scroll to show new user message at the top when a NEW user message is sent
+    if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && lastMessage.role === "user") {
+        // Use setTimeout to ensure DOM is updated first
+        setTimeout(() => {
+          scrollToLastUserMessage()
+        }, 100)
       }
     }
+    prevMessageCountRef.current = messages.length
   }, [messages])
 
   useEffect(() => {
@@ -433,6 +525,60 @@ useEffect(() => {
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
+
+  useEffect(() => {
+    // Reset guest usage when user logs in
+    if (user) {
+      reset()
+      localStorage.removeItem("previous_user_message_count")
+    }
+  }, [user, reset])
+
+  useEffect(() => {
+    // Check if logged in user needs to agree to terms
+    const checkTermsAgreement = async () => {
+      if (!user) return
+
+      try {
+        const { data: sessionData } = await supabase
+          .from("saju_sessions")
+          .select("privacy")
+          .eq("auth_user_id", user.id)
+          .single()
+
+        if (!sessionData || sessionData.privacy !== true) {
+          // Determine provider label
+          const provider = user.app_metadata?.provider || "unknown"
+          setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
+          setShowTermsDialog(true)
+        }
+      } catch (error) {
+        console.error("Error checking terms agreement:", error)
+      }
+    }
+
+    checkTermsAgreement()
+  }, [user, supabase])
+
+  useEffect(() => {
+    // Increment guest usage when user sends a message (not logged in)
+    if (!user && messages.length > 0) {
+      const userMessages = messages.filter((msg: any) => msg.role === "user")
+      const currentUserMessageCount = userMessages.length
+      
+      // localStorage에서 이전 메시지 개수 가져오기
+      const previousCount = parseInt(localStorage.getItem("previous_user_message_count") || "0", 10)
+      
+      // 새로운 사용자 메시지가 있으면 카운트 증가 (자동 초기 메시지 포함)
+      if (currentUserMessageCount > previousCount) {
+        const newMessagesCount = currentUserMessageCount - previousCount
+        for (let i = 0; i < newMessagesCount; i++) {
+          increment()
+        }
+        localStorage.setItem("previous_user_message_count", currentUserMessageCount.toString())
+      }
+    }
+  }, [messages, user, increment])
 
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
@@ -468,31 +614,31 @@ useEffect(() => {
     )
   }
 
-const shouldShowSajuDiagram = (index: number) => {
-  // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
-  if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
-    return true
+  const shouldShowSajuDiagram = (index: number) => {
+    // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
+    if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
+      return true
+    }
+    // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
+    if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
+      return true
+    }
+    return false
   }
-  // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
-  if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
-    return true
-  }
-  return false
-}
 
-const shouldShowDaeunDiagram = (index: number) => {
-  // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
-  return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
-}
+  const shouldShowDaeunDiagram = (index: number) => {
+    // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
+    return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
+  }
 
   return (
     <div className="flex h-screen-mobile bg-white">
-    {/* Mobile Header - only show on mobile */}
-    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
-      <SiteHeader />
-    </div>
-    
-    {/* Sidebar for desktop */}
+      {/* Mobile Header - only show on mobile */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
+        <SiteHeader />
+      </div>
+
+      {/* Sidebar for desktop */}
       <div className="hidden lg:block w-96 flex-shrink-0">
         <Sidebar
           saju={stableSaju}
@@ -522,10 +668,7 @@ const shouldShowDaeunDiagram = (index: number) => {
         </SheetContent>
       </Sheet>
       <div className="flex-1 flex flex-col min-w-0 h-screen-mobile pt-16 lg:pt-0">
-        <div
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto chat-messages-container chat-container-height"
-        >
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
           <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
@@ -535,7 +678,7 @@ const shouldShowDaeunDiagram = (index: number) => {
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "user" ? (
-                  <div className="flex justify-end">
+                  <div className="flex justify-end" data-role="user">
                     <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-2xl rounded-br-md max-w-[85%] sm:max-w-md text-sm sm:text-base leading-relaxed">
                       {message.content}
                     </div>
@@ -579,7 +722,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                       </div>
                     )}
                     <div className="ai-response-content">
-                      <ReactMarkdown 
+                      <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
                           // 제목들 스타일링
@@ -594,14 +737,10 @@ const shouldShowDaeunDiagram = (index: number) => {
                             </h2>
                           ),
                           h3: ({ children }) => (
-                            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5">
-                              {children}
-                            </h3>
+                            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 mt-5">{children}</h3>
                           ),
                           h4: ({ children }) => (
-                            <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">
-                              {children}
-                            </h4>
+                            <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">{children}</h4>
                           ),
                           // 단락 스타일링
                           p: ({ children }) => (
@@ -614,22 +753,16 @@ const shouldShowDaeunDiagram = (index: number) => {
                             <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                           ),
                           // 리스트 스타일링
-                          ul: ({ children }) => (
-                            <ul className="space-y-2 mb-4 pl-0">
-                              {children}
-                            </ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="space-y-2 mb-4 pl-0 counter-reset-item">
-                              {children}
-                            </ol>
-                          ),
+                          ul: ({ children }) => <ul className="space-y-2 mb-4 pl-0">{children}</ul>,
+                          ol: ({ children }) => <ol className="space-y-2 mb-4 pl-0 counter-reset-item">{children}</ol>,
                           li: ({ children, ordered }) => (
-                            <li className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
-                              ordered 
-                                ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5" 
-                                : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
-                            }`}>
+                            <li
+                              className={`flex items-start gap-3 text-base sm:text-lg leading-relaxed text-gray-700 ${
+                                ordered
+                                  ? "counter-increment-item before:content-[counter(item)] before:bg-gray-900 before:text-white before:text-sm before:font-medium before:rounded-full before:w-6 before:h-6 before:flex before:items-center before:justify-center before:flex-shrink-0 before:mt-0.5"
+                                  : "before:content-['•'] before:text-gray-400 before:font-bold before:text-xl before:flex-shrink-0 before:w-4 before:mt-0.5"
+                              }`}
+                            >
                               <span className="flex-1">{children}</span>
                             </li>
                           ),
@@ -639,11 +772,7 @@ const shouldShowDaeunDiagram = (index: number) => {
                               {children}
                             </strong>
                           ),
-                          em: ({ children }) => (
-                            <em className="italic text-gray-600 font-medium">
-                              {children}
-                            </em>
-                          ),
+                          em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
                           // 코드 블록 스타일링
                           code: ({ children, className }) => {
                             const isInline = !className
@@ -679,20 +808,14 @@ const shouldShowDaeunDiagram = (index: number) => {
                               </table>
                             </div>
                           ),
-                          thead: ({ children }) => (
-                            <thead className="bg-gray-50">
-                              {children}
-                            </thead>
-                          ),
+                          thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
                           th: ({ children }) => (
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-200">
                               {children}
                             </th>
                           ),
                           td: ({ children }) => (
-                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
-                              {children}
-                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">{children}</td>
                           ),
                         }}
                       >
@@ -718,9 +841,9 @@ const shouldShowDaeunDiagram = (index: number) => {
             )}
           </div>
         </div>
-        <div 
+        <div
           className={`border-t bg-white p-3 sm:p-4 flex-shrink-0 chat-input-container ${
-            isKeyboardOpen ? 'ios-keyboard-adjust' : 'pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4'
+            isKeyboardOpen ? "ios-keyboard-adjust" : "pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4"
           }`}
           style={isKeyboardOpen ? { paddingBottom: `max(12px, ${keyboardHeight}px)` } : {}}
         >
@@ -750,7 +873,16 @@ const shouldShowDaeunDiagram = (index: number) => {
                 ))}
               </div>
             )}
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+            <form onSubmit={(e) => {
+              // Check if user is over limit before submitting
+              const userMessageCount = messages.filter((msg: any) => msg.role === "user").length
+              if (!user && userMessageCount >= limit) {
+                e.preventDefault()
+                setShowSignupDialog(true)
+                return
+              }
+              handleSubmit(e)
+            }} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
@@ -785,14 +917,43 @@ const shouldShowDaeunDiagram = (index: number) => {
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode || (!user && messages.filter((msg: any) => msg.role === "user").length >= limit)}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </form>
+            {/* Message counter for guests - positioned below input like ChatGPT */}
+            {!user && (
+              <div className="flex justify-center mt-2">
+                <div
+                  className={`text-xs text-center ${
+                    messages.filter((msg: any) => msg.role === "user").length >= limit ? "text-red-600" : 
+                    messages.filter((msg: any) => msg.role === "user").length >= limit - 1 ? "text-orange-600" : "text-gray-500"
+                  }`}
+                >
+                  {/* Show remaining messages based on actual user message count */}
+                  무료 메시지 {Math.max(0, limit - messages.filter((msg: any) => msg.role === "user").length)}/{limit}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+      
+      {/* Signup Dialog */}
+      <SignupDialog
+        open={showSignupDialog}
+        onOpenChange={setShowSignupDialog}
+        onSelectProvider={handleSignupProvider}
+      />
+      
+      {/* Terms Dialog */}
+      <TermsDialog
+        open={showTermsDialog}
+        onOpenChange={setShowTermsDialog}
+        providerLabel={providerLabel}
+        onAgree={handleTermsAgree}
+      />
     </div>
   )
 }
