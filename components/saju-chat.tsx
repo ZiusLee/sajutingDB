@@ -1,7 +1,5 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
-import type React from "react"
-
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
@@ -139,8 +137,6 @@ export default function SajuChat({
   const [isInitialQuestionsMode, setIsInitialQuestionsMode] = useState(false)
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
-  const [userMessageCount, setUserMessageCount] = useState(0)
-  const shouldScrollToBottomRef = useRef(false)
   const [showSignupDialog, setShowSignupDialog] = useState(false)
 
   const sessionId = useMemo(() => {
@@ -179,7 +175,7 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
-  const { count, limit, isOverLimit, incrementOnMessage } = useGuestUsage(5)
+  const { count, limit, isOverLimit, increment, reset } = useGuestUsage(5)
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
@@ -272,10 +268,6 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
-          // Count existing user messages for guest usage tracking
-          const existingUserMessages = pastMessages.filter((msg) => msg.role === "user").length
-          setUserMessageCount(existingUserMessages)
-
           // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
           if (shouldSendInitialQuestions && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
@@ -304,54 +296,12 @@ export default function SajuChat({
     onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
-      // Ensure we stay at bottom after streaming completes
-      if (shouldScrollToBottomRef.current) {
-        setTimeout(() => {
-          scrollToBottom()
-          shouldScrollToBottomRef.current = false
-        }, 100)
-      }
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
     },
   })
-
-  // Custom handleSubmit to track guest usage properly and show signup dialog
-  const customHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    // Check if guest user is over limit
-    if (!user && isOverLimit) {
-      setShowSignupDialog(true)
-      return
-    }
-
-    // Increment guest usage counter when user sends a message
-    if (!user && input.trim()) {
-      incrementOnMessage()
-      setUserMessageCount((prev) => prev + 1)
-      shouldScrollToBottomRef.current = true
-    }
-
-    // Call the original handleSubmit
-    handleSubmit(e)
-  }
-
-  // Handle suggested question clicks for guests
-  const handleSuggestedQuestionClick = (question: string) => {
-    if (isLoading) return
-
-    // Check if guest user is over limit
-    if (!user && isOverLimit) {
-      setShowSignupDialog(true)
-      return
-    }
-
-    setInput(question)
-    setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
-  }
 
   // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
 
@@ -449,6 +399,12 @@ export default function SajuChat({
     }
   }, [transitionMessages])
 
+  const handleSuggestedQuestionClick = (question: string) => {
+    if (isLoading) return
+    setInput(question)
+    setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
+  }
+
   const handleChatRoomSelect = (chatRoomId: string) => {
     if (window.innerWidth < 1024) setSidebarOpen(false)
     window.location.href = `/saju-chat/${roomType}?roomId=${chatRoomId}`
@@ -459,29 +415,33 @@ export default function SajuChat({
   }
 
   const scrollToBottom = () => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      })
+    if (chatContainerRef.current)
+      chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: "smooth" })
+  }
+
+  const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
+    try {
+      // Save current location for redirect after auth
+      localStorage.setItem("auth_return_url", window.location.href)
+      
+      // Redirect to auth provider
+      if (provider === "kakao") {
+        window.location.href = `/api/auth/login?provider=kakao`
+      } else if (provider === "google") {
+        window.location.href = `/api/auth/login?provider=google`
+      }
+      setShowSignupDialog(false)
+    } catch (error) {
+      console.error("Signup error:", error)
+      toast.error("로그인 중 오류가 발생했습니다.")
     }
   }
 
-  // Improved scroll behavior - always scroll to bottom for new messages
   useEffect(() => {
     if (chatContainerRef.current && !isTransitioningRef.current) {
-      const container = chatContainerRef.current
-      const { scrollHeight, scrollTop, clientHeight } = container
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200
-
-      // Always scroll to bottom for new messages or if user is near bottom
-      if (messages.length === 1 || isNearBottom || shouldScrollToBottomRef.current) {
-        setTimeout(() => {
-          container.scrollTo({
-            top: container.scrollHeight,
-            behavior: messages.length === 1 ? "auto" : "smooth",
-          })
-        }, 50)
+      const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current
+      if (scrollHeight - scrollTop - clientHeight < 100 || messages.length === 1) {
+        scrollToBottom()
       }
     }
   }, [messages])
@@ -496,6 +456,34 @@ export default function SajuChat({
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
+
+  useEffect(() => {
+    // Reset guest usage when user logs in
+    if (user) {
+      reset()
+      localStorage.removeItem("previous_user_message_count")
+    }
+  }, [user, reset])
+
+  useEffect(() => {
+    // Increment guest usage when user sends a message (not logged in)
+    if (!user && messages.length > 0) {
+      const userMessages = messages.filter((msg) => msg.role === "user")
+      const currentUserMessageCount = userMessages.length
+      
+      // localStorage에서 이전 메시지 개수 가져오기
+      const previousCount = parseInt(localStorage.getItem("previous_user_message_count") || "0", 10)
+      
+      // 새로운 사용자 메시지가 있으면 카운트 증가
+      if (currentUserMessageCount > previousCount) {
+        const newMessagesCount = currentUserMessageCount - previousCount
+        for (let i = 0; i < newMessagesCount; i++) {
+          increment()
+        }
+        localStorage.setItem("previous_user_message_count", currentUserMessageCount.toString())
+      }
+    }
+  }, [messages, user, increment])
 
   const suggestedQuestions = useMemo(
     () => generateSuggestedQuestions(stableConcerns, roomType),
@@ -790,7 +778,15 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={customHandleSubmit} className="flex gap-2 items-center">
+            <form onSubmit={(e) => {
+              // Check if user is over limit before submitting
+              if (!user && isOverLimit) {
+                e.preventDefault()
+                setShowSignupDialog(true)
+                return
+              }
+              handleSubmit(e)
+            }} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
@@ -825,7 +821,7 @@ export default function SajuChat({
                 type="submit"
                 size="icon"
                 className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode || (!user && isOverLimit)}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
@@ -845,9 +841,13 @@ export default function SajuChat({
           </div>
         </div>
       </div>
-
+      
       {/* Signup Dialog */}
-      <SignupDialog open={showSignupDialog} onOpenChange={setShowSignupDialog} trigger="message_limit" />
+      <SignupDialog
+        open={showSignupDialog}
+        onOpenChange={setShowSignupDialog}
+        onSelectProvider={handleSignupProvider}
+      />
     </div>
   )
 }

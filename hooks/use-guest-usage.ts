@@ -47,18 +47,6 @@ export function useGuestUsage(limit = 5) {
     }
   }, [])
 
-  // New function to increment on each message send
-  const incrementOnMessage = useCallback(() => {
-    try {
-      const current = Number.parseInt(localStorage.getItem(STORAGE_KEY_COUNT) || "0", 10) || 0
-      const next = current + 1
-      localStorage.setItem(STORAGE_KEY_COUNT, String(next))
-      setCount(next)
-    } catch {
-      // ignore
-    }
-  }, [])
-
   const increment = useCallback(() => {
     try {
       const current = Number.parseInt(localStorage.getItem(STORAGE_KEY_COUNT) || "0", 10) || 0
@@ -88,7 +76,6 @@ export function useGuestUsage(limit = 5) {
     isOverLimit,
     increment,
     incrementOncePerVisit,
-    incrementOnMessage,
     reset,
   }
 }
