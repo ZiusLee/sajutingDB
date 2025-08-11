@@ -1,25 +1,23 @@
 "use client"
-
-import type * as React from "react"
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { X } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { getSupabase } from "@/lib/supabase-client"
 import { toast } from "@/hooks/use-toast"
 
-type Provider = "kakao" | "google" | "apple"
+type Provider = "kakao" | "google"
 
 export interface SignupDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelectProvider: (provider: Provider) => void
+  forceOpen?: boolean
 }
 
-export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDialogProps) {
+export function SignupDialog({ open, onOpenChange, onSelectProvider, forceOpen = false }: SignupDialogProps) {
   const [showTerms, setShowTerms] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
   const [serviceTermsChecked, setServiceTermsChecked] = useState(false)
@@ -30,7 +28,6 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
   const canProceed = serviceTermsChecked && privacyChecked
 
   const handleProviderSelect = (provider: Provider) => {
-    if (provider === "apple") return // currently disabled
     setSelectedProvider(provider)
     setShowTerms(true)
   }
@@ -76,6 +73,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
   }
 
   const handleClose = () => {
+    if (forceOpen) return
     onOpenChange(false)
     // Reset state
     setShowTerms(false)
@@ -86,70 +84,86 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
     setIsLoading(false)
   }
 
-  const providerLabel = selectedProvider === "kakao" ? "카카오" : selectedProvider === "google" ? "구글" : "Apple"
+  const providerLabel = selectedProvider === "kakao" ? "카카오" : "구글"
 
   return (
     <>
       {/* Main signup dialog */}
       <Dialog open={open && !showTerms && !showPrivacyDetails} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md rounded-2xl shadow-xl p-0 overflow-hidden">
-          <div className="p-6">
-            <DialogHeader className="space-y-3 text-center">
-              <DialogTitle className="text-xl font-bold leading-tight tracking-tight">
-                지금 계정을 연동하고
-3초만에 사주 분석을 받아보세요.
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                로그인하면 더 많은 기능을 이용할 수 있습니다
-              </DialogDescription>
-            </DialogHeader>
+        <DialogContent
+          className="sm:max-w-md rounded-2xl shadow-xl p-0 overflow-hidden"
+          // forceOpen이 true면 ESC 키로도 닫을 수 없음
+          onEscapeKeyDown={forceOpen ? (e) => e.preventDefault() : undefined}
+          // forceOpen이 true면 overlay 클릭으로도 닫을 수 없음
+          onPointerDownOutside={forceOpen ? (e) => e.preventDefault() : undefined}
+        >
+          <DialogHeader className="space-y-3 text-center relative">
+            <DialogTitle className="text-xl font-bold leading-tight tracking-tight">
+              지금 계정을 연동하고
+              <br />
+              3초만에 사주 분석을 받아보세요.
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              로그인하면 더 많은 기능을 이용할 수 있습니다
+            </DialogDescription>
+            {/* forceOpen이 true면 X 버튼을 숨김 */}
+            {!forceOpen && (
+              <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-6 w-6" onClick={handleClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </DialogHeader>
 
-            <div className="mt-8">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Kakao */}
-                <ProviderButton
-                  label="카카오로 시작하기"
-                  bgClass="bg-[#FEE500] hover:bg-[#E6CF00] text-black"
-                  onClick={() => handleProviderSelect("kakao")}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M12 3C6.48 3 2 6.48 2 10.8C2 13.8 3.92 16.44 6.76 17.88L5.6 21.48C5.52 21.72 5.76 21.96 6 21.84L10.32 19.2C10.88 19.28 11.44 19.32 12 19.32C17.52 19.32 22 15.84 22 10.8C22 6.48 17.52 3 12 3Z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                  <span className="ml-2 text-sm font-medium">카카오</span>
-                </ProviderButton>
+          <div className="mt-8">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Kakao */}
+              <Button
+                onClick={() => handleProviderSelect("kakao")}
+                className="h-12 px-4 rounded-lg inline-flex items-center justify-center shadow-sm transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary bg-[#FEE500] hover:bg-[#E6CF00] text-black"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M12 3C6.48 3 2 6.48 2 10.8C2 13.8 3.92 16.44 6.76 17.88L5.6 21.48C5.52 21.72 5.76 21.96 6 21.84L10.32 19.2C10.88 19.28 11.44 19.32 12 19.32C17.52 19.32 22 15.84 22 10.8C22 6.48 17.52 3 12 3Z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span className="ml-2 text-sm font-medium">카카오</span>
+              </Button>
 
-                {/* Google */}
-                <ProviderButton
-                  label="구글로 시작하기"
-                  bgClass="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
-                  onClick={() => handleProviderSelect("google")}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                  <span className="ml-2 text-sm font-medium">구글</span>
-                </ProviderButton>
-              </div>
+              {/* Google */}
+              <Button
+                onClick={() => handleProviderSelect("google")}
+                variant="outline"
+                className="h-12 px-4 rounded-lg inline-flex items-center justify-center shadow-sm transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    fill="#34A853"
+                  />
+                  <path
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    fill="#EA4335"
+                  />
+                </svg>
+                <span className="ml-2 text-sm font-medium">구글</span>
+              </Button>
             </div>
           </div>
+
+          {forceOpen && (
+            <div className="text-center text-xs text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg">
+              💡 회원가입을 완료해야 사주핑을 계속 이용할 수 있습니다
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -190,13 +204,13 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
                 </label>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-xs text-muted-foreground">개인정보 수집 및 이용에 관한 동의입니다.</p>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setShowPrivacyDetails(true)}
                     className="text-xs text-blue-600 hover:text-blue-800 underline"
                   >
                     자세히
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -298,36 +312,5 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
         </DialogContent>
       </Dialog>
     </>
-  )
-}
-
-function ProviderButton({
-  children,
-  label,
-  onClick,
-  bgClass,
-  disabled,
-}: {
-  children: React.ReactNode
-  label: string
-  onClick?: () => void
-  bgClass?: string
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "h-12 px-4 rounded-lg inline-flex items-center justify-center shadow-sm transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary",
-        bgClass,
-        disabled && "cursor-not-allowed opacity-60",
-        "hover:scale-[1.02] active:scale-[0.98]",
-      )}
-    >
-      {children}
-    </button>
   )
 }

@@ -23,6 +23,7 @@ export default function SajuChatPage() {
   const [currentChatRoom, setCurrentChatRoom] = useState(null)
   const [isLoadingOAuth, setIsLoadingOAuth] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
+  const [forceSignupOpen, setForceSignupOpen] = useState(false)
 
   const supabase = getSupabase()
 
@@ -175,7 +176,8 @@ export default function SajuChatPage() {
 
               const timer = setTimeout(() => {
                 setSignupOpen(true)
-              }, 1500)
+                setForceSignupOpen(true) // 강제로 열린 상태로 설정
+              }, 4000)
 
               return () => clearTimeout(timer)
             } else if (!error && data && data.auth_user_id) {
@@ -330,7 +332,17 @@ export default function SajuChatPage() {
         onChatRoomPersisted={handleChatRoomPersisted}
       />
 
-      <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
+      <SignupDialog
+        open={signupOpen}
+        onOpenChange={(open) => {
+          if (!forceSignupOpen) {
+            setSignupOpen(open)
+          }
+          // forceSignupOpen이 true면 닫을 수 없음
+        }}
+        onSelectProvider={handleOAuth}
+        forceOpen={forceSignupOpen}
+      />
     </div>
   )
 }
