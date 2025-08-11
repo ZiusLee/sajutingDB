@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -63,6 +63,13 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const [citySearchResults, setCitySearchResults] = useState<CityTimezoneData[]>([])
   const [showCityDropdown, setShowCityDropdown] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    // Set onboarding start time when component mounts
+    if (!localStorage.getItem("onboarding_start_time")) {
+      localStorage.setItem("onboarding_start_time", Date.now().toString())
+    }
+  }, [])
 
   const handleNext = () => {
     if (currentStep < 5) {

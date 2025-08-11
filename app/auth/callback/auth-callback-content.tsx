@@ -40,30 +40,41 @@ export default function AuthCallbackContent() {
 
           if (sessionId) {
             console.log("Found existing saju_session ID, updating auth_user_id:", sessionId)
-            
+
             try {
               // Update auth_user_id for existing session
               console.log("Updating auth_user_id for session:", sessionId, "with auth user:", authUserId)
               const success = await updateAuthUserId(sessionId, authUserId)
-              
+
               if (success) {
                 console.log("Successfully updated auth_user_id for saju session:", sessionId)
                 linkedAnySession = true
-                
+
                 // Clean up tempSajuData since session is now linked
                 localStorage.removeItem("tempSajuData")
-                
+
                 toast({
                   title: "로그인 완료",
                   description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
                 })
 
-                // Check for stored auth return URL (from saju-chat) to return to exact same room
                 const authReturnUrl = localStorage.getItem("auth_return_url")
                 if (authReturnUrl) {
                   console.log("Returning to original chat room:", authReturnUrl)
                   localStorage.removeItem("auth_return_url")
+
+                  const streamKeys = Object.keys(localStorage).filter((key) => key.startsWith("chat-stream-"))
+                  const sessionData = localStorage.getItem("current_saju")
+                  const tempSajuData = localStorage.getItem("tempSajuData")
+
+                  console.log("Preserving stream states:", streamKeys)
+                  console.log("Preserving session data:", !!sessionData)
+
+                  // Don't remove tempSajuData if we're returning to the same chat room
+                  // It will be cleaned up after successful session linking
+
                   router.push(authReturnUrl)
+                  return
                 } else {
                   // Fallback: Navigate to generic chat
                   router.push("/saju-chat/sajuping")
@@ -79,12 +90,24 @@ export default function AuthCallbackContent() {
 
           // Check for stored auth return URL (from saju-chat)
           const authReturnUrl = localStorage.getItem("auth_return_url")
-          let redirectUrl = "/mypage" // default
+          const redirectUrl = "/mypage" // default
 
           if (authReturnUrl) {
-            console.log("Found auth return URL:", authReturnUrl)
-            redirectUrl = authReturnUrl
-            localStorage.removeItem("auth_return_url") // Clean up
+            console.log("Returning to original chat room:", authReturnUrl)
+            localStorage.removeItem("auth_return_url")
+
+            const streamKeys = Object.keys(localStorage).filter((key) => key.startsWith("chat-stream-"))
+            const sessionData = localStorage.getItem("current_saju")
+            const tempSajuData = localStorage.getItem("tempSajuData")
+
+            console.log("Preserving stream states:", streamKeys)
+            console.log("Preserving session data:", !!sessionData)
+
+            // Don't remove tempSajuData if we're returning to the same chat room
+            // It will be cleaned up after successful session linking
+
+            router.push(authReturnUrl)
+            return
           }
 
           // Default redirect with appropriate message
@@ -99,7 +122,7 @@ export default function AuthCallbackContent() {
               description: "성공적으로 로그인되었습니다.",
             })
           }
-          
+
           router.push(redirectUrl)
         } else {
           console.log("No session found after auth callback")
