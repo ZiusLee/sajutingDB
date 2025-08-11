@@ -11,7 +11,9 @@
   "dependencies": {
     "@ai-sdk/deepseek": "latest",
     "@ai-sdk/openai": "latest",
+    "@chakra-ui/react": "latest",
     "@emotion/is-prop-valid": "latest",
+    "@emotion/react": "latest",
     "@neondatabase/serverless": "^0.10.1",
     "@next/third-parties": "latest",
     "@radix-ui/react-accordion": "latest",
@@ -74,6 +76,7 @@
     "react-hook-form": "latest",
     "react-markdown": "latest",
     "react-resizable-panels": "latest",
+    "react-toastify": "latest",
     "recharts": "latest",
     "remark-gfm": "latest",
     "sonner": "latest",
