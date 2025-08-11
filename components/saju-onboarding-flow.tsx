@@ -11,7 +11,6 @@ import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
 import { syncLocalStorageToDatabase } from "@/lib/data-sync"
 import { getSupabase } from "@/lib/supabase-client"
-import { updateAuthUserId } from "@/lib/db-service"
 import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } from "@/lib/city-timezone-data"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { SajuLogo } from "./saju-logo"
@@ -145,7 +144,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
   const handleSignupSuccess = async (provider: "kakao" | "google" | "apple") => {
     try {
-      console.log("Signup success, attempting to link saju data...")
+      console.log("Signup success, attempting to save saju data to database...")
 
       // Wait a bit for auth state to settle
       await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -169,47 +168,40 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       const authUserId = session.user.id
       console.log("Authenticated user ID:", authUserId)
 
-      // Get the session ID from localStorage or pendingSajuData
-      const sessionId = localStorage.getItem("user_id") || pendingSajuData?.sessionId
+      // Now save the pending saju data to database with auth_user_id
+      if (pendingSajuData) {
+        console.log("Saving saju data to database with auth_user_id:", authUserId)
 
-      if (!sessionId) {
-        console.error("No session ID found to link")
-        toast({
-          title: "데이터 연결 실패",
-          description: "사주 데이터를 찾을 수 없습니다.",
-          variant: "destructive",
-        })
-        return
-      }
+        // Save to database with authenticated user ID
+        const userId = await syncLocalStorageToDatabase(authUserId)
 
-      console.log("Attempting to link session:", sessionId, "to auth user:", authUserId)
+        if (userId) {
+          console.log("Successfully saved saju data with session ID:", userId)
 
-      // Update the auth_user_id in the database
-      const success = await updateAuthUserId(sessionId, authUserId)
-
-      if (success) {
-        console.log("Successfully linked saju session to authenticated user")
-        toast({
-          title: "계정 연결 완료",
-          description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
-        })
-
-        // Navigate to chat with the linked data
-        if (pendingSajuData) {
+          // Update the chat data with the session ID
           const chatSajuData = {
             ...pendingSajuData,
-            sessionId: sessionId, // Ensure session ID is included
+            sessionId: userId,
           }
+
           localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+          localStorage.setItem("user_id", userId)
+
+          toast({
+            title: "계정 연결 완료",
+            description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
+          })
+
+          // Navigate to chat
           router.push("/saju-chat/sajuping")
+        } else {
+          console.error("Failed to save saju data to database")
+          toast({
+            title: "데이터 저장 실패",
+            description: "사주 정보 저장에 실패했습니다. 다시 시도해주세요.",
+            variant: "destructive",
+          })
         }
-      } else {
-        console.error("Failed to link saju session to authenticated user")
-        toast({
-          title: "데이터 연결 실패",
-          description: "사주 정보 연결에 실패했습니다. 고객센터에 문의해주세요.",
-          variant: "destructive",
-        })
       }
     } catch (error) {
       console.error("Error in handleSignupSuccess:", error)
@@ -220,48 +212,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       })
     } finally {
       setShowSignupDialog(false)
-    }
-  }
-
-  const navigateToChat = async (sajuResult: any, daeunData: any) => {
-    try {
-      const parsedTime = birthInfo.timeUnknown ? { hour: 12, minute: 0 } : parseTime(birthInfo.birthTime)
-
-      const chatSajuData = {
-        saju: sajuResult,
-        name: birthInfo.name,
-        gender: birthInfo.gender,
-        interpretation: "",
-        returnPath: "/",
-        timeStandard: getTimeStandardFromCity(),
-        birthCityId: birthInfo.birthPlaceId,
-        daeun: daeunData,
-        concerns: birthInfo.concerns,
-        birthInfo: {
-          solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
-          solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
-          solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-          solarHour: parsedTime.hour,
-          solarMinute: parsedTime.minute,
-          lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
-          lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
-          lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-          timeUnknown: birthInfo.timeUnknown,
-          birthCityId: birthInfo.birthPlaceId,
-          timeStandard: getTimeStandardFromCity(),
-        },
-      }
-
-      localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      router.push("/saju-chat/sajuping")
-    } catch (error) {
-      console.error("Navigation error:", error)
-      toast({
-        title: "페이지 이동 중 오류가 발생했습니다",
-        description: "잠시 후 다시 시도해주세요.",
-        variant: "destructive",
-      })
     }
   }
 
@@ -350,85 +300,75 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         concerns: birthInfo.concerns,
       }
 
+      // Store in localStorage for later use
       localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
       window.sajuInfo = sajuResult
       window.sajuFullData = sajuDataToStore
 
-      // Save to database without auth user ID first
-      const userId = await syncLocalStorageToDatabase(null)
-
-      // After saving to database and getting userId
-      if (userId) {
-        const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-        storedData.userId = userId
-        storedData.sessionId = userId
-        localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-        localStorage.setItem("user_id", userId)
-
-        console.log("Saju data saved with session ID:", userId)
-
-        // Prepare chat data
-        const chatSajuData = {
-          saju: sajuResult,
-          name: birthInfo.name,
-          gender: birthInfo.gender,
-          interpretation: "",
-          returnPath: "/",
-          timeStandard: getTimeStandardFromCity(),
+      // Prepare chat data
+      const chatSajuData = {
+        saju: sajuResult,
+        name: birthInfo.name,
+        gender: birthInfo.gender,
+        interpretation: "",
+        returnPath: "/",
+        timeStandard: getTimeStandardFromCity(),
+        birthCityId: birthInfo.birthPlaceId,
+        daeun: daeunData,
+        concerns: birthInfo.concerns,
+        birthInfo: {
+          solarYear: Number.parseInt(year),
+          solarMonth: Number.parseInt(month),
+          solarDay: Number.parseInt(day),
+          solarHour: hour,
+          solarMinute: minute,
+          lunarYear: Number.parseInt(lunarData.year),
+          lunarMonth: Number.parseInt(lunarData.month),
+          lunarDay: Number.parseInt(lunarData.day),
+          timeUnknown: birthInfo.timeUnknown,
           birthCityId: birthInfo.birthPlaceId,
-          daeun: daeunData,
-          concerns: birthInfo.concerns,
-          sessionId: userId,
-          birthInfo: {
-            solarYear: Number.parseInt(year),
-            solarMonth: Number.parseInt(month),
-            solarDay: Number.parseInt(day),
-            solarHour: hour,
-            solarMinute: minute,
-            lunarYear: Number.parseInt(lunarData.year),
-            lunarMonth: Number.parseInt(lunarData.month),
-            lunarDay: Number.parseInt(lunarData.day),
-            timeUnknown: birthInfo.timeUnknown,
-            birthCityId: birthInfo.birthPlaceId,
-            timeStandard: getTimeStandardFromCity(),
-          },
-        }
+          timeStandard: getTimeStandardFromCity(),
+        },
+      }
 
-        // Store pending data for after signup
-        setPendingSajuData(chatSajuData)
+      // Store pending data for after signup
+      setPendingSajuData(chatSajuData)
 
-        // Check if user is already authenticated
-        const supabaseClient = getSupabase()
-        const {
-          data: { session },
-        } = await supabaseClient.auth.getSession()
+      // Check if user is already authenticated
+      const supabaseClient = getSupabase()
+      const {
+        data: { session },
+      } = await supabaseClient.auth.getSession()
 
-        if (session?.user) {
-          // User is already logged in, link immediately and go to chat
-          console.log("User already authenticated, linking session and proceeding to chat")
-          const success = await updateAuthUserId(userId, session.user.id)
-          if (success) {
-            console.log("Successfully linked existing session")
-            localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
-            router.push("/saju-chat/sajuping")
-          } else {
-            toast({
-              title: "데이터 연결 실패",
-              description: "사주 정보 연결에 실패했습니다.",
-              variant: "destructive",
-            })
+      if (session?.user) {
+        // User is already logged in, save to database immediately
+        console.log("User already authenticated, saving to database immediately")
+
+        const userId = await syncLocalStorageToDatabase(session.user.id)
+
+        if (userId) {
+          console.log("Successfully saved saju data with session ID:", userId)
+
+          const finalChatSajuData = {
+            ...chatSajuData,
+            sessionId: userId,
           }
+
+          localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
+          localStorage.setItem("user_id", userId)
+
+          router.push("/saju-chat/sajuping")
         } else {
-          // User not logged in, show signup dialog
-          console.log("User not authenticated, showing signup dialog")
-          setShowSignupDialog(true)
+          toast({
+            title: "데이터 저장 실패",
+            description: "사주 정보 저장에 실패했습니다.",
+            variant: "destructive",
+          })
         }
       } else {
-        toast({
-          title: "데이터 저장 실패",
-          description: "사주 정보 저장에 실패했습니다.",
-          variant: "destructive",
-        })
+        // User not logged in, show signup dialog
+        console.log("User not authenticated, showing signup dialog")
+        setShowSignupDialog(true)
       }
     } catch (error) {
       console.error("Error in saju calculation:", error)
