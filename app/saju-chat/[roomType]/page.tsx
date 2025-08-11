@@ -238,17 +238,43 @@ export default function SajuChatPage() {
 
   const startOAuth = async (provider: Provider) => {
     const redirectBack = `${window.location.origin}/auth/callback?redirect_to=${encodeURIComponent(window.location.pathname + window.location.search)}`
+
+    console.log(`🔐 Starting ${provider} OAuth...`)
+    console.log("Redirect URL:", redirectBack)
+
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: redirectBack,
-          // You can request extra scopes here if needed
-        } as any,
+          // For Google, you might need to specify scopes
+          ...(provider === "google" && {
+            queryParams: {
+              access_type: "offline",
+              prompt: "consent",
+            },
+          }),
+        },
       })
-      if (error) throw error
+
+      if (error) {
+        console.error(`❌ ${provider} OAuth error:`, error)
+        toast({
+          title: "로그인 오류",
+          description: `${provider === "kakao" ? "카카오" : "구글"} 로그인 중 오류가 발생했습니다: ${error.message}`,
+          variant: "destructive",
+        })
+        throw error
+      }
+
+      console.log(`✅ ${provider} OAuth initiated successfully:`, data)
     } catch (e) {
-      console.error("OAuth start error:", e)
+      console.error(`❌ ${provider} OAuth start error:`, e)
+      toast({
+        title: "로그인 실패",
+        description: `${provider === "kakao" ? "카카오" : "구글"} 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.`,
+        variant: "destructive",
+      })
       // keep the dialog open for retry
     }
   }
