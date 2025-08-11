@@ -179,6 +179,17 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
+  // Auto-show signup dialog after 4 seconds for non-authenticated users
+  useEffect(() => {
+    if (!user && chatData.isInitialized) {
+      const timer = setTimeout(() => {
+        setShowSignupDialog(true)
+      }, 4000) // 4 seconds
+
+      return () => clearTimeout(timer)
+    }
+  }, [user, chatData.isInitialized])
+
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
     const compressedSajuObject =
