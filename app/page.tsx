@@ -29,9 +29,9 @@ export default function HomePage() {
           return
         }
 
-        console.log("✅ User is authenticated, redirecting to appropriate chat room...")
+        console.log("✅ User is authenticated, checking for saju sessions...")
 
-        // User is authenticated, redirect to appropriate chat room
+        // User is authenticated, check for saju sessions
         const userId = session.user.id
 
         try {
@@ -43,11 +43,14 @@ export default function HomePage() {
             .order("created_at", { ascending: true }) // Get oldest first
 
           if (!sessions || sessions.length === 0) {
-            // No saju sessions found, redirect to onboarding
-            console.log("No saju sessions found, redirecting to onboarding")
-            router.push("/?onboarding=true")
+            // No saju sessions found for authenticated user
+            // Redirect to mypage or a dedicated saju creation page instead of onboarding
+            console.log("No saju sessions found for authenticated user, redirecting to mypage")
+            router.push("/mypage")
             return
           }
+
+          console.log(`Found ${sessions.length} saju sessions for authenticated user`)
 
           // Check if first session has only one message (incomplete first chat)
           const firstSessionId = sessions[0].id
@@ -97,15 +100,14 @@ export default function HomePage() {
             await prepareSajuDataForChat(profileToUse)
             router.push("/saju-chat/sajuping")
           } else {
-            // Fallback to onboarding
-            console.log("Could not get profile data, redirecting to onboarding")
-            router.push("/?onboarding=true")
+            // Fallback to mypage if profile data is corrupted
+            console.log("Could not get profile data, redirecting to mypage")
+            router.push("/mypage")
           }
         } catch (error) {
           console.error("Error getting saju sessions:", error)
-          // Fallback to landing page
-          setShowLanding(true)
-          setIsLoading(false)
+          // Fallback to mypage for authenticated users
+          router.push("/mypage")
         }
       } catch (error) {
         console.error("Error checking authentication:", error)

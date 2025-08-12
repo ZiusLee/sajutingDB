@@ -150,9 +150,14 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       try {
         setIsLoadingOAuth(true)
 
-        // 현재 생성된 세션 ID 저장
+        // 현재 생성된 세션 ID와 사주 데이터 저장
         const sessionId = localStorage.getItem("saju_session_id")
         const currentSajuData = localStorage.getItem("current_saju")
+
+        console.log("Preparing OAuth with data:", {
+          sessionId,
+          hasCurrentSajuData: !!currentSajuData,
+        })
 
         if (sessionId) {
           localStorage.setItem("pending_session_link", sessionId)
@@ -613,7 +618,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       </div>
 
       {/* Signup Dialog 추가 */}
-      <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
+      <SignupDialog
+        open={signupOpen}
+        onOpenChange={setSignupOpen}
+        onSelectProvider={handleOAuth}
+        isLoading={isLoadingOAuth}
+      />
     </>
   )
 }

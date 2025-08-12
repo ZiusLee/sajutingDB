@@ -39,6 +39,12 @@ export default function AuthCallbackContent() {
           const pendingSajuData = localStorage.getItem("auth_pending_saju_data")
           const pendingSessionId = localStorage.getItem("pending_session_link")
 
+          console.log("Auth callback state:", {
+            authReturnAction,
+            hasPendingSajuData: !!pendingSajuData,
+            pendingSessionId,
+          })
+
           if (authReturnAction === "continue_to_chat" && pendingSajuData && pendingSessionId) {
             console.log("Processing onboarding completion flow")
 
@@ -77,6 +83,8 @@ export default function AuthCallbackContent() {
                   localStorage.setItem("user_email", data.session.user.email)
                 }
 
+                console.log("All data prepared, redirecting to chat...")
+
                 toast({
                   title: "로그인 완료",
                   description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
@@ -85,8 +93,8 @@ export default function AuthCallbackContent() {
                 // 6. Wait a bit for state to settle, then redirect
                 setTimeout(() => {
                   console.log("Redirecting to chat after onboarding completion")
-                  router.push("/saju-chat/sajuping")
-                }, 500)
+                  window.location.href = "/saju-chat/sajuping"
+                }, 1000)
                 return
               } else {
                 console.error("Failed to update auth_user_id for session:", pendingSessionId)
@@ -144,10 +152,10 @@ export default function AuthCallbackContent() {
                 if (authReturnUrl) {
                   console.log("Returning to original chat room:", authReturnUrl)
                   localStorage.removeItem("auth_return_url")
-                  router.push(authReturnUrl)
+                  window.location.href = authReturnUrl
                 } else {
                   // Fallback: Navigate to generic chat
-                  router.push("/saju-chat/sajuping")
+                  window.location.href = "/saju-chat/sajuping"
                 }
                 return
               } else {
@@ -191,7 +199,7 @@ export default function AuthCallbackContent() {
             })
           }
 
-          router.push(redirectUrl)
+          window.location.href = redirectUrl
         } else {
           console.log("No session found after auth callback")
           router.push("/")
