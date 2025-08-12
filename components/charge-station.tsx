@@ -114,7 +114,7 @@ export default function ChargeStation() {
     setBalance(old + delta)
     try {
       await postPurchase(delta, { packageId: pkg.id })
-      toast({ title: "결��� 완료", description: `${pkg.name} 구매로 ${delta}핑이 적립되었습니다.` })
+      toast({ title: "결제 완료", description: `${pkg.name} 구매로 ${delta}핑이 적립되었습니다.` })
     } catch (e: any) {
       setBalance(old) // revert
       toast({ title: "결제에 실패했어요", description: e?.message || "다시 시도해주세요.", variant: "destructive" })
