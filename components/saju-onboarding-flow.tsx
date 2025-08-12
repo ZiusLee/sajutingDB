@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,8 @@ import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } fro
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { SajuLogo } from "./saju-logo"
 import { Checkbox } from "@/components/ui/checkbox"
+import { SignupDialog } from "./signup-dialog"
+import { getSupabase } from "@/lib/supabase-client"
 
 interface SajuOnboardingFlowProps {
   onClose: () => void
@@ -49,6 +51,8 @@ const concernOptions = [
 export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [signupOpen, setSignupOpen] = useState(false)
+  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false)
   const [birthInfo, setBirthInfo] = useState<BirthInfo>({
     name: "",
     gender: "",
@@ -63,13 +67,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const [citySearchResults, setCitySearchResults] = useState<CityTimezoneData[]>([])
   const [showCityDropdown, setShowCityDropdown] = useState(false)
   const router = useRouter()
-
-  useEffect(() => {
-    // Set onboarding start time when component mounts
-    if (!localStorage.getItem("onboarding_start_time")) {
-      localStorage.setItem("onboarding_start_time", Date.now().toString())
-    }
-  }, [])
+  const supabase = getSupabase()
 
   const handleNext = () => {
     if (currentStep < 5) {
@@ -144,6 +142,74 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     }
     return { hour: 12, minute: 0 }
   }
+
+  const handleOAuth = useCallback(
+    async (provider: "kakao" | "google") => {
+      console.log(`🔐 Starting ${provider} OAuth from onboarding...`)
+
+      try {
+        setIsLoadingOAuth(true)
+
+        // 현재 생성된 세션 ID 저장
+        const sessionId = localStorage.getItem("saju_session_id")
+        const currentSajuData = localStorage.getItem("current_saju")
+
+        if (sessionId) {
+          localStorage.setItem("pending_session_link", sessionId)
+        }
+        if (currentSajuData) {
+          localStorage.setItem("auth_pending_saju_data", currentSajuData)
+        }
+
+        // auth callback에서 onboarding 완료 후 chat으로 가야 함을 표시
+        localStorage.setItem("auth_return_action", "continue_to_chat")
+
+        const redirectTo = `${window.location.origin}/auth/callback`
+        console.log("Redirect URL:", redirectTo)
+
+        const options: any = {
+          redirectTo,
+        }
+
+        if (provider === "google") {
+          options.queryParams = {
+            access_type: "offline",
+            prompt: "consent",
+          }
+          options.scopes = "openid email profile"
+        }
+
+        console.log(`OAuth options for ${provider}:`, options)
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options,
+        })
+
+        if (error) {
+          console.error(`❌ ${provider} OAuth error:`, error)
+          toast({
+            title: "로그인 오류",
+            description: `${provider === "kakao" ? "카카오" : "구글"} 로그인 중 오류가 발생했습니다: ${error.message}`,
+            variant: "destructive",
+          })
+          throw error
+        }
+
+        console.log(`✅ ${provider} OAuth initiated successfully`)
+      } catch (e) {
+        console.error(`❌ ${provider} OAuth start error:`, e)
+        toast({
+          title: "로그인 실패",
+          description: `${provider === "kakao" ? "카카오" : "구글"} 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.`,
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingOAuth(false)
+      }
+    },
+    [supabase, toast],
+  )
 
   const handleSubmit = async () => {
     if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlaceId || !birthInfo.birthDate) {
@@ -261,9 +327,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         },
       }
 
-      // Store saju data in localStorage
-      localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
-
       // Create saju_session with auth_user_id: null (for anonymous users)
       try {
         console.log("Creating anonymous saju_session with auth_user_id: null")
@@ -280,10 +343,11 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
           localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
           localStorage.setItem("saju_session_id", userId)
-          localStorage.setItem("anonymous_session_created", "true") // 익명 세션 생성 플래그
+          localStorage.setItem("anonymous_session_created", "true")
 
-          console.log("Saju calculation complete, navigating to chat")
-          router.push("/saju-chat/sajuping")
+          console.log("Saju session created, showing signup modal")
+          setIsLoading(false)
+          setSignupOpen(true) // 로딩 완료 후 signup modal 표시
         } else {
           console.error("Failed to create saju session")
           toast({
@@ -291,6 +355,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             description: "사주 정보 저장에 실패했습니다.",
             variant: "destructive",
           })
+          setIsLoading(false)
         }
       } catch (error) {
         console.error("Error creating saju session:", error)
@@ -299,11 +364,11 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           description: "사주 세션 생성 중 오류가 발생했습니다.",
           variant: "destructive",
         })
+        setIsLoading(false)
       }
     } catch (error) {
       console.error("Error in saju calculation:", error)
       toast({ title: "사주 계산 중 오류가 발생했습니다.", variant: "destructive" })
-    } finally {
       setIsLoading(false)
     }
   }
@@ -546,6 +611,9 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           {renderStepContent()}
         </main>
       </div>
+
+      {/* Signup Dialog 추가 */}
+      <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
     </>
   )
 }

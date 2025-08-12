@@ -291,6 +291,13 @@ export default function SajuChatPage() {
     if (!isLoggedIn && !loading) {
       const sessionId = localStorage.getItem("saju_session_id")
       const anonymousSessionCreated = localStorage.getItem("anonymous_session_created")
+      const authReturnAction = localStorage.getItem("auth_return_action")
+
+      // onboarding에서 바로 온 경우는 signup dialog 표시하지 않음
+      if (authReturnAction === "continue_to_chat") {
+        console.log("Came from onboarding, not showing signup dialog")
+        return
+      }
 
       console.log("Session ID from localStorage:", sessionId)
       console.log("Anonymous session created flag:", anonymousSessionCreated)
@@ -310,12 +317,11 @@ export default function SajuChatPage() {
 
             const timer = setTimeout(() => {
               setSignupOpen(true)
-            }, 2000) // 2초 후 signup dialog 표시
+            }, 2000)
 
             return () => clearTimeout(timer)
           } else if (!error && data && data.auth_user_id) {
             console.log("Session is already linked to authenticated user:", data.auth_user_id)
-            // 이미 연결된 세션이면 플래그 제거
             localStorage.removeItem("anonymous_session_created")
           }
         } catch (error) {

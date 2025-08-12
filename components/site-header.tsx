@@ -6,7 +6,6 @@ import { SajuLogo } from "@/components/saju-logo"
 import { useAuth } from "@/hooks/use-auth"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { User } from "lucide-react"
-import { PanelLeft } from "lucide-react"
 
 export function SiteHeader() {
   const { user, isAuthenticated } = useAuth()
@@ -35,14 +34,12 @@ export function SiteHeader() {
         {/* Logo */}
         <div className="flex items-center">
           {isSajuChat ? (
+            // In saju chat: Logo acts as sidebar toggle
             <button
               onClick={handleLogoClick}
               className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
             >
-              <div className="md:hidden">
-                <PanelLeft className="h-6 w-6" />
-              </div>
-              <SajuLogo className="hidden md:block" />
+              <SajuLogo className="lg:hidden" />
               <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
             </button>
           ) : (

@@ -10,7 +10,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import confetti from "canvas-confetti"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import type { BirthDateInfo } from "@/types/birth-date"
 
 export function BetaSignupForm() {
@@ -241,147 +240,49 @@ export function BetaSignupForm() {
 
       {/* 개인정보 수집·이용 동의서 다이얼로그 */}
       <Dialog open={showPrivacyDialog} onOpenChange={setShowPrivacyDialog}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh]">
+        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>사주핑 이용약관 및 개인정보 처리방침</DialogTitle>
+            <DialogTitle>개인정보 수집·이용 동의서</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh] pr-4">
-            <div className="space-y-8 text-sm">
-              {/* 서비스 이용약관 */}
-              <section>
-                <h2 className="font-bold text-lg mb-4 text-blue-600">1. 사주핑 서비스 이용약관</h2>
+          <div className="space-y-4 text-sm">
+            <p>[사주핑]은 다음과 같이 개인정보를 수집 및 이용합니다.</p>
+            <p>
+              고객님의 개인정보는 사주 분석 및 상담 서비스를 위한 용도로만 사용되며, 동의 없이는 절대 제3자에게 제공되지
+              않습니다.
+            </p>
 
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제1조 (목적)</h3>
-                    <p className="leading-relaxed">
-                      본 약관은 사주핑 주식회사(이하 "회사")가 운영하는 모바일 앱·웹 기반의 사주핑 서비스(이하 "서비스")
-                      이용과 관련하여, 회사와 이용자의 권리·의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로
-                      합니다.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제2조 (용어의 정의)</h3>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>
-                        "서비스"란 회사가 이용자에게 사주 기반 AI 해석, 감정케어 상담, 운세 리포트 등 콘텐츠를 제공하기
-                        위해 정보통신설비를 이용하여 거래할 수 있도록 설정한 가상의 영업장을 의미하며, 해당 서비스를
-                        운영하는 사업자도 포함합니다.
-                      </li>
-                      <li>
-                        "이용자"란 회사의 서비스에 접속하여 본 약관에 따라 회사가 제공하는 콘텐츠와 제반 서비스를
-                        이용하는 회원 및 비회원을 말합니다.
-                      </li>
-                      <li>
-                        "회원"이란 본 약관에 동의하고 가입하여 회사가 제공하는 서비스를 지속적으로 이용할 수 있는 자를
-                        말합니다.
-                      </li>
-                      <li>"비회원"이란 회원 가입 없이 회사가 제공하는 서비스 일부를 이용하는 자를 말합니다.</li>
-                      <li>
-                        "콘텐츠"란 회사가 제공하는 서비스와 관련하여 생성·게시하는 정보, 텍스트, 이미지, 영상, 데이터
-                        등을 의미합니다.
-                      </li>
-                      <li>
-                        "유료콘텐츠"란 회사가 유료로 제공하는 프리미엄 사주 해석, 맞춤형 상담, 전문 리포트 등 콘텐츠를
-                        의미합니다.
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제3조 (회원가입 및 계정관리)</h3>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>
-                        회원가입은 카카오, 네이버, 구글, 애플 등 제3자 소셜 로그인 또는 이메일 가입을 통해 가능합니다.
-                      </li>
-                      <li>
-                        가입 시 필수 입력 정보: 성별, 생년월일(음·양력 여부 포함), 태어난 도시
-                        <br />
-                        선택 입력 정보: 태어난 시, 추가 프로필 정보
-                      </li>
-                      <li>"동의하고 시작하기" 버튼 클릭 시 본 약관과 개인정보 처리방침에 동의한 것으로 간주합니다.</li>
-                      <li>
-                        회사는 다음의 경우 회원가입을 제한하거나 해지할 수 있습니다.
-                        <br />- 타인의 개인정보 도용
-                        <br />- 허위 정보 입력
-                        <br />- 만 14세 미만 미성년자
-                        <br />- 법령 또는 서비스 정책 위반 이력
-                        <br />- 기술적·운영상 현저한 지장이 예상되는 경우
-                      </li>
-                      <li>
-                        회원은 본인 계정을 직접 관리해야 하며, 타인 사용을 허용하거나 계정 보안을 소홀히 하여 발생한
-                        손해에 대해 회사는 책임지지 않습니다.
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제4조 (회원의 의무)</h3>
-                    <p className="mb-2">회원은 다음 행위를 하여서는 안 됩니다.</p>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>서비스 접근 방해 또는 비정상적 사용 시도</li>
-                      <li>타인의 개인정보 수집·이용·제공</li>
-                      <li>음란·저작권 침해·허위 정보 게시</li>
-                      <li>회사 승인 없이 서비스 또는 소프트웨어 복제·변경·판매·양도</li>
-                      <li>다계정 생성, 이벤트 부정참여, 포인트·사이버머니 부정사용</li>
-                      <li>서비스 이용 중 타인 명예훼손, 불법·미풍양속 위반 행위</li>
-                    </ul>
-                  </div>
-                </div>
-              </section>
-
-              {/* 개인정보 처리방침 */}
-              <section>
-                <h2 className="font-bold text-lg mb-4 text-green-600">2. 사주핑 개인정보 처리방침</h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제1조 (개인정보의 수집 및 이용)</h3>
-                    <p className="mb-2">회사는 서비스 제공을 위해 다음과 같은 개인정보를 수집·이용합니다.</p>
-                    <ul className="list-decimal list-inside space-y-2 ml-4">
-                      <li>
-                        <strong>회원가입 및 서비스 이용</strong>
-                        <br />- 필수항목: 이름, 성별, 음/양력 여부, 생년월일, 태어난 도시, 소셜ID
-                        <br />- 선택항목: 태어난 시<br />- 보유기간: 회원 탈퇴 시까지
-                      </li>
-                      <li>
-                        <strong>민원처리</strong>
-                        <br />- 필수항목: 이메일, 문의내용, 앱 버전, 단말기 정보
-                        <br />- 보유기간: 처리 완료 후 3년
-                      </li>
-                      <li>
-                        <strong>유료서비스 결제</strong>
-                        <br />- 필수항목: 결제수단 정보(카드번호, 계좌정보), 결제기록
-                        <br />- 보유기간: 전자상거래법 등 관계 법령에 따른 기간
-                      </li>
-                      <li>
-                        <strong>마케팅 및 이벤트</strong>
-                        <br />- 필수항목: 이름, 성별, 접속IP, 서비스 이용기록, 기기정보, 국가정보, 쿠키, 푸시 알림 토큰
-                        <br />- 보유기간: 동의 철회 또는 탈퇴 시까지
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제12조 (개인정보 보호책임자)</h3>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>성명: 이윤섭</li>
-                      <li>이메일: yoon@sajuping.ai</li>
-                    </ul>
-                  </div>
-                </div>
-              </section>
-
-              <section className="pt-4 border-t">
-                <p className="text-xs text-muted-foreground">
-                  <strong>공고일자:</strong> 2025년 8월 11일
-                  <br />
-                  <strong>시행일자:</strong> 2025년 8월 11일
-                </p>
-              </section>
+            <div>
+              <h3 className="font-bold mb-1">1. 수집하는 개인정보 항목</h3>
+              <p>필수 항목: 이름, 생년월일(양력/음력 구분 포함), 성별, 이메일, 전화번호</p>
+              <p>선택 항목: 태어난 시간, 출생지(도시/지역 단위), 카카오톡 ID 또는 상담 채널 아이디</p>
             </div>
-          </ScrollArea>
+
+            <div>
+              <h3 className="font-bold mb-1">2. 수집 및 이용 목적</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>사주 및 운세 분석을 통한 개인 맞춤형 연애 상담 서비스 제공</li>
+                <li>고객 맞춤 리포트 제공 및 콘텐츠 발송</li>
+                <li>고객 응대 및 상담 진행</li>
+                <li>이벤트 안내 및 소통(선택 항목 활용 시)</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold mb-1">3. 보유 및 이용 기간</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>수집일로부터 1년간 보관 후 파기</li>
+                <li>고객이 삭제 요청 시 즉시 파기 가능</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold mb-1">4. 동의 거부 권리 안내</h3>
+              <p>위 개인정보 제공에 동의하지 않으실 수 있습니다.</p>
+              <p>단, 동의하지 않으실 경우 서비스 이용이 제한될 수 있습니다.</p>
+            </div>
+
+            <p className="font-medium">위 내용을 충분히 이해하였으며, 개인정보 수집 및 이용에 동의합니다.</p>
+          </div>
           <DialogFooter>
             <Button
               onClick={() => {

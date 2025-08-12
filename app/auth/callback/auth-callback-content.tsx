@@ -1,165 +1,88 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { getSupabase } from "@/lib/supabase-client"
-import { updateAuthUserId } from "@/lib/db-service"
-import { toast } from "@/hooks/use-toast"
+import { useEffect } from "react"
+import { useRouter } from "next/router"
+import { useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useUser } from "@/context/UserContext"
 
-export default function AuthCallbackContent() {
+const AuthCallbackContent = () => {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const [isProcessing, setIsProcessing] = useState(true)
+  const supabase = useSupabaseClient()
+  const { setUser } = useUser()
+
+  const findAndLinkSessions = async () => {
+    // Placeholder for session linking logic
+    return { success: true, linkedCount: 0 }
+  }
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      try {
-        const supabase = getSupabase()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-        // Handle the auth callback
-        const { data, error } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
 
-        if (error) {
-          console.error("Auth callback error:", error)
-          toast({
-            title: "로그인 실패",
-            description: "로그인 처리 중 오류가 발생했습니다.",
-            variant: "destructive",
-          })
-          router.push("/")
-          return
-        }
+        // 세션 연결 로직
+        try {
+          const pendingSessionId = localStorage.getItem("pending_session_link")
+          if (pendingSessionId) {
+            console.log(`Linking pending session ${pendingSessionId} to user ${session.user.id}`)
 
-        if (data.session?.user) {
-          const authUserId = data.session.user.id
-          console.log("Auth callback successful, user ID:", authUserId)
+            const { error } = await supabase
+              .from("saju_sessions")
+              .update({ auth_user_id: session.user.id })
+              .eq("id", pendingSessionId)
+              .eq("auth_user_id", null)
 
-          // Check if there's an existing anonymous saju_session that needs auth_user_id update
-          const sessionId = localStorage.getItem("saju_session_id")
-          let linkedAnySession = false
-
-          if (sessionId) {
-            console.log("Found existing saju_session ID, updating auth_user_id:", sessionId)
-
-            try {
-              // Update auth_user_id for existing session
-              console.log("Updating auth_user_id for session:", sessionId, "with auth user:", authUserId)
-              const success = await updateAuthUserId(sessionId, authUserId)
-
-              if (success) {
-                console.log("Successfully updated auth_user_id for saju session:", sessionId)
-                linkedAnySession = true
-
-                // Clean up tempSajuData since session is now linked
-                localStorage.removeItem("tempSajuData")
-
-                toast({
-                  title: "로그인 완료",
-                  description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
-                })
-
-                const authReturnUrl = localStorage.getItem("auth_return_url")
-                if (authReturnUrl) {
-                  console.log("Returning to original chat room:", authReturnUrl)
-                  localStorage.removeItem("auth_return_url")
-
-                  const streamKeys = Object.keys(localStorage).filter((key) => key.startsWith("chat-stream-"))
-                  const sessionData = localStorage.getItem("current_saju")
-                  const tempSajuData = localStorage.getItem("tempSajuData")
-
-                  console.log("Preserving stream states:", streamKeys)
-                  console.log("Preserving session data:", !!sessionData)
-
-                  // Don't remove tempSajuData if we're returning to the same chat room
-                  // It will be cleaned up after successful session linking
-
-                  router.push(authReturnUrl)
-                  return
-                } else {
-                  // Fallback: Navigate to generic chat
-                  router.push("/saju-chat/sajuping")
-                }
-                return
-              } else {
-                console.error("Failed to update auth_user_id for session:", sessionId)
-              }
-            } catch (error) {
-              console.error("Error updating session auth_user_id:", error)
+            if (error) {
+              console.error("Error linking pending session:", error)
+            } else {
+              console.log(`Successfully linked pending session ${pendingSessionId}`)
+              localStorage.removeItem("pending_session_link")
+              localStorage.removeItem("anonymous_session_created")
             }
           }
 
-          // Check for stored auth return URL (from saju-chat)
-          const authReturnUrl = localStorage.getItem("auth_return_url")
-          const redirectUrl = "/mypage" // default
-
-          if (authReturnUrl) {
-            console.log("Returning to original chat room:", authReturnUrl)
-            localStorage.removeItem("auth_return_url")
-
-            const streamKeys = Object.keys(localStorage).filter((key) => key.startsWith("chat-stream-"))
-            const sessionData = localStorage.getItem("current_saju")
-            const tempSajuData = localStorage.getItem("tempSajuData")
-
-            console.log("Preserving stream states:", streamKeys)
-            console.log("Preserving session data:", !!sessionData)
-
-            // Don't remove tempSajuData if we're returning to the same chat room
-            // It will be cleaned up after successful session linking
-
-            router.push(authReturnUrl)
-            return
+          // 일반적인 세션 연결
+          const { success, linkedCount } = await findAndLinkSessions()
+          if (success && linkedCount > 0) {
+            console.log(`Successfully linked ${linkedCount} sessions to user`)
           }
-
-          // Default redirect with appropriate message
-          if (linkedAnySession) {
-            toast({
-              title: "로그인 완료",
-              description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
-            })
-          } else {
-            toast({
-              title: "로그인 완료",
-              description: "성공적으로 로그인되었습니다.",
-            })
-          }
-
-          router.push(redirectUrl)
-        } else {
-          console.log("No session found after auth callback")
-          router.push("/")
+        } catch (error) {
+          console.error("Error linking sessions:", error)
         }
-      } catch (error) {
-        console.error("Error in auth callback:", error)
-        toast({
-          title: "로그인 오류",
-          description: "로그인 처리 중 오류가 발생했습니다.",
-          variant: "destructive",
-        })
+
+        // 리다이렉션 로직
+        const authReturnAction = localStorage.getItem("auth_return_action")
+        const pendingSajuData = localStorage.getItem("auth_pending_saju_data")
+
+        if (authReturnAction === "continue_to_chat" && pendingSajuData) {
+          // onboarding에서 온 경우: chat으로 직접 이동
+          console.log("Redirecting to chat after onboarding completion")
+          localStorage.removeItem("auth_return_action")
+          localStorage.removeItem("auth_pending_saju_data")
+          router.push("/saju-chat/sajuping")
+          return
+        }
+
+        // 기존 리다이렉션 로직
+        const returnUrl = localStorage.getItem("auth_return_url")
+        if (returnUrl && returnUrl !== window.location.href) {
+          localStorage.removeItem("auth_return_url")
+          window.location.href = returnUrl
+          return
+        }
+
         router.push("/")
-      } finally {
-        setIsProcessing(false)
       }
     }
 
     handleAuthCallback()
-  }, [router, searchParams])
+  }, [router, supabase])
 
-  if (isProcessing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">로그인 처리 중...</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-muted-foreground">로그인 처리가 완료되었습니다.</p>
-      </div>
-    </div>
-  )
+  return null
 }
+
+export default AuthCallbackContent
