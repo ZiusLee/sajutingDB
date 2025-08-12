@@ -526,14 +526,22 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
                 )}
               />
             </div>
-            <div className="flex items-center space-x-2 mt-6">
-              <Checkbox id="timeUnknown" checked={birthInfo.timeUnknown} onCheckedChange={handleTimeUnknownToggle} />
-              <label
-                htmlFor="timeUnknown"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground cursor-pointer"
-              >
-                태어난 시간 모름
-              </label>
+            {/* 체크박스를 오른쪽에 배치 */}
+            <div className="flex justify-end w-full mt-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="timeUnknown"
+                  checked={birthInfo.timeUnknown}
+                  onCheckedChange={handleTimeUnknownToggle}
+                  className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground border-2 border-gray-400 bg-white"
+                />
+                <label
+                  htmlFor="timeUnknown"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground cursor-pointer"
+                >
+                  태어난 시간 모름
+                </label>
+              </div>
             </div>
             <div className="w-full max-w-xs mt-8">
               <Button

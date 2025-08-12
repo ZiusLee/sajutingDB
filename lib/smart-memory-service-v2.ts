@@ -1065,7 +1065,7 @@ AI: ${assistantResponse}
       mems.forEach((memory: any) => {
         const qualityIndicator = memory.quality_score >= 0.7 ? "⭐" : 
                                 memory.quality_score >= 0.5 ? "✓" : "⚠️"
-        const confidence = memory.confidence ? ` (확신도: ${memory.confidence})` : ""
+        const confidence = memory.confidence ? ` (���신도: ${memory.confidence})` : ""
         context += `${qualityIndicator} ${memory.content}${confidence}\n`
       })
       context += "\n"

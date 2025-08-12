@@ -63,7 +63,7 @@ export default function LandingPageClient() {
   }
 
   const handleRegisterClick = () => {
-    router.push("/register")
+    setShowOnboarding(true)
   }
 
   if (showOnboarding) {
