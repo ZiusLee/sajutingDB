@@ -58,6 +58,13 @@ export default function SajuChatPage() {
 
     const initializePage = async () => {
       try {
+        // Wait a bit for auth state to settle if coming from OAuth
+        const authReturnAction = localStorage.getItem("auth_return_action")
+        if (authReturnAction === "continue_to_chat") {
+          console.log("Coming from OAuth, waiting for auth state to settle...")
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+        }
+
         const { data } = await supabase.auth.getSession()
         const isAuthenticated = Boolean(data.session?.user)
 
@@ -78,6 +85,72 @@ export default function SajuChatPage() {
         const savedSaju = localStorage.getItem("current_saju")
 
         if (!savedSaju) {
+          console.log("No saju data found in localStorage")
+
+          // If coming from onboarding, try to get data from tempSajuData
+          const tempSajuData = localStorage.getItem("tempSajuData")
+          if (tempSajuData && isAuthenticated) {
+            console.log("Found tempSajuData, converting to current_saju")
+            const tempData = JSON.parse(tempSajuData)
+
+            // Create chat saju data structure
+            const chatSajuData = {
+              saju: tempData,
+              name: tempData.name,
+              gender: tempData.gender,
+              interpretation: "",
+              returnPath: "/",
+              timeStandard: tempData.timeStandard,
+              birthCityId: tempData.birthCityId,
+              daeun: tempData.daeun,
+              concerns: tempData.concerns || [],
+              userId: data.session.user.id,
+              authUserId: data.session.user.id,
+              sessionId: localStorage.getItem("saju_session_id"),
+              birthInfo: {
+                solarYear: tempData.year,
+                solarMonth: tempData.month,
+                solarDay: tempData.day,
+                solarHour: tempData.hour,
+                solarMinute: tempData.minute,
+                lunarYear: tempData.lunarYear,
+                lunarMonth: tempData.lunarMonth,
+                lunarDay: tempData.lunarDay,
+                timeUnknown: tempData.timeUnknown,
+                birthCityId: tempData.birthCityId,
+                timeStandard: tempData.timeStandard,
+              },
+            }
+
+            localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+            localStorage.removeItem("tempSajuData")
+
+            if (isMounted) {
+              setSaju(chatSajuData)
+              const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+              setSessionKey(generatedKey)
+
+              let chatRoom = null
+              if (!roomId) {
+                chatRoom = createTemporaryChatRoom({
+                  sessionId: chatSajuData.sessionId || `fallback-${Date.now()}`,
+                  title: "새로운 대화",
+                  roomType: roomType || "sajuping",
+                  isTemporary: true,
+                })
+
+                setCurrentChatRoom(chatRoom)
+                const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+                window.history.replaceState({}, "", newUrl)
+              } else {
+                setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+              }
+
+              setLoading(false)
+              return
+            }
+          }
+
           if (isMounted) {
             toast({
               title: "사주 정보가 없습니다",
