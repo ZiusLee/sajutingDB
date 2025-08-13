@@ -126,8 +126,8 @@ export default function Sidebar({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 border-r">
-      <div className="border-b bg-white">
+    <div className="h-full overflow-y-auto bg-transparent">
+      <div className="border-b border-gray-200/50 bg-white/90 backdrop-blur-sm">
         <SajuDiagram
           saju={saju}
           name={name}
@@ -146,15 +146,19 @@ export default function Sidebar({
         />
       </div>
 
-      {/* Chat History Section */}
-      <div className="bg-white">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
+      <div className="bg-white/90 backdrop-blur-sm">
+        <div className="p-3 border-b border-gray-200/50">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-medium text-gray-900 flex items-center gap-2 text-sm">
+              <MessageSquare className="h-3.5 w-3.5" />
               대화 목록
             </h3>
-            <Button onClick={handleNewChat} disabled={creatingNewChat} size="sm" className="h-8 px-3 text-xs">
+            <Button
+              onClick={handleNewChat}
+              disabled={creatingNewChat}
+              size="sm"
+              className="h-7 px-2.5 text-xs bg-gray-900 hover:bg-gray-800 text-white rounded-md"
+            >
               <Plus className="h-3 w-3 mr-1" />새 대화
             </Button>
           </div>
@@ -164,13 +168,13 @@ export default function Sidebar({
           {loadingChatRooms ? (
             <div className="space-y-2">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="h-14 bg-gray-100/50 rounded-lg animate-pulse" />
               ))}
             </div>
           ) : chatRooms.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">아직 대화가 없습니다</p>
+            <div className="text-center py-6 text-gray-500">
+              <MessageSquare className="h-6 w-6 mx-auto mb-2 opacity-50" />
+              <p className="text-xs">아직 대화가 없습니다</p>
               <p className="text-xs text-gray-400 mt-1">새 대화를 시작해보세요</p>
             </div>
           ) : (
@@ -179,27 +183,43 @@ export default function Sidebar({
                 <div
                   key={room.id}
                   onClick={() => handleChatRoomClick(room.id)}
-                  className={`group relative p-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 ${
+                  className={`group relative p-2.5 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-100/80 ${
                     currentChatRoomId === room.id
-                      ? "bg-blue-50 border border-blue-200"
-                      : "bg-white border border-gray-100"
+                      ? "bg-gray-900 text-white shadow-sm"
+                      : "bg-white/60 border border-gray-200/50 hover:border-gray-300/50"
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm text-gray-900 truncate">{room.title}</h4>
+                      <h4
+                        className={`font-medium text-xs truncate ${
+                          currentChatRoomId === room.id ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {room.title}
+                      </h4>
                       {room.lastMessage && (
-                        <p className="text-xs text-gray-500 mt-1 truncate">
+                        <p
+                          className={`text-xs mt-1 truncate ${
+                            currentChatRoomId === room.id ? "text-gray-300" : "text-gray-500"
+                          }`}
+                        >
                           {room.lastMessage.role === "user" ? "나: " : "사주핑: "}
                           {room.lastMessage.content}
                         </p>
                       )}
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-gray-400">
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span
+                          className={`text-xs ${currentChatRoomId === room.id ? "text-gray-400" : "text-gray-400"}`}
+                        >
                           {formatRelativeTime(room.lastMessage?.createdAt || room.createdAt)}
                         </span>
                         {room.messageCount && room.messageCount > 0 && (
-                          <span className="text-xs text-gray-400">{room.messageCount}개 메시지</span>
+                          <span
+                            className={`text-xs ${currentChatRoomId === room.id ? "text-gray-400" : "text-gray-400"}`}
+                          >
+                            {room.messageCount}개
+                          </span>
                         )}
                       </div>
                     </div>
@@ -209,10 +229,12 @@ export default function Sidebar({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 ml-2 hover:bg-red-100 hover:text-red-600"
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 p-0 ml-2 hover:bg-red-100 hover:text-red-600 ${
+                            currentChatRoomId === room.id ? "hover:bg-red-900/20" : ""
+                          }`}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-2.5 w-2.5" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>

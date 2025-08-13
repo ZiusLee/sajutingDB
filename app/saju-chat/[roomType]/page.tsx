@@ -515,7 +515,7 @@ export default function SajuChatPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 relative">
+    <div className="h-screen w-full relative">
       <SajuChat
         saju={saju.saju}
         name={saju.name || "사용자"}

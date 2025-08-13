@@ -798,12 +798,12 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-screen-mobile bg-white">
+    <div className="flex h-screen bg-gray-50">
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
         <SiteHeader />
       </div>
 
-      <div className="hidden lg:block w-96 flex-shrink-0">
+      <div className="hidden lg:block w-80 flex-shrink-0 bg-white/80 backdrop-blur-sm border-r border-gray-200/50">
         <Sidebar
           saju={stableSaju}
           name={name}
@@ -831,14 +831,57 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen-mobile pt-16 lg:pt-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen bg-white pt-16 lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
-          <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
+          <div className="px-3 sm:px-6 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
+
+            {messages.length === 0 && !isInitialQuestionsMode && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+                <div className="mb-8">
+                  <h1 className="text-3xl md:text-4xl font-bold text-black leading-tight mb-4">
+                    오늘은 어떤 것이
+                    <br />
+                    궁금하세요?
+                  </h1>
+                  <p className="text-base text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 w-full max-w-md">
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-xl bg-white border-gray-200 text-left justify-start px-4 hover:bg-gray-50 transition-colors"
+                    onClick={() => handleSuggestedQuestionClick("직장을 어떤 기준으로 선택하면 좋을까?")}
+                  >
+                    <span className="text-lg mr-3">💼</span>
+                    <span className="text-sm font-medium">직장을 어떤 기준으로 선택하면 좋을까?</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-xl bg-white border-gray-200 text-left justify-start px-4 hover:bg-gray-50 transition-colors"
+                    onClick={() => handleSuggestedQuestionClick("올해 나의 결혼운은 어때?")}
+                  >
+                    <span className="text-lg mr-3">💕</span>
+                    <span className="text-sm font-medium">올해 나의 결혼운은 어때?</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-xl bg-white border-gray-200 text-left justify-start px-4 hover:bg-gray-50 transition-colors"
+                    onClick={() => handleSuggestedQuestionClick("이번달 재물운 알려줘")}
+                  >
+                    <span className="text-lg mr-3">💰</span>
+                    <span className="text-sm font-medium">이번달 재물운 알려줘</span>
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "user" ? (
