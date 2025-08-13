@@ -7,16 +7,16 @@ import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Star, Edit, Plus, X } from "lucide-react"
+import { Edit, Plus, X } from "lucide-react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import {
-  getUserSajuProfiles,
-  getDefaultSajuSession,
-  getSajuProfileBySessionId,
-  setDefaultSajuSession,
-} from "@/lib/saju-session-service"
+import { getUserSajuProfiles, getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
 import { toast } from "@/components/ui/use-toast"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { CitySearch } from "@/components/city-search"
+import { DEFAULT_CITY_ID } from "@/lib/city-timezone-data"
 
 interface SajuDiagramProps {
   saju: Saju
@@ -34,6 +34,7 @@ interface SajuDiagramProps {
   lunarDay?: string | number
   location?: string
   variant?: "chat" | "sidebar" | "card"
+  onProfileUpdate?: (profile: any) => void
 }
 
 export default function SajuDiagram({
@@ -52,6 +53,7 @@ export default function SajuDiagram({
   lunarDay = "",
   location,
   variant = "chat",
+  onProfileUpdate,
 }: SajuDiagramProps) {
   const { theme } = useTheme()
   const isDark = theme === "dark"
@@ -156,6 +158,18 @@ export default function SajuDiagram({
     }
     return false
   })
+  const [editingProfile, setEditingProfile] = useState<any>(null)
+  const [editForm, setEditForm] = useState({
+    name: "",
+    gender: "female",
+    birthYear: "",
+    birthMonth: "",
+    birthDay: "",
+    birthHour: "",
+    birthMinute: "",
+    timeUnknown: false,
+    birthCityId: DEFAULT_CITY_ID,
+  })
   const supabase = createClientComponentClient()
 
   // Load user saju profiles
@@ -187,25 +201,182 @@ export default function SajuDiagram({
     }
   }
 
-  // Handle setting main profile
-  const handleSetAsMain = async (profile: any) => {
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) return
+  const handleEditProfile = (profile: any) => {
+    setEditingProfile(profile)
+    setEditForm({
+      name: profile.name || "",
+      gender: profile.gender || "female",
+      birthYear: profile.birthYear || "",
+      birthMonth: profile.birthMonth || "",
+      birthDay: profile.birthDay || "",
+      birthHour: profile.birthHour || "",
+      birthMinute: profile.birthMinute || "",
+      timeUnknown: profile.timeUnknown || false,
+      birthCityId: profile.birthCityId || DEFAULT_CITY_ID,
+    })
+  }
 
-      const success = await setDefaultSajuSession(userData.user.id, profile.id)
-      if (success) {
-        setDefaultProfileState(profile)
-        toast({
-          title: "메인 사주 설정 완료",
-          description: `${profile.name}님의 사주가 메인 사주로 설정되었습니다.`,
-        })
+  const handleUpdateProfile = async () => {
+    if (!editingProfile) return
+
+    try {
+      const birthDateChanged =
+        editForm.birthYear !== editingProfile.birthYear ||
+        editForm.birthMonth !== editingProfile.birthMonth ||
+        editForm.birthDay !== editingProfile.birthDay ||
+        editForm.birthHour !== editingProfile.birthHour ||
+        editForm.birthMinute !== editingProfile.birthMinute ||
+        editForm.timeUnknown !== editingProfile.timeUnknown ||
+        editForm.birthCityId !== editingProfile.birthCityId
+
+      let updatedSaju = editingProfile.saju
+      let updatedDaeun = editingProfile.daeun
+
+      if (birthDateChanged) {
+        const { solarToLunar } = await import("@/lib/lunar-calendar")
+        const { calculateSaju } = await import("@/lib/saju")
+        const { calculateDaeunInfo } = await import("@/lib/daeun-calculator")
+        const { getCityById } = await import("@/lib/city-timezone-data")
+
+        // 음력 날짜 계산
+        const lunarDate = solarToLunar(
+          Number.parseInt(editForm.birthYear),
+          Number.parseInt(editForm.birthMonth),
+          Number.parseInt(editForm.birthDay),
+        )
+
+        // 시간 기준 가져오기
+        const cityData = getCityById(editForm.birthCityId)
+        const timeStandard = cityData?.timeStandard || "동경135도"
+
+        // 사주 재계산
+        updatedSaju = calculateSaju(
+          lunarDate.year.toString(),
+          lunarDate.month.toString(),
+          lunarDate.day.toString(),
+          editForm.timeUnknown ? 0 : Number.parseInt(editForm.birthHour || "0"),
+          editForm.timeUnknown ? 0 : Number.parseInt(editForm.birthMinute || "0"),
+          Number.parseInt(editForm.birthYear),
+          Number.parseInt(editForm.birthMonth),
+          Number.parseInt(editForm.birthDay),
+          editForm.gender,
+          editForm.name,
+          editForm.timeUnknown,
+          lunarDate.isLeapMonth,
+          lunarDate.monthStem,
+          lunarDate.monthBranch,
+          timeStandard,
+        )
+
+        // 대운 재계산
+        updatedDaeun = calculateDaeunInfo(
+          {
+            yearStem: updatedSaju.yearStem,
+            monthStem: updatedSaju.monthStem,
+            monthBranch: updatedSaju.monthBranch,
+          },
+          Number.parseInt(editForm.birthYear),
+          Number.parseInt(editForm.birthMonth),
+          Number.parseInt(editForm.birthDay),
+          editForm.gender,
+          editForm.timeUnknown ? undefined : Number.parseInt(editForm.birthHour || "0"),
+          editForm.timeUnknown ? undefined : Number.parseInt(editForm.birthMinute || "0"),
+          editForm.timeUnknown,
+        )
       }
+
+      const response = await fetch("/api/save-saju-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: editingProfile.id,
+          sajuData: updatedSaju,
+          daeunData: updatedDaeun,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update saju data")
+      }
+
+      const { error } = await supabase
+        .from("saju_sessions")
+        .update({
+          name: editForm.name,
+          gender: editForm.gender,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingProfile.id)
+
+      if (error) throw error
+
+      if (birthDateChanged) {
+        const birthInfoResponse = await fetch("/api/birth-info", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: editingProfile.birthInfoId,
+            user_id: editingProfile.id,
+            solar_year: Number.parseInt(editForm.birthYear),
+            solar_month: Number.parseInt(editForm.birthMonth),
+            solar_day: Number.parseInt(editForm.birthDay),
+            solar_hour: editForm.timeUnknown ? null : Number.parseInt(editForm.birthHour || "0"),
+            solar_minute: editForm.timeUnknown ? null : Number.parseInt(editForm.birthMinute || "0"),
+            time_unknown: editForm.timeUnknown,
+            birth_city_id: editForm.birthCityId,
+          }),
+        })
+
+        if (!birthInfoResponse.ok) {
+          console.error("Failed to update birth_info")
+        }
+      }
+
+      const updatedProfile = {
+        ...editingProfile,
+        name: editForm.name,
+        gender: editForm.gender,
+        birthYear: editForm.birthYear,
+        birthMonth: editForm.birthMonth,
+        birthDay: editForm.birthDay,
+        birthHour: editForm.birthHour,
+        birthMinute: editForm.birthMinute,
+        timeUnknown: editForm.timeUnknown,
+        birthCityId: editForm.birthCityId,
+        saju: updatedSaju,
+        daeun: updatedDaeun,
+      }
+
+      setSajuProfiles((prevProfiles) =>
+        prevProfiles.map((profile) => (profile.id === editingProfile.id ? updatedProfile : profile)),
+      )
+
+      // defaultProfile이 편집된 프로필과 같다면 업데이트
+      if (defaultProfile && defaultProfile.id === editingProfile.id) {
+        setDefaultProfileState(updatedProfile)
+      }
+
+      if (onProfileUpdate && saju && editingProfile.id === editingProfile.id) {
+        onProfileUpdate(updatedProfile)
+      }
+
+      toast({
+        title: "프로필 수정 완료",
+        description: birthDateChanged
+          ? `${editForm.name}님의 프로필이 수정되고 사주가 재계산되었습니다.`
+          : `${editForm.name}님의 프로필이 수정되었습니다.`,
+      })
+
+      setEditingProfile(null)
     } catch (error) {
-      console.error("Error setting main saju:", error)
+      console.error("Error updating profile:", error)
       toast({
         title: "오류 발생",
-        description: "메인 사주 설정 중 오류가 발생했습니다.",
+        description: "프로필 수정 중 오류가 발생했습니다.",
         variant: "destructive",
       })
     }
@@ -467,18 +638,24 @@ export default function SajuDiagram({
                 <div className="flex justify-start gap-2">
                   <span>생일</span>
                   <span>
-                    {solarYear}. {solarMonth}. {solarDay}(양력)
+                    {defaultProfile?.birthYear || ""}. {defaultProfile?.birthMonth || ""}.{" "}
+                    {defaultProfile?.birthDay || ""}(양력)
                   </span>
                 </div>
                 <div className="flex justify-start gap-2">
                   <span>생시</span>
                   <span>
-                    {formatTime(hour, minute)}, {location || "서울특별시"}
+                    {defaultProfile?.timeUnknown
+                      ? "시간 모름"
+                      : `${String(defaultProfile?.birthHour || "00").padStart(2, "0")}시 ${String(defaultProfile?.birthMinute || "00").padStart(2, "0")}분`}
+                    , {defaultProfile?.location || "서울특별시"}
                   </span>
                 </div>
                 <div className="flex justify-start gap-2">
                   <span>성별</span>
-                  <span>{gender === "male" ? "남성" : gender === "female" ? "여성" : "미상"}</span>
+                  <span>
+                    {defaultProfile?.gender === "male" ? "남성" : defaultProfile?.gender === "female" ? "여성" : "미상"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -614,7 +791,7 @@ export default function SajuDiagram({
               {/* Main Profile Section */}
               <div className="flex-1 space-y-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Star className="h-4 w-4" />
+                  <div className="w-4 h-4 rounded bg-muted" />
                   대표 프로필
                 </div>
 
@@ -634,23 +811,21 @@ export default function SajuDiagram({
 
                     <div className="space-y-1 md:space-y-2 text-sm">
                       <div>
-                        생일: {defaultProfile.birthYear}.{defaultProfile.birthMonth}.{defaultProfile.birthDay}(양력)
+                        생일: {defaultProfile.birthYear || ""}.{defaultProfile.birthMonth || ""}.
+                        {defaultProfile.birthDay || ""}(양력)
                       </div>
                       <div>
                         생시:{" "}
                         {defaultProfile.timeUnknown
                           ? "시간 모름"
-                          : `${defaultProfile.birthHour}:${defaultProfile.birthMinute}`}
-                        , 서울특별시
+                          : `${String(defaultProfile.birthHour || "00").padStart(2, "0")}:${String(defaultProfile.birthMinute || "00").padStart(2, "0")}`}
+                        , {defaultProfile.location || "서울특별시"}
                       </div>
                       <div>성별: {defaultProfile.gender === "male" ? "남성" : "여성"}</div>
                     </div>
 
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                        사주 풀이 보기
-                      </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleEditProfile(defaultProfile)}>
                         프로필 편집
                       </Button>
                     </div>
@@ -709,25 +884,20 @@ export default function SajuDiagram({
                               <span className="font-medium truncate">{profile.name}</span>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {profile.gender === "male" ? "남성" : "여성"} • {profile.birthYear}.{profile.birthMonth}.
-                              {profile.birthDay}(양력)
+                              {profile.gender === "male" ? "남성" : "여성"} • {profile.birthYear || ""}.
+                              {profile.birthMonth || ""}.{profile.birthDay || ""}(양력)
                             </div>
                           </div>
 
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEditProfile(profile)}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {!isMain && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleSetAsMain(profile)}
-                              >
-                                <Star className="h-4 w-4" />
-                              </Button>
-                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -743,6 +913,123 @@ export default function SajuDiagram({
                     })
                   )}
                 </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!editingProfile} onOpenChange={(open) => !open && setEditingProfile(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>프로필 편집</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">이름</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  placeholder="이름을 입력하세요"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>성별</Label>
+                <RadioGroup
+                  value={editForm.gender}
+                  onValueChange={(value) => setEditForm({ ...editForm, gender: value })}
+                  className="flex space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="female" id="edit-female" />
+                    <Label htmlFor="edit-female">여성</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="male" id="edit-male" />
+                    <Label htmlFor="edit-male">남성</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-year">년</Label>
+                  <Input
+                    id="edit-year"
+                    value={editForm.birthYear}
+                    onChange={(e) => setEditForm({ ...editForm, birthYear: e.target.value })}
+                    placeholder="1998"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-month">월</Label>
+                  <Input
+                    id="edit-month"
+                    value={editForm.birthMonth}
+                    onChange={(e) => setEditForm({ ...editForm, birthMonth: e.target.value })}
+                    placeholder="04"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-day">일</Label>
+                  <Input
+                    id="edit-day"
+                    value={editForm.birthDay}
+                    onChange={(e) => setEditForm({ ...editForm, birthDay: e.target.value })}
+                    placeholder="07"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>태어난 시간</Label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="edit-timeUnknown"
+                      checked={editForm.timeUnknown}
+                      onChange={(e) => setEditForm({ ...editForm, timeUnknown: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="edit-timeUnknown" className="text-sm">
+                      시간 모름
+                    </Label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    value={editForm.birthHour}
+                    onChange={(e) => setEditForm({ ...editForm, birthHour: e.target.value })}
+                    placeholder="시"
+                    disabled={editForm.timeUnknown}
+                  />
+                  <Input
+                    value={editForm.birthMinute}
+                    onChange={(e) => setEditForm({ ...editForm, birthMinute: e.target.value })}
+                    placeholder="분"
+                    disabled={editForm.timeUnknown}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>태어난 도시</Label>
+                <CitySearch
+                  value={editForm.birthCityId}
+                  onChange={(value) => setEditForm({ ...editForm, birthCityId: value })}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditingProfile(null)} className="flex-1">
+                  취소
+                </Button>
+                <Button onClick={handleUpdateProfile} className="flex-1">
+                  저장
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -791,18 +1078,24 @@ export default function SajuDiagram({
         <div className="flex items-center gap-2">
           <span className="font-medium">생일</span>
           <span>
-            {solarYear}. {solarMonth}. {solarDay}(양력)
+            {defaultProfile?.birthYear || ""}. {defaultProfile?.birthMonth || ""}. {defaultProfile?.birthDay || ""}
+            (양력)
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="font-medium">생시</span>
           <span>
-            {formatTime(hour, minute)}, {location || "서울특별시"}
+            {defaultProfile?.timeUnknown
+              ? "시간 모름"
+              : `${String(defaultProfile?.birthHour || "00").padStart(2, "0")}시 ${String(defaultProfile?.birthMinute || "00").padStart(2, "0")}분`}
+            , {defaultProfile?.location || "서울특별시"}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="font-medium">성별</span>
-          <span>{gender === "male" ? "남성" : gender === "female" ? "여성" : "미상"}</span>
+          <span>
+            {defaultProfile?.gender === "male" ? "남성" : defaultProfile?.gender === "female" ? "여성" : "미상"}
+          </span>
         </div>
       </div>
 
