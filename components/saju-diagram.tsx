@@ -152,12 +152,7 @@ export default function SajuDiagram({
   const [sajuProfiles, setSajuProfiles] = useState<any[]>([])
   const [defaultProfile, setDefaultProfileState] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [profileCollapsed, setProfileCollapsed] = useState(() => {
-    if (typeof window !== "undefined" && variant === "sidebar") {
-      return localStorage.getItem("saju_profile_collapsed") === "true"
-    }
-    return false
-  })
+  const [profileCollapsed, setProfileCollapsed] = useState(false)
   const [editingProfile, setEditingProfile] = useState<any>(null)
   const [editForm, setEditForm] = useState({
     name: "",
@@ -451,6 +446,12 @@ export default function SajuDiagram({
 
   useEffect(() => {
     if (variant === "sidebar") {
+      loadSajuProfiles()
+    }
+  }, [variant])
+
+  useEffect(() => {
+    if (variant === "sidebar") {
       localStorage.setItem("saju_profile_collapsed", profileCollapsed.toString())
     }
   }, [profileCollapsed, variant])
@@ -638,23 +639,27 @@ export default function SajuDiagram({
                 <div className="flex justify-start gap-2">
                   <span>생일</span>
                   <span>
-                    {defaultProfile?.birthYear || ""}. {defaultProfile?.birthMonth || ""}.{" "}
-                    {defaultProfile?.birthDay || ""}(양력)
+                    {defaultProfile?.birthYear || solarYear || ""}. {defaultProfile?.birthMonth || solarMonth || ""}.{" "}
+                    {defaultProfile?.birthDay || solarDay || ""}(양력)
                   </span>
                 </div>
                 <div className="flex justify-start gap-2">
                   <span>생시</span>
                   <span>
-                    {defaultProfile?.timeUnknown
+                    {(defaultProfile?.timeUnknown ?? timeUnknown)
                       ? "시간 모름"
-                      : `${String(defaultProfile?.birthHour || "00").padStart(2, "0")}시 ${String(defaultProfile?.birthMinute || "00").padStart(2, "0")}분`}
-                    , {defaultProfile?.location || "서울특별시"}
+                      : `${String((defaultProfile?.birthHour ?? hour) || "00").padStart(2, "0")}시 ${String((defaultProfile?.birthMinute ?? minute) || "00").padStart(2, "0")}분`}
+                    , {defaultProfile?.location || location || "서울특별시"}
                   </span>
                 </div>
                 <div className="flex justify-start gap-2">
                   <span>성별</span>
                   <span>
-                    {defaultProfile?.gender === "male" ? "남성" : defaultProfile?.gender === "female" ? "여성" : "미상"}
+                    {(defaultProfile?.gender || gender) === "male"
+                      ? "남성"
+                      : (defaultProfile?.gender || gender) === "female"
+                        ? "여성"
+                        : "미상"}
                   </span>
                 </div>
               </div>
