@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/utils/supabase/server"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 
 const TOSS_SECRET_KEY = process.env.TOSS_SECRET_KEY || "test_sk_5OWRapdA8dWnKzAjQAEBro1zEqZK"
 
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const supabase = createClient()
+    const supabase = createRouteHandlerClient({ cookies })
     const {
       data: { user },
       error: userError,
@@ -98,24 +99,43 @@ export async function POST(request: NextRequest) {
         .eq("id", paymentOrder.id)
     }
 
-    // Call the existing user-coins API to add coins
-    const coinsResponse = await fetch(`${request.nextUrl.origin}/api/user-coins`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Cookie: request.headers.get("cookie") || "",
-      },
-      body: JSON.stringify({
-        delta: coinsToAdd,
-        type: "purchase",
-        packageId,
-        orderId,
-        paymentKey,
-      }),
-    })
+    try {
+      const coinsResponse = await fetch(`${request.nextUrl.origin}/api/user-coins`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: request.headers.get("cookie") || "",
+        },
+        body: JSON.stringify({
+          action: "add",
+          amount: coinsToAdd,
+        }),
+      })
 
-    if (!coinsResponse.ok) {
-      console.error("Failed to add coins to user account")
+      if (!coinsResponse.ok) {
+        const errorData = await coinsResponse.json()
+        throw new Error(errorData.error || "Failed to add coins")
+      }
+
+      const coinsData = await coinsResponse.json()
+
+      await supabase
+        .from("payment_orders")
+        .update({
+          status: "completed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", paymentOrder.id)
+
+      return NextResponse.json({
+        success: true,
+        coinsAdded: coinsToAdd,
+        totalCoins: coinsData.coins,
+        packageName: packageData.name,
+        orderId: paymentOrder.id,
+      })
+    } catch (coinsError) {
+      console.error("Failed to add coins to user account:", coinsError)
 
       await supabase
         .from("payment_orders")
@@ -126,23 +146,14 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", paymentOrder.id)
 
-      return NextResponse.json({ error: "Failed to process purchase" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to process purchase",
+          details: "Payment confirmed but coin addition failed",
+        },
+        { status: 500 },
+      )
     }
-
-    await supabase
-      .from("payment_orders")
-      .update({
-        status: "completed",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", paymentOrder.id)
-
-    return NextResponse.json({
-      success: true,
-      coinsAdded: coinsToAdd,
-      packageName: packageData.name,
-      orderId: paymentOrder.id,
-    })
   } catch (error) {
     console.error("Payment confirmation error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
