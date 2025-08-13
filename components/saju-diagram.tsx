@@ -1,7 +1,7 @@
 "use client"
 
 import type { Saju } from "@/lib/saju"
-import { InfoIcon, ChevronDown } from "lucide-react"
+import { InfoIcon, ChevronDown, Heart } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
@@ -199,6 +199,45 @@ export default function SajuDiagram({
       toast({
         title: "오류 발생",
         description: "메인 사주 설정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Handle compatibility check
+  const handleCompatibilityCheck = async (profile: any) => {
+    if (!defaultProfile) {
+      toast({
+        title: "오류",
+        description: "대표 프로필이 설정되지 않았습니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // 궁합 채팅방으로 이동
+      const compatibilityData = {
+        profile1: defaultProfile,
+        profile2: profile,
+        type: "compatibility",
+      }
+
+      // localStorage에 궁합 데이터 저장
+      localStorage.setItem("compatibility_data", JSON.stringify(compatibilityData))
+
+      // 궁합 채팅방으로 이동
+      window.location.href = "/saju-chat/compatibility"
+
+      toast({
+        title: "궁합 분석 시작",
+        description: `${defaultProfile.name}님과 ${profile.name}님의 궁합을 분석합니다.`,
+      })
+    } catch (error) {
+      console.error("Error starting compatibility check:", error)
+      toast({
+        title: "오류 발생",
+        description: "궁합 분석 시작 중 오류가 발생했습니다.",
         variant: "destructive",
       })
     }
@@ -525,20 +564,20 @@ export default function SajuDiagram({
                 </div>
 
                 {defaultProfile && (
-                  <div className="bg-muted rounded-lg p-6 space-y-4">
-                    <div className="w-20 h-20 rounded-lg bg-red-400 flex items-center justify-center text-white text-2xl font-bold">
+                  <div className="bg-muted rounded-lg p-3 md:p-6 space-y-3 md:space-y-4">
+                    <div className="w-12 h-12 md:w-20 md:h-20 rounded-lg bg-red-400 flex items-center justify-center text-white text-lg md:text-2xl font-bold">
                       {defaultProfile.name?.charAt(0) || "?"}
                     </div>
 
                     <div>
-                      <h3 className="text-lg font-bold">{defaultProfile.name}의 사주</h3>
+                      <h3 className="text-base md:text-lg font-bold">{defaultProfile.name}의 사주</h3>
                       <p className="text-sm text-red-500">
                         {defaultProfile.saju?.dayStem}
                         {defaultProfile.saju?.dayBranch}일주
                       </p>
                     </div>
 
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-1 md:space-y-2 text-sm">
                       <div>
                         생일: {defaultProfile.birthYear}.{defaultProfile.birthMonth}.{defaultProfile.birthDay}(양력)
                       </div>
@@ -634,6 +673,15 @@ export default function SajuDiagram({
                                 <Star className="h-4 w-4" />
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleCompatibilityCheck(profile)}
+                              title="궁합보기"
+                            >
+                              <Heart className="h-4 w-4 text-pink-500" />
+                            </Button>
                           </div>
                         </div>
                       )
