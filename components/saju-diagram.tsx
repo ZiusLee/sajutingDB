@@ -1,17 +1,20 @@
 "use client"
 
 import type { Saju } from "@/lib/saju"
-import { InfoIcon, ChevronDown } from 'lucide-react'
+import { InfoIcon, ChevronDown } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Star, Edit, Trash2, Plus, X } from 'lucide-react'
+import { Star, Edit, Plus, X } from "lucide-react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { getUserSajuProfiles, getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession } from "@/lib/saju-session-service"
-import { calculateElementsFromSaju } from "@/lib/element-utils"
+import {
+  getUserSajuProfiles,
+  getDefaultSajuSession,
+  getSajuProfileBySessionId,
+  setDefaultSajuSession,
+} from "@/lib/saju-session-service"
 import { toast } from "@/components/ui/use-toast"
 
 interface SajuDiagramProps {
@@ -151,7 +154,7 @@ export default function SajuDiagram({
   // Load user saju profiles
   const loadSajuProfiles = async () => {
     if (variant !== "sidebar") return
-    
+
     try {
       setIsLoading(true)
       const { profiles } = await getUserSajuProfiles()
@@ -367,7 +370,7 @@ export default function SajuDiagram({
         {/* Profile Info */}
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-red-400 flex items-center justify-center text-white font-bold">
+            <div className="w-12 h-12 rounded-xl bg-red-400 flex items-center justify-center text-white font-bold shadow-sm">
               {displayName.charAt(0)}
             </div>
             <div>
@@ -401,7 +404,7 @@ export default function SajuDiagram({
         </div>
 
         {/* Saju Chart Header */}
-        <div className="flex items-center gap-2 pt-2">
+        <div className="flex items-center gap-2">
           <span className="text-sm font-medium">사주팔자 상세</span>
           <InfoIcon className="w-4 h-4 text-muted-foreground" />
         </div>
@@ -439,17 +442,17 @@ export default function SajuDiagram({
           </div>
 
           {/* Sibseong for stems - increased height */}
-          <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+          <div className="grid grid-cols-4 gap-1 text-center text-sm text-muted-foreground">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {timeUnknown ? "" : saju.hourStemSibseong}
             </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {saju.dayStemSibseong || "본원"}
             </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {saju.monthStemSibseong}
             </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {saju.yearStemSibseong}
             </div>
           </div>
@@ -483,27 +486,23 @@ export default function SajuDiagram({
           </div>
 
           {/* Sibseong for branches - increased height */}
-          <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+          <div className="grid grid-cols-4 gap-1 text-center text-sm text-muted-foreground">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {timeUnknown ? "" : saju.hourBranchSibseong}
             </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {saju.dayBranchSibseong}
             </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {saju.monthBranchSibseong}
             </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center">
+            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
               {saju.yearBranchSibseong}
             </div>
           </div>
         </div>
         {/* Add profile management button and dialog */}
-        <Button 
-          variant="outline" 
-          className="w-full mt-4" 
-          onClick={() => setIsProfileDialogOpen(true)}
-        >
+        <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={() => setIsProfileDialogOpen(true)}>
           등록된 사주 정보 보기
         </Button>
 
@@ -512,44 +511,49 @@ export default function SajuDiagram({
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
             <DialogHeader className="flex flex-row items-center justify-between">
               <DialogTitle>프로필 관리</DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsProfileDialogOpen(false)}
-              >
+              <Button variant="ghost" size="icon" onClick={() => setIsProfileDialogOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </DialogHeader>
-            
-            <div className="flex gap-6 h-[600px]">
+
+            <div className="flex flex-col md:flex-row gap-6 h-auto md:h-[600px]">
               {/* Main Profile Section */}
               <div className="flex-1 space-y-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Star className="h-4 w-4" />
                   대표 프로필
                 </div>
-                
+
                 {defaultProfile && (
                   <div className="bg-muted rounded-lg p-6 space-y-4">
                     <div className="w-20 h-20 rounded-lg bg-red-400 flex items-center justify-center text-white text-2xl font-bold">
                       {defaultProfile.name?.charAt(0) || "?"}
                     </div>
-                    
+
                     <div>
                       <h3 className="text-lg font-bold">{defaultProfile.name}의 사주</h3>
                       <p className="text-sm text-red-500">
-                        {defaultProfile.saju?.dayStem}{defaultProfile.saju?.dayBranch}일주 
+                        {defaultProfile.saju?.dayStem}
+                        {defaultProfile.saju?.dayBranch}일주
                       </p>
                     </div>
-                    
+
                     <div className="space-y-2 text-sm">
-                      <div>생일: {defaultProfile.birthYear}.{defaultProfile.birthMonth}.{defaultProfile.birthDay}(양력)</div>
-                      <div>생시: {defaultProfile.timeUnknown ? "시간 모름" : `${defaultProfile.birthHour}:${defaultProfile.birthMinute}`}, 서울특별시</div>
+                      <div>
+                        생일: {defaultProfile.birthYear}.{defaultProfile.birthMonth}.{defaultProfile.birthDay}(양력)
+                      </div>
+                      <div>
+                        생시:{" "}
+                        {defaultProfile.timeUnknown
+                          ? "시간 모름"
+                          : `${defaultProfile.birthHour}:${defaultProfile.birthMinute}`}
+                        , 서울특별시
+                      </div>
                       <div>성별: {defaultProfile.gender === "male" ? "남성" : "여성"}</div>
                     </div>
-                    
+
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">
+                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
                         사주 풀이 보기
                       </Button>
                       <Button variant="outline" size="sm">
@@ -559,7 +563,7 @@ export default function SajuDiagram({
                   </div>
                 )}
               </div>
-              
+
               {/* Profiles List Section */}
               <div className="flex-1 space-y-4">
                 <div className="flex items-center justify-between">
@@ -572,8 +576,8 @@ export default function SajuDiagram({
                     프로필 추가
                   </Button>
                 </div>
-                
-                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+
+                <div className="space-y-3 max-h-[300px] md:max-h-[500px] overflow-y-auto">
                   {isLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -581,33 +585,49 @@ export default function SajuDiagram({
                   ) : (
                     sajuProfiles.map((profile, index) => {
                       const isMain = defaultProfile?.id === profile.id
-                      const colors = ["bg-red-400", "bg-orange-400", "bg-blue-400", "bg-purple-400", "bg-green-400", "bg-pink-400", "bg-indigo-400"]
+                      const colors = [
+                        "bg-red-400",
+                        "bg-orange-400",
+                        "bg-blue-400",
+                        "bg-purple-400",
+                        "bg-green-400",
+                        "bg-pink-400",
+                        "bg-indigo-400",
+                      ]
                       const bgColor = colors[index % colors.length]
-                      
+
                       return (
-                        <div key={profile.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50">
-                          <div className={`w-10 h-10 rounded ${bgColor} flex items-center justify-center text-white font-bold`}>
+                        <div
+                          key={profile.id}
+                          className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50"
+                        >
+                          <div
+                            className={`w-10 h-10 rounded ${bgColor} flex items-center justify-center text-white font-bold`}
+                          >
                             {profile.name?.charAt(0) || "?"}
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              {isMain && <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">대표</span>}
+                              {isMain && (
+                                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">대표</span>
+                              )}
                               <span className="font-medium truncate">{profile.name}</span>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {profile.gender === "male" ? "남성" : "여성"} • {profile.birthYear}.{profile.birthMonth}.{profile.birthDay}(양력)
+                              {profile.gender === "male" ? "남성" : "여성"} • {profile.birthYear}.{profile.birthMonth}.
+                              {profile.birthDay}(양력)
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8">
                               <Edit className="h-4 w-4" />
                             </Button>
                             {!isMain && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-8 w-8"
                                 onClick={() => handleSetAsMain(profile)}
                               >
@@ -708,8 +728,7 @@ export default function SajuDiagram({
           <div className="text-2xl font-bold">{saju.dayStem}</div>
           <div className="text-sm">{saju.dayStemHanja}</div>
         </div>
-        <div className={`${getStemColor(saju.monthStem)} text-white rounded-lg p-4 text-center shadow-md`}
-        >
+        <div className={`${getStemColor(saju.monthStem)} text-white rounded-lg p-4 text-center shadow-md`}>
           <div className="text-2xl font-bold">{saju.monthStem}</div>
           <div className="text-sm">{saju.monthStemHanja}</div>
         </div>
