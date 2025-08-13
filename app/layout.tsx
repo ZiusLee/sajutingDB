@@ -67,7 +67,7 @@ export const metadata: Metadata = {
       'naver-site-verification': 'naverd0ceb7b213e6ca7ce0f7076be36f2075',
     },
   },
-    generator: 'v0.dev'
+    generator: 'v0.app'
 }
 
 export default function RootLayout({
