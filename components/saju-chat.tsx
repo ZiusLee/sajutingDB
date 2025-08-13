@@ -23,7 +23,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SignupDialog } from "@/components/signup-dialog"
 import { TermsDialog } from "@/components/terms-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { useEffect as useEffectPersistent, useRef as useRefPersistent } from "react"
+import { useRouter } from "next/navigation"
 
 interface SajuChatProps {
   saju: any
@@ -153,15 +153,13 @@ export default function SajuChat({
     currentMessageId: null,
     pendingContent: "",
   })
-  const chatStreamRef = useRefPersistent<{
-    isStreaming: boolean
-    messageId: string | null
-    content: string
-  }>({
+  const chatStreamRef = useRef({
     isStreaming: false,
     messageId: null,
     content: "",
   })
+
+  const router = useRouter()
 
   const sessionId = useMemo(() => {
     try {
@@ -459,11 +457,13 @@ export default function SajuChat({
 
   const handleChatRoomSelect = (chatRoomId: string) => {
     if (window.innerWidth < 1024) setSidebarOpen(false)
-    window.location.href = `/saju-chat/${roomType}?roomId=${chatRoomId}`
+    saveScrollPosition()
+    router.push(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
   }
 
   const handleNewChat = () => {
-    window.location.href = `/saju-chat/${roomType}`
+    saveScrollPosition()
+    router.push(`/saju-chat/${roomType}`)
   }
 
   const scrollToBottom = () => {
@@ -596,7 +596,7 @@ export default function SajuChat({
     [stableConcerns, roomType],
   )
 
-  useEffectPersistent(() => {
+  useEffect(() => {
     const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
 
     // Load persistent stream state on mount
@@ -633,7 +633,7 @@ export default function SajuChat({
     }
   }, [effectiveChatRoomId, sessionId])
 
-  useEffectPersistent(() => {
+  useEffect(() => {
     const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
 
     if (isLoading && messages.length > 0) {
@@ -667,7 +667,7 @@ export default function SajuChat({
     }
   }, [isLoading, messages, effectiveChatRoomId, sessionId, chatStreamState.isStreaming])
 
-  useEffectPersistent(() => {
+  useEffect(() => {
     const handleBeforeUnload = () => {
       const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
       if (chatStreamRef.current.isStreaming) {
@@ -687,7 +687,7 @@ export default function SajuChat({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [effectiveChatRoomId, sessionId])
 
-  useEffectPersistent(() => {
+  useEffect(() => {
     // Check for interrupted streams on page load
     const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
     const savedStream = localStorage.getItem(streamKey)
@@ -728,6 +728,31 @@ export default function SajuChat({
       }
     }
   }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
+
+  const saveScrollPosition = () => {
+    if (chatContainerRef.current) {
+      const scrollPosition = chatContainerRef.current.scrollTop
+      sessionStorage.setItem(`chat-scroll-${roomType}`, scrollPosition.toString())
+    }
+  }
+
+  const restoreScrollPosition = () => {
+    const savedPosition = sessionStorage.getItem(`chat-scroll-${roomType}`)
+    if (savedPosition && chatContainerRef.current) {
+      const position = Number.parseInt(savedPosition, 10)
+      if (position > 0) {
+        setTimeout(() => {
+          if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = position
+          }
+        }, 100)
+      }
+    }
+  }
+
+  useEffect(() => {
+    restoreScrollPosition()
+  }, [roomType])
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
