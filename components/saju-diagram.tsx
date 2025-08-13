@@ -1,7 +1,7 @@
 "use client"
 
 import type { Saju } from "@/lib/saju"
-import { InfoIcon, ChevronDown, Heart } from "lucide-react"
+import { InfoIcon, ChevronDown, Heart, ChevronUp } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
@@ -16,6 +16,7 @@ import {
   setDefaultSajuSession,
 } from "@/lib/saju-session-service"
 import { toast } from "@/components/ui/use-toast"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface SajuDiagramProps {
   saju: Saju
@@ -149,6 +150,12 @@ export default function SajuDiagram({
   const [sajuProfiles, setSajuProfiles] = useState<any[]>([])
   const [defaultProfile, setDefaultProfileState] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [profileCollapsed, setProfileCollapsed] = useState(() => {
+    if (typeof window !== "undefined" && variant === "sidebar") {
+      return localStorage.getItem("saju_profile_collapsed") === "true"
+    }
+    return false
+  })
   const supabase = createClientComponentClient()
 
   // Load user saju profiles
@@ -270,6 +277,12 @@ export default function SajuDiagram({
       loadSajuProfiles()
     }
   }, [isProfileDialogOpen, variant])
+
+  useEffect(() => {
+    if (variant === "sidebar") {
+      localStorage.setItem("saju_profile_collapsed", profileCollapsed.toString())
+    }
+  }, [profileCollapsed, variant])
 
   const getAvatarContent = (gender: string) => (gender === "male" ? "👨" : "👩")
 
@@ -416,155 +429,175 @@ export default function SajuDiagram({
   if (variant === "sidebar") {
     return (
       <div className="p-4 space-y-4">
-        {/* Profile Header */}
-        <div className="flex items-center gap-2 pb-2 border-b border-border">
-          <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
-            <span className="text-xs">👤</span>
-          </div>
-          <div className="flex-1">
-            <span className="text-sm text-muted-foreground">사주 프로필</span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground float-right" />
-          </div>
-        </div>
+        <Collapsible open={!profileCollapsed} onOpenChange={(open) => setProfileCollapsed(!open)}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full flex items-center justify-between p-2 hover:bg-gray-50">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                  <span className="text-xs">👤</span>
+                </div>
+                <span className="text-sm font-medium">사주프로필</span>
+              </div>
+              {profileCollapsed ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
 
-        {/* Profile Info */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-red-400 flex items-center justify-center text-white font-bold shadow-sm">
-              {displayName.charAt(0)}
-            </div>
-            <div>
-              <h3 className="font-bold text-foreground">{displayName}의 사주 ⭐</h3>
-              <p className="text-sm text-red-500">
-                {dayMasterInfo.ilju}일주 ({dayMasterInfo.elementName}) {dayMasterInfo.colorName}
-                {dayMasterInfo.animalName}
-              </p>
-            </div>
-          </div>
+          <CollapsibleContent className="space-y-4 mt-4">
+            {/* Profile Info */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-red-400 flex items-center justify-center text-white font-bold shadow-sm">
+                  {displayName.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">{displayName}의 사주 ⭐</h3>
+                  <p className="text-sm text-red-500">
+                    {dayMasterInfo.ilju}일주 ({dayMasterInfo.elementName}) {dayMasterInfo.colorName}
+                    {dayMasterInfo.animalName}
+                  </p>
+                </div>
+              </div>
 
-          {/* Birth Info - Fixed time display */}
-          <div className="space-y-1 text-sm text-muted-foreground">
-            <div className="flex justify-start gap-2">
-              <span>생일</span>
-              <span>
-                {solarYear}. {solarMonth}. {solarDay}(양력)
-              </span>
+              {/* Birth Info - Fixed time display */}
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="flex justify-start gap-2">
+                  <span>생일</span>
+                  <span>
+                    {solarYear}. {solarMonth}. {solarDay}(양력)
+                  </span>
+                </div>
+                <div className="flex justify-start gap-2">
+                  <span>생시</span>
+                  <span>
+                    {formatTime(hour, minute)}, {location || "서울특별시"}
+                  </span>
+                </div>
+                <div className="flex justify-start gap-2">
+                  <span>성별</span>
+                  <span>{gender === "male" ? "남성" : gender === "female" ? "여성" : "미상"}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-start gap-2">
-              <span>생시</span>
-              <span>
-                {formatTime(hour, minute)}, {location || "서울특별시"}
-              </span>
+
+            {/* Saju Chart Header */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">사주팔자 상세</span>
+              <InfoIcon className="w-4 h-4 text-muted-foreground" />
             </div>
-            <div className="flex justify-start gap-2">
-              <span>성별</span>
-              <span>{gender === "male" ? "남성" : gender === "female" ? "여성" : "미상"}</span>
+
+            {/* Compact 4-pillar chart with text colors */}
+            <div className="space-y-2">
+              {/* Headers */}
+              <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
+                <div>시주</div>
+                <div>일주</div>
+                <div>월주</div>
+                <div>년주</div>
+              </div>
+
+              {/* Stems with text colors */}
+              <div className="grid grid-cols-4 gap-1">
+                <div
+                  className={`${timeUnknown ? "text-muted-foreground" : getStemColor(saju.hourStem, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
+                  <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourStemHanja}</div>
+                </div>
+                <div
+                  className={`${getStemColor(saju.dayStem, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{saju.dayStem}</div>
+                  <div className="text-xs text-muted-foreground">{saju.dayStemHanja}</div>
+                </div>
+                <div
+                  className={`${getStemColor(saju.monthStem, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{saju.monthStem}</div>
+                  <div className="text-xs text-muted-foreground">{saju.monthStemHanja}</div>
+                </div>
+                <div
+                  className={`${getStemColor(saju.yearStem, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{saju.yearStem}</div>
+                  <div className="text-xs text-muted-foreground">{saju.yearStemHanja}</div>
+                </div>
+              </div>
+
+              {/* Sibseong for stems - increased height */}
+              <div className="grid grid-cols-4 gap-1 text-center text-sm text-muted-foreground">
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {timeUnknown ? "" : saju.hourStemSibseong}
+                </div>
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {saju.dayStemSibseong || "본원"}
+                </div>
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {saju.monthStemSibseong}
+                </div>
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {saju.yearStemSibseong}
+                </div>
+              </div>
+
+              {/* Branches with text colors */}
+              <div className="grid grid-cols-4 gap-1">
+                <div
+                  className={`${timeUnknown ? "text-muted-foreground" : getBranchColor(saju.hourBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
+                  <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourBranchHanja}</div>
+                </div>
+                <div
+                  className={`${getBranchColor(saju.dayBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{saju.dayBranch}</div>
+                  <div className="text-xs text-muted-foreground">{saju.dayBranchHanja}</div>
+                </div>
+                <div
+                  className={`${getBranchColor(saju.monthBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{saju.monthBranch}</div>
+                  <div className="text-xs text-muted-foreground">{saju.monthBranchHanja}</div>
+                </div>
+                <div
+                  className={`${getBranchColor(saju.yearBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
+                >
+                  <div className="text-sm font-bold">{saju.yearBranch}</div>
+                  <div className="text-xs text-muted-foreground">{saju.yearBranchHanja}</div>
+                </div>
+              </div>
+
+              {/* Sibseong for branches - increased height */}
+              <div className="grid grid-cols-4 gap-1 text-center text-sm text-muted-foreground">
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {timeUnknown ? "" : saju.hourBranchSibseong}
+                </div>
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {saju.dayBranchSibseong}
+                </div>
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {saju.monthBranchSibseong}
+                </div>
+                <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
+                  {saju.yearBranchSibseong}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Saju Chart Header */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">사주팔자 상세</span>
-          <InfoIcon className="w-4 h-4 text-muted-foreground" />
-        </div>
-
-        {/* Compact 4-pillar chart with text colors */}
-        <div className="space-y-2">
-          {/* Headers */}
-          <div className="grid grid-cols-4 gap-1 text-center text-xs text-muted-foreground">
-            <div>시주</div>
-            <div>일주</div>
-            <div>월주</div>
-            <div>년주</div>
-          </div>
-
-          {/* Stems with text colors */}
-          <div className="grid grid-cols-4 gap-1">
-            <div
-              className={`${timeUnknown ? "text-muted-foreground" : getStemColor(saju.hourStem, true)} bg-muted rounded p-2 text-center font-bold border`}
+            {/* Add profile management button and dialog */}
+            <Button
+              variant="outline"
+              className="w-full mt-4 bg-transparent"
+              onClick={() => setIsProfileDialogOpen(true)}
             >
-              <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourStem}</div>
-              <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourStemHanja}</div>
-            </div>
-            <div className={`${getStemColor(saju.dayStem, true)} bg-muted rounded p-2 text-center font-bold border`}>
-              <div className="text-sm font-bold">{saju.dayStem}</div>
-              <div className="text-xs text-muted-foreground">{saju.dayStemHanja}</div>
-            </div>
-            <div className={`${getStemColor(saju.monthStem, true)} bg-muted rounded p-2 text-center font-bold border`}>
-              <div className="text-sm font-bold">{saju.monthStem}</div>
-              <div className="text-xs text-muted-foreground">{saju.monthStemHanja}</div>
-            </div>
-            <div className={`${getStemColor(saju.yearStem, true)} bg-muted rounded p-2 text-center font-bold border`}>
-              <div className="text-sm font-bold">{saju.yearStem}</div>
-              <div className="text-xs text-muted-foreground">{saju.yearStemHanja}</div>
-            </div>
-          </div>
-
-          {/* Sibseong for stems - increased height */}
-          <div className="grid grid-cols-4 gap-1 text-center text-sm text-muted-foreground">
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {timeUnknown ? "" : saju.hourStemSibseong}
-            </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {saju.dayStemSibseong || "본원"}
-            </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {saju.monthStemSibseong}
-            </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {saju.yearStemSibseong}
-            </div>
-          </div>
-
-          {/* Branches with text colors */}
-          <div className="grid grid-cols-4 gap-1">
-            <div
-              className={`${timeUnknown ? "text-muted-foreground" : getBranchColor(saju.hourBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
-            >
-              <div className="text-sm font-bold">{timeUnknown ? "?" : saju.hourBranch}</div>
-              <div className="text-xs text-muted-foreground">{timeUnknown ? "" : saju.hourBranchHanja}</div>
-            </div>
-            <div
-              className={`${getBranchColor(saju.dayBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
-            >
-              <div className="text-sm font-bold">{saju.dayBranch}</div>
-              <div className="text-xs text-muted-foreground">{saju.dayBranchHanja}</div>
-            </div>
-            <div
-              className={`${getBranchColor(saju.monthBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
-            >
-              <div className="text-sm font-bold">{saju.monthBranch}</div>
-              <div className="text-xs text-muted-foreground">{saju.monthBranchHanja}</div>
-            </div>
-            <div
-              className={`${getBranchColor(saju.yearBranch, true)} bg-muted rounded p-2 text-center font-bold border`}
-            >
-              <div className="text-sm font-bold">{saju.yearBranch}</div>
-              <div className="text-xs text-muted-foreground">{saju.yearBranchHanja}</div>
-            </div>
-          </div>
-
-          {/* Sibseong for branches - increased height */}
-          <div className="grid grid-cols-4 gap-1 text-center text-sm text-muted-foreground">
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {timeUnknown ? "" : saju.hourBranchSibseong}
-            </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {saju.dayBranchSibseong}
-            </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {saju.monthBranchSibseong}
-            </div>
-            <div className="bg-muted rounded px-1 py-2 h-8 flex items-center justify-center shadow-sm">
-              {saju.yearBranchSibseong}
-            </div>
-          </div>
-        </div>
-        {/* Add profile management button and dialog */}
-        <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={() => setIsProfileDialogOpen(true)}>
-          등록된 사주 정보 보기
-        </Button>
+              등록된 사주 정보 보기
+            </Button>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Profile Management Dialog */}
         <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>

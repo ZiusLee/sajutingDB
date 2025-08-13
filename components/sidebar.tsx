@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Plus, Trash2, MessageSquare, ChevronUp, ChevronDown } from "lucide-react"
+import { Plus, Trash2, MessageSquare } from "lucide-react"
 import SajuDiagram from "@/components/saju-diagram"
 import { getChatRooms, createChatRoom, deleteChatRoom, type ChatRoom } from "@/lib/chat-room-service"
 import { toast } from "sonner"
@@ -20,7 +20,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type { BirthInfo } from "@/types/birth-date"
 
 interface SidebarProps {
@@ -50,17 +49,6 @@ export default function Sidebar({
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
   const [loadingChatRooms, setLoadingChatRooms] = useState(false)
   const [creatingNewChat, setCreatingNewChat] = useState(false)
-  const [profileCollapsed, setProfileCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("profile_collapsed") === "true"
-    }
-    return false
-  })
-
-  // 프로필 접기/펼치기 상태 저장
-  useEffect(() => {
-    localStorage.setItem("profile_collapsed", profileCollapsed.toString())
-  }, [profileCollapsed])
 
   // Load chat rooms
   useEffect(() => {
@@ -139,48 +127,23 @@ export default function Sidebar({
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 border-r">
-      {/* Profile Section - Collapsible */}
       <div className="border-b bg-white">
-        <Collapsible open={!profileCollapsed} onOpenChange={(open) => setProfileCollapsed(!open)}>
-          <div className="p-4">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full flex items-center justify-between p-2 hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <div className="text-left">
-                    <h3 className="font-semibold text-gray-900">{name}</h3>
-                    <p className="text-sm text-gray-500">
-                      {gender === "male" ? "남성" : "여성"} • {birthInfo?.solarYear}년생
-                    </p>
-                  </div>
-                </div>
-                {profileCollapsed ? (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                ) : (
-                  <ChevronUp className="h-4 w-4 text-gray-500" />
-                )}
-              </Button>
-            </CollapsibleTrigger>
-
-            <CollapsibleContent className="space-y-4 mt-4">
-              <SajuDiagram
-                saju={saju}
-                name={name}
-                gender={gender}
-                variant="sidebar"
-                solarYear={birthInfo?.solarYear}
-                solarMonth={birthInfo?.solarMonth}
-                solarDay={birthInfo?.solarDay}
-                hour={birthInfo?.solarHour}
-                minute={birthInfo?.solarMinute}
-                lunarYear={birthInfo?.lunarYear}
-                lunarMonth={birthInfo?.lunarMonth}
-                lunarDay={birthInfo?.lunarDay}
-                timeUnknown={birthInfo?.timeUnknown}
-                location="서울특별시"
-              />
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
+        <SajuDiagram
+          saju={saju}
+          name={name}
+          gender={gender}
+          variant="sidebar"
+          solarYear={birthInfo?.solarYear}
+          solarMonth={birthInfo?.solarMonth}
+          solarDay={birthInfo?.solarDay}
+          hour={birthInfo?.solarHour}
+          minute={birthInfo?.solarMinute}
+          lunarYear={birthInfo?.lunarYear}
+          lunarMonth={birthInfo?.lunarMonth}
+          lunarDay={birthInfo?.lunarDay}
+          timeUnknown={birthInfo?.timeUnknown}
+          location="서울특별시"
+        />
       </div>
 
       {/* Chat History Section */}
