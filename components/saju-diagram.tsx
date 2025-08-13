@@ -216,18 +216,39 @@ export default function SajuDiagram({
     }
 
     try {
-      // 궁합 채팅방으로 이동
-      const compatibilityData = {
-        profile1: defaultProfile,
-        profile2: profile,
-        type: "compatibility",
-      }
+      // 궁합 분석 요청 메시지 생성
+      const compatibilityMessage = `안녕하세요! 두 사주의 궁합을 분석해주세요.
 
-      // localStorage에 궁합 데이터 저장
-      localStorage.setItem("compatibility_data", JSON.stringify(compatibilityData))
+**첫 번째 사주 (대표 프로필):**
+- 이름: ${defaultProfile.name}
+- 성별: ${defaultProfile.gender === "male" ? "남성" : "여성"}
+- 생년월일: ${defaultProfile.birthYear}년 ${defaultProfile.birthMonth}월 ${defaultProfile.birthDay}일 (양력)
+- 생시: ${defaultProfile.timeUnknown ? "시간 모름" : `${defaultProfile.birthHour}시 ${defaultProfile.birthMinute}분`}
+- 출생지: ${defaultProfile.location || "서울특별시"}
+- 사주: ${defaultProfile.saju?.yearStem}${defaultProfile.saju?.yearBranch}년 ${defaultProfile.saju?.monthStem}${defaultProfile.saju?.monthBranch}월 ${defaultProfile.saju?.dayStem}${defaultProfile.saju?.dayBranch}일 ${defaultProfile.timeUnknown ? "??시" : `${defaultProfile.saju?.hourStem}${defaultProfile.saju?.hourBranch}시`}
 
-      // 궁합 채팅방으로 이동
-      window.location.href = "/saju-chat/compatibility"
+**두 번째 사주:**
+- 이름: ${profile.name}
+- 성별: ${profile.gender === "male" ? "남성" : "여성"}
+- 생년월일: ${profile.birthYear}년 ${profile.birthMonth}월 ${profile.birthDay}일 (양력)
+- 생시: ${profile.timeUnknown ? "시간 모름" : `${profile.birthHour}시 ${profile.birthMinute}분`}
+- 출생지: ${profile.location || "서울특별시"}
+- 사주: ${profile.saju?.yearStem}${profile.saju?.yearBranch}년 ${profile.saju?.monthStem}${profile.saju?.monthBranch}월 ${profile.saju?.dayStem}${profile.saju?.dayBranch}일 ${profile.timeUnknown ? "??시" : `${profile.saju?.hourStem}${profile.saju?.hourBranch}시`}
+
+이 두 사주의 궁합을 자세히 분석해주세요. 특히 다음 사항들을 포함해서 설명해주세요:
+1. 전체적인 궁합 점수와 평가
+2. 성격적 궁합
+3. 연애/결혼 궁합
+4. 사업/협력 관계 궁합
+5. 서로 보완할 수 있는 부분
+6. 주의해야 할 점들
+7. 궁합을 더 좋게 만들 수 있는 방법`
+
+      // 궁합 메시지를 sessionStorage에 저장하고 채팅 페이지로 이동
+      sessionStorage.setItem("pending_compatibility_message", compatibilityMessage)
+
+      // 일반 채팅방으로 이동 (궁합 전용 방이 아닌)
+      window.location.href = "/saju-chat/general"
 
       toast({
         title: "궁합 분석 시작",
