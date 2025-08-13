@@ -5,7 +5,6 @@ import { getLunarDate } from "@/lib/api"
 import { calculateSaju } from "@/lib/saju"
 import SajuResult from "@/components/saju-result"
 import SocialShareButtons from "@/components/social-share-buttons"
-import { BetaSignupForm } from "@/components/beta-signup-form"
 import { getSajuDataByUuid } from "@/lib/saju-session-service"
 
 export default async function ResultPage({
@@ -101,7 +100,7 @@ export default async function ResultPage({
 
                 {/* 채팅 상담 버튼 추가 */}
                 <div className="py-2">
-                  <Button variant="outline" className="w-full" asChild>
+                  <Button variant="outline" className="w-full bg-transparent" asChild>
                     <Link
                       href={`/chat-list?saju=${
                         sajuParam || encodeURIComponent(JSON.stringify(formattedSaju))
@@ -115,11 +114,6 @@ export default async function ResultPage({
                     </Link>
                   </Button>
                 </div>
-              </div>
-
-              {/* 베타서비스 신청 폼 */}
-              <div className="mb-6">
-                <BetaSignupForm />
               </div>
 
               {/* 마이페이지로 돌아가기 버튼 */}
@@ -164,7 +158,7 @@ export default async function ResultPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* 사주 결과 표�� */}
+              {/* 사주 결과 표시 */}
               <div className="space-y-6">
                 <SajuResult
                   saju={{
@@ -225,7 +219,7 @@ export default async function ResultPage({
 
                 {/* 채팅 상담 버튼 추가 */}
                 <div className="py-2">
-                  <Button variant="outline" className="w-full" asChild>
+                  <Button variant="outline" className="w-full bg-transparent" asChild>
                     <Link
                       href={`/chat-list?saju=${
                         sajuParam ||
@@ -321,12 +315,7 @@ export default async function ResultPage({
                 </div>
               </div>
 
-              {/* 베타서비스 신청 폼 */}
-              <div className="mb-6">
-                <BetaSignupForm />
-              </div>
-
-              {/* 마이페이지�� 돌아가기 버튼 */}
+              {/* 마이페이지로 돌아가기 버튼 */}
               <div className="flex justify-center">
                 <Button variant="outline" asChild>
                   <Link href="/mypage">마이페이지로 돌아가기</Link>
@@ -447,7 +436,7 @@ export default async function ResultPage({
 
               {/* 채팅 상담 버튼 추가 */}
               <div className="py-2">
-                <Button variant="outline" className="w-full" asChild>
+                <Button variant="outline" className="w-full bg-transparent" asChild>
                   <Link
                     href={`/chat-list?saju=${
                       sajuParam || encodeURIComponent(JSON.stringify(saju))
@@ -463,9 +452,11 @@ export default async function ResultPage({
               </div>
             </div>
 
-            {/* 베타서비스 신청 폼 */}
-            <div className="mb-6">
-              <BetaSignupForm />
+            {/* 마이페이지로 돌아가기 버튼 */}
+            <div className="flex justify-center">
+              <Button variant="outline" asChild>
+                <Link href="/mypage">마이페이지로 돌아가기</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

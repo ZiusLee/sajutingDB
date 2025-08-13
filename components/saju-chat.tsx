@@ -831,11 +831,11 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen bg-white pt-16 lg:pt-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen bg-white pt-12 lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
-          <div className="px-3 sm:px-6 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
+          <div className="px-3 sm:px-6 py-2 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
-              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
+              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3 mt-2">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}

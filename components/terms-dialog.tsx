@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -10,102 +10,172 @@ import { X } from "lucide-react"
 export interface TermsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  providerLabel: string
   onAgree: () => void
 }
 
-export function TermsDialog({ open, onOpenChange, providerLabel, onAgree }: TermsDialogProps) {
+export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
+  const [allAgreed, setAllAgreed] = useState(false)
   const [serviceTermsChecked, setServiceTermsChecked] = useState(false)
   const [privacyChecked, setPrivacyChecked] = useState(false)
-  const [showPrivacyDetails, setShowPrivacyDetails] = useState(false)
+  const [ageChecked, setAgeChecked] = useState(false)
+  const [marketingChecked, setMarketingChecked] = useState(false)
+  const [showTermsDetails, setShowTermsDetails] = useState(false)
 
-  const canProceed = serviceTermsChecked && privacyChecked
+  const canProceed = serviceTermsChecked && privacyChecked && ageChecked
+
+  const handleAllAgree = (checked: boolean) => {
+    setAllAgreed(checked)
+    setServiceTermsChecked(checked)
+    setPrivacyChecked(checked)
+    setAgeChecked(checked)
+    setMarketingChecked(checked)
+  }
+
+  const updateAllAgreedState = () => {
+    const allChecked = serviceTermsChecked && privacyChecked && ageChecked && marketingChecked
+    setAllAgreed(allChecked)
+  }
+
+  const handleServiceTermsChange = (checked: boolean) => {
+    setServiceTermsChecked(checked)
+    setTimeout(updateAllAgreedState, 0)
+  }
+
+  const handlePrivacyChange = (checked: boolean) => {
+    setPrivacyChecked(checked)
+    setTimeout(updateAllAgreedState, 0)
+  }
+
+  const handleAgeChange = (checked: boolean) => {
+    setAgeChecked(checked)
+    setTimeout(updateAllAgreedState, 0)
+  }
+
+  const handleMarketingChange = (checked: boolean) => {
+    setMarketingChecked(checked)
+    setTimeout(updateAllAgreedState, 0)
+  }
 
   const handleAgree = () => {
     if (canProceed) {
       onAgree()
       onOpenChange(false)
       // Reset state
+      setAllAgreed(false)
       setServiceTermsChecked(false)
       setPrivacyChecked(false)
-      setShowPrivacyDetails(false)
+      setAgeChecked(false)
+      setMarketingChecked(false)
+      setShowTermsDetails(false)
     }
   }
 
   const handleClose = () => {
     onOpenChange(false)
     // Reset state
+    setAllAgreed(false)
     setServiceTermsChecked(false)
     setPrivacyChecked(false)
-    setShowPrivacyDetails(false)
+    setAgeChecked(false)
+    setMarketingChecked(false)
+    setShowTermsDetails(false)
   }
 
   return (
     <>
-      <Dialog open={open && !showPrivacyDetails} onOpenChange={handleClose}>
+      <Dialog open={open && !showTermsDetails} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">{providerLabel} 로그인을 위한 약관 동의</DialogTitle>
-            <DialogDescription>서비스 이용을 위해 다음 약관에 동의해주세요.</DialogDescription>
+            <DialogTitle className="text-xl font-semibold text-center">
+              사주핑을 시작하기 위해
+              <br />
+              약관에 동의해주세요
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="service-terms"
-                checked={serviceTermsChecked}
-                onCheckedChange={setServiceTermsChecked}
-                className="mt-1"
-              />
-              <div className="flex-1">
-                <label htmlFor="service-terms" className="text-sm font-medium cursor-pointer">
-                  서비스 이용약관 동의 (필수)
-                </label>
-                <p className="text-xs text-muted-foreground mt-1">사주핑 서비스 이용에 관한 기본 약관입니다.</p>
-              </div>
+            <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
+              <Checkbox id="all-agree" checked={allAgreed} onCheckedChange={handleAllAgree} className="rounded-full" />
+              <label htmlFor="all-agree" className="text-base font-medium cursor-pointer flex-1">
+                모두 동의합니다.
+              </label>
             </div>
 
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="privacy-terms"
-                checked={privacyChecked}
-                onCheckedChange={setPrivacyChecked}
-                className="mt-1"
-              />
-              <div className="flex-1">
-                <label htmlFor="privacy-terms" className="text-sm font-medium cursor-pointer">
-                  개인정보 처리방침 동의 (필수)
+            <div className="space-y-3 pl-2">
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="service-terms"
+                  checked={serviceTermsChecked}
+                  onCheckedChange={handleServiceTermsChange}
+                  className="rounded-full"
+                />
+                <label htmlFor="service-terms" className="text-sm cursor-pointer flex-1">
+                  [필수] 사주핑의 서비스 이용약관에 동의합니다.
                 </label>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-xs text-muted-foreground">개인정보 수집 및 이용에 관한 동의입니다.</p>
-                  <button
-                    type="button"
-                    onClick={() => setShowPrivacyDetails(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline"
-                  >
-                    자세히
-                  </button>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="privacy-terms"
+                  checked={privacyChecked}
+                  onCheckedChange={handlePrivacyChange}
+                  className="rounded-full"
+                />
+                <label htmlFor="privacy-terms" className="text-sm cursor-pointer flex-1">
+                  [필수] 사주핑의 개인정보 수집 및 이용에 동의합니다.
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="age-terms"
+                  checked={ageChecked}
+                  onCheckedChange={handleAgeChange}
+                  className="rounded-full"
+                />
+                <label htmlFor="age-terms" className="text-sm cursor-pointer flex-1">
+                  [필수] 만 14세 이상입니다.
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="marketing-terms"
+                  checked={marketingChecked}
+                  onCheckedChange={handleMarketingChange}
+                  className="rounded-full"
+                />
+                <div className="flex-1">
+                  <label htmlFor="marketing-terms" className="text-sm cursor-pointer">
+                    [선택] 서비스·이벤트 정보 제공을 위한 마케팅 이메일 수신에 동의합니다.
+                  </label>
+                  <div className="mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsDetails(true)}
+                      className="text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      자세히 보기
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent">
-              취소
-            </Button>
-            <Button onClick={handleAgree} disabled={!canProceed} className="flex-1">
-              동의하고 {providerLabel} 로그인
+          <div className="pt-4">
+            <Button onClick={handleAgree} disabled={!canProceed} className="w-full bg-blue-600 hover:bg-blue-700">
+              완료
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showPrivacyDetails} onOpenChange={setShowPrivacyDetails}>
+      <Dialog open={showTermsDetails} onOpenChange={setShowTermsDetails}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh]">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle className="text-xl font-semibold">사주핑 이용약관 및 개인정보 처리방침</DialogTitle>
-            <Button variant="ghost" size="icon" onClick={() => setShowPrivacyDetails(false)} className="h-6 w-6">
+            <Button variant="ghost" size="icon" onClick={() => setShowTermsDetails(false)} className="h-6 w-6">
               <X className="h-4 w-4" />
             </Button>
           </DialogHeader>
@@ -335,16 +405,16 @@ export function TermsDialog({ open, onOpenChange, providerLabel, onAgree }: Term
 
               <section className="pt-4 border-t">
                 <p className="text-xs text-muted-foreground">
-                  <strong>공고일자:</strong> 2025년 8월 11일
+                  <strong>공고일자:</strong> 2025년 8월 6일
                   <br />
-                  <strong>시행일자:</strong> 2025년 8월 11일
+                  <strong>시행일자:</strong> 2025년 8월 6일
                 </p>
               </section>
             </div>
           </ScrollArea>
 
           <div className="flex justify-end pt-4">
-            <Button onClick={() => setShowPrivacyDetails(false)}>확인</Button>
+            <Button onClick={() => setShowTermsDetails(false)}>확인</Button>
           </div>
         </DialogContent>
       </Dialog>

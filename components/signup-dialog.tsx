@@ -17,13 +17,14 @@ interface SignupDialogProps {
 export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDialogProps) {
   const [showTerms, setShowTerms] = useState(false)
   const [showPrivacyDetails, setShowPrivacyDetails] = useState(false)
+  const [showServiceTermsDetails, setShowServiceTermsDetails] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<"kakao" | "google" | null>(null)
-  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [agreedToService, setAgreedToService] = useState(false)
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false)
+  const [agreedToAge, setAgreedToAge] = useState(false)
+  const [agreedToMarketing, setAgreedToMarketing] = useState(false)
 
-  // Force dialog to stay open - prevent closing
   const handleOpenChange = (newOpen: boolean) => {
-    // Do nothing - force dialog to stay open
     return
   }
 
@@ -32,17 +33,157 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
     setShowTerms(true)
   }
 
-  const handleTermsAgree = () => {
-    if (selectedProvider && agreedToTerms && agreedToPrivacy) {
-      onSelectProvider(selectedProvider)
+  const handleAgreeAll = (checked: boolean) => {
+    setAgreedToService(checked)
+    setAgreedToPrivacy(checked)
+    setAgreedToAge(checked)
+    setAgreedToMarketing(checked)
+  }
+
+  const allRequiredAgreed = agreedToService && agreedToPrivacy && agreedToAge
+  const allAgreed = allRequiredAgreed && agreedToMarketing
+
+  const handleTermsAgree = async () => {
+    if (selectedProvider && allRequiredAgreed) {
+      try {
+        const response = await fetch("/api/user/update-privacy-consent", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            privacy_consent: true,
+            marketing_consent: agreedToMarketing,
+          }),
+        })
+
+        if (response.ok) {
+          onSelectProvider(selectedProvider)
+        }
+      } catch (error) {
+        console.error("Failed to update privacy consent:", error)
+        onSelectProvider(selectedProvider)
+      }
     }
   }
 
   const handleBackToProviders = () => {
     setShowTerms(false)
     setSelectedProvider(null)
-    setAgreedToTerms(false)
+    setAgreedToService(false)
     setAgreedToPrivacy(false)
+    setAgreedToAge(false)
+    setAgreedToMarketing(false)
+  }
+
+  if (showServiceTermsDetails) {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange} modal={true}>
+        <DialogContent
+          className="sm:max-w-md max-w-[90vw] rounded-3xl border-none bg-white shadow-xl"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <div className="flex flex-row items-center justify-between p-6 pb-0">
+            <h2 className="text-lg font-semibold">서비스 이용약관</h2>
+            <Button variant="ghost" size="icon" onClick={() => setShowServiceTermsDetails(false)} className="h-6 w-6">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <ScrollArea className="h-96 w-full px-6">
+            <div className="space-y-4 text-sm">
+              <div>
+                <h4 className="font-semibold mb-2">제1조 (목적)</h4>
+                <p className="text-gray-600">
+                  본 약관은 사주핑 주식회사(이하 "회사")가 운영하는 모바일 앱·웹 기반의 사주핑 서비스(이하 "서비스")
+                  이용과 관련하여, 회사와 이용자의 권리·의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제2조 (용어의 정의)</h4>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>
+                    "서비스"란 회사가 이용자에게 사주 기반 AI 해석, 감정케어 상담, 운세 리포트 등 콘텐츠를 제공하기 위해
+                    정보통신설비를 이용하여 거래할 수 있도록 설정한 가상의 영업장을 의미합니다.
+                  </li>
+                  <li>
+                    "이용자"란 회사의 서비스에 접속하여 본 약관에 따라 회사가 제공하는 콘텐츠와 제반 서비스를 이용하는
+                    회원 및 비회원을 말합니다.
+                  </li>
+                  <li>
+                    "회원"이란 본 약관에 동의하고 가입하여 회사가 제공하는 서비스를 지속적으로 이용할 수 있는 자를
+                    말합니다.
+                  </li>
+                  <li>"비회원"이란 회원 가입 없이 회사가 제공하는 서비스 일부를 이용하는 자를 말합니다.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제3조 (회원가입 및 계정관리)</h4>
+                <p className="text-gray-600 mb-2">
+                  회원가입은 카카오, 네이버, 구글, 애플 등 제3자 소셜 로그인 또는 이메일 가입을 통해 가능합니다.
+                </p>
+                <p className="text-gray-600 mb-2">
+                  가입 시 필수 입력 정보: 성별, 생년월일(음·양력 여부 포함), 태어난 도시
+                </p>
+                <p className="text-gray-600 mb-2">선택 입력 정보: 태어난 시, 추가 프로필 정보</p>
+                <p className="text-gray-600">
+                  "동의하고 시작하기" 버튼 클릭 시 본 약관과 개인정보 처리방침에 동의한 것으로 간주합니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제4조 (회원의 의무)</h4>
+                <p className="text-gray-600 mb-2">회원은 다음 행위를 하여서는 안 됩니다:</p>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>서비스 접근 방해 또는 비정상적 사용 시도</li>
+                  <li>타인의 개인정보 수집·이용·제공</li>
+                  <li>음란·저작권 침해·허위 정보 게시</li>
+                  <li>회사 승인 없이 서비스 또는 소프트웨어 복제·변경·판매·양도</li>
+                  <li>다계정 생성, 이벤트 부정참여, 포인트·사이버머니 부정사용</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제5조 (서비스 제공 및 변경)</h4>
+                <p className="text-gray-600">
+                  회사는 24시간, 365일 안정적인 서비스 제공을 위해 노력합니다. 점검, 시스템 업그레이드, 천재지변 등
+                  불가피한 사유로 서비스가 일시 중단될 수 있으며, 사전 또는 사후 공지를 진행합니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제6조 (유료콘텐츠 이용)</h4>
+                <p className="text-gray-600">
+                  유료콘텐츠는 포인트("핑") 또는 인앱결제를 통해 구매 후 이용할 수 있으며, 환불 규정은 별도의 유료
+                  이용약관에 따릅니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제7조 (회원 탈퇴)</h4>
+                <p className="text-gray-600">
+                  회원은 앱 내 계정삭제 메뉴 또는 고객센터를 통해 언제든 탈퇴할 수 있습니다. 탈퇴 시 법령에 따라 보관
+                  의무가 있는 정보를 제외하고 모든 데이터는 삭제됩니다.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t">
+                <p className="text-sm text-gray-500">공고일자: 8/6/2025</p>
+                <p className="text-sm text-gray-500">시행일자: 8/6/2025</p>
+              </div>
+            </div>
+          </ScrollArea>
+          <div className="p-6 pt-0">
+            <Button onClick={() => setShowServiceTermsDetails(false)} className="w-full">
+              확인
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   if (showPrivacyDetails) {
@@ -63,97 +204,71 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
           <ScrollArea className="h-96 w-full px-6">
             <div className="space-y-4 text-sm">
               <div>
-                <h4 className="font-semibold mb-2">1. 개인정보의 처리목적</h4>
-                <p className="text-gray-600">사주핑은 다음의 목적을 위하여 개인정보를 처리합니다:</p>
-                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-600">
-                  <li>회원 가입 및 관리</li>
-                  <li>사주 분석 서비스 제공</li>
-                  <li>고객 상담 및 불만 처리</li>
-                  <li>서비스 개선 및 맞춤형 서비스 제공</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">2. 처리하는 개인정보 항목</h4>
-                <p className="text-gray-600">사주핑은 다음의 개인정보 항목을 처리합니다:</p>
-                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-600">
-                  <li>필수항목: 이름, 생년월일, 성별, 출생시간</li>
-                  <li>선택항목: 출생지역, 연락처</li>
-                  <li>자동수집: 서비스 이용기록, 접속로그</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">3. 개인정보의 처리 및 보유기간</h4>
-                <p className="text-gray-600">
-                  개인정보는 수집·이용에 관한 동의일로부터 개인정보의 수집·이용목적을 달성할 때까지 보유·이용됩니다.
-                  회원 탈퇴 시 지체없이 파기하며, 관련 법령에 따라 보존이 필요한 경우에는 해당 기간 동안 보관합니다.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">4. 개인정보의 제3자 제공</h4>
-                <p className="text-gray-600">
-                  사주핑은 원칙적으로 이용자의 개인정보를 외부에 제공하지 않습니다. 다만, 법령의 규정에 의거하거나 수사
-                  목적으로 법령에 정해진 절차와 방법에 따라 수사기관의 요구가 있는 경우에는 제공할 수 있습니다.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">5. 개인정보 처리의 위탁</h4>
-                <p className="text-gray-600">
-                  사주핑은 서비스 향상을 위해 개인정보 처리업무를 외부 전문업체에 위탁할 수 있으며, 위탁 시에는 관련
-                  법령에 따라 위탁계약서에 개인정보 보호 관련 사항을 명시하고 안전하게 관리하도록 감독합니다.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">6. 정보주체의 권리·의무 및 행사방법</h4>
-                <p className="text-gray-600">
-                  이용자는 언제든지 개인정보 열람·정정·삭제·처리정지 요구 등의 권리를 행사할 수 있으며, 고객센터를 통해
-                  요청하실 수 있습니다.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">7. 개인정보의 안전성 확보조치</h4>
-                <p className="text-gray-600">
-                  사주핑은 개인정보의 안전성 확보를 위해 다음과 같은 조치를 취하고 있습니다:
-                </p>
-                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-600">
-                  <li>관리적 조치: 내부관리계획 수립·시행, 정기적 직원 교육</li>
-                  <li>기술적 조치: 개인정보처리시스템 등의 접근권한 관리, 접근통제시스템 설치</li>
-                  <li>물리적 조치: 전산실, 자료보관실 등의 접근통제</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">8. 개인정보 보호책임자</h4>
-                <p className="text-gray-600">
-                  개인정보 처리에 관한 업무를 총괄해서 책임지고, 개인정보 처리와 관련한 정보주체의 불만처리 및
-                  피해구제를 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.
-                </p>
-                <div className="mt-2 p-3 bg-gray-50 rounded">
-                  <p className="text-sm">
-                    <strong>개인정보 보호책임자</strong>
-                    <br />
-                    이메일: privacy@sajuping.com
-                    <br />
-                    연락처: 02-1234-5678
-                  </p>
+                <h4 className="font-semibold mb-2">제1조 (개인정보의 수집 및 이용)</h4>
+                <p className="text-gray-600 mb-2">회사는 서비스 제공을 위해 다음과 같은 개인정보를 수집·이용합니다:</p>
+                <div className="space-y-2">
+                  <div>
+                    <p className="font-medium text-gray-700">1. 회원가입 및 서비스 이용</p>
+                    <p className="text-gray-600">필수항목: 이름, 성별, 음/양력 여부, 생년월일, 태어난 도시, 소셜ID</p>
+                    <p className="text-gray-600">선택항목: 태어난 시</p>
+                    <p className="text-gray-600">보유기간: 회원 탈퇴 시까지</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-700">2. 유료서비스 결제</p>
+                    <p className="text-gray-600">필수항목: 결제수단 정보, 결제기록</p>
+                    <p className="text-gray-600">보유기간: 전자상거래법 등 관계 법령에 따른 기간</p>
+                  </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-semibold mb-2">9. 개인정보 처리방침 변경</h4>
+                <h4 className="font-semibold mb-2">제2조 (민감정보 수집 제한)</h4>
+                <p className="text-gray-600">회사는 이용자의 사상, 신념, 건강 등 민감정보를 수집하지 않습니다.</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제3조 (만 14세 미만 아동의 개인정보)</h4>
                 <p className="text-gray-600">
-                  이 개인정보 처리방침은 시행일로부터 적용되며, 법령 및 방침에 따른 변경내용의 추가, 삭제 및 정정이 있는
-                  경우에는 변경사항의 시행 7일 전부터 공지사항을 통하여 고지할 것입니다.
+                  만 14세 미만 아동의 개인정보를 수집하지 않으며, 이와 관련하여 서비스 이용을 제한합니다.
                 </p>
               </div>
 
+              <div>
+                <h4 className="font-semibold mb-2">제4조 (개인정보의 보유·이용기간)</h4>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>회원 탈퇴 시 즉시 파기</li>
+                  <li>결제기록: 5년</li>
+                  <li>소비자 불만 및 분쟁 기록: 3년</li>
+                  <li>접속 기록: 3개월</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제5조 (개인정보 처리 위탁)</h4>
+                <p className="text-gray-600 mb-2">
+                  회사는 원활한 서비스 제공을 위해 일부 업무를 외부에 위탁할 수 있습니다:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>Supabase, AWS, Google Firebase: 데이터 저장 및 서버 운영</li>
+                  <li>PG사(결제대행사): 결제 처리</li>
+                  <li>Onesignal: 푸시 알림 발송</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제6조 (개인정보 보호책임자)</h4>
+                <div className="p-3 bg-gray-50 rounded">
+                  <p className="text-sm">
+                    <strong>성명:</strong> 이윤섭
+                    <br />
+                    <strong>이메일:</strong> yoon@sajuping.ai
+                  </p>
+                </div>
+              </div>
+
               <div className="pt-4 border-t">
-                <p className="text-sm text-gray-500">시행일자: 2024년 1월 1일</p>
+                <p className="text-sm text-gray-500">공고일자: 8/6/2025</p>
+                <p className="text-sm text-gray-500">시행일자: 8/6/2025</p>
               </div>
             </div>
           </ScrollArea>
@@ -177,56 +292,123 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
           onInteractOutside={(e) => e.preventDefault()}
         >
           <div className="p-6">
-            <h2 className="text-lg font-semibold text-center mb-6">약관 동의</h2>
+            <h2 className="text-lg font-semibold text-center mb-6">
+              사주핑을 시작하기 위해
+              <br />
+              약관에 동의해주세요
+            </h2>
 
             <div className="space-y-4 mb-6">
-              <div className="flex items-start space-x-3">
-                <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={setAgreedToTerms} className="mt-1" />
-                <div className="space-y-1 flex-1">
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="agree-all"
+                    checked={allAgreed}
+                    onCheckedChange={handleAgreeAll}
+                    className="rounded-full"
+                  />
                   <label
-                    htmlFor="terms"
+                    htmlFor="agree-all"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
-                    서비스 이용약관 동의 (필수)
+                    모두 동의합니다.
                   </label>
-                  <p className="text-xs text-muted-foreground">사주핑 서비스 이용을 위한 기본 약관에 동의합니다.</p>
                 </div>
               </div>
 
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  id="privacy"
-                  checked={agreedToPrivacy}
-                  onCheckedChange={setAgreedToPrivacy}
-                  className="mt-1"
-                />
-                <div className="space-y-1 flex-1">
-                  <label
-                    htmlFor="privacy"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    개인정보 처리방침 동의 (필수)
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    개인정보 수집 및 이용에 동의합니다.{" "}
-                    <button
-                      type="button"
-                      onClick={() => setShowPrivacyDetails(true)}
-                      className="text-blue-600 hover:underline"
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="service-terms"
+                    checked={agreedToService}
+                    onCheckedChange={setAgreedToService}
+                    className="mt-1 rounded-full"
+                  />
+                  <div className="space-y-1 flex-1">
+                    <label
+                      htmlFor="service-terms"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
-                      자세히 보기
-                    </button>
-                  </p>
+                      [필수] 사주핑의 서비스 이용약관에 동의합니다.
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      사주핑 서비스 이용을 위한 기본 약관에 동의합니다.{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowServiceTermsDetails(true)}
+                        className="text-blue-600 hover:underline"
+                      >
+                        자세히 보기
+                      </button>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="privacy-policy"
+                    checked={agreedToPrivacy}
+                    onCheckedChange={setAgreedToPrivacy}
+                    className="mt-1 rounded-full"
+                  />
+                  <div className="space-y-1 flex-1">
+                    <label
+                      htmlFor="privacy-policy"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      [필수] 사주핑의 개인정보 수집 및 이용에 동의합니다.
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      개인정보 수집 및 이용에 동의합니다.{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivacyDetails(true)}
+                        className="text-blue-600 hover:underline"
+                      >
+                        자세히 보기
+                      </button>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="age-verification"
+                    checked={agreedToAge}
+                    onCheckedChange={setAgreedToAge}
+                    className="mt-1 rounded-full"
+                  />
+                  <div className="space-y-1 flex-1">
+                    <label
+                      htmlFor="age-verification"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      [필수] 만 14세 이상입니다.
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="marketing-consent"
+                    checked={agreedToMarketing}
+                    onCheckedChange={setAgreedToMarketing}
+                    className="mt-1 rounded-full"
+                  />
+                  <div className="space-y-1 flex-1">
+                    <label
+                      htmlFor="marketing-consent"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      [선택] 서비스·이벤트 정보 제공을 위한 마케팅 이메일 수신에 동의합니다.
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col space-y-3">
-              <Button
-                onClick={handleTermsAgree}
-                disabled={!agreedToTerms || !agreedToPrivacy}
-                className="w-full py-3 rounded-full"
-              >
+              <Button onClick={handleTermsAgree} disabled={!allRequiredAgreed} className="w-full py-3 rounded-full">
                 {selectedProvider === "kakao" && "카카오로 시작하기"}
                 {selectedProvider === "google" && "Google로 시작하기"}
               </Button>
@@ -253,7 +435,6 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
         onInteractOutside={(e) => e.preventDefault()}
       >
         <div className="p-8">
-          {/* Main heading */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900 leading-tight">
               지금 계정을 연동하고
@@ -264,7 +445,6 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
             </h1>
           </div>
 
-          {/* SNS LOGIN separator */}
           <div className="relative mb-8">
             <div className="absolute inset-0 flex items-center">
               <Separator className="w-full" />
@@ -274,9 +454,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
             </div>
           </div>
 
-          {/* Social login buttons */}
           <div className="flex justify-center items-center gap-8">
-            {/* Kakao Talk Button */}
             <button
               onClick={() => handleProviderSelect("kakao")}
               className="w-20 h-20 rounded-full bg-[#FEE500] flex items-center justify-center hover:bg-[#FEE500]/90 transition-colors shadow-lg"
@@ -286,7 +464,6 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
             </button>
 
-            {/* Google Button */}
             <button
               onClick={() => handleProviderSelect("google")}
               className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors shadow-lg"
@@ -302,7 +479,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
                 />
                 <path
                   fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66 2.84.81-.62z"
                 />
                 <path
                   fill="#EA4335"
