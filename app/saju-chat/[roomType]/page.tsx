@@ -9,6 +9,7 @@ import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { SignupDialog } from "@/components/signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
+import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -148,6 +149,86 @@ export default function SajuChatPage() {
 
               setLoading(false)
               return
+            }
+          }
+
+          // User is authenticated, redirecting to saju chat...
+          if (isAuthenticated && data.session?.user) {
+            console.log("✅ User is authenticated, redirecting to saju chat...")
+            console.log("Trying to load default saju for authenticated user...")
+
+            try {
+              const defaultSession = await getDefaultSajuSession(data.session.user.id)
+
+              if (defaultSession) {
+                console.log("Found default saju session:", defaultSession.id)
+
+                // Get full profile data for the default session
+                const profile = await getSajuProfileBySessionId(defaultSession.id)
+
+                if (profile && isMounted) {
+                  console.log("Successfully loaded default saju profile")
+
+                  // Create chat saju data structure from profile
+                  const chatSajuData = {
+                    saju: profile.saju,
+                    name: profile.name,
+                    gender: profile.gender,
+                    interpretation: "",
+                    returnPath: "/",
+                    timeStandard: "KST",
+                    birthCityId: null,
+                    daeun: profile.saju.daeun,
+                    concerns: [],
+                    userId: data.session.user.id,
+                    authUserId: data.session.user.id,
+                    sessionId: profile.id,
+                    birthInfo: {
+                      solarYear: Number.parseInt(profile.birthYear),
+                      solarMonth: Number.parseInt(profile.birthMonth),
+                      solarDay: Number.parseInt(profile.birthDay),
+                      solarHour: Number.parseInt(profile.birthHour),
+                      solarMinute: Number.parseInt(profile.birthMinute),
+                      lunarYear: Number.parseInt(profile.lunarYear),
+                      lunarMonth: Number.parseInt(profile.lunarMonth),
+                      lunarDay: Number.parseInt(profile.lunarDay),
+                      timeUnknown: profile.timeUnknown,
+                      birthCityId: null,
+                      timeStandard: "KST",
+                    },
+                  }
+
+                  localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+                  localStorage.setItem("saju_session_id", profile.id)
+
+                  setSaju(chatSajuData)
+                  const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+                  setSessionKey(generatedKey)
+
+                  let chatRoom = null
+                  if (!roomId) {
+                    chatRoom = createTemporaryChatRoom({
+                      sessionId: profile.id,
+                      title: "새로운 대화",
+                      roomType: roomType || "sajuping",
+                      isTemporary: true,
+                    })
+
+                    setCurrentChatRoom(chatRoom)
+                    const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+                    window.history.replaceState({}, "", newUrl)
+                  } else {
+                    setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+                  }
+
+                  setLoading(false)
+                  return
+                }
+              } else {
+                console.log("No default saju session found for authenticated user")
+              }
+            } catch (error) {
+              console.error("Error loading default saju session:", error)
             }
           }
 

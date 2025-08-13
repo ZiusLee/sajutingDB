@@ -485,7 +485,7 @@ export default function SajuChat({
     if (lastUserMessageElement) {
       const containerRect = container.getBoundingClientRect()
       const messageRect = lastUserMessageElement.getBoundingClientRect()
-      const scrollTop = container.scrollTop + messageRect.top - containerRect.top
+      const scrollTop = container.scrollTop + messageRect.top - containerRect.top - 20 // 20px 여백
 
       container.scrollTo({ top: scrollTop, behavior: "smooth" })
     }
