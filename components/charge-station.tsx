@@ -2,46 +2,63 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { X } from "lucide-react"
+import { X, Check } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 
-type Pkg = {
+type SubscriptionPkg = {
   id: string
   name: string
   coins: number
   price: number
   crossedPrice?: number
-  bonus?: number
-  accent?: "cyan" | "orange" | "rose"
+  accent?: "cyan" | "green" | "red"
   tag?: string
   subtitle?: string
+  period: string
+  isCurrentPlan?: boolean
 }
-
-const CYAN = "#28d0ed"
-const ORANGE = "#ffa938"
 
 const KRW = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW", maximumFractionDigits: 0 })
 function formatKRW(v: number) {
   return KRW.format(v).replace("₩", "₩")
 }
 
-const RECOMMENDED: Pkg = {
-  id: "daily-30",
-  name: "주간구독",
-  coins: 30,
-  price: 9900,
-  crossedPrice: 97500,
-  subtitle: "매일 30핑 제공",
-  accent: "cyan",
-  tag: "주간구독",
-}
-
-const GENERAL: Pkg[] = [
-  { id: "basic-20", name: "Basic", coins: 20, price: 9900 },
-  { id: "premium-60", name: "Premium", coins: 60, bonus: 20, price: 29900, crossedPrice: 39900 },
-  { id: "heritage-100", name: "Heritage", coins: 100, bonus: 100, price: 49900, crossedPrice: 99900 },
+const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
+  {
+    id: "starter",
+    name: "Starter",
+    coins: 10,
+    price: 9900,
+    crossedPrice: 14000,
+    subtitle: "하루에 10핑씩",
+    accent: "cyan",
+    period: "주",
+    isCurrentPlan: false,
+  },
+  {
+    id: "plus",
+    name: "Plus",
+    coins: 30,
+    price: 19900,
+    crossedPrice: 42000,
+    subtitle: "하루에 30핑씩",
+    accent: "green",
+    period: "주",
+    isCurrentPlan: false,
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    coins: 100,
+    price: 49900,
+    crossedPrice: 140000,
+    subtitle: "하루에 100핑씩",
+    accent: "red",
+    period: "주",
+    isCurrentPlan: false,
+  },
 ]
 
 const BONUS: { id: string; name: string; coins: number; buttonText: string; action: () => void }[] = [
@@ -52,16 +69,6 @@ const BONUS: { id: string; name: string; coins: number; buttonText: string; acti
     buttonText: "초대 코드 복사",
     action: () => {
       navigator.clipboard?.writeText("SAJUPING2024")
-      // toast will be handled in component
-    },
-  },
-  {
-    id: "feedback",
-    name: "피드백",
-    coins: 3,
-    buttonText: "피드백 작성",
-    action: () => {
-      window.open("/feedback", "_blank")
     },
   },
 ]
@@ -93,19 +100,16 @@ export default function ChargeStation() {
     fetchBalance().then(setBalance)
   }, [])
 
-  const onPurchase = async (pkg: Pkg) => {
+  const onSubscribe = async (pkg: SubscriptionPkg) => {
     const params = new URLSearchParams({
       packageId: pkg.id,
       name: pkg.name,
       coins: pkg.coins.toString(),
       price: pkg.price.toString(),
-      isSubscription: (pkg.id === "daily-30").toString(),
-      userEmail: "skyywwind@gmail.com", // This should come from user session
+      isSubscription: "true",
+      period: pkg.period,
+      userEmail: "skyywwind@gmail.com",
     })
-
-    if (pkg.bonus) {
-      params.set("bonus", pkg.bonus.toString())
-    }
 
     router.push(`/payment?${params.toString()}`)
   }
@@ -125,143 +129,152 @@ export default function ChargeStation() {
     }
   }
 
+  const getDiscountPercent = (price: number, crossedPrice?: number) => {
+    if (!crossedPrice) return null
+    const discount = Math.round((1 - price / crossedPrice) * 100)
+    return `-${discount}%`
+  }
+
+  const getAccentColor = (accent?: string) => {
+    switch (accent) {
+      case "cyan":
+        return "#28d0ed"
+      case "green":
+        return "#1ed45a"
+      case "red":
+        return "#ff6363"
+      default:
+        return "#28d0ed"
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="sticky top-0 z-10 -mx-4 md:-mx-6 bg-[#1b1c1e]/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur border-b border-[#70737c]/20">
-        <div className="mx-auto max-w-md md:max-w-lg px-4 md:px-6 h-12 flex items-center justify-between">
-          <button
-            aria-label="닫기"
-            onClick={handleGoBack}
-            className="inline-flex items-center justify-center rounded-md p-2 text-[#aeb0b6] hover:text-white hover:bg-white/5"
-          >
+    <div className="min-h-screen bg-[#1b1c1e] text-white">
+      <div className="sticky top-0 z-10 bg-[#1b1c1e] border-b border-[#70737c]/20">
+        <div className="flex items-center justify-between p-4">
+          <button aria-label="닫기" onClick={handleGoBack} className="p-2 text-[#aeb0b6] hover:text-white">
             <X size={18} />
           </button>
-          <div className="text-sm text-[#aeb0b6]">sajuping.ai</div>
         </div>
       </div>
 
-      <section className="space-y-3">
-        <div className="flex items-center gap-2 text-2xl font-medium">
-          <span className="text-white">나의 핑</span>
-          <span className="text-[#28d0ed] tabular-nums">{balance === null ? "로딩중..." : `${balance}핑`}</span>
-          <div className="w-6 h-6 rounded-full bg-[#ffa938] flex items-center justify-center">
-            <span className="text-black text-sm font-bold">P</span>
+      <div className="px-4 pb-6 space-y-6">
+        <section className="pt-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-medium text-white">나의 플랜</span>
+            <span className="text-2xl font-medium text-[#28d0ed]">Free Plan</span>
           </div>
-        </div>
-        <p className="text-sm leading-relaxed text-[#aeb0b6]">
-          오프라인 사주보다 10배 합리적인 사주핑에서 마음껏 질문하세요!
-        </p>
-      </section>
+          <p className="text-[#aeb0b6] text-sm">
+            오프라인 사주보다 10배 합리적인 사주핑에서
+            <br />
+            마음껏 질문하세요!
+          </p>
+        </section>
 
-      <section className="space-y-3">
-        <div className="text-base font-medium text-white">추천 패키지</div>
-        <Card className="bg-[#141415] border-[#70737c]/20">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium bg-[#28d0ed]/20 text-[#28d0ed]">
-                    {RECOMMENDED.tag}
+        <section className="space-y-3">
+          <h3 className="text-[#aeb0b6] text-sm font-medium">현재 플랜</h3>
+          <Card className="bg-[#141415] border-[#70737c]/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-[#aeb0b6] px-2 py-1 bg-[#70737c]/20 rounded text-xs">Basic</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
+                      <span className="text-black text-xs font-bold">P</span>
+                    </div>
+                    <span className="text-white text-sm">하루에 3핑씩</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-6 h-6 rounded-full bg-[#ffa938] flex items-center justify-center">
-                    <span className="text-black text-sm font-bold">P</span>
-                  </div>
-                  <span className="text-white font-medium">{RECOMMENDED.subtitle}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  {RECOMMENDED.crossedPrice && (
-                    <span className="line-through text-[#70737c]">{formatKRW(RECOMMENDED.crossedPrice)}</span>
-                  )}
-                  <span className="text-[#28d0ed] font-medium">-89%</span>
+                <div className="flex items-center gap-2 px-3 py-1 bg-[#70737c]/20 rounded-full">
+                  <Check size={14} className="text-[#1ed45a]" />
+                  <span className="text-white text-xs">현재 플랜</span>
                 </div>
               </div>
-              <Button
-                onClick={() => onPurchase(RECOMMENDED)}
-                className="rounded-lg bg-[#28d0ed] hover:bg-[#28d0ed]/90 text-black font-semibold px-6"
-              >
-                {formatKRW(RECOMMENDED.price)}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+            </CardContent>
+          </Card>
+        </section>
 
-      <section className="space-y-3">
-        <div className="text-base font-medium text-white">일반 패키지</div>
-        <div className="space-y-3">
-          {GENERAL.map((pkg) => {
-            const hasBonus = typeof pkg.bonus === "number" && pkg.bonus > 0
-            const discountPercent = pkg.name === "Premium" ? "-33%" : pkg.name === "Heritage" ? "-50%" : null
+        <section className="space-y-3">
+          <h3 className="text-white text-base font-medium">일반 패키지</h3>
+          <div className="space-y-3">
+            {SUBSCRIPTION_PACKAGES.map((pkg) => {
+              const discountPercent = getDiscountPercent(pkg.price, pkg.crossedPrice)
+              const accentColor = getAccentColor(pkg.accent)
 
-            return (
-              <Card key={pkg.id} className="bg-[#141415] border-[#70737c]/20">
+              return (
+                <Card key={pkg.id} className="bg-[#141415] border-[#70737c]/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium" style={{ color: accentColor }}>
+                            {pkg.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
+                            <span className="text-black text-xs font-bold">P</span>
+                          </div>
+                          <span className="text-white text-sm">{pkg.subtitle}</span>
+                        </div>
+                        {pkg.crossedPrice && discountPercent && (
+                          <div className="flex items-center gap-2">
+                            <span className="line-through text-[#70737c] text-xs">{formatKRW(pkg.crossedPrice)}</span>
+                            <span className="text-xs font-medium" style={{ color: accentColor }}>
+                              {discountPercent}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
+                          {formatKRW(pkg.price)}/{pkg.period}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-white text-base font-medium">보너스 패키지</h3>
+          <div className="space-y-3">
+            {BONUS.map((bonus) => (
+              <Card key={bonus.id} className="bg-[#141415] border-[#70737c]/20">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[#aeb0b6] text-sm">{pkg.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-6 h-6 rounded-full bg-[#ffa938] flex items-center justify-center">
-                          <span className="text-black text-sm font-bold">P</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white text-sm">{bonus.name}</span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
+                          <span className="text-black text-xs font-bold">P</span>
                         </div>
-                        <span className="text-white font-medium">{pkg.coins}핑</span>
-                        {hasBonus && <span className="text-[#28d0ed] text-sm font-medium">+{pkg.bonus}핑</span>}
+                        <span className="text-[#ffa938] text-sm font-medium">{bonus.coins}핑</span>
                       </div>
-                      {pkg.crossedPrice && discountPercent && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="line-through text-[#70737c]">{formatKRW(pkg.crossedPrice)}</span>
-                          <span className="text-[#28d0ed] font-medium">{discountPercent}</span>
-                        </div>
-                      )}
                     </div>
-
                     <Button
-                      onClick={() => onPurchase(pkg)}
-                      variant="secondary"
-                      className="rounded-lg bg-white text-black hover:bg-white/90 font-semibold px-6"
+                      onClick={() => handleBonusAction(bonus)}
+                      className="bg-[#70737c]/20 text-white hover:bg-[#70737c]/30 border-[#70737c]/20 text-sm px-4 rounded-lg"
                     >
-                      {formatKRW(pkg.price)}
+                      {bonus.buttonText}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            )
-          })}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
-      <section className="space-y-3">
-        <div className="text-base font-medium text-white">보너스 패키지</div>
-        <div className="space-y-3">
-          {BONUS.map((bonus) => (
-            <Card key={bonus.id} className="bg-[#141415] border-[#70737c]/20">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[#aeb0b6] text-sm">{bonus.name}</span>
-                    <div className="flex items-center gap-1">
-                      <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
-                        <span className="text-black text-xs font-bold">P</span>
-                      </div>
-                      <span className="text-white text-sm font-medium">{bonus.coins}핑</span>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => handleBonusAction(bonus)}
-                    variant="secondary"
-                    className="rounded-lg bg-[#70737c]/20 text-white hover:bg-[#70737c]/30 border-[#70737c]/20 text-sm px-4"
-                  >
-                    {bonus.buttonText}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="text-center pt-6 pb-4">
+          <div className="inline-flex items-center gap-1 text-[#aeb0b6] text-xs">
+            <div className="w-3 h-3 bg-[#aeb0b6] rounded-sm"></div>
+            <span>sajuping.ai</span>
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   )
 }

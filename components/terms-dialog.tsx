@@ -357,10 +357,24 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                   <div>
                     <h3 className="font-semibold text-base mb-2">제2조 (정의)</h3>
                     <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>"핑"이란 유상으로 충전하여 유료서비스 결제에 사용할 수 있는 사이버머니를 말합니다.</li>
                       <li>
-                        "보너스핑"이란 이벤트, 프로모션 등으로 무상 지급되는 사이버머니를 말하며, 환불되지 않습니다.
+                        <strong>핑:</strong> 회원이 유료서비스 또는 콘텐츠 구매 시 사용할 수 있도록 유상으로 충전하는
+                        사이버머니를 말합니다. 핑은 마지막 이용일로부터 5년 동안 사용하지 않을 경우 「상사소멸시효」에
+                        따라 소멸될 수 있습니다.
                       </li>
+                      <li>
+                        <strong>보너스핑:</strong> 회사가 이벤트, 프로모션 등으로 무상 지급하는 가상의 데이터를
+                        말합니다. 보너스핑은 환불되지 않으며, 유효기간은 회사 정책에 따릅니다. 유효기간 경과 시 자동
+                        소멸되며, 소멸된 보너스핑은 환불 불가합니다.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제5조 (이용계약의 성립)</h3>
+                    <ul className="list-decimal list-inside space-y-1 ml-4">
+                      <li>결제가 완료되는 시점에 계약이 성립합니다.</li>
+                      <li>핑과 보너스핑을 모두 보유한 경우, 유효기간이 먼저 도래하는 보너스핑이 우선 차감됩니다.</li>
                     </ul>
                   </div>
 
@@ -398,7 +412,30 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                           </li>
                         </ul>
                       </div>
+                      <div>
+                        <h4 className="font-medium">제3항 (보너스핑 환불 불가)</h4>
+                        <ul className="list-decimal list-inside space-y-1 ml-4">
+                          <li>보너스핑은 환불 대상이 아니며, 유효기간 내 미사용 시 자동 소멸됩니다.</li>
+                        </ul>
+                      </div>
                     </div>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제10조 (보너스핑)</h3>
+                    <ul className="list-decimal list-inside space-y-1 ml-4">
+                      <li>부정 취득 시 회수됩니다.</li>
+                      <li>유효기간 경과 또는 계정 해지 시 소멸됩니다.</li>
+                      <li>양도·매매는 불가합니다.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제11조 (과오금)</h3>
+                    <p>
+                      과오금 발생 시 결제와 동일한 방법으로 환불하며, 동일 방법 불가 시 사전 안내 후 다른 방법으로
+                      환불합니다.
+                    </p>
                   </div>
                 </div>
               </section>

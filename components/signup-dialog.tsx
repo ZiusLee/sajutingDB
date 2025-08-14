@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useCallback } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -23,28 +25,38 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false)
   const [agreedToAge, setAgreedToAge] = useState(false)
   const [agreedToMarketing, setAgreedToMarketing] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const handleOpenChange = (newOpen: boolean) => {
     return
   }
 
-  const handleProviderSelect = (provider: "kakao" | "google") => {
+  const handleProviderSelect = useCallback((provider: "kakao" | "google") => {
     setSelectedProvider(provider)
     setShowTerms(true)
-  }
+  }, [])
 
-  const handleAgreeAll = (checked: boolean) => {
+  const handleAgreeAll = useCallback((checked: boolean) => {
     setAgreedToService(checked)
     setAgreedToPrivacy(checked)
     setAgreedToAge(checked)
     setAgreedToMarketing(checked)
-  }
+  }, [])
 
   const allRequiredAgreed = agreedToService && agreedToPrivacy && agreedToAge
   const allAgreed = allRequiredAgreed && agreedToMarketing
 
-  const handleTermsAgree = async () => {
-    if (selectedProvider && allRequiredAgreed) {
+  const handleTermsAgree = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (!selectedProvider || !allRequiredAgreed || isProcessing) {
+        return
+      }
+
+      setIsProcessing(true)
+
       try {
         const response = await fetch("/api/user/update-privacy-consent", {
           method: "POST",
@@ -59,22 +71,46 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
 
         if (response.ok) {
           onSelectProvider(selectedProvider)
+        } else {
+          // 실패해도 진행
+          onSelectProvider(selectedProvider)
         }
       } catch (error) {
         console.error("Failed to update privacy consent:", error)
+        // 에러가 발생해도 진행
         onSelectProvider(selectedProvider)
+      } finally {
+        setIsProcessing(false)
       }
-    }
-  }
+    },
+    [selectedProvider, allRequiredAgreed, agreedToMarketing, onSelectProvider, isProcessing],
+  )
 
-  const handleBackToProviders = () => {
+  const handleBackToProviders = useCallback(() => {
     setShowTerms(false)
     setSelectedProvider(null)
     setAgreedToService(false)
     setAgreedToPrivacy(false)
     setAgreedToAge(false)
     setAgreedToMarketing(false)
-  }
+    setIsProcessing(false)
+  }, [])
+
+  const showServiceTerms = useCallback(() => {
+    setShowServiceTermsDetails(true)
+  }, [])
+
+  const hideServiceTerms = useCallback(() => {
+    setShowServiceTermsDetails(false)
+  }, [])
+
+  const showPrivacyTerms = useCallback(() => {
+    setShowPrivacyDetails(true)
+  }, [])
+
+  const hidePrivacyTerms = useCallback(() => {
+    setShowPrivacyDetails(false)
+  }, [])
 
   if (showServiceTermsDetails) {
     return (
@@ -87,7 +123,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
         >
           <div className="flex flex-row items-center justify-between p-6 pb-0">
             <h2 className="text-lg font-semibold">서비스 이용약관</h2>
-            <Button variant="ghost" size="icon" onClick={() => setShowServiceTermsDetails(false)} className="h-6 w-6">
+            <Button variant="ghost" size="icon" onClick={hideServiceTerms} className="h-6 w-6">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -171,13 +207,13 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
 
               <div className="pt-4 border-t">
-                <p className="text-sm text-gray-500">공고일자: 8/6/2025</p>
-                <p className="text-sm text-gray-500">시행일자: 8/6/2025</p>
+                <p className="text-sm text-gray-500">공고일자: 2025년 8월 6일</p>
+                <p className="text-sm text-gray-500">시행일자: 2025년 8월 6일</p>
               </div>
             </div>
           </ScrollArea>
           <div className="p-6 pt-0">
-            <Button onClick={() => setShowServiceTermsDetails(false)} className="w-full">
+            <Button onClick={hideServiceTerms} className="w-full">
               확인
             </Button>
           </div>
@@ -197,7 +233,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
         >
           <div className="flex flex-row items-center justify-between p-6 pb-0">
             <h2 className="text-lg font-semibold">개인정보 처리방침</h2>
-            <Button variant="ghost" size="icon" onClick={() => setShowPrivacyDetails(false)} className="h-6 w-6">
+            <Button variant="ghost" size="icon" onClick={hidePrivacyTerms} className="h-6 w-6">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -267,13 +303,13 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
 
               <div className="pt-4 border-t">
-                <p className="text-sm text-gray-500">공고일자: 8/6/2025</p>
-                <p className="text-sm text-gray-500">시행일자: 8/6/2025</p>
+                <p className="text-sm text-gray-500">공고일자: 2025년 8월 6일</p>
+                <p className="text-sm text-gray-500">시행일자: 2025년 8월 6일</p>
               </div>
             </div>
           </ScrollArea>
           <div className="p-6 pt-0">
-            <Button onClick={() => setShowPrivacyDetails(false)} className="w-full">
+            <Button onClick={hidePrivacyTerms} className="w-full">
               확인
             </Button>
           </div>
@@ -335,8 +371,8 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
                       사주핑 서비스 이용을 위한 기본 약관에 동의합니다.{" "}
                       <button
                         type="button"
-                        onClick={() => setShowServiceTermsDetails(true)}
-                        className="text-blue-600 hover:underline"
+                        onClick={showServiceTerms}
+                        className="text-blue-600 hover:underline focus:outline-none focus:underline"
                       >
                         자세히 보기
                       </button>
@@ -362,8 +398,8 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
                       개인정보 수집 및 이용에 동의합니다.{" "}
                       <button
                         type="button"
-                        onClick={() => setShowPrivacyDetails(true)}
-                        className="text-blue-600 hover:underline"
+                        onClick={showPrivacyTerms}
+                        className="text-blue-600 hover:underline focus:outline-none focus:underline"
                       >
                         자세히 보기
                       </button>
@@ -408,14 +444,27 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
             </div>
 
             <div className="flex flex-col space-y-3">
-              <Button onClick={handleTermsAgree} disabled={!allRequiredAgreed} className="w-full py-3 rounded-full">
-                {selectedProvider === "kakao" && "카카오로 시작하기"}
-                {selectedProvider === "google" && "Google로 시작하기"}
+              <Button
+                onClick={handleTermsAgree}
+                disabled={!allRequiredAgreed || isProcessing}
+                className="w-full py-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+              >
+                {isProcessing ? (
+                  "처리 중..."
+                ) : (
+                  <>
+                    {selectedProvider === "kakao" && "카카오로 시작하기"}
+                    {selectedProvider === "google" && "Google로 시작하기"}
+                  </>
+                )}
               </Button>
               <Button
                 variant="outline"
                 onClick={handleBackToProviders}
+                disabled={isProcessing}
                 className="w-full py-3 rounded-full bg-transparent"
+                type="button"
               >
                 이전
               </Button>
@@ -457,7 +506,8 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
           <div className="flex justify-center items-center gap-8">
             <button
               onClick={() => handleProviderSelect("kakao")}
-              className="w-20 h-20 rounded-full bg-[#FEE500] flex items-center justify-center hover:bg-[#FEE500]/90 transition-colors shadow-lg"
+              className="w-20 h-20 rounded-full bg-[#FEE500] flex items-center justify-center hover:bg-[#FEE500]/90 transition-colors shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FEE500]/50"
+              type="button"
             >
               <div className="w-10 h-10 bg-[#3C1E1E] rounded-full flex items-center justify-center">
                 <span className="text-[#FEE500] text-xs font-bold">TALK</span>
@@ -466,7 +516,8 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
 
             <button
               onClick={() => handleProviderSelect("google")}
-              className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors shadow-lg"
+              className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-300"
+              type="button"
             >
               <svg className="w-8 h-8" viewBox="0 0 24 24">
                 <path
