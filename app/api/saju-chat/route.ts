@@ -6,6 +6,8 @@ import { solarToLunar } from "@/lib/lunar-calendar"
 import { parseMessageForDatesAndBirth, formatDateForDisplay, testMessageParsing } from "@/lib/message-parser"
 import { parseMessageWithGPT } from "@/lib/gpt-date-parser"
 import { smartMemoryServiceV2 } from "@/lib/smart-memory-service-v2"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -181,9 +183,9 @@ async function processMemoryAsync(
     NODE_ENV: process.env.NODE_ENV,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ? "✅ SET" : "❌ MISSING",
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ SET" : "❌ MISSING",
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ SET" : "❌ MISSING"
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ SET" : "❌ MISSING",
   })
-  
+
   if (!ENABLE_SMART_MEMORY) {
     console.log("🧠 Smart memory is disabled, skipping async memory processing.")
     return
@@ -212,22 +214,27 @@ async function processMemoryImmediate(
   userId: string,
   sessionId: string,
   userMessage: string,
-  assistantResponse: string
+  assistantResponse: string,
 ) {
   console.log("🧠 [DEBUG] processMemoryImmediate started")
   console.log("🧠 [DEBUG] Processing memory for user:", userId)
   console.log("🧠 [DEBUG] Session ID:", sessionId)
   console.log("🧠 [DEBUG] User message preview:", userMessage.slice(0, 100))
   console.log("🧠 [DEBUG] Assistant response preview:", assistantResponse.slice(0, 100))
-  
+
   const result = await smartMemoryServiceV2.processConversation(userId, sessionId, userMessage, assistantResponse)
 
   console.log("🧠 [DEBUG] Raw result:", JSON.stringify(result, null, 2))
 
   if (result && result.shouldSave) {
-    console.log(`✅ [DEBUG] Memory processing completed: ${result.memories?.length || 0} memories extracted, ${result.savedMemories?.length || 0} saved`)
+    console.log(
+      `✅ [DEBUG] Memory processing completed: ${result.memories?.length || 0} memories extracted, ${result.savedMemories?.length || 0} saved`,
+    )
     if (result.savedMemories?.length > 0) {
-      console.log("✅ [DEBUG] Saved memories:", result.savedMemories.map((m: any) => ({ id: m.id, content: m.content?.slice(0, 50) })))
+      console.log(
+        "✅ [DEBUG] Saved memories:",
+        result.savedMemories.map((m: any) => ({ id: m.id, content: m.content?.slice(0, 50) })),
+      )
     }
   } else {
     console.log("ℹ️ [DEBUG] No memorable information found:", result?.reasoning || "No reason provided")
@@ -238,9 +245,9 @@ export async function POST(req: Request) {
   console.log("==================================================")
   console.log("🚀🚀🚀 SAJU CHAT API CALLED 🚀🚀🚀")
   console.log("Time:", new Date().toISOString())
-  console.log("User-Agent:", req.headers.get('user-agent'))
+  console.log("User-Agent:", req.headers.get("user-agent"))
   console.log("==================================================")
-  
+
   try {
     const body = await req.json()
     const {
@@ -264,16 +271,69 @@ export async function POST(req: Request) {
       name,
       gender,
     })
-    
+
     // 🚀 브라우저별 차이 디버깅
     console.log("🔍 [DEBUG] Request details for browser compatibility:", {
-      userAgent: req.headers.get('user-agent'),
-      referer: req.headers.get('referer'),
-      origin: req.headers.get('origin'),
+      userAgent: req.headers.get("user-agent"),
+      referer: req.headers.get("referer"),
+      origin: req.headers.get("origin"),
       hasUserId: !!userId,
       userIdType: typeof userId,
-      bodyKeys: Object.keys(body)
+      bodyKeys: Object.keys(body),
     })
+
+    if (userId) {
+      try {
+        const supabase = createRouteHandlerClient({ cookies })
+
+        // 사용자 인증 확인
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser()
+
+        if (!authError && user && user.id === userId) {
+          console.log("💰 핑 차감 시도 중...")
+
+          // 현재 코인 정보 조회
+          const { data: coinData, error: selectError } = await supabase
+            .from("user_coins")
+            .select("coins")
+            .eq("user_id", userId)
+            .single()
+
+          if (selectError && selectError.code === "PGRST116") {
+            // 사용자 코인 데이터가 없으면 새로 생성 (0 코인으로 시작)
+            console.log("💰 새 사용자 코인 계정 생성")
+            await supabase.from("user_coins").insert({ user_id: userId, coins: 0 })
+          } else if (!selectError && coinData) {
+            // 코인이 있으면 차감 시도 (0이어도 차감 시도하되 실패해도 계속 진행)
+            if (coinData.coins > 0) {
+              const { error: updateError } = await supabase
+                .from("user_coins")
+                .update({ coins: coinData.coins - 1 })
+                .eq("user_id", userId)
+
+              if (!updateError) {
+                console.log(`💰 핑 차감 성공: ${coinData.coins} → ${coinData.coins - 1}`)
+              } else {
+                console.log("💰 핑 차감 실패:", updateError.message)
+              }
+            } else {
+              console.log("💰 핑이 0개이지만 채팅 계속 진행")
+              // TODO: 나중에 여기서 제한을 걸 수 있음 (현재는 계속 진행)
+            }
+          }
+        } else {
+          console.log("💰 인증되지 않은 사용자 - 핑 차감 건너뜀")
+        }
+      } catch (coinError) {
+        console.error("💰 핑 차감 중 오류 발생:", coinError)
+        // 핑 차감 실패해도 채팅은 계속 진행
+      }
+    } else {
+      console.log("💰 userId 없음 - 핑 차감 건너뜀")
+    }
 
     // Validate required fields with better error messages
     if (!messages || !Array.isArray(messages)) {
@@ -379,7 +439,7 @@ export async function POST(req: Request) {
       // 메모리 컨텍스트에서 생년월일이나 파트너 정보가 있는지 확인
       const hasDateInfo = /\d{4}년|\d{1,2}월|\d{1,2}일|생년월일|태어난|출생/i.test(memoryContext)
       const hasPartnerInfo = /여자친구|남자친구|연인|상대방|파트너|궁합/i.test(memoryContext)
-      
+
       if (hasDateInfo || hasPartnerInfo) {
         console.log("🧠 메모리 컨텍스트에서 날짜/파트너 정보 감지, GPT 파싱에 포함")
         combinedParsingText = `${latestMessage}\n\n[메모리에서 불러온 관련 정보]\n${memoryContext}`
@@ -670,7 +730,7 @@ ${index + 1}. **${person.name}**
       console.log("UserId:", userId)
       console.log("ENABLE_SMART_MEMORY:", ENABLE_SMART_MEMORY)
       console.log("==================================================")
-      
+
       result.text
         .then((completeText) => {
           console.log("==================================================")

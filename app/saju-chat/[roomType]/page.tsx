@@ -19,6 +19,7 @@ export default function SajuChatPage() {
   const [saju, setSaju] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [defaultProfileLoaded, setDefaultProfileLoaded] = useState(false)
   const [sessionKey, setSessionKey] = useState("")
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [currentChatRoom, setCurrentChatRoom] = useState(null)
@@ -77,6 +78,85 @@ export default function SajuChatPage() {
           console.log("User is authenticated:", data.session?.user.id)
           localStorage.setItem("user_authenticated", "true")
           localStorage.setItem("user_id", data.session.user.id)
+
+          console.log("✅ User is authenticated, loading default saju profile first...")
+
+          try {
+            const defaultSession = await getDefaultSajuSession(data.session.user.id)
+
+            if (defaultSession) {
+              console.log("Found default saju session:", defaultSession.id)
+
+              // Get full profile data for the default session
+              const profile = await getSajuProfileBySessionId(defaultSession.id)
+
+              if (profile && isMounted) {
+                console.log("Successfully loaded default saju profile, using as priority")
+
+                // Create chat saju data structure from profile
+                const chatSajuData = {
+                  saju: profile.saju,
+                  name: profile.name,
+                  gender: profile.gender,
+                  interpretation: "",
+                  returnPath: "/",
+                  timeStandard: "KST",
+                  birthCityId: null,
+                  daeun: profile.saju.daeun,
+                  concerns: [],
+                  userId: data.session.user.id,
+                  authUserId: data.session.user.id,
+                  sessionId: profile.id,
+                  birthInfo: {
+                    solarYear: Number.parseInt(profile.birthYear),
+                    solarMonth: Number.parseInt(profile.birthMonth),
+                    solarDay: Number.parseInt(profile.birthDay),
+                    solarHour: Number.parseInt(profile.birthHour),
+                    solarMinute: Number.parseInt(profile.birthMinute),
+                    lunarYear: Number.parseInt(profile.lunarYear),
+                    lunarMonth: Number.parseInt(profile.lunarMonth),
+                    lunarDay: Number.parseInt(profile.lunarDay),
+                    timeUnknown: profile.timeUnknown,
+                    birthCityId: null,
+                    timeStandard: "KST",
+                  },
+                }
+
+                localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+                localStorage.setItem("saju_session_id", profile.id)
+
+                setSaju(chatSajuData)
+                setDefaultProfileLoaded(true)
+                const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+                setSessionKey(generatedKey)
+
+                let chatRoom = null
+                if (!roomId) {
+                  chatRoom = createTemporaryChatRoom({
+                    sessionId: profile.id,
+                    title: "새로운 대화",
+                    roomType: roomType || "sajuping",
+                    isTemporary: true,
+                  })
+
+                  setCurrentChatRoom(chatRoom)
+                  const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+                  window.history.replaceState({}, "", newUrl)
+                } else {
+                  setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+                }
+
+                setLoading(false)
+                return
+              }
+            } else {
+              console.log("No default saju session found for authenticated user")
+            }
+          } catch (error) {
+            console.error("Error loading default saju session:", error)
+          }
+
+          console.log("No default profile found, checking localStorage as fallback")
         } else {
           console.log("User is not authenticated")
           localStorage.removeItem("user_authenticated")
@@ -149,86 +229,6 @@ export default function SajuChatPage() {
 
               setLoading(false)
               return
-            }
-          }
-
-          // User is authenticated, redirecting to saju chat...
-          if (isAuthenticated && data.session?.user) {
-            console.log("✅ User is authenticated, redirecting to saju chat...")
-            console.log("Trying to load default saju for authenticated user...")
-
-            try {
-              const defaultSession = await getDefaultSajuSession(data.session.user.id)
-
-              if (defaultSession) {
-                console.log("Found default saju session:", defaultSession.id)
-
-                // Get full profile data for the default session
-                const profile = await getSajuProfileBySessionId(defaultSession.id)
-
-                if (profile && isMounted) {
-                  console.log("Successfully loaded default saju profile")
-
-                  // Create chat saju data structure from profile
-                  const chatSajuData = {
-                    saju: profile.saju,
-                    name: profile.name,
-                    gender: profile.gender,
-                    interpretation: "",
-                    returnPath: "/",
-                    timeStandard: "KST",
-                    birthCityId: null,
-                    daeun: profile.saju.daeun,
-                    concerns: [],
-                    userId: data.session.user.id,
-                    authUserId: data.session.user.id,
-                    sessionId: profile.id,
-                    birthInfo: {
-                      solarYear: Number.parseInt(profile.birthYear),
-                      solarMonth: Number.parseInt(profile.birthMonth),
-                      solarDay: Number.parseInt(profile.birthDay),
-                      solarHour: Number.parseInt(profile.birthHour),
-                      solarMinute: Number.parseInt(profile.birthMinute),
-                      lunarYear: Number.parseInt(profile.lunarYear),
-                      lunarMonth: Number.parseInt(profile.lunarMonth),
-                      lunarDay: Number.parseInt(profile.lunarDay),
-                      timeUnknown: profile.timeUnknown,
-                      birthCityId: null,
-                      timeStandard: "KST",
-                    },
-                  }
-
-                  localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
-                  localStorage.setItem("saju_session_id", profile.id)
-
-                  setSaju(chatSajuData)
-                  const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
-                  setSessionKey(generatedKey)
-
-                  let chatRoom = null
-                  if (!roomId) {
-                    chatRoom = createTemporaryChatRoom({
-                      sessionId: profile.id,
-                      title: "새로운 대화",
-                      roomType: roomType || "sajuping",
-                      isTemporary: true,
-                    })
-
-                    setCurrentChatRoom(chatRoom)
-                    const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
-                    window.history.replaceState({}, "", newUrl)
-                  } else {
-                    setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
-                  }
-
-                  setLoading(false)
-                  return
-                }
-              } else {
-                console.log("No default saju session found for authenticated user")
-              }
-            } catch (error) {
-              console.error("Error loading default saju session:", error)
             }
           }
 
@@ -442,7 +442,13 @@ export default function SajuChatPage() {
   const checkAnonymousSession = useCallback(async () => {
     console.log("Checking anonymous session. isLoggedIn:", isLoggedIn)
 
-    if (!isLoggedIn && !loading) {
+    if (isLoggedIn || defaultProfileLoaded) {
+      console.log("User is logged in or default profile loaded, skipping anonymous session check")
+      localStorage.removeItem("anonymous_session_created")
+      return
+    }
+
+    if (!loading) {
       const sessionId = localStorage.getItem("saju_session_id")
       const anonymousSessionCreated = localStorage.getItem("anonymous_session_created")
       const authReturnAction = localStorage.getItem("auth_return_action")
@@ -482,15 +488,12 @@ export default function SajuChatPage() {
           console.error("Error checking saju_session:", error)
         }
       }
-    } else if (isLoggedIn) {
-      console.log("User is logged in, removing anonymous session flag")
-      localStorage.removeItem("anonymous_session_created")
     }
-  }, [isLoggedIn, loading, supabase])
+  }, [isLoggedIn, loading, defaultProfileLoaded, supabase])
 
   useEffect(() => {
     checkAnonymousSession()
-  }, [isLoggedIn, loading, supabase])
+  }, [isLoggedIn, loading, defaultProfileLoaded, supabase])
 
   if (loading) {
     return (
