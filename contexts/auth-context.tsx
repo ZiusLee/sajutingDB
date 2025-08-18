@@ -167,19 +167,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // 로그인 성공 시 세션 연결 시도 (비동기로 처리)
           setTimeout(async () => {
             try {
-              const authReturnAction = localStorage.getItem("auth_return_action")
               let linkedAnySession = false
 
-              // 먼저 pending session이 있는지 확인 (온보딩 완료 플로우)
+              // pending session이 있는지 확인 (온보딩 완료 또는 일반 플로우)
               const pendingSessionId = localStorage.getItem("pending_session_link")
-              if (pendingSessionId && authReturnAction === "continue_to_chat") {
-                console.log(`Linking pending session ${pendingSessionId} to user ${session.user.id} (onboarding flow)`)
+              if (pendingSessionId) {
+                console.log(`Linking pending session ${pendingSessionId} to user ${session.user.id}`)
 
                 const { error } = await supabase
                   .from("saju_sessions")
-                  .update({ auth_user_id: session.user.id })
+                  .update({
+                    auth_user_id: session.user.id,
+                    updated_at: new Date().toISOString(),
+                  })
                   .eq("id", pendingSessionId)
-                  .eq("auth_user_id", null) // null인 경우에만 업데이트
 
                 if (error) {
                   console.error("Error linking pending session:", error)
@@ -190,27 +191,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   localStorage.removeItem("anonymous_session_created")
                   localStorage.removeItem("auth_return_action")
                 }
-              } else if (pendingSessionId && !authReturnAction) {
-                // 일반적인 pending session 처리 (온보딩이 아닌 경우)
-                console.log(`Linking pending session ${pendingSessionId} to user ${session.user.id} (general flow)`)
-
-                const { error } = await supabase
-                  .from("saju_sessions")
-                  .update({ auth_user_id: session.user.id })
-                  .eq("id", pendingSessionId)
-                  .eq("auth_user_id", null) // null인 경우에만 업데이트
-
-                if (error) {
-                  console.error("Error linking pending session:", error)
-                } else {
-                  console.log(`Successfully linked pending session ${pendingSessionId}`)
-                  linkedAnySession = true
-                  localStorage.removeItem("pending_session_link")
-                  localStorage.removeItem("anonymous_session_created")
-                }
               }
 
-              if (!linkedAnySession && !authReturnAction) {
+              if (!linkedAnySession) {
                 // 기존 사용자가 이미 연결된 세션이 있는지 확인
                 const { data: existingSessions } = await supabase
                   .from("saju_sessions")
@@ -227,18 +210,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     linkedAnySession = true
                   }
                 } else {
-                  console.log("User already has existing sessions, skipping session linking")
+                  console.log("User already has existing sessions")
+                  linkedAnySession = true
                 }
+              }
+
+              // 세션 연결 후 원래 URL로 리다이렉션
+              const returnUrl = localStorage.getItem("auth_return_url")
+              if (returnUrl && returnUrl !== window.location.href) {
+                localStorage.removeItem("auth_return_url")
+                window.location.href = returnUrl
               }
             } catch (error) {
               console.error("Error linking sessions:", error)
-            }
-
-            // 세션 연결 후 원래 URL로 리다이렉션
-            const returnUrl = localStorage.getItem("auth_return_url")
-            if (returnUrl && returnUrl !== window.location.href) {
-              localStorage.removeItem("auth_return_url")
-              window.location.href = returnUrl
             }
           }, 100)
 

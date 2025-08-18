@@ -540,26 +540,32 @@ export default function SajuChat({
   }
 
   const handleTermsAgree = async () => {
-    if (!user) return
-
     try {
-      const sessionId = localStorage.getItem("current_session_id") || localStorage.getItem("user_id") || user.id
+      const sessionId = localStorage.getItem("current_session_id") || localStorage.getItem("user_id")
 
-      const { error } = await supabase.from("saju_sessions").upsert({
-        id: sessionId,
-        auth_user_id: user.id,
-        privacy: true,
-        updated_at: new Date().toISOString(),
-      })
+      if (!sessionId) {
+        console.error("No session ID found for terms agreement")
+        toast.error("세션 정보를 찾을 수 없습니다.")
+        return
+      }
+
+      // 현재 세션의 privacy_consent를 true로 업데이트
+      const { error } = await supabase
+        .from("saju_sessions")
+        .update({
+          privacy: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId)
 
       if (error) {
-        console.error("Error updating saju_sessions:", error)
-        toast.error("사용자 정보 업데이트 중 오류가 발생했습니다.")
+        console.error("Error updating saju_sessions privacy:", error)
+        toast.error("약관 동의 처리 중 오류가 발생했습니다.")
         return
       }
 
       setShowTermsDialog(false)
-      toast.success("회원가입이 완료되었습니다!")
+      toast.success("약관 동의가 완료되었습니다!")
     } catch (error) {
       console.error("Terms agreement error:", error)
       toast.error("약관 동의 처리 중 오류가 발생했습니다.")
@@ -593,30 +599,37 @@ export default function SajuChat({
 
   useEffect(() => {
     const checkTermsAgreement = async () => {
-      if (!user) return
-
       try {
+        const sessionId = localStorage.getItem("current_session_id") || localStorage.getItem("user_id")
+
+        if (!sessionId) {
+          console.log("No session ID found, showing terms dialog")
+          setShowTermsDialog(true)
+          return
+        }
+
         const { data: sessionData } = await supabase
           .from("saju_sessions")
-          .select("privacy")
-          .eq("auth_user_id", user.id)
+          .select("privacy, id")
+          .eq("id", sessionId)
           .single()
 
-        if (!sessionData || sessionData.privacy !== true) {
-          const { data: existingData } = await supabase
-            .from("saju_sessions")
-            .select("id")
-            .eq("auth_user_id", user.id)
-            .limit(1)
+        if (sessionData && sessionData.privacy === true) {
+          console.log("Terms already agreed for session:", sessionData.id)
+          return
+        }
 
-          if (!existingData || existingData.length === 0) {
-            const provider = user.app_metadata?.provider || "unknown"
-            setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
-            setShowTermsDialog(true)
-          }
+        if (!sessionData || sessionData.privacy !== true) {
+          console.log("Terms agreement required for session:", sessionId)
+          const provider = user?.app_metadata?.provider || "unknown"
+          setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
+          setShowTermsDialog(true)
         }
       } catch (error) {
         console.error("Error checking terms agreement:", error)
+        const provider = user?.app_metadata?.provider || "unknown"
+        setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
+        setShowTermsDialog(true)
       }
     }
 
