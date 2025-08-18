@@ -294,7 +294,6 @@ export async function findAndLinkSessions(): Promise<{ success: boolean; linkedC
 
     const authUserId = userData.user.id
     const userEmail = userData.user.email
-    const userName = userData.user.user_metadata?.name
     let linkedCount = 0
 
     console.log(`Finding sessions for user ${authUserId} (${userEmail})`)
@@ -317,48 +316,6 @@ export async function findAndLinkSessions(): Promise<{ success: boolean; linkedC
       console.log(`Checking localStorage session ID: ${localStorageSessionId}`)
       const success = await linkSessionIfUnlinked(localStorageSessionId, authUserId)
       if (success) linkedCount++
-    }
-
-    // Strategy 2: Check if there's a session with matching email
-    if (userEmail) {
-      console.log(`Looking for sessions with email: ${userEmail}`)
-      const { data: emailSessions, error: emailError } = await supabase
-        .from("saju_sessions")
-        .select("id, auth_user_id, name")
-        .eq("email", userEmail)
-        .is("auth_user_id", null) // Only get unlinked sessions
-
-      if (emailError) {
-        console.error("Error finding sessions by email:", emailError)
-      } else if (emailSessions && emailSessions.length > 0) {
-        console.log(`Found ${emailSessions.length} unlinked sessions with email ${userEmail}`)
-        for (const session of emailSessions) {
-          const success = await linkSessionToUser(session.id)
-          if (success) linkedCount++
-        }
-      }
-    }
-
-    // Strategy 3: Check if there's a session with matching name (more restrictive)
-    if (userName && userEmail) {
-      // Require both name and email for name-based matching
-      console.log(`Looking for sessions with name: ${userName} and email: ${userEmail}`)
-      const { data: nameSessions, error: nameError } = await supabase
-        .from("saju_sessions")
-        .select("id, auth_user_id, name, email")
-        .eq("name", userName)
-        .eq("email", userEmail) // Must match both name and email
-        .is("auth_user_id", null) // Only get unlinked sessions
-
-      if (nameError) {
-        console.error("Error finding sessions by name and email:", nameError)
-      } else if (nameSessions && nameSessions.length > 0) {
-        console.log(`Found ${nameSessions.length} unlinked sessions with name ${userName} and email ${userEmail}`)
-        for (const session of nameSessions) {
-          const success = await linkSessionToUser(session.id)
-          if (success) linkedCount++
-        }
-      }
     }
 
     // After linking, verify we can find the sessions
