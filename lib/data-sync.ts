@@ -65,6 +65,38 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
       name: sajuData.name,
       gender: sajuData.gender,
       auth_user_id: userId, // This can be null for anonymous users
+      is_default: true, // 첫 번째 세션이므로 기본값으로 설정
+      saju: {
+        yearStem: sajuData.yearStem,
+        yearBranch: sajuData.yearBranch,
+        yearStemHanja: sajuData.yearStemHanja,
+        yearBranchHanja: sajuData.yearBranchHanja,
+        monthStem: sajuData.monthStem,
+        monthBranch: sajuData.monthBranch,
+        monthStemHanja: sajuData.monthStemHanja,
+        monthBranchHanja: sajuData.monthBranchHanja,
+        dayStem: sajuData.dayStem,
+        dayBranch: sajuData.dayBranch,
+        dayStemHanja: sajuData.dayStemHanja,
+        dayBranchHanja: sajuData.dayBranchHanja,
+        hourStem: sajuData.hourStem,
+        hourBranch: sajuData.hourBranch,
+        hourStemHanja: sajuData.hourStemHanja,
+        hourBranchHanja: sajuData.hourBranchHanja,
+        dayMaster: sajuData.dayMaster,
+        dayMasterHanja: sajuData.dayMasterHanja,
+        yearAnimal: sajuData.yearAnimal,
+        elements: sajuData.elements,
+        yearStemSibseong: sajuData.yearStemSibseong,
+        monthStemSibseong: sajuData.monthStemSibseong,
+        dayStemSibseong: sajuData.dayStemSibseong,
+        hourStemSibseong: sajuData.hourStemSibseong,
+        yearBranchSibseong: sajuData.yearBranchSibseong,
+        monthBranchSibseong: sajuData.monthBranchSibseong,
+        dayBranchSibseong: sajuData.dayBranchSibseong,
+        hourBranchSibseong: sajuData.hourBranchSibseong,
+      },
+      daeun: sajuData.daeun || null,
     }
 
     console.log("Creating saju session with data:", sessionData)

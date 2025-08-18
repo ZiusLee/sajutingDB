@@ -43,9 +43,26 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, name, gender, saju, roomType, birthInfo, daeun } = await request.json()
 
-    console.log("[v0] Received saju data:", JSON.stringify(saju, null, 2))
-    console.log("[v0] Received daeun data:", JSON.stringify(daeun, null, 2))
-    console.log("[v0] Received birthInfo data:", JSON.stringify(birthInfo, null, 2))
+    console.log("[v0] Received request data:")
+    console.log("[v0] - userId:", userId)
+    console.log("[v0] - name:", name)
+    console.log("[v0] - gender:", gender)
+    console.log("[v0] - saju exists:", !!saju)
+    console.log("[v0] - daeun exists:", !!daeun)
+    console.log("[v0] - birthInfo exists:", !!birthInfo)
+
+    if (saju) {
+      console.log("[v0] Saju data keys:", Object.keys(saju))
+      console.log("[v0] Saju has sibseong data:", {
+        yearStemSibseong: !!saju.yearStemSibseong,
+        monthStemSibseong: !!saju.monthStemSibseong,
+        dayStemSibseong: !!saju.dayStemSibseong,
+        hourStemSibseong: !!saju.hourStemSibseong,
+      })
+      console.log("[v0] Saju has elements:", !!saju.elements)
+    } else {
+      console.log("[v0] WARNING: No saju data received!")
+    }
 
     const supabase = createServerSupabaseClient()
 
@@ -69,6 +86,11 @@ export async function POST(request: NextRequest) {
       isDefault = true
     }
 
+    if (!saju) {
+      console.error("[v0] ERROR: saju data is required but not provided")
+      return NextResponse.json({ error: "사주 데이터가 필요합니다" }, { status: 400 })
+    }
+
     const sessionData = {
       id: sessionId,
       name: name,
@@ -78,18 +100,24 @@ export async function POST(request: NextRequest) {
       relationship_status: "solo",
       is_beta_applicant: false,
       is_default: isDefault,
-      saju: saju || null, // 대운처럼 직접 저장
+      saju: saju, // null 체크 후 직접 저장
       daeun: daeun || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    console.log("[v0] Final session data for insert:", JSON.stringify(sessionData, null, 2))
+    console.log("[v0] Final session data structure:")
+    console.log("[v0] - id:", sessionData.id)
+    console.log("[v0] - name:", sessionData.name)
+    console.log("[v0] - gender:", sessionData.gender)
+    console.log("[v0] - is_default:", sessionData.is_default)
+    console.log("[v0] - saju type:", typeof sessionData.saju)
+    console.log("[v0] - daeun type:", typeof sessionData.daeun)
 
     const { data, error: sessionError } = await supabase.from("saju_sessions").insert(sessionData).select("id").single()
 
     if (sessionError) {
-      console.error("Error creating saju session:", sessionError)
+      console.error("[v0] Error creating saju session:", sessionError)
       return NextResponse.json({ error: sessionError.message }, { status: 500 })
     }
 
