@@ -43,6 +43,10 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, name, gender, saju, roomType, birthInfo, daeun } = await request.json()
 
+    console.log("[v0] Received saju data:", JSON.stringify(saju, null, 2))
+    console.log("[v0] Received daeun data:", JSON.stringify(daeun, null, 2))
+    console.log("[v0] Received birthInfo data:", JSON.stringify(birthInfo, null, 2))
+
     const supabase = createServerSupabaseClient()
 
     // Generate session ID
@@ -65,6 +69,50 @@ export async function POST(request: NextRequest) {
       isDefault = true
     }
 
+    const sajuData = saju
+      ? {
+          // 기본 사주 정보
+          yearStem: saju.yearStem,
+          yearBranch: saju.yearBranch,
+          yearStemHanja: saju.yearStemHanja,
+          yearBranchHanja: saju.yearBranchHanja,
+          monthStem: saju.monthStem,
+          monthBranch: saju.monthBranch,
+          monthStemHanja: saju.monthStemHanja,
+          monthBranchHanja: saju.monthBranchHanja,
+          dayStem: saju.dayStem,
+          dayBranch: saju.dayBranch,
+          dayStemHanja: saju.dayStemHanja,
+          dayBranchHanja: saju.dayBranchHanja,
+          hourStem: saju.hourStem,
+          hourBranch: saju.hourBranch,
+          hourStemHanja: saju.hourStemHanja,
+          hourBranchHanja: saju.hourBranchHanja,
+          dayMaster: saju.dayMaster,
+          dayMasterHanja: saju.dayMasterHanja,
+          yearAnimal: saju.yearAnimal,
+          // 십성 정보
+          yearStemSibseong: saju.yearStemSibseong,
+          monthStemSibseong: saju.monthStemSibseong,
+          dayStemSibseong: saju.dayStemSibseong,
+          hourStemSibseong: saju.hourStemSibseong,
+          yearBranchSibseong: saju.yearBranchSibseong,
+          monthBranchSibseong: saju.monthBranchSibseong,
+          dayBranchSibseong: saju.dayBranchSibseong,
+          hourBranchSibseong: saju.hourBranchSibseong,
+          // 오행 정보
+          elements: saju.elements || {},
+          // 생년월일시 정보 (birthInfo에서 가져옴)
+          birthYear: birthInfo?.solarYear,
+          birthMonth: birthInfo?.solarMonth,
+          birthDay: birthInfo?.solarDay,
+          birthHour: birthInfo?.solarHour,
+          birthMinute: birthInfo?.solarMinute,
+        }
+      : null
+
+    console.log("[v0] Processed saju data for storage:", JSON.stringify(sajuData, null, 2))
+
     const sessionData = {
       id: sessionId,
       name: name,
@@ -74,51 +122,13 @@ export async function POST(request: NextRequest) {
       relationship_status: "solo",
       is_beta_applicant: false,
       is_default: isDefault, // Set is_default based on whether this is the first session
-      saju: saju
-        ? {
-            // 기본 사주 정보
-            yearStem: saju.yearStem,
-            yearBranch: saju.yearBranch,
-            yearStemHanja: saju.yearStemHanja,
-            yearBranchHanja: saju.yearBranchHanja,
-            monthStem: saju.monthStem,
-            monthBranch: saju.monthBranch,
-            monthStemHanja: saju.monthStemHanja,
-            monthBranchHanja: saju.monthBranchHanja,
-            dayStem: saju.dayStem,
-            dayBranch: saju.dayBranch,
-            dayStemHanja: saju.dayStemHanja,
-            dayBranchHanja: saju.dayBranchHanja,
-            hourStem: saju.hourStem,
-            hourBranch: saju.hourBranch,
-            hourStemHanja: saju.hourStemHanja,
-            hourBranchHanja: saju.hourBranchHanja,
-            dayMaster: saju.dayMaster,
-            dayMasterHanja: saju.dayMasterHanja,
-            yearAnimal: saju.yearAnimal,
-            // 십성 정보
-            yearStemSibseong: saju.yearStemSibseong,
-            monthStemSibseong: saju.monthStemSibseong,
-            dayStemSibseong: saju.dayStemSibseong,
-            hourStemSibseong: saju.hourStemSibseong,
-            yearBranchSibseong: saju.yearBranchSibseong,
-            monthBranchSibseong: saju.monthBranchSibseong,
-            dayBranchSibseong: saju.dayBranchSibseong,
-            hourBranchSibseong: saju.hourBranchSibseong,
-            // 오행 정보
-            elements: saju.elements,
-            // 생년월일시 정보 (birthInfo에서 가져옴)
-            birthYear: birthInfo?.solarYear,
-            birthMonth: birthInfo?.solarMonth,
-            birthDay: birthInfo?.solarDay,
-            birthHour: birthInfo?.solarHour,
-            birthMinute: birthInfo?.solarMinute,
-          }
-        : null,
+      saju: sajuData, // 처리된 saju 데이터 사용
       daeun: daeun || null, // 대운 정보는 daeun column에 저장
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
+
+    console.log("[v0] Final session data for insert:", JSON.stringify(sessionData, null, 2))
 
     const { data, error: sessionError } = await supabase.from("saju_sessions").insert(sessionData).select("id").single()
 
@@ -126,6 +136,8 @@ export async function POST(request: NextRequest) {
       console.error("Error creating saju session:", sessionError)
       return NextResponse.json({ error: sessionError.message }, { status: 500 })
     }
+
+    console.log("[v0] Successfully created session with ID:", data.id)
 
     // If birthInfo is provided, save it to birth_info table
     if (birthInfo) {
