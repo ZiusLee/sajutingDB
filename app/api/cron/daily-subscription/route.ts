@@ -17,37 +17,43 @@ export async function GET(request: NextRequest) {
   const today = new Date().toISOString().split("T")[0]
 
   try {
-    // Get all active subscriptions that haven't been charged today
-    const { data: activeSubscriptions, error } = await supabase
+    const { data: allUsers, error: usersError } = await supabase
       .from("user_coins")
       .select(`
         user_id,
         subscription_plan,
         subscription_start_date,
         subscription_end_date,
-        last_daily_charge,
-        payment_orders!inner(daily_coins, subscription_status)
+        last_daily_charge
       `)
-      .not("subscription_plan", "is", null)
-      .gte("subscription_end_date", new Date().toISOString())
       .neq("last_daily_charge", today)
-      .eq("payment_orders.subscription_status", "active")
 
-    if (error) {
-      console.error("[Daily Charge] Error fetching subscriptions:", error)
-      return NextResponse.json({ error: "Failed to fetch subscriptions" }, { status: 500 })
+    if (usersError) {
+      console.error("[Daily Charge] Error fetching users:", usersError)
+      return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 })
     }
 
-    console.log(`[Daily Charge] Found ${activeSubscriptions?.length || 0} subscriptions to charge`)
+    const freeUsers = allUsers?.filter((user) => !user.subscription_plan || user.subscription_plan === "free") || []
+    const subscriptionUsers =
+      allUsers?.filter(
+        (user) =>
+          user.subscription_plan &&
+          user.subscription_plan !== "free" &&
+          user.subscription_end_date &&
+          new Date(user.subscription_end_date) >= new Date(),
+      ) || []
+
+    console.log(
+      `[Daily Charge] Found ${freeUsers.length} free users and ${subscriptionUsers.length} subscription users to charge`,
+    )
 
     let successCount = 0
     let errorCount = 0
 
-    for (const subscription of activeSubscriptions || []) {
+    for (const user of freeUsers) {
       try {
-        const dailyCoins = subscription.payment_orders.daily_coins
+        const dailyCoins = 3 // Free plan gets 3 coins daily
 
-        // Add daily coins to subscription_coins
         const { error: updateError } = await supabase
           .from("user_coins")
           .update({
@@ -55,27 +61,68 @@ export async function GET(request: NextRequest) {
             last_daily_charge: today,
             updated_at: new Date().toISOString(),
           })
-          .eq("user_id", subscription.user_id)
+          .eq("user_id", user.user_id)
 
         if (updateError) {
-          console.error(`[Daily Charge] Error updating coins for user ${subscription.user_id}:`, updateError)
+          console.error(`[Daily Charge] Error updating coins for free user ${user.user_id}:`, updateError)
+          errorCount++
+          continue
+        }
+
+        console.log(`[Daily Charge] Successfully charged ${dailyCoins} coins to free user ${user.user_id}`)
+        successCount++
+      } catch (userError) {
+        console.error(`[Daily Charge] Error processing free user ${user.user_id}:`, userError)
+        errorCount++
+      }
+    }
+
+    for (const user of subscriptionUsers) {
+      try {
+        // Get payment order for this subscription user
+        const { data: paymentOrder, error: paymentError } = await supabase
+          .from("payment_orders")
+          .select("daily_coins, subscription_status")
+          .eq("user_id", user.user_id)
+          .eq("subscription_status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single()
+
+        if (paymentError || !paymentOrder) {
+          console.warn(`[Daily Charge] No active payment order found for user ${user.user_id}`)
+          continue
+        }
+
+        const dailyCoins = paymentOrder.daily_coins
+
+        const { error: updateError } = await supabase
+          .from("user_coins")
+          .update({
+            subscription_coins: supabase.raw(`subscription_coins + ${dailyCoins}`),
+            last_daily_charge: today,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.user_id)
+
+        if (updateError) {
+          console.error(`[Daily Charge] Error updating coins for subscription user ${user.user_id}:`, updateError)
           errorCount++
           continue
         }
 
         // Record the charge
         await supabase.from("subscription_charges").insert({
-          user_id: subscription.user_id,
-          subscription_order_id: subscription.payment_orders.id,
+          user_id: user.user_id,
           charge_date: today,
           coins_added: dailyCoins,
           status: "completed",
         })
 
-        console.log(`[Daily Charge] Successfully charged ${dailyCoins} coins to user ${subscription.user_id}`)
+        console.log(`[Daily Charge] Successfully charged ${dailyCoins} coins to subscription user ${user.user_id}`)
         successCount++
       } catch (userError) {
-        console.error(`[Daily Charge] Error processing user ${subscription.user_id}:`, userError)
+        console.error(`[Daily Charge] Error processing subscription user ${user.user_id}:`, userError)
         errorCount++
       }
     }
@@ -86,7 +133,9 @@ export async function GET(request: NextRequest) {
       success: true,
       message: "Daily subscription charge completed",
       statistics: {
-        totalSubscriptions: activeSubscriptions?.length || 0,
+        totalUsers: allUsers?.length || 0,
+        freeUsers: freeUsers.length,
+        subscriptionUsers: subscriptionUsers.length,
         successfulCharges: successCount,
         errors: errorCount,
         date: today,

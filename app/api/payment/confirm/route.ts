@@ -28,7 +28,30 @@ export async function POST(request: NextRequest) {
     }
 
     const isSubscription = packageData.isSubscription || false
-    const dailyCoins = isSubscription ? Math.floor(packageData.coins / 7) : 0 // Weekly subscription divided by 7 days
+    const dailyCoins = isSubscription ? Math.floor(packageData.coins / 7) : 0
+
+    if (isSubscription) {
+      // Deactivate previous subscription orders
+      await supabase
+        .from("payment_orders")
+        .update({
+          subscription_status: "cancelled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id)
+        .eq("subscription_status", "active")
+
+      // Clear existing subscription coins when changing plans
+      await supabase
+        .from("user_coins")
+        .update({
+          subscription_coins: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id)
+
+      console.log(`[Payment Confirm] Cleared existing subscription coins for user ${user.id}`)
+    }
 
     const { data: paymentOrder, error: insertError } = await supabase
       .from("payment_orders")
@@ -43,7 +66,7 @@ export async function POST(request: NextRequest) {
         subscription_type: isSubscription ? packageId : null,
         subscription_status: isSubscription ? "pending" : "inactive",
         daily_coins: dailyCoins,
-        next_billing_date: isSubscription ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : null, // 7 days from now
+        next_billing_date: isSubscription ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : null,
         payment_data: {
           packageName: packageData.name,
           timestamp: new Date().toISOString(),

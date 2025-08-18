@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { X, Check } from "lucide-react"
+import { X, Check, AlertTriangle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -14,11 +14,12 @@ type SubscriptionPkg = {
   coins: number
   price: number
   crossedPrice?: number
-  accent?: "cyan" | "green" | "red"
+  accent?: "cyan" | "green" | "red" | "gray"
   tag?: string
   subtitle?: string
   period: string
   isCurrentPlan?: boolean
+  isDowngrade?: boolean
 }
 
 const KRW = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW", maximumFractionDigits: 0 })
@@ -60,6 +61,17 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     period: "주",
     isCurrentPlan: false,
   },
+  {
+    id: "free",
+    name: "Free Plan",
+    coins: 3,
+    price: 0,
+    subtitle: "하루에 3핑씩 제공",
+    accent: "gray",
+    period: "주",
+    isCurrentPlan: false,
+    isDowngrade: true,
+  },
 ]
 
 const BONUS: { id: string; name: string; coins: number; buttonText: string; action: () => void }[] = [
@@ -86,6 +98,8 @@ export default function ChargeStation() {
     plan: null,
   })
   const [loadingCoins, setLoadingCoins] = useState(false)
+  const [showDowngradeDialog, setShowDowngradeDialog] = useState(false)
+  const [selectedDowngradePkg, setSelectedDowngradePkg] = useState<SubscriptionPkg | null>(null)
 
   const fetchBalance = async () => {
     if (!isAuthenticated || !user) return
@@ -115,7 +129,23 @@ export default function ChargeStation() {
     fetchBalance()
   }, [isAuthenticated, user])
 
+  const isDowngrade = (selectedPlan: string, currentPlan: string | null) => {
+    if (!currentPlan || currentPlan === "Free Plan") return false
+
+    const planHierarchy = { free: 0, starter: 1, plus: 2, pro: 3 }
+    const currentLevel = planHierarchy[currentPlan.toLowerCase() as keyof typeof planHierarchy] || 0
+    const selectedLevel = planHierarchy[selectedPlan.toLowerCase() as keyof typeof planHierarchy] || 0
+
+    return selectedLevel < currentLevel
+  }
+
   const onSubscribe = async (pkg: SubscriptionPkg) => {
+    if (isDowngrade(pkg.id, userCoins.plan)) {
+      setSelectedDowngradePkg(pkg)
+      setShowDowngradeDialog(true)
+      return
+    }
+
     const params = new URLSearchParams({
       packageId: pkg.id,
       name: pkg.name,
@@ -127,6 +157,40 @@ export default function ChargeStation() {
     })
 
     router.push(`/payment?${params.toString()}`)
+  }
+
+  const handleDowngradeConfirm = async () => {
+    if (!selectedDowngradePkg) return
+
+    try {
+      const response = await fetch("/api/subscription/schedule-downgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newPlan: selectedDowngradePkg.id,
+          planName: selectedDowngradePkg.name,
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "다운그레이드 예약 완료",
+          description: `현재 주차가 끝나면 ${selectedDowngradePkg.name}으로 전환됩니다.`,
+        })
+        fetchBalance()
+      } else {
+        throw new Error("다운그레이드 예약 실패")
+      }
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "다운그레이드 예약 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setShowDowngradeDialog(false)
+      setSelectedDowngradePkg(null)
+    }
   }
 
   const handleBonusAction = (bonus: (typeof BONUS)[0]) => {
@@ -158,6 +222,8 @@ export default function ChargeStation() {
         return "#1ed45a"
       case "red":
         return "#ff6363"
+      case "gray":
+        return "#70737c"
       default:
         return "#28d0ed"
     }
@@ -170,7 +236,14 @@ export default function ChargeStation() {
     if (plan.includes("starter")) return 10
     if (plan.includes("plus")) return 30
     if (plan.includes("pro")) return 100
-    return 3 // Default for Free Plan
+    return 3
+  }
+
+  const getVisiblePackages = () => {
+    if (!userCoins.plan || userCoins.plan === "Free Plan") {
+      return SUBSCRIPTION_PACKAGES.filter((pkg) => !pkg.isDowngrade)
+    }
+    return SUBSCRIPTION_PACKAGES
   }
 
   return (
@@ -248,15 +321,19 @@ export default function ChargeStation() {
         <section className="space-y-3">
           <h3 className="text-white text-base font-medium">일반 패키지</h3>
           <div className="space-y-3">
-            {SUBSCRIPTION_PACKAGES.map((pkg) => {
+            {getVisiblePackages().map((pkg) => {
               const discountPercent = getDiscountPercent(pkg.price, pkg.crossedPrice)
               const accentColor = getAccentColor(pkg.accent)
+              const isCurrentUserPlan = userCoins.plan?.toLowerCase().includes(pkg.id.toLowerCase())
+              const willBeDowngrade = isDowngrade(pkg.id, userCoins.plan)
 
               return (
                 <Card
                   key={pkg.id}
-                  className="bg-[#141415] border-[#70737c]/20 cursor-pointer hover:bg-[#1a1b1d] transition-colors"
-                  onClick={() => onSubscribe(pkg)}
+                  className={`bg-[#141415] border-[#70737c]/20 cursor-pointer hover:bg-[#1a1b1d] transition-colors ${
+                    isCurrentUserPlan ? "ring-1 ring-[#28d0ed]/50" : ""
+                  }`}
+                  onClick={() => !isCurrentUserPlan && onSubscribe(pkg)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
@@ -265,6 +342,11 @@ export default function ChargeStation() {
                           <span className="text-sm font-medium" style={{ color: accentColor }}>
                             {pkg.name}
                           </span>
+                          {willBeDowngrade && (
+                            <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded">
+                              다운그레이드
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
@@ -282,9 +364,16 @@ export default function ChargeStation() {
                         )}
                       </div>
                       <div className="text-right">
-                        <Button className="bg-white text-black hover:bg-gray-100 px-4 py-2 rounded-lg font-medium text-sm">
-                          {formatKRW(pkg.price)}/{pkg.period}
-                        </Button>
+                        {isCurrentUserPlan ? (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-[#70737c]/20 rounded-lg">
+                            <Check size={14} className="text-[#1ed45a]" />
+                            <span className="text-white text-xs">현재 플랜</span>
+                          </div>
+                        ) : (
+                          <Button className="bg-white text-black hover:bg-gray-100 px-4 py-2 rounded-lg font-medium text-sm">
+                            {pkg.price === 0 ? "무료 전환" : `${formatKRW(pkg.price)}/${pkg.period}`}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -330,6 +419,45 @@ export default function ChargeStation() {
           </div>
         </div>
       </div>
+
+      {showDowngradeDialog && selectedDowngradePkg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#141415] border border-[#70737c]/20 rounded-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="text-orange-400" size={24} />
+              <h3 className="text-white text-lg font-semibold">다운그레이드 확인</h3>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <p className="text-[#aeb0b6] text-sm">{selectedDowngradePkg.name}으로 다운그레이드하시겠습니까?</p>
+              <div className="bg-[#70737c]/10 p-3 rounded-lg">
+                <p className="text-white text-sm font-medium mb-2">⚠️ 다운그레이드 안내</p>
+                <ul className="text-[#aeb0b6] text-xs space-y-1">
+                  <li>• 현재 주차가 끝나면 {selectedDowngradePkg.name}으로 전환됩니다</li>
+                  <li>• 현재 요금제는 그대로 유지됩니다</li>
+                  <li>• 핑 사용량도 기존 기준으로 유지됩니다</li>
+                  <li>• 자동 갱신이 중단됩니다</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowDowngradeDialog(false)
+                  setSelectedDowngradePkg(null)
+                }}
+                className="flex-1 bg-[#70737c]/20 text-white hover:bg-[#70737c]/30"
+              >
+                취소
+              </Button>
+              <Button onClick={handleDowngradeConfirm} className="flex-1 bg-orange-500 text-white hover:bg-orange-600">
+                확인
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
