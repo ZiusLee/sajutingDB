@@ -440,7 +440,7 @@ export function parseMessageForDatesAndBirth(message: string): ParsedMessageInfo
   // 6. Follow-up 질문 필요성 체크
   if (result.partnerInfo) {
     if (!result.partnerInfo.gender) {
-      result.needsFollowUp.push("상대방의 성별을 알려주세요")
+      result.needsFollowUp.push("상대���의 성별을 알려주세요")
     }
     if (!result.partnerInfo.hour && !result.partnerInfo.timeUnknown) {
       result.needsFollowUp.push("상대방의 태어난 시간을 알고 계신가요? (모르시면 '시간 모름'이라고 해주세요)")

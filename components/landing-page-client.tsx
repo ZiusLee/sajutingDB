@@ -113,7 +113,7 @@ export default function LandingPageClient() {
               궁금하세요?
             </h1>
             <div className="space-y-2">
-              <p className="text-base md:text-lg text-gray-600">사주로 나를 이해한다, 사주핑</p>
+              <p className="text-base md:text-lg text-gray-600">사주로 나를 이해하다, 사주핑</p>
 
               {isAuthenticated && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg max-w-sm mx-auto">

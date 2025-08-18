@@ -416,7 +416,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1936, month: 10, solarTerm: '상강', timestamp: '1936-10-23 23:18' },
   { year: 1936, month: 11, solarTerm: '입동', timestamp: '1936-11-07 23:15' },
   { year: 1936, month: 11, solarTerm: '소설', timestamp: '1936-11-22 20:25' },
-  { year: 1936, month: 12, solarTerm: '대설', timestamp: '1936-12-07 15:42' },
+  { year: 1936, month: 12, solarTerm: '대��', timestamp: '1936-12-07 15:42' },
   { year: 1936, month: 12, solarTerm: '동지', timestamp: '1936-12-22 09:27' },
   { year: 1937, month: 1, solarTerm: '소한', timestamp: '1937-01-06 02:44' },
   { year: 1937, month: 1, solarTerm: '대한', timestamp: '1937-01-20 20:01' },
