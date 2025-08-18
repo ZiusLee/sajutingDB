@@ -70,14 +70,17 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
         })
 
         if (response.ok) {
+          setShowTerms(false)
           onSelectProvider(selectedProvider)
         } else {
           // 실패해도 진행
+          setShowTerms(false)
           onSelectProvider(selectedProvider)
         }
       } catch (error) {
         console.error("Failed to update privacy consent:", error)
         // 에러가 발생해도 진행
+        setShowTerms(false)
         onSelectProvider(selectedProvider)
       } finally {
         setIsProcessing(false)

@@ -195,8 +195,7 @@ export async function getUserSajuProfiles() {
 }
 
 /**
- * Link a session to the current authenticated user
- * @param sessionId The ID of the session to link
+ * Link a session to the current authenticated user and set as default if it's their first
  */
 export async function linkSessionToUser(sessionId: string): Promise<boolean> {
   try {
@@ -229,10 +228,20 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       return true
     }
 
-    // Update the auth_user_id for the session
+    const { data: existingSessions, error: existingError } = await supabase
+      .from("saju_sessions")
+      .select("id")
+      .eq("auth_user_id", authUserId)
+      .limit(1)
+
+    const shouldBeDefault = !existingError && (!existingSessions || existingSessions.length === 0)
+
     const { error: updateError } = await supabase
       .from("saju_sessions")
-      .update({ auth_user_id: authUserId })
+      .update({
+        auth_user_id: authUserId,
+        is_default: shouldBeDefault,
+      })
       .eq("id", sessionId)
 
     if (updateError) {
@@ -243,7 +252,7 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
     // Verify the update was successful
     const { data: verifyData, error: verifyError } = await supabase
       .from("saju_sessions")
-      .select("id, auth_user_id")
+      .select("id, auth_user_id, is_default")
       .eq("id", sessionId)
       .single()
 
@@ -252,7 +261,9 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       return false
     }
 
-    console.log(`Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}`)
+    console.log(
+      `Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}, is_default: ${verifyData.is_default}`,
+    )
     return true
   } catch (error) {
     console.error("Error in linkSessionToUser:", error)
@@ -415,10 +426,20 @@ async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Pro
       return false
     }
 
-    // If linked to another user or not linked at all, update it
+    const { data: existingSessions, error: existingError } = await supabase
+      .from("saju_sessions")
+      .select("id")
+      .eq("auth_user_id", authUserId)
+      .limit(1)
+
+    const shouldBeDefault = !existingError && (!existingSessions || existingSessions.length === 0)
+
     const { error: updateError } = await supabase
       .from("saju_sessions")
-      .update({ auth_user_id: authUserId })
+      .update({
+        auth_user_id: authUserId,
+        is_default: shouldBeDefault,
+      })
       .eq("id", sessionId)
 
     if (updateError) {
@@ -429,7 +450,7 @@ async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Pro
     // Verify the update was successful
     const { data: verifyData, error: verifyError } = await supabase
       .from("saju_sessions")
-      .select("id, auth_user_id")
+      .select("id, auth_user_id, is_default")
       .eq("id", sessionId)
       .single()
 
@@ -438,7 +459,9 @@ async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Pro
       return false
     }
 
-    console.log(`Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}`)
+    console.log(
+      `Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}, is_default: ${verifyData.is_default}`,
+    )
     return true
   } catch (error) {
     console.error(`Error in linkSessionIfUnlinked for session ${sessionId}:`, error)
@@ -619,43 +642,6 @@ export async function getUserSajuSessions(authUserId: string): Promise<any[]> {
 }
 
 /**
- * Set a saju session as the default for a user
- */
-export async function setDefaultSajuSession(authUserId: string, sessionId: string): Promise<boolean> {
-  try {
-    const supabase = createClientComponentClient()
-
-    // First, reset all sessions for this user to not be default
-    const { error: resetError } = await supabase
-      .from("saju_sessions")
-      .update({ is_default: false })
-      .eq("auth_user_id", authUserId)
-
-    if (resetError) {
-      console.error("Error resetting default sessions:", resetError)
-      return false
-    }
-
-    // Then set the specified session as default
-    const { error: updateError } = await supabase
-      .from("saju_sessions")
-      .update({ is_default: true })
-      .eq("id", sessionId)
-      .eq("auth_user_id", authUserId)
-
-    if (updateError) {
-      console.error("Error setting default session:", updateError)
-      return false
-    }
-
-    return true
-  } catch (error) {
-    console.error("Error in setDefaultSajuSession:", error)
-    return false
-  }
-}
-
-/**
  * Get the default saju session for a user
  */
 export async function getDefaultSajuSession(authUserId: string): Promise<any | null> {
@@ -819,5 +805,40 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
   } catch (error) {
     console.error("Error in getSajuProfileBySessionId:", error)
     return null
+  }
+}
+
+/**
+ * Set a saju session as the default for a user
+ */
+export async function setDefaultSajuSession(authUserId: string, sessionId: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient()
+
+    const { error: resetError } = await supabase
+      .from("saju_sessions")
+      .update({ is_default: false })
+      .eq("auth_user_id", authUserId)
+
+    if (resetError) {
+      console.error("Error resetting default sessions:", resetError)
+      return false
+    }
+
+    const { error: updateError } = await supabase
+      .from("saju_sessions")
+      .update({ is_default: true })
+      .eq("id", sessionId)
+      .eq("auth_user_id", authUserId)
+
+    if (updateError) {
+      console.error("Error setting default session:", updateError)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in setDefaultSajuSession:", error)
+    return false
   }
 }
