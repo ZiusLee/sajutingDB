@@ -100,6 +100,8 @@ export default function ChargeStation() {
   const [loadingCoins, setLoadingCoins] = useState(false)
   const [showDowngradeDialog, setShowDowngradeDialog] = useState(false)
   const [selectedDowngradePkg, setSelectedDowngradePkg] = useState<SubscriptionPkg | null>(null)
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [selectedUpgradePkg, setSelectedUpgradePkg] = useState<SubscriptionPkg | null>(null)
 
   const fetchBalance = async () => {
     if (!isAuthenticated || !user) return
@@ -146,17 +148,8 @@ export default function ChargeStation() {
       return
     }
 
-    const params = new URLSearchParams({
-      packageId: pkg.id,
-      name: pkg.name,
-      coins: pkg.coins.toString(),
-      price: pkg.price.toString(),
-      isSubscription: "true",
-      period: pkg.period,
-      userEmail: "skyywwind@gmail.com",
-    })
-
-    router.push(`/payment?${params.toString()}`)
+    setSelectedUpgradePkg(pkg)
+    setShowUpgradeDialog(true)
   }
 
   const handleDowngradeConfirm = async () => {
@@ -203,6 +196,24 @@ export default function ChargeStation() {
       setShowDowngradeDialog(false)
       setSelectedDowngradePkg(null)
     }
+  }
+
+  const handleUpgradeConfirm = async () => {
+    if (!selectedUpgradePkg) return
+
+    const params = new URLSearchParams({
+      packageId: selectedUpgradePkg.id,
+      name: selectedUpgradePkg.name,
+      coins: selectedUpgradePkg.coins.toString(),
+      price: selectedUpgradePkg.price.toString(),
+      isSubscription: "true",
+      period: selectedUpgradePkg.period,
+      userEmail: "skyywwind@gmail.com",
+    })
+
+    setShowUpgradeDialog(false)
+    setSelectedUpgradePkg(null)
+    router.push(`/payment?${params.toString()}`)
   }
 
   const handleBonusAction = (bonus: (typeof BONUS)[0]) => {
@@ -441,14 +452,22 @@ export default function ChargeStation() {
             </div>
 
             <div className="space-y-3 mb-6">
-              <p className="text-[#aeb0b6] text-sm">{selectedDowngradePkg.name}으로 다운그레이드하시겠습니까?</p>
+              <p className="text-[#aeb0b6] text-sm">선택하신 요금제로 변경하시겠습니까?</p>
               <div className="bg-[#70737c]/10 p-3 rounded-lg">
-                <p className="text-white text-sm font-medium mb-2">⚠️ 다운그레이드 안내</p>
+                <p className="text-white text-sm font-medium mb-2">다운그레이드 안내</p>
                 <ul className="text-[#aeb0b6] text-xs space-y-1">
-                  <li>• 현재 주차가 끝나면 {selectedDowngradePkg.name}으로 전환됩니다</li>
-                  <li>• 현재 요금제는 그대로 유지됩니다</li>
-                  <li>• 핑 사용량도 기존 기준으로 유지됩니다</li>
-                  <li>• 자동 갱신이 중단됩니다</li>
+                  <li>
+                    • <strong>현재 주차 종료 후</strong> 변경됩니다
+                  </li>
+                  <li>
+                    • 그때까지는 <strong>기존 요금제가 유지</strong>됩니다
+                  </li>
+                  <li>
+                    • 핑 제공량도 <strong>기존 기준으로 유지</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>다음 결제부터 새 요금제 금액으로 결제</strong>됩니다
+                  </li>
                 </ul>
               </div>
             </div>
@@ -464,6 +483,53 @@ export default function ChargeStation() {
                 취소
               </Button>
               <Button onClick={handleDowngradeConfirm} className="flex-1 bg-orange-500 text-white hover:bg-orange-600">
+                확인
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUpgradeDialog && selectedUpgradePkg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#141415] border border-[#70737c]/20 rounded-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="text-blue-400" size={24} />
+              <h3 className="text-white text-lg font-semibold">업그레이드 확인</h3>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <p className="text-[#aeb0b6] text-sm">선택하신 요금제로 즉시 전환하시겠습니까?</p>
+              <div className="bg-[#70737c]/10 p-3 rounded-lg">
+                <p className="text-white text-sm font-medium mb-2">업그레이드 안내</p>
+                <ul className="text-[#aeb0b6] text-xs space-y-1">
+                  <li>
+                    • 업그레이드 시 <strong>현재 요금제는 즉시 종료</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>새 요금제 금액이 즉시 결제</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>오늘부터 새로운 핑 제공량이 적용</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>남은 기간 및 핑은 환불되지 않습니다</strong>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowUpgradeDialog(false)
+                  setSelectedUpgradePkg(null)
+                }}
+                className="flex-1 bg-[#70737c]/20 text-white hover:bg-[#70737c]/30"
+              >
+                취소
+              </Button>
+              <Button onClick={handleUpgradeConfirm} className="flex-1 bg-blue-500 text-white hover:bg-blue-600">
                 확인
               </Button>
             </div>
