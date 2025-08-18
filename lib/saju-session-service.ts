@@ -219,6 +219,11 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       return false
     }
 
+    if (session.auth_user_id && session.auth_user_id !== authUserId) {
+      console.log(`Session ${sessionId} is already linked to different user ${session.auth_user_id}`)
+      return false
+    }
+
     // If already linked to this user, no need to update
     if (session.auth_user_id === authUserId) {
       console.log(`Session ${sessionId} is already linked to user ${authUserId}`)
@@ -229,9 +234,13 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
       .from("saju_sessions")
       .select("id")
       .eq("auth_user_id", authUserId)
-      .limit(1)
 
-    const shouldBeDefault = !existingError && (!existingSessions || existingSessions.length === 0)
+    if (existingError) {
+      console.error("Error checking existing sessions:", existingError)
+      return false
+    }
+
+    const shouldBeDefault = !existingSessions || existingSessions.length === 0
 
     const { error: updateError } = await supabase
       .from("saju_sessions")
@@ -240,6 +249,7 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
         is_default: shouldBeDefault,
       })
       .eq("id", sessionId)
+      .eq("auth_user_id", null) // null인 경우에만 업데이트하도록 추가 보안
 
     if (updateError) {
       console.error("Error linking session:", updateError)
@@ -309,71 +319,44 @@ export async function findAndLinkSessions(): Promise<{ success: boolean; linkedC
       if (success) linkedCount++
     }
 
-    // Strategy 1.1: Check for recent saju sessions that might belong to this user
-    try {
-      console.log(`Looking for recent unlinked sessions that might belong to user ${authUserId}`)
-      const { data: recentSessions, error: recentError } = await supabase
-        .from("saju_sessions")
-        .select("id, name, auth_user_id, created_at")
-        .is("auth_user_id", null)
-        .gte("created_at", new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Last 30 minutes
-        .order("created_at", { ascending: false })
-        .limit(5)
-
-      if (!recentError && recentSessions && recentSessions.length > 0) {
-        console.log(`Found ${recentSessions.length} recent unlinked sessions`)
-        // Try to link the most recent session
-        const mostRecentSession = recentSessions[0]
-        const success = await linkSessionToUser(mostRecentSession.id)
-        if (success) {
-          console.log(`Successfully linked recent session ${mostRecentSession.id}`)
-          linkedCount++
-        }
-      }
-    } catch (error) {
-      console.error("Error checking recent sessions:", error)
-    }
-
     // Strategy 2: Check if there's a session with matching email
     if (userEmail) {
       console.log(`Looking for sessions with email: ${userEmail}`)
       const { data: emailSessions, error: emailError } = await supabase
         .from("saju_sessions")
-        .select("id, auth_user_id")
+        .select("id, auth_user_id, name")
         .eq("email", userEmail)
+        .is("auth_user_id", null) // Only get unlinked sessions
 
       if (emailError) {
         console.error("Error finding sessions by email:", emailError)
       } else if (emailSessions && emailSessions.length > 0) {
-        console.log(`Found ${emailSessions.length} sessions with email ${userEmail}`)
+        console.log(`Found ${emailSessions.length} unlinked sessions with email ${userEmail}`)
         for (const session of emailSessions) {
-          // Only link if not already linked to this user
-          if (session.auth_user_id !== authUserId) {
-            const success = await linkSessionToUser(session.id)
-            if (success) linkedCount++
-          }
+          const success = await linkSessionToUser(session.id)
+          if (success) linkedCount++
         }
       }
     }
 
-    // Strategy 3: Check if there's a session with matching name
-    if (userName) {
-      console.log(`Looking for sessions with name: ${userName}`)
+    // Strategy 3: Check if there's a session with matching name (more restrictive)
+    if (userName && userEmail) {
+      // Require both name and email for name-based matching
+      console.log(`Looking for sessions with name: ${userName} and email: ${userEmail}`)
       const { data: nameSessions, error: nameError } = await supabase
         .from("saju_sessions")
-        .select("id, auth_user_id")
+        .select("id, auth_user_id, name, email")
         .eq("name", userName)
+        .eq("email", userEmail) // Must match both name and email
+        .is("auth_user_id", null) // Only get unlinked sessions
 
       if (nameError) {
-        console.error("Error finding sessions by name:", nameError)
+        console.error("Error finding sessions by name and email:", nameError)
       } else if (nameSessions && nameSessions.length > 0) {
-        console.log(`Found ${nameSessions.length} sessions with name ${userName}`)
+        console.log(`Found ${nameSessions.length} unlinked sessions with name ${userName} and email ${userEmail}`)
         for (const session of nameSessions) {
-          // Only link if not already linked to this user
-          if (session.auth_user_id !== authUserId) {
-            const success = await linkSessionToUser(session.id)
-            if (success) linkedCount++
-          }
+          const success = await linkSessionToUser(session.id)
+          if (success) linkedCount++
         }
       }
     }
@@ -417,6 +400,11 @@ async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Pro
       return false
     }
 
+    if (session.auth_user_id && session.auth_user_id !== authUserId) {
+      console.log(`Session ${sessionId} is already linked to different user ${session.auth_user_id}`)
+      return false
+    }
+
     // If already linked to this user, no need to update
     if (session.auth_user_id === authUserId) {
       console.log(`Session ${sessionId} is already linked to user ${authUserId}`)
@@ -427,9 +415,13 @@ async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Pro
       .from("saju_sessions")
       .select("id")
       .eq("auth_user_id", authUserId)
-      .limit(1)
 
-    const shouldBeDefault = !existingError && (!existingSessions || existingSessions.length === 0)
+    if (existingError) {
+      console.error("Error checking existing sessions:", existingError)
+      return false
+    }
+
+    const shouldBeDefault = !existingSessions || existingSessions.length === 0
 
     const { error: updateError } = await supabase
       .from("saju_sessions")
@@ -438,6 +430,7 @@ async function linkSessionIfUnlinked(sessionId: string, authUserId: string): Pro
         is_default: shouldBeDefault,
       })
       .eq("id", sessionId)
+      .eq("auth_user_id", null) // null인 경우에만 업데이트하도록 추가 보안
 
     if (updateError) {
       console.error(`Error linking session ${sessionId}:`, updateError)
