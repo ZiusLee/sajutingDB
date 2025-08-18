@@ -69,50 +69,6 @@ export async function POST(request: NextRequest) {
       isDefault = true
     }
 
-    const sajuData = saju
-      ? {
-          // 기본 사주 정보
-          yearStem: saju.yearStem,
-          yearBranch: saju.yearBranch,
-          yearStemHanja: saju.yearStemHanja,
-          yearBranchHanja: saju.yearBranchHanja,
-          monthStem: saju.monthStem,
-          monthBranch: saju.monthBranch,
-          monthStemHanja: saju.monthStemHanja,
-          monthBranchHanja: saju.monthBranchHanja,
-          dayStem: saju.dayStem,
-          dayBranch: saju.dayBranch,
-          dayStemHanja: saju.dayStemHanja,
-          dayBranchHanja: saju.dayBranchHanja,
-          hourStem: saju.hourStem,
-          hourBranch: saju.hourBranch,
-          hourStemHanja: saju.hourStemHanja,
-          hourBranchHanja: saju.hourBranchHanja,
-          dayMaster: saju.dayMaster,
-          dayMasterHanja: saju.dayMasterHanja,
-          yearAnimal: saju.yearAnimal,
-          // 십성 정보
-          yearStemSibseong: saju.yearStemSibseong,
-          monthStemSibseong: saju.monthStemSibseong,
-          dayStemSibseong: saju.dayStemSibseong,
-          hourStemSibseong: saju.hourStemSibseong,
-          yearBranchSibseong: saju.yearBranchSibseong,
-          monthBranchSibseong: saju.monthBranchSibseong,
-          dayBranchSibseong: saju.dayBranchSibseong,
-          hourBranchSibseong: saju.hourBranchSibseong,
-          // 오행 정보
-          elements: saju.elements || {},
-          // 생년월일시 정보 (birthInfo에서 가져옴)
-          birthYear: birthInfo?.solarYear,
-          birthMonth: birthInfo?.solarMonth,
-          birthDay: birthInfo?.solarDay,
-          birthHour: birthInfo?.solarHour,
-          birthMinute: birthInfo?.solarMinute,
-        }
-      : null
-
-    console.log("[v0] Processed saju data for storage:", JSON.stringify(sajuData, null, 2))
-
     const sessionData = {
       id: sessionId,
       name: name,
@@ -121,9 +77,9 @@ export async function POST(request: NextRequest) {
       auth_user_id: userId,
       relationship_status: "solo",
       is_beta_applicant: false,
-      is_default: isDefault, // Set is_default based on whether this is the first session
-      saju: sajuData, // 처리된 saju 데이터 사용
-      daeun: daeun || null, // 대운 정보는 daeun column에 저장
+      is_default: isDefault,
+      saju: saju || null, // 대운처럼 직접 저장
+      daeun: daeun || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
