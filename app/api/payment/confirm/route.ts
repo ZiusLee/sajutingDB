@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const coinType = isSubscription ? "subscription" : "bonus"
-      const coinsToAdd = isSubscription ? packageData.coins : packageData.coins + (packageData.bonus || 0)
+      const coinsToAdd = isSubscription ? dailyCoins : packageData.coins + (packageData.bonus || 0)
 
       const coinsResponse = await fetch(`${request.nextUrl.origin}/api/user-coins`, {
         method: "POST",

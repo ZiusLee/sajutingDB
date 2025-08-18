@@ -2345,7 +2345,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 2017, month: 3, solarTerm: '경칩', timestamp: '2017-03-05 18:32' },
   { year: 2017, month: 3, solarTerm: '춘분', timestamp: '2017-03-20 19:28' },
   { year: 2017, month: 4, solarTerm: '청명', timestamp: '2017-04-04 23:16' },
-  { year: 2017, month: 4, solarTerm: '곡우', timestamp: '2017-04-20 06:11' },
+  { year: 2017, month: 4, solarTerm: '��우', timestamp: '2017-04-20 06:11' },
   { year: 2017, month: 5, solarTerm: '입하', timestamp: '2017-05-05 16:30' },
   { year: 2017, month: 5, solarTerm: '소만', timestamp: '2017-05-21 05:30' },
   { year: 2017, month: 6, solarTerm: '망종', timestamp: '2017-06-05 20:36' },

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         payment_orders!inner(daily_coins, subscription_status)
       `)
       .not("subscription_plan", "is", null)
-      .lt("subscription_end_date", new Date().toISOString())
+      .gte("subscription_end_date", new Date().toISOString())
       .neq("last_daily_charge", today)
       .eq("payment_orders.subscription_status", "active")
 

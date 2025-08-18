@@ -163,6 +163,16 @@ export default function ChargeStation() {
     }
   }
 
+  const getDailyPingAmount = (planName: string | null) => {
+    if (!planName) return 3
+
+    const plan = planName.toLowerCase()
+    if (plan.includes("starter")) return 10
+    if (plan.includes("plus")) return 30
+    if (plan.includes("pro")) return 100
+    return 3 // Default for Free Plan
+  }
+
   return (
     <div className="min-h-screen bg-[#1b1c1e] text-white">
       <div className="sticky top-0 z-10 bg-[#1b1c1e] border-b border-[#70737c]/20">
@@ -184,7 +194,6 @@ export default function ChargeStation() {
             <br />
             마음껏 질문하세요!
           </p>
-          <p className="text-[#ffa938] text-xs font-medium">구독중에는 구독핑이 보너스핑보다 우선 소진됩니다.</p>
         </section>
 
         {isAuthenticated && (
@@ -205,7 +214,7 @@ export default function ChargeStation() {
                     <div>
                       구독핑: {userCoins.subscription}핑 | 보너스핑: {userCoins.bonus}핑
                     </div>
-                    <div>구독핑이 우선적으로 소비되고 다 소진되고 나면 보너스핑이 사용됩니다</div>
+                    <div>구독중에는 구독핑이 보너스핑보다 우선 소진됩니다.</div>
                   </div>
                 </div>
               </CardContent>
@@ -224,7 +233,7 @@ export default function ChargeStation() {
                     <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
                       <span className="text-black text-xs font-bold">P</span>
                     </div>
-                    <span className="text-white text-sm">하루에 3핑씩</span>
+                    <span className="text-white text-sm">하루에 {getDailyPingAmount(userCoins.plan)}핑씩</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1 bg-[#70737c]/20 rounded-full">
