@@ -40,9 +40,39 @@ const questionChips = [
 
 export default function LandingPageClient() {
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [userCoins, setUserCoins] = useState({ total: 0, subscription: 0, bonus: 0, plan: null })
+  const [loadingCoins, setLoadingCoins] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+
+  const fetchUserCoins = async () => {
+    if (!isAuthenticated || !user) return
+
+    try {
+      setLoadingCoins(true)
+      const response = await fetch("/api/user-coins")
+      if (response.ok) {
+        const data = await response.json()
+        setUserCoins({
+          total: (data.subscription_coins || 0) + (data.bonus_coins || 0),
+          subscription: data.subscription_coins || 0,
+          bonus: data.bonus_coins || 0,
+          plan: data.subscription_plan || null,
+        })
+      }
+    } catch (error) {
+      console.error("핑 정보 조회 오류:", error)
+    } finally {
+      setLoadingCoins(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUserCoins()
+    }
+  }, [isAuthenticated, user])
 
   // Check for showOnboarding query parameter
   useEffect(() => {
@@ -74,8 +104,6 @@ export default function LandingPageClient() {
     <>
       {/* 메인: 하단 고정 바가 가리지 않도록 패딩 추가 */}
       <div className="min-h-screen relative overflow-hidden bg-white pb-16">
-        {/* 배경 wave pattern 및 하단 pattern 섹션 제거 */}
-
         {/* 메인 콘텐츠 */}
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
           <div className="mb-8">
@@ -84,7 +112,31 @@ export default function LandingPageClient() {
               <br />
               궁금하세요?
             </h1>
-            <p className="text-base md:text-lg text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion, 사주핑</p>
+            <div className="space-y-2">
+              <p className="text-base md:text-lg text-gray-600">사주로 나를 이해한다, 사주핑</p>
+
+              {isAuthenticated && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg max-w-sm mx-auto">
+                  {userCoins.plan && (
+                    <p className="text-sm font-medium text-gray-700 mb-2">현재 나의 플랜: {userCoins.plan}</p>
+                  )}
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <div className="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center">
+                      <span className="text-black text-xs font-bold">P</span>
+                    </div>
+                    <span className="text-lg font-bold text-gray-900">
+                      {loadingCoins ? "..." : `${userCoins.total}핑`}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <div>
+                      구독핑: {userCoins.subscription}핑 | 보너스핑: {userCoins.bonus}핑
+                    </div>
+                    <div>구독핑이 우선적으로 소비되고 다 소진되고 나면 보너스핑이 사용됩니다</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 질문 칩 - 2줄 스크롤 애니메이션 */}

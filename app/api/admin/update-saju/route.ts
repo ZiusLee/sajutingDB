@@ -1,8 +1,9 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { calculateSaju } from "@/lib/saju"
+import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
+import { getCityById, DEFAULT_CITY_ID } from "@/lib/city-timezone-data"
 
 export async function POST(request: Request) {
   const supabase = createRouteHandlerClient({ cookies })
@@ -36,8 +37,13 @@ export async function POST(request: Request) {
                 solar_day,
                 solar_hour,
                 solar_minute,
+                lunar_year,
+                lunar_month,
+                lunar_day,
+                is_leap_month,
                 time_unknown,
-                time_standard
+                time_standard,
+                birth_city_id
               )
             `)
             .not("birth_info", "is", null)
@@ -87,8 +93,24 @@ export async function POST(request: Request) {
               const solarYear = Number(birthInfo.solar_year)
               const solarMonth = Number(birthInfo.solar_month)
               const solarDay = Number(birthInfo.solar_day)
-              const solarHour = Number(birthInfo.solar_hour) || 12
-              const solarMinute = Number(birthInfo.solar_minute) || 0
+              const lunarYear = Number(birthInfo.lunar_year)
+              const lunarMonth = Number(birthInfo.lunar_month)
+              const lunarDay = Number(birthInfo.lunar_day)
+              const isLeapMonth = birthInfo.is_leap_month || false
+              const timeUnknown = birthInfo.time_unknown || false
+
+              let solarHour: number
+              let solarMinute: number
+
+              if (timeUnknown) {
+                // time_unknown이 true면 12시 0분으로 설정
+                solarHour = 12
+                solarMinute = 0
+              } else {
+                // time_unknown이 false인데 null인 경우 0으로 처리
+                solarHour = Number(birthInfo.solar_hour) || 0
+                solarMinute = Number(birthInfo.solar_minute) || 0
+              }
 
               // 데이터 유효성 검사
               if (
@@ -100,12 +122,18 @@ export async function POST(request: Request) {
                 solarMonth > 12 ||
                 !solarDay ||
                 solarDay < 1 ||
-                solarDay > 31
+                solarDay > 31 ||
+                !lunarYear ||
+                !lunarMonth ||
+                !lunarDay
               ) {
                 console.log(`[v0] 세션 ${session.id}: 잘못된 생년월일 데이터`, {
                   solarYear,
                   solarMonth,
                   solarDay,
+                  lunarYear,
+                  lunarMonth,
+                  lunarDay,
                 })
                 stats.errors++
                 stats.processed++
@@ -116,133 +144,98 @@ export async function POST(request: Request) {
                 solarYear,
                 solarMonth,
                 solarDay,
+                lunarYear,
+                lunarMonth,
+                lunarDay,
                 solarHour,
                 solarMinute,
+                timeUnknown,
+                isLeapMonth,
               })
 
-              let needsUpdate = false
               const updateData: any = {}
 
-              const hasSibseongInfo =
-                session.saju &&
-                typeof session.saju === "object" &&
-                session.saju.yearStemSibseong &&
-                session.saju.monthStemSibseong &&
-                session.saju.dayStemSibseong &&
-                session.saju.hourStemSibseong &&
-                session.saju.yearBranchSibseong &&
-                session.saju.monthBranchSibseong &&
-                session.saju.dayBranchSibseong &&
-                session.saju.hourBranchSibseong
+              try {
+                const birthCityId = birthInfo.birth_city_id || DEFAULT_CITY_ID
+                const cityData = getCityById(birthCityId)
+                const timeStandard: TimeStandard = cityData?.timeStandard || birthInfo.time_standard || "동경135도"
+                console.log(`[v0] 세션 ${session.id}: 시간 표준 = ${timeStandard}`)
 
-              const needsSajuUpdate =
-                !session.saju ||
-                session.saju === null ||
-                (typeof session.saju === "object" && Object.keys(session.saju).length === 0) ||
-                (session.saju && typeof session.saju === "object" && "daeun" in session.saju) ||
-                (session.saju && typeof session.saju === "object" && !session.saju.yearStem) ||
-                !hasSibseongInfo // 십성 정보가 불완전한 경우 추가
+                const newSajuResult = calculateSaju(
+                  lunarYear,
+                  lunarMonth,
+                  lunarDay,
+                  solarHour,
+                  solarMinute,
+                  solarYear,
+                  solarMonth,
+                  solarDay,
+                  gender,
+                  "", // name
+                  timeUnknown,
+                  isLeapMonth,
+                  undefined, // apiMonthStem
+                  undefined, // apiMonthBranch
+                  timeStandard,
+                )
 
-              if (needsSajuUpdate) {
-                console.log(`[v0] 세션 ${session.id}: 사주 업데이트 필요 - 십성 정보 확인:`, {
-                  hasSaju: !!session.saju,
-                  hasYearStem: !!(session.saju && session.saju.yearStem),
-                  hasSibseongInfo: hasSibseongInfo,
-                })
-
-                try {
-                  const sajuResult = calculateSaju(
-                    solarYear, // lunarYear (양력 연도 사용)
-                    solarMonth, // lunarMonth
-                    solarDay, // lunarDay
-                    solarHour, // hour
-                    solarMinute, // minute
-                    solarYear, // solarYear
-                    solarMonth, // solarMonth
-                    solarDay, // solarDay
-                    gender, // 실제 gender 값 사용
-                    "", // name
-                    birthInfo.time_unknown || false, // timeUnknown
-                    false, // isLeapMonth
-                    undefined, // apiMonthStem
-                    undefined, // apiMonthBranch
-                    birthInfo.time_standard || "동경135도", // timeStandard
-                  )
-
-                  if (sajuResult && sajuResult.yearStem) {
-                    updateData.saju = sajuResult
-                    needsUpdate = true
-                    console.log(`[v0] 세션 ${session.id}: 사주 계산 성공`, {
-                      yearStem: sajuResult.yearStem,
-                      dayStem: sajuResult.dayStem,
-                    })
-                  } else {
-                    console.log(`[v0] 세션 ${session.id}: 사주 계산 실패 - yearStem이 없음`)
-                    stats.errors++
-                    stats.processed++
-                    continue
-                  }
-                } catch (sajuError) {
-                  console.error(`[v0] 세션 ${session.id}: 사주 계산 오류:`, sajuError)
+                if (!newSajuResult || !newSajuResult.yearStem) {
+                  console.log(`[v0] 세션 ${session.id}: 사주 계산 실패`)
                   stats.errors++
                   stats.processed++
                   continue
                 }
-              }
 
-              const needsDaeunUpdate =
-                !session.daeun ||
-                session.daeun === null ||
-                (typeof session.daeun === "object" && Object.keys(session.daeun).length === 0)
+                console.log(`[v0] 세션 ${session.id}: 사주 계산 완료`, {
+                  yearStem: newSajuResult.yearStem,
+                  monthStem: newSajuResult.monthStem,
+                  dayStem: newSajuResult.dayStem,
+                  hourStem: newSajuResult.hourStem,
+                })
 
-              if (needsDaeunUpdate) {
-                try {
-                  const sajuForDaeun = updateData.saju || session.saju
-                  if (!sajuForDaeun || !sajuForDaeun.yearStem) {
-                    console.log(`[v0] 세션 ${session.id}: 대운 계산을 위한 사주 데이터가 없음`)
-                    stats.processed++
-                    continue
-                  }
+                const newDaeunResult = calculateDaeunInfo(
+                  newSajuResult,
+                  solarYear,
+                  solarMonth,
+                  solarDay,
+                  gender,
+                  timeUnknown ? undefined : solarHour,
+                  timeUnknown ? undefined : solarMinute,
+                  timeUnknown,
+                )
 
-                  const daeunResult = calculateDaeunInfo(
-                    sajuForDaeun, // saju 객체
-                    solarYear, // birthYear
-                    solarMonth, // birthMonth
-                    solarDay, // birthDay
-                    gender, // gender
-                    solarHour, // birthHour
-                    solarMinute, // birthMinute
-                    birthInfo.time_unknown || false, // timeUnknown
-                  )
+                console.log(`[v0] 세션 ${session.id}: 대운 계산 완료`, {
+                  direction: newDaeunResult?.direction,
+                  pillarsCount: newDaeunResult?.pillars?.length,
+                })
 
-                  if (daeunResult) {
-                    updateData.daeun = daeunResult
-                    needsUpdate = true
-                    console.log(`[v0] 세션 ${session.id}: 대운 계산 성공`, {
-                      direction: daeunResult.direction,
-                      pillarsCount: daeunResult.pillars?.length || 0,
-                    })
-                  }
-                } catch (daeunError) {
-                  console.error(`[v0] 세션 ${session.id}: 대운 계산 오류:`, daeunError)
-                  // 대운 계산 실패는 전체 업데이트를 중단하지 않음
-                }
-              }
-
-              // 업데이트 실행
-              if (needsUpdate) {
-                const { error: updateError } = await supabase
-                  .from("saju_sessions")
-                  .update(updateData)
-                  .eq("id", session.id)
-
-                if (updateError) {
-                  throw updateError
+                updateData.saju = newSajuResult
+                if (newDaeunResult) {
+                  updateData.daeun = newDaeunResult
                 }
 
-                stats.updated++
-                console.log(`[v0] 세션 ${session.id}: 업데이트 완료`)
+                console.log(`[v0] 세션 ${session.id}: 업데이트 데이터 준비 완료`)
+              } catch (calculationError) {
+                console.error(`[v0] 세션 ${session.id}: 계산 오류:`, calculationError)
+                stats.errors++
+                stats.processed++
+                continue
               }
+
+              const { error: updateError } = await supabase
+                .from("saju_sessions")
+                .update(updateData)
+                .eq("id", session.id)
+
+              if (updateError) {
+                throw updateError
+              }
+
+              stats.updated++
+              console.log(`[v0] 세션 ${session.id}: 업데이트 완료`, {
+                updatedSaju: !!updateData.saju,
+                updatedDaeun: !!updateData.daeun,
+              })
 
               stats.processed++
 

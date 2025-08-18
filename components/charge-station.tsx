@@ -6,6 +6,7 @@ import { X, Check } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
 type SubscriptionPkg = {
   id: string
@@ -32,7 +33,7 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     coins: 10,
     price: 9900,
     crossedPrice: 14000,
-    subtitle: "하루에 10핑씩",
+    subtitle: "하루에 10핑씩 제공",
     accent: "cyan",
     period: "주",
     isCurrentPlan: false,
@@ -43,7 +44,7 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     coins: 30,
     price: 19900,
     crossedPrice: 42000,
-    subtitle: "하루에 30핑씩",
+    subtitle: "하루에 30핑씩 제공",
     accent: "green",
     period: "주",
     isCurrentPlan: false,
@@ -54,7 +55,7 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     coins: 100,
     price: 49900,
     crossedPrice: 140000,
-    subtitle: "하루에 100핑씩",
+    subtitle: "하루에 100핑씩 제공",
     accent: "red",
     period: "주",
     isCurrentPlan: false,
@@ -73,32 +74,46 @@ const BONUS: { id: string; name: string; coins: number; buttonText: string; acti
   },
 ]
 
-async function fetchBalance(): Promise<number> {
-  try {
-    if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_USE_MOCK_API === "true") {
-      await new Promise((r) => setTimeout(r, 250))
-      return 26
-    }
-  } catch {}
-  try {
-    const res = await fetch("/api/user-coins", { cache: "no-store" })
-    const data = await res.json().catch(() => ({}))
-    if (typeof data?.balance === "number") return data.balance
-    if (typeof data?.coins === "number") return data.coins
-    return 0
-  } catch {
-    return 0
-  }
-}
-
 export default function ChargeStation() {
   const { toast } = useToast()
   const router = useRouter()
+  const { isAuthenticated, user } = useAuth()
   const [balance, setBalance] = useState<number | null>(null)
+  const [userCoins, setUserCoins] = useState({
+    total: 0,
+    subscription: 0,
+    bonus: 0,
+    plan: null,
+  })
+  const [loadingCoins, setLoadingCoins] = useState(false)
+
+  const fetchBalance = async () => {
+    if (!isAuthenticated || !user) return
+
+    try {
+      setLoadingCoins(true)
+      const response = await fetch("/api/user-coins")
+      if (response.ok) {
+        const data = await response.json()
+        const total = (data.subscription_coins || 0) + (data.bonus_coins || 0)
+        setBalance(total)
+        setUserCoins({
+          total,
+          subscription: data.subscription_coins || 0,
+          bonus: data.bonus_coins || 0,
+          plan: data.subscription_plan || "Free Plan",
+        })
+      }
+    } catch (error) {
+      console.error("핑 정보 조회 오류:", error)
+    } finally {
+      setLoadingCoins(false)
+    }
+  }
 
   useEffect(() => {
-    fetchBalance().then(setBalance)
-  }, [])
+    fetchBalance()
+  }, [isAuthenticated, user])
 
   const onSubscribe = async (pkg: SubscriptionPkg) => {
     const params = new URLSearchParams({
@@ -162,14 +177,41 @@ export default function ChargeStation() {
         <section className="pt-4 space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-2xl font-medium text-white">나의 플랜</span>
-            <span className="text-2xl font-medium text-[#28d0ed]">Free Plan</span>
+            <span className="text-2xl font-medium text-[#28d0ed]">{userCoins.plan}</span>
           </div>
           <p className="text-[#aeb0b6] text-sm">
             오프라인 사주보다 10배 합리적인 사주핑에서
             <br />
             마음껏 질문하세요!
           </p>
+          <p className="text-[#ffa938] text-xs font-medium">구독중에는 구독핑이 보너스핑보다 우선 소진됩니다.</p>
         </section>
+
+        {isAuthenticated && (
+          <section className="space-y-3">
+            <h3 className="text-white text-base font-medium">현재 나의 핑</h3>
+            <Card className="bg-[#141415] border-[#70737c]/20">
+              <CardContent className="p-4">
+                <div className="text-center space-y-2">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-[#ffa938] flex items-center justify-center">
+                      <span className="text-black text-sm font-bold">P</span>
+                    </div>
+                    <span className="text-2xl font-bold text-white">
+                      {loadingCoins ? "..." : `${userCoins.total}핑`}
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#aeb0b6] space-y-1">
+                    <div>
+                      구독핑: {userCoins.subscription}핑 | 보너스핑: {userCoins.bonus}핑
+                    </div>
+                    <div>구독핑이 우선적으로 소비되고 다 소진되고 나면 보너스핑이 사용됩니다</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         <section className="space-y-3">
           <h3 className="text-[#aeb0b6] text-sm font-medium">현재 플랜</h3>
@@ -177,7 +219,7 @@ export default function ChargeStation() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-[#aeb0b6] px-2 py-1 bg-[#70737c]/20 rounded text-xs">Basic</span>
+                  <span className="text-[#aeb0b6] px-2 py-1 bg-[#70737c]/20 rounded text-xs">{userCoins.plan}</span>
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
                       <span className="text-black text-xs font-bold">P</span>
@@ -202,7 +244,11 @@ export default function ChargeStation() {
               const accentColor = getAccentColor(pkg.accent)
 
               return (
-                <Card key={pkg.id} className="bg-[#141415] border-[#70737c]/20">
+                <Card
+                  key={pkg.id}
+                  className="bg-[#141415] border-[#70737c]/20 cursor-pointer hover:bg-[#1a1b1d] transition-colors"
+                  onClick={() => onSubscribe(pkg)}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col gap-2">
@@ -227,9 +273,9 @@ export default function ChargeStation() {
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
+                        <Button className="bg-white text-black hover:bg-gray-100 px-4 py-2 rounded-lg font-medium text-sm">
                           {formatKRW(pkg.price)}/{pkg.period}
-                        </div>
+                        </Button>
                       </div>
                     </div>
                   </CardContent>

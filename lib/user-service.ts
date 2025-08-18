@@ -131,7 +131,7 @@ export async function authenticateSession(email: string, password: string): Prom
   } catch (error) {
     console.error("사주 세션 인증 오류:", error)
 
-    // 임시 구현: 데이터베이스 연결 실패 시 임시 인증
+    // 임시 구현: 데이터베이스 연결 실�� 시 임시 인증
     // 실제 환경에서는 이 부분을 제거하고 오류를 throw해야 함
     if (process.env.NODE_ENV === "development") {
       console.warn("개발 환경에서 임시 세션 인증")

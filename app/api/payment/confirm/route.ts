@@ -22,13 +22,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Process the package and add coins to user account
     const packageData = getPackageData(packageId)
     if (!packageData) {
       return NextResponse.json({ error: "Invalid package" }, { status: 400 })
     }
 
-    const coinsToAdd = packageData.coins + (packageData.bonus || 0)
+    const isSubscription = packageData.isSubscription || false
+    const dailyCoins = isSubscription ? Math.floor(packageData.coins / 7) : 0 // Weekly subscription divided by 7 days
 
     const { data: paymentOrder, error: insertError } = await supabase
       .from("payment_orders")
@@ -37,12 +37,17 @@ export async function POST(request: NextRequest) {
         order_id: orderId,
         package_id: packageId,
         amount: amount || packageData.price,
-        coins: coinsToAdd,
+        coins: packageData.coins + (packageData.bonus || 0),
         payment_key: paymentKey,
         status: "pending",
+        subscription_type: isSubscription ? packageId : null,
+        subscription_status: isSubscription ? "pending" : "inactive",
+        daily_coins: dailyCoins,
+        next_billing_date: isSubscription ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : null, // 7 days from now
         payment_data: {
           packageName: packageData.name,
           timestamp: new Date().toISOString(),
+          isSubscription: isSubscription,
         },
       })
       .select()
@@ -53,7 +58,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create payment order" }, { status: 500 })
     }
 
-    // For subscription payments, paymentKey might not be present
+    // Process the package and add coins to user account
     if (paymentKey && amount) {
       // Confirm payment with Toss Payments
       const tossResponse = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
@@ -100,6 +105,9 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      const coinType = isSubscription ? "subscription" : "bonus"
+      const coinsToAdd = isSubscription ? packageData.coins : packageData.coins + (packageData.bonus || 0)
+
       const coinsResponse = await fetch(`${request.nextUrl.origin}/api/user-coins`, {
         method: "POST",
         headers: {
@@ -109,6 +117,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           action: "add",
           amount: coinsToAdd,
+          coin_type: coinType,
         }),
       })
 
@@ -118,6 +127,29 @@ export async function POST(request: NextRequest) {
       }
 
       const coinsData = await coinsResponse.json()
+
+      if (isSubscription) {
+        const subscriptionEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+
+        await supabase
+          .from("user_coins")
+          .update({
+            subscription_plan: packageId,
+            subscription_start_date: new Date().toISOString().split("T")[0],
+            subscription_end_date: subscriptionEndDate.toISOString().split("T")[0],
+            last_daily_charge: new Date().toISOString().split("T")[0],
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id)
+
+        await supabase
+          .from("payment_orders")
+          .update({
+            subscription_status: "active",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", paymentOrder.id)
+      }
 
       await supabase
         .from("payment_orders")
@@ -130,9 +162,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         coinsAdded: coinsToAdd,
-        totalCoins: coinsData.coins,
+        coinType: coinType,
+        totalCoins: coinsData.total_coins || coinsData.coins,
         packageName: packageData.name,
         orderId: paymentOrder.id,
+        isSubscription: isSubscription,
       })
     } catch (coinsError) {
       console.error("Failed to add coins to user account:", coinsError)
@@ -161,8 +195,13 @@ export async function POST(request: NextRequest) {
 }
 
 function getPackageData(packageId: string) {
-  const packages: Record<string, { name: string; coins: number; bonus?: number; price: number }> = {
-    "daily-30": { name: "주간구독", coins: 30, price: 9900 },
+  const packages: Record<
+    string,
+    { name: string; coins: number; bonus?: number; price: number; isSubscription?: boolean }
+  > = {
+    starter: { name: "Starter", coins: 70, price: 9900, isSubscription: true }, // 7 days * 10 coins
+    plus: { name: "Plus", coins: 210, price: 19900, isSubscription: true }, // 7 days * 30 coins
+    pro: { name: "Pro", coins: 700, price: 49900, isSubscription: true }, // 7 days * 100 coins
     "basic-20": { name: "Basic", coins: 20, price: 9900 },
     "premium-60": { name: "Premium", coins: 60, bonus: 20, price: 29900 },
     "heritage-100": { name: "Heritage", coins: 100, bonus: 100, price: 49900 },

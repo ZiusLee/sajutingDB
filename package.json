@@ -12,7 +12,7 @@
     "@ai-sdk/deepseek": "latest",
     "@ai-sdk/openai": "latest",
     "@emotion/is-prop-valid": "latest",
-    "@neondatabase/serverless": "latest",
+    "@neondatabase/serverless": "^0.10.1",
     "@next/third-parties": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",

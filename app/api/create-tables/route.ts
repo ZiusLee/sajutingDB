@@ -13,7 +13,7 @@ export async function GET() {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // user_coins 테이블 생성
+    // user_coins 테이블 생���
     const { error: coinsError } = await supabase.rpc("create_user_coins_table")
 
     if (coinsError) {

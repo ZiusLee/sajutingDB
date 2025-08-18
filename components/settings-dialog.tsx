@@ -19,7 +19,12 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const { user, isAuthenticated, logout } = useAuth()
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [coins, setCoins] = useState<number>(0)
+  const [userCoins, setUserCoins] = useState({
+    total: 0,
+    subscription: 0,
+    bonus: 0,
+    plan: null,
+  })
   const [loadingCoins, setLoadingCoins] = useState(false)
 
   const fetchCoins = async () => {
@@ -30,7 +35,12 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
       const response = await fetch("/api/user-coins")
       if (response.ok) {
         const data = await response.json()
-        setCoins(data.coins || 0)
+        setUserCoins({
+          total: (data.subscription_coins || 0) + (data.bonus_coins || 0),
+          subscription: data.subscription_coins || 0,
+          bonus: data.bonus_coins || 0,
+          plan: data.subscription_plan || null,
+        })
       }
     } catch (error) {
       console.error("핑 갯수 조회 오류:", error)
@@ -128,11 +138,18 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
             <Button variant="ghost" className="w-full justify-start h-12 px-4" onClick={handleChargeStation}>
               <Zap className="h-5 w-5 mr-3 text-yellow-500" />
               <span className="flex-1 text-left">정기결제</span>
-              <div className="flex items-center gap-1 mr-2">
-                <div className="w-4 h-4 rounded-full bg-yellow-500 flex items-center justify-center">
-                  <span className="text-black text-xs font-bold">P</span>
+              <div className="flex flex-col items-end gap-1 mr-2">
+                <div className="flex items-center gap-1">
+                  <div className="w-4 h-4 rounded-full bg-yellow-500 flex items-center justify-center">
+                    <span className="text-black text-xs font-bold">P</span>
+                  </div>
+                  <span className="text-sm font-medium text-yellow-600">
+                    {loadingCoins ? "..." : `${userCoins.total}핑`}
+                  </span>
                 </div>
-                <span className="text-sm font-medium text-yellow-600">{loadingCoins ? "..." : `${coins}핑`}</span>
+                <div className="text-xs text-gray-500">
+                  구독핑 {userCoins.subscription} + 보너스핑 {userCoins.bonus}
+                </div>
               </div>
               <ChevronRight className="h-4 w-4" />
             </Button>

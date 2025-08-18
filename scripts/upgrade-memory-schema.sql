@@ -157,7 +157,7 @@ CREATE POLICY "Users can manage their own feedback" ON memory_feedback
 -- 완료 메시지
 DO $$
 BEGIN
-    RAISE NOTICE '🎉 스마트 메모리 시스템 v2 스키마 업그레이드 완료!';
+    RAISE NOTICE '🎉 스마트 메��리 시스템 v2 스키마 업그레이드 완료!';
     RAISE NOTICE '✅ 품질 점수 시스템 활성화';
     RAISE NOTICE '✅ 사용자 피드백 시스템 준비';
     RAISE NOTICE '✅ 향상된 검색 함수 배포';

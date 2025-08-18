@@ -43,7 +43,7 @@ export function LoginFormClient() {
       const data = await response.json()
 
       if (!data.success) {
-        setError(data.message || "로그인에 실패했습니다.")
+        setError(data.message || "로그인에 ��패했습니다.")
         setIsLoading(false)
         return
       }

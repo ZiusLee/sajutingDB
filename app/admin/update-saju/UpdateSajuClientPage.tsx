@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { AlertCircle, CheckCircle2, RefreshCw, TestTube } from "lucide-react"
 
 interface UpdateStats {
   total: number
@@ -21,8 +23,11 @@ export default function UpdateSajuClientPage() {
   const supabase = getSupabase()
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testSessionId, setTestSessionId] = useState("b4ac1ab4-b9ff-4786-81cd-6c7263afbcb7")
   const [stats, setStats] = useState<UpdateStats>({ total: 0, processed: 0, updated: 0, errors: 0 })
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [testResult, setTestResult] = useState<any>(null)
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -103,6 +108,45 @@ export default function UpdateSajuClientPage() {
     }
   }
 
+  const handleTestSession = async () => {
+    if (!testSessionId.trim()) {
+      setTestResult({ success: false, message: "세션 ID를 입력해주세요." })
+      return
+    }
+
+    setTesting(true)
+    setTestResult(null)
+
+    try {
+      const response = await fetch("/api/admin/test-saju-calculation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sessionId: testSessionId }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "테스트 요청 실패")
+      }
+
+      setTestResult({
+        success: true,
+        message: "테스트 완료",
+        data: data,
+      })
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: `테스트 중 오류가 발생했습니다: ${error.message}`,
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto py-8 flex justify-center items-center min-h-[60vh]">
@@ -120,11 +164,61 @@ export default function UpdateSajuClientPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TestTube className="h-5 w-5" />
+            사주 계산 테스트
+          </CardTitle>
+          <CardDescription>특정 세션 ID의 사주 계산 결과를 미리 확인할 수 있습니다.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="sessionId">세션 ID</Label>
+            <Input
+              id="sessionId"
+              value={testSessionId}
+              onChange={(e) => setTestSessionId(e.target.value)}
+              placeholder="세션 ID를 입력하세요"
+            />
+          </div>
+
+          <Button onClick={handleTestSession} disabled={testing} variant="outline" className="w-full bg-transparent">
+            {testing ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                테스트 중...
+              </>
+            ) : (
+              <>
+                <TestTube className="mr-2 h-4 w-4" />
+                사주 계산 테스트
+              </>
+            )}
+          </Button>
+
+          {testResult && (
+            <Alert variant={testResult.success ? "default" : "destructive"}>
+              {testResult.success ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+              <AlertTitle>{testResult.success ? "테스트 성공" : "테스트 실패"}</AlertTitle>
+              <AlertDescription>
+                {testResult.message}
+                {testResult.success && testResult.data && (
+                  <div className="mt-2 p-2 bg-muted rounded text-xs">
+                    <pre>{JSON.stringify(testResult.data, null, 2)}</pre>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>사주 세션 데이터 업데이트</CardTitle>
           <CardDescription>
             생년월일을 기반으로 사주와 대운 데이터를 다시 계산하여 업데이트합니다.
             <br />
-            <strong>주의:</strong> saju 또는 daeun 컬럼이 비어있는 세션만 업데이트됩니다.
+            <strong>주의:</strong> 모든 세션의 사주와 대운 데이터를 새로 계산된 값으로 업데이트합니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
