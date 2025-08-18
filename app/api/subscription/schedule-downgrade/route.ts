@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,22 +10,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "newPlan과 planName이 필요합니다." }, { status: 400 })
     }
 
-    // 사용자 인증 확인 (실제 구현에서는 JWT 토큰 검증 필요)
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader) {
-      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
+    const supabase = createRouteHandlerClient({ cookies })
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "인증되지 않은 사용자입니다." }, { status: 401 })
     }
 
-    // 임시로 하드코딩된 사용자 ID (실제로는 JWT에서 추출)
-    const userId = "temp-user-id"
-
-    // 현재 활성 구독 조회
     const { data: currentSubscription, error: fetchError } = await supabase
       .from("payment_orders")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .eq("status", "completed")
-      .not("subscription_plan", "is", null)
+      .not("subscription_type", "is", null)
       .order("created_at", { ascending: false })
       .limit(1)
       .single()
@@ -40,15 +40,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "활성 구독이 없습니다." }, { status: 400 })
     }
 
-    // 다운그레이드 예약 정보 저장
-    const { error: insertError } = await supabase.from("subscription_downgrades").insert({
-      user_id: userId,
-      current_plan: currentSubscription.subscription_plan,
-      new_plan: newPlan,
-      new_plan_name: planName,
-      scheduled_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7일 후
+    const scheduledDate = new Date()
+    scheduledDate.setDate(scheduledDate.getDate() + 7) // 7일 후
+
+    const { error: insertError } = await supabase.from("subscription_charges").insert({
+      user_id: user.id,
+      subscription_order_id: currentSubscription.id,
+      charge_date: scheduledDate.toISOString().split("T")[0],
       status: "scheduled",
+      change_type: "downgrade",
+      current_plan: currentSubscription.subscription_type || currentSubscription.package_id,
+      scheduled_plan_change: newPlan,
+      coins_added: 0,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      scheduled_date: scheduledDate.toISOString(),
     })
 
     if (insertError) {
