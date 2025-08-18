@@ -11,8 +11,6 @@ import { toast } from "sonner"
 import DaeunDiagram from "@/components/daeun-diagram"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
@@ -21,9 +19,9 @@ import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SiteHeader } from "@/components/site-header"
 import { SignupDialog } from "@/components/signup-dialog"
-import { TermsDialog } from "@/components/terms-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 
 interface SajuChatProps {
   saju: any
@@ -140,9 +138,6 @@ export default function SajuChat({
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
   const [showSignupDialog, setShowSignupDialog] = useState(false)
-  const [showTermsDialog, setShowTermsDialog] = useState(false)
-  const [providerLabel, setProviderLabel] = useState("")
-  const [signupTimerStarted, setSignupTimerStarted] = useState(false)
   const supabase = createClientComponentClient()
   const [chatStreamState, setChatStreamState] = useState<{
     isStreaming: boolean
@@ -197,12 +192,12 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
+  const prevMessageCountRef = useRef(0) // Declare prevMessageCountRef
+
   // Auto-show signup dialog after 3 seconds for non-authenticated users
   useEffect(() => {
-    if (!user && !signupTimerStarted) {
+    if (!user) {
       console.log("🕐 Starting 3-second signup timer from page arrival...")
-      setSignupTimerStarted(true)
-
       const timer = setTimeout(() => {
         console.log("🕐 3 seconds elapsed since page arrival, showing signup dialog")
         setShowSignupDialog(true)
@@ -213,16 +208,7 @@ export default function SajuChat({
         clearTimeout(timer)
       }
     }
-  }, [user, signupTimerStarted]) // Removed chatData.isInitialized dependency
-
-  // Reset signup timer when user logs in
-  useEffect(() => {
-    if (user && signupTimerStarted) {
-      console.log("🕐 User logged in, resetting signup timer")
-      setSignupTimerStarted(false)
-      setShowSignupDialog(false)
-    }
-  }, [user, signupTimerStarted])
+  }, [user]) // Removed chatData.isInitialized dependency
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
@@ -539,40 +525,10 @@ export default function SajuChat({
     }
   }
 
-  const handleTermsAgree = async () => {
-    try {
-      const sessionId = localStorage.getItem("current_session_id") || localStorage.getItem("user_id")
-
-      if (!sessionId) {
-        console.error("No session ID found for terms agreement")
-        toast.error("세션 정보를 찾을 수 없습니다.")
-        return
-      }
-
-      // 현재 세션의 privacy_consent를 true로 업데이트
-      const { error } = await supabase
-        .from("saju_sessions")
-        .update({
-          privacy: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sessionId)
-
-      if (error) {
-        console.error("Error updating saju_sessions privacy:", error)
-        toast.error("약관 동의 처리 중 오류가 발생했습니다.")
-        return
-      }
-
-      setShowTermsDialog(false)
-      toast.success("약관 동의가 완료되었습니다!")
-    } catch (error) {
-      console.error("Terms agreement error:", error)
-      toast.error("약관 동의 처리 중 오류가 발생했습니다.")
-    }
-  }
-
-  const prevMessageCountRef = useRef(0)
+  const suggestedQuestions = useMemo(
+    () => generateSuggestedQuestions(stableConcerns, roomType),
+    [stableConcerns, roomType],
+  )
 
   useEffect(() => {
     if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
@@ -596,50 +552,6 @@ export default function SajuChat({
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
-
-  useEffect(() => {
-    const checkTermsAgreement = async () => {
-      try {
-        const sessionId = localStorage.getItem("current_session_id") || localStorage.getItem("user_id")
-
-        if (!sessionId) {
-          console.log("No session ID found, showing terms dialog")
-          setShowTermsDialog(true)
-          return
-        }
-
-        const { data: sessionData } = await supabase
-          .from("saju_sessions")
-          .select("privacy, id")
-          .eq("id", sessionId)
-          .single()
-
-        if (sessionData && sessionData.privacy === true) {
-          console.log("Terms already agreed for session:", sessionData.id)
-          return
-        }
-
-        if (!sessionData || sessionData.privacy !== true) {
-          console.log("Terms agreement required for session:", sessionId)
-          const provider = user?.app_metadata?.provider || "unknown"
-          setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
-          setShowTermsDialog(true)
-        }
-      } catch (error) {
-        console.error("Error checking terms agreement:", error)
-        const provider = user?.app_metadata?.provider || "unknown"
-        setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
-        setShowTermsDialog(true)
-      }
-    }
-
-    checkTermsAgreement()
-  }, [user, supabase])
-
-  const suggestedQuestions = useMemo(
-    () => generateSuggestedQuestions(stableConcerns, roomType),
-    [stableConcerns, roomType],
-  )
 
   useEffect(() => {
     const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
@@ -1118,27 +1030,15 @@ export default function SajuChat({
                   className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
                   disabled={isLoading || isInitialQuestionsMode}
                 />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
-                      disabled={isInitialQuestionsMode}
-                    >
-                      <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 sm:w-56 p-2 mb-2" align="end">
-                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">💕</span>궁합 보기
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">👥</span>다른 사람 사주 봐주기
-                    </Button>
-                  </PopoverContent>
-                </Popover>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
+                  disabled={isInitialQuestionsMode}
+                >
+                  <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
               </div>
               <Button
                 type="submit"
@@ -1156,13 +1056,6 @@ export default function SajuChat({
           open={showSignupDialog}
           onOpenChange={setShowSignupDialog}
           onSelectProvider={handleSignupProvider}
-        />
-
-        <TermsDialog
-          open={showTermsDialog}
-          onOpenChange={setShowTermsDialog}
-          providerLabel={providerLabel}
-          onAgree={handleTermsAgree}
         />
       </div>
     </div>
