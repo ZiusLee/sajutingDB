@@ -28,7 +28,7 @@ export async function signInWithSocial(provider: "kakao" | "google" | "facebook"
     })
 
     if (error) {
-      console.error(`❌ ${provider} 로그인 오류:`, error)
+      console.error(`❌ ${provider} 로��인 오류:`, error)
       throw error
     }
 

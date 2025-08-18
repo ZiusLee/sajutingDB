@@ -447,7 +447,7 @@ ${relationshipContext}
     } else if (questionCategory.startsWith("custom:")) {
       // 5. 나만의 추가 질문
       prompt = `
-사주팔자 전문가로서 다음 사주에 대한 사용자의 추가 질문에 답변해주세요:
+사주팔자 전문가로서 다음 사주에 대한 사용���의 추가 질문에 답변해주세요:
 
 오늘 날짜: ${new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}
 

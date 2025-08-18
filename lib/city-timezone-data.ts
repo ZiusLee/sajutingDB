@@ -678,7 +678,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   {
     id: "cairo",
     city: "카이로",
-    country: "이집트",
+    country: "이집��",
     timezone: "Africa/Cairo",
     utcOffset: 2,
     timeStandard: "서머타임",

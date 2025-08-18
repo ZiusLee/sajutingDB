@@ -266,6 +266,9 @@ export default function SajuChat({
     let isMounted = true
     const initializeChatData = async () => {
       if (!stableSaju) return
+
+      let apiCallMade = false
+
       try {
         const calculatedDaeunData =
           stableSaju?.yearStem && stableBirthInfo?.solarYear && gender
@@ -286,23 +289,43 @@ export default function SajuChat({
         let isFirstRoom = false
 
         if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
-          const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-          if (response.ok) {
-            const result = await response.json()
-            const chatRooms = result.chatRooms || []
-            const sortedRooms = chatRooms.sort(
-              (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-            )
-            isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
+          try {
+            const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+            if (response.ok) {
+              const result = await response.json()
+              const chatRooms = result.chatRooms || []
+              const sortedRooms = chatRooms.sort(
+                (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              )
+              isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
+              apiCallMade = true
+            } else {
+              console.warn("Failed to fetch chat rooms:", response.status)
+            }
+          } catch (error) {
+            console.error("Error fetching chat rooms:", error)
           }
-          pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
-            .filter((msg) => msg.role === "user" || msg.role === "assistant")
-            .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
-            .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+
+          try {
+            pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
+              .filter((msg) => msg.role === "user" || msg.role === "assistant")
+              .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+              .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+          } catch (error) {
+            console.error("Error loading messages:", error)
+            pastMessages = []
+          }
         } else {
           shouldSendInitialQuestions = true
-          const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-          isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
+          if (!apiCallMade) {
+            try {
+              const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+              isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
+            } catch (error) {
+              console.error("Error checking first room:", error)
+              isFirstRoom = true // 에러 시 첫 번째 방으로 간주
+            }
+          }
         }
 
         if (isMounted) {
@@ -324,13 +347,22 @@ export default function SajuChat({
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
+        if (isMounted) {
+          setChatData({
+            calculatedDaeun: null,
+            stableBirthInfo: stableBirthInfo,
+            initialMessages: [],
+            isInitialized: true,
+          })
+          setIsFirstChatRoom(true)
+        }
       }
     }
     initializeChatData()
     return () => {
       isMounted = false
     }
-  }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId, stableConcerns])
+  }, [stableSaju, effectiveChatRoomId, sessionId])
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
     api: "/api/saju-chat",
@@ -615,27 +647,6 @@ export default function SajuChat({
       }
     }
 
-    // Save stream state when it changes
-    return () => {
-      if (chatStreamRef.current.isStreaming) {
-        localStorage.setItem(
-          streamKey,
-          JSON.stringify({
-            isStreaming: chatStreamRef.current.isStreaming,
-            messageId: chatStreamRef.current.messageId,
-            pendingContent: chatStreamRef.current.content,
-            timestamp: Date.now(),
-          }),
-        )
-      } else {
-        localStorage.removeItem(streamKey)
-      }
-    }
-  }, [effectiveChatRoomId, sessionId])
-
-  useEffect(() => {
-    const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
-
     if (isLoading && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
       if (lastMessage && lastMessage.role === "assistant") {
@@ -665,7 +676,22 @@ export default function SajuChat({
       setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
       chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     }
-  }, [isLoading, messages, effectiveChatRoomId, sessionId, chatStreamState.isStreaming])
+
+    // Cleanup function
+    return () => {
+      if (chatStreamRef.current.isStreaming) {
+        localStorage.setItem(
+          streamKey,
+          JSON.stringify({
+            isStreaming: chatStreamRef.current.isStreaming,
+            messageId: chatStreamRef.current.messageId,
+            pendingContent: chatStreamRef.current.content,
+            timestamp: Date.now(),
+          }),
+        )
+      }
+    }
+  }, [effectiveChatRoomId, sessionId, isLoading, messages, chatStreamState.isStreaming])
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -1112,20 +1138,20 @@ export default function SajuChat({
             </form>
           </div>
         </div>
+
+        <SignupDialog
+          open={showSignupDialog}
+          onOpenChange={setShowSignupDialog}
+          onSelectProvider={handleSignupProvider}
+        />
+
+        <TermsDialog
+          open={showTermsDialog}
+          onOpenChange={setShowTermsDialog}
+          providerLabel={providerLabel}
+          onAgree={handleTermsAgree}
+        />
       </div>
-
-      <SignupDialog
-        open={showSignupDialog}
-        onOpenChange={setShowSignupDialog}
-        onSelectProvider={handleSignupProvider}
-      />
-
-      <TermsDialog
-        open={showTermsDialog}
-        onOpenChange={setShowTermsDialog}
-        providerLabel={providerLabel}
-        onAgree={handleTermsAgree}
-      />
     </div>
   )
 }
