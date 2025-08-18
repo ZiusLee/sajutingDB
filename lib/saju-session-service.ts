@@ -21,7 +21,7 @@ export async function getUserSajuProfiles() {
     // First get the basic session data without joins to avoid duplicates
     const { data: sessions, error: sessionsError } = await supabase
       .from("saju_sessions")
-      .select("id, name, gender, email, created_at, auth_user_id, is_default, saju")
+      .select("id, name, gender, email, created_at, auth_user_id, is_default, saju, daeun")
       .eq("auth_user_id", authUserId)
 
     console.log("Sessions query result:", sessions)
@@ -80,8 +80,7 @@ export async function getUserSajuProfiles() {
         const sajuInfo = sajuInfoData || {}
         const sajuJsonb = session.saju || {}
 
-        // 대운 데이터 확인 및 계산
-        let daeunData = sajuJsonb.daeun
+        let daeunData = session.daeun
         let shouldUpdateDB = false
 
         // 대운이 없거나 잘못된 데이터인 경우 계산
@@ -127,14 +126,11 @@ export async function getUserSajuProfiles() {
           }
         }
 
-        // DB 업데이트를 비동기로 처리 (프로필 반환을 블록하지 않음)
         if (shouldUpdateDB && daeunData) {
-          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
-
           // 비동기로 DB 업데이트 (await 하지 않음)
           supabase
             .from("saju_sessions")
-            .update({ saju: updatedSajuJsonb })
+            .update({ daeun: daeunData })
             .eq("id", session.id)
             .then(({ error }) => {
               if (error) {
@@ -179,7 +175,8 @@ export async function getUserSajuProfiles() {
             monthBranchSibseong: sajuJsonb.monthBranchSibseong || "",
             dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
             hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
-            // 대운 데이터 추가
+            // 오행 정보도 saju JSONB에서 가져옴
+            elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
             daeun: daeunData,
           },
         }
@@ -676,7 +673,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     const { data, error } = await supabase
       .from("saju_sessions")
-      .select("id, name, gender, created_at, saju")
+      .select("id, name, gender, created_at, saju, daeun")
       .eq("id", sessionId)
       .single()
 
@@ -695,8 +692,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     console.log("JSONB saju data from database:", sajuJsonb)
 
-    // 대운 데이터 확인 및 계산
-    let daeunData = sajuJsonb.daeun
+    let daeunData = data?.daeun
 
     // 대운이 없거나 잘못된 데이터인 경우 계산
     if (
@@ -735,12 +731,9 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
           console.log(`Session ${sessionId}: 새로 계산된 대운:`, daeunData)
 
-          // 계산된 대운을 DB에 비동기 업데이트 (반환을 블록하지 않음)
-          const updatedSajuJsonb = { ...sajuJsonb, daeun: daeunData }
-
           supabase
             .from("saju_sessions")
-            .update({ saju: updatedSajuJsonb })
+            .update({ daeun: daeunData })
             .eq("id", sessionId)
             .then(({ error }) => {
               if (error) {
@@ -798,7 +791,6 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         dayBranchSibseong: sajuJsonb.dayBranchSibseong || "",
         hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
         elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
-        // 대운 데이터 추가
         daeun: daeunData,
       },
     }

@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
       isDefault = true
     }
 
-    // Create session data (without birth date fields - those go to birth_info table)
     const sessionData = {
       id: sessionId,
       name: name,
@@ -76,7 +75,8 @@ export async function POST(request: NextRequest) {
       is_beta_applicant: false,
       is_default: isDefault, // Set is_default based on whether this is the first session
       saju: saju
-        ? JSON.stringify({
+        ? {
+            // 기본 사주 정보
             yearStem: saju.yearStem,
             yearBranch: saju.yearBranch,
             yearStemHanja: saju.yearStemHanja,
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
             dayMaster: saju.dayMaster,
             dayMasterHanja: saju.dayMasterHanja,
             yearAnimal: saju.yearAnimal,
-            elements: saju.elements,
+            // 십성 정보
             yearStemSibseong: saju.yearStemSibseong,
             monthStemSibseong: saju.monthStemSibseong,
             dayStemSibseong: saju.dayStemSibseong,
@@ -105,9 +105,17 @@ export async function POST(request: NextRequest) {
             monthBranchSibseong: saju.monthBranchSibseong,
             dayBranchSibseong: saju.dayBranchSibseong,
             hourBranchSibseong: saju.hourBranchSibseong,
-          })
+            // 오행 정보
+            elements: saju.elements,
+            // 생년월일시 정보 (birthInfo에서 가져옴)
+            birthYear: birthInfo?.solarYear,
+            birthMonth: birthInfo?.solarMonth,
+            birthDay: birthInfo?.solarDay,
+            birthHour: birthInfo?.solarHour,
+            birthMinute: birthInfo?.solarMinute,
+          }
         : null,
-      daeun: daeun ? JSON.stringify(daeun) : null,
+      daeun: daeun || null, // 대운 정보는 daeun column에 저장
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -168,6 +176,7 @@ export async function POST(request: NextRequest) {
         day_master: saju.dayMaster,
         day_master_hanja: saju.dayMasterHanja,
         year_animal: saju.yearAnimal,
+        // 십성 정보 올바르게 저장
         year_stem_sibseong: saju.yearStemSibseong,
         month_stem_sibseong: saju.monthStemSibseong,
         day_stem_sibseong: saju.dayStemSibseong,
@@ -176,7 +185,6 @@ export async function POST(request: NextRequest) {
         month_branch_sibseong: saju.monthBranchSibseong,
         day_branch_sibseong: saju.dayBranchSibseong,
         hour_branch_sibseong: saju.hourBranchSibseong,
-        daeun_data: daeun ? JSON.stringify(daeun) : null,
         created_at: new Date().toISOString(),
       }
 
