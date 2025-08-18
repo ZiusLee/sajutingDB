@@ -163,28 +163,40 @@ export default function ChargeStation() {
     if (!selectedDowngradePkg) return
 
     try {
+      console.log("[v0] 다운그레이드 요청 시작:", selectedDowngradePkg.id)
+
       const response = await fetch("/api/subscription/schedule-downgrade", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user?.id || "temp-user-id"}`, // 임시 인증
+        },
         body: JSON.stringify({
           newPlan: selectedDowngradePkg.id,
           planName: selectedDowngradePkg.name,
         }),
       })
 
-      if (response.ok) {
+      console.log("[v0] 응답 상태:", response.status)
+
+      const responseData = await response.json()
+      console.log("[v0] 응답 데이터:", responseData)
+
+      if (response.ok && responseData.success) {
         toast({
           title: "다운그레이드 예약 완료",
           description: `현재 주차가 끝나면 ${selectedDowngradePkg.name}으로 전환됩니다.`,
         })
         fetchBalance()
       } else {
-        throw new Error("다운그레이드 예약 실패")
+        console.error("[v0] 다운그레이드 실패:", responseData.error)
+        throw new Error(responseData.error || "다운그레이드 예약 실패")
       }
     } catch (error) {
+      console.error("[v0] 다운그레이드 오류:", error)
       toast({
         title: "오류",
-        description: "다운그레이드 예약 중 오류가 발생했습니다.",
+        description: error instanceof Error ? error.message : "다운그레이드 예약 중 오류가 발생했습니다.",
         variant: "destructive",
       })
     } finally {
