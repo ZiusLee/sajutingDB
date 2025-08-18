@@ -589,12 +589,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
           <SajuLogo size="md" />
           <div className="flex items-center gap-4">
-            <Button
-              className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 py-2 text-sm font-medium"
-              onClick={() => router.push("/login")}
-            >
-              로그인
-            </Button>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-6 w-6" />
             </Button>

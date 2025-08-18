@@ -73,7 +73,6 @@ export default function LoginPage() {
     checkUser()
   }, [router, supabase.auth])
 
-  // Rest of the component remains the same...
   // Handle Kakao login
   const handleKakaoLogin = async () => {
     setIsLoading(true)
@@ -161,6 +160,13 @@ export default function LoginPage() {
 
       if (error) {
         console.error("Email login error:", error)
+        if (error.message.includes("Invalid login credentials") || error.message.includes("User not found")) {
+          setError("계정을 찾을 수 없습니다. 먼저 사주프로필을 생성해주세요.")
+          setTimeout(() => {
+            router.push("/?showOnboarding=true")
+          }, 2000)
+          return
+        }
         throw error
       }
 
@@ -213,7 +219,6 @@ export default function LoginPage() {
     }
   }
 
-  // Rest of the component remains the same...
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* 컨텐츠 */}
@@ -426,20 +431,6 @@ export default function LoginPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* 회원가입 링크 */}
-          <div className="mt-8 text-center">
-            <p className="text-center text-sm text-muted-foreground">
-              계정이 없으신가요?{" "}
-              <Button
-                variant="link"
-                className="p-0 h-auto font-normal"
-                onClick={() => router.push("/?showOnboarding=true")}
-              >
-                회원가입
-              </Button>
-            </p>
-          </div>
         </div>
       </div>
     </div>
