@@ -95,6 +95,11 @@ body {
     transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* 키보드 열림 상태에서 자연스러운 높이 조정 */
+  body.keyboard-open .chat-layout {
+    height: var(--viewport-height, 100vh);
+  }
+
   .chat-messages-area {
     flex: 1;
     min-height: 0;
@@ -112,6 +117,12 @@ body {
   .dynamic-viewport {
     height: var(--viewport-height, 100vh);
     max-height: var(--viewport-height, 100vh);
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 키보드 상태에 따른 자연스러운 전환 */
+  body.keyboard-open .dynamic-viewport {
+    height: var(--viewport-height, 100vh);
   }
 
   /* Mobile viewport optimizations */
@@ -165,9 +176,9 @@ body {
     transition: transform 0.3s ease-in-out;
   }
 
-  /* Android 키보드 조정 클래스 추가 */
+  /* 안드로이드 키보드 조정을 위한 부드러운 전환 */
   .android-keyboard-adjust {
-    transition: height 0.3s ease-in-out;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* AI Response Content Styling */

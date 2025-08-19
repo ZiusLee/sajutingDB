@@ -34,9 +34,11 @@ export function useMobileKeyboard() {
         if (heightDiff > keyboardThreshold) {
           setIsKeyboardOpen(true)
           setKeyboardHeight(heightDiff)
+          document.body.classList.add("keyboard-open")
         } else {
           setIsKeyboardOpen(false)
           setKeyboardHeight(0)
+          document.body.classList.remove("keyboard-open")
         }
       }
     }
@@ -48,6 +50,7 @@ export function useMobileKeyboard() {
       return () => {
         window.visualViewport?.removeEventListener("resize", handleViewportChange)
         window.visualViewport?.removeEventListener("scroll", updateViewportHeight)
+        document.body.classList.remove("keyboard-open")
       }
     } else {
       // 폴백: resize 이벤트 사용
@@ -55,6 +58,7 @@ export function useMobileKeyboard() {
 
       return () => {
         window.removeEventListener("resize", handleViewportChange)
+        document.body.classList.remove("keyboard-open")
       }
     }
   }, [])
