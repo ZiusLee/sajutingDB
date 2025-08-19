@@ -12,9 +12,12 @@ export function useMobileKeyboard() {
       const height = window.visualViewport?.height || window.innerHeight
       setViewportHeight(height)
 
-      // CSS 변수로 실시간 viewport 높이 업데이트
       document.documentElement.style.setProperty("--viewport-height", `${height}px`)
       document.documentElement.style.setProperty("--vh", `${height * 0.01}px`)
+
+      // 실제 가용 높이에서 하단 네비게이션 바 높이 제외
+      const availableHeight = height - 60 // 하단 네비게이션 바 높이
+      document.documentElement.style.setProperty("--available-height", `${availableHeight}px`)
     }
 
     // 초기 설정
@@ -35,6 +38,16 @@ export function useMobileKeyboard() {
           setIsKeyboardOpen(true)
           setKeyboardHeight(heightDiff)
           document.body.classList.add("keyboard-open")
+
+          setTimeout(() => {
+            const chatContainer = document.querySelector(".chat-messages-container") as HTMLElement
+            if (chatContainer) {
+              const maxScroll = chatContainer.scrollHeight - chatContainer.clientHeight
+              if (chatContainer.scrollTop >= maxScroll - 50) {
+                chatContainer.scrollTop = maxScroll
+              }
+            }
+          }, 100)
         } else {
           setIsKeyboardOpen(false)
           setKeyboardHeight(0)

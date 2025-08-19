@@ -88,16 +88,18 @@ body {
 
   /* 새로운 자연스러운 키보드 처리 시스템 */
   .chat-layout {
-    height: 100vh;
-    height: 100dvh;
+    height: var(--available-height, 100vh);
+    max-height: var(--available-height, 100vh);
     display: flex;
     flex-direction: column;
     transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
   }
 
   /* 키보드 열림 상태에서 자연스러운 높이 조정 */
   body.keyboard-open .chat-layout {
-    height: var(--viewport-height, 100vh);
+    height: var(--available-height, 100vh);
+    max-height: var(--available-height, 100vh);
   }
 
   .chat-messages-area {
@@ -118,20 +120,24 @@ body {
 
   /* CSS 변수를 활용한 동적 높이 조정 */
   .dynamic-viewport {
-    height: var(--viewport-height, 100vh);
-    max-height: var(--viewport-height, 100vh);
+    height: var(--available-height, 100vh);
+    max-height: var(--available-height, 100vh);
     transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
   }
 
   /* 키보드 상태에 따른 자연스러운 전환 */
   body.keyboard-open .dynamic-viewport {
-    height: var(--viewport-height, 100vh);
+    height: var(--available-height, 100vh);
+    max-height: var(--available-height, 100vh);
   }
 
   .chat-container-height {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
   }
 
   /* Safe area utilities */
@@ -202,10 +208,20 @@ body {
   /* 키보드 처리를 위한 새로운 클래스들 */
   .keyboard-transition {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
   }
 
   .keyboard-open {
-    height: var(--viewport-height, 100vh);
+    height: var(--available-height, 100vh);
+    max-height: var(--available-height, 100vh);
+  }
+
+  /* 채팅 메시지 컨테이너 스크롤 제한 */
+  .chat-messages-container {
+    overflow-y: auto;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -319,7 +335,9 @@ body {
 /* Android specific optimizations */
 @media screen and (max-width: 768px) {
   .chat-layout {
-    height: var(--viewport-height, 100vh);
+    height: var(--available-height, 100vh);
+    max-height: var(--available-height, 100vh);
+    overflow: hidden;
   }
 
   .mobile-optimized {
@@ -333,7 +351,8 @@ body {
 /* iOS와 Android 공통 키보드 처리 */
 @supports (height: 100dvh) {
   .chat-layout {
-    height: 100dvh;
+    height: var(--available-height, 100dvh);
+    max-height: var(--available-height, 100dvh);
   }
 }
 
