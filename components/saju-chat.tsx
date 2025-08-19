@@ -194,6 +194,12 @@ export default function SajuChat({
 
   const prevMessageCountRef = useRef(0) // Declare prevMessageCountRef
 
+  const [isAndroid, setIsAndroid] = useState(false)
+
+  useEffect(() => {
+    setIsAndroid(/Android/i.test(navigator.userAgent))
+  }, [])
+
   // Auto-show signup dialog after 3 seconds for non-authenticated users
   useEffect(() => {
     if (!user) {
@@ -749,7 +755,7 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className={`flex h-screen bg-gray-50 ${isAndroid && isKeyboardOpen ? "android-keyboard-open" : ""}`}>
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-transparent">
         <SiteHeader />
       </div>
@@ -783,7 +789,12 @@ export default function SajuChat({
         </SheetContent>
       </Sheet>
       <div className="flex-1 flex flex-col min-w-0 h-screen bg-white lg:pt-0">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
+        <div
+          ref={chatContainerRef}
+          className={`flex-1 overflow-y-auto chat-messages-container chat-container-height ${
+            isAndroid ? "android-chat-fix" : ""
+          }`}
+        >
           <div className="px-3 sm:px-6 py-2 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3 mt-2">
@@ -991,9 +1002,19 @@ export default function SajuChat({
         </div>
         <div
           className={`border-t bg-white p-3 sm:p-4 flex-shrink-0 chat-input-container ${
-            isKeyboardOpen ? "ios-keyboard-adjust" : "pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4"
+            isKeyboardOpen
+              ? isAndroid
+                ? "android-keyboard-adjust"
+                : "ios-keyboard-adjust"
+              : "pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4"
           }`}
-          style={isKeyboardOpen ? { paddingBottom: `max(12px, ${keyboardHeight}px)` } : {}}
+          style={
+            isKeyboardOpen
+              ? isAndroid
+                ? { paddingBottom: `max(12px, ${Math.min(keyboardHeight * 0.1, 20)}px)` }
+                : { paddingBottom: `max(12px, ${keyboardHeight}px)` }
+              : {}
+          }
         >
           {showScrollButton && (
             <Button

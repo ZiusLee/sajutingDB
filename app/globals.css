@@ -97,6 +97,26 @@ body {
     height: 100dvh; /* Dynamic viewport height for mobile */
   }
 
+  /* Android 브라우저 특화 채팅 컨테이너 높이 최적화 */
+  .chat-container-height {
+    height: calc(100vh - 140px); /* 기본값 */
+    height: calc(100dvh - 140px); /* 동적 viewport 높이 */
+  }
+
+  /* Android Chrome에서 키보드 열릴 때 높이 조정 */
+  @media screen and (max-width: 768px) {
+    .chat-container-height {
+      height: calc(100vh - 140px);
+      max-height: calc(100vh - 140px);
+    }
+
+    /* Android Chrome 키보드 감지 시 */
+    .android-keyboard-open .chat-container-height {
+      height: calc(100vh - 200px);
+      max-height: calc(100vh - 200px);
+    }
+  }
+
   /* Safe area utilities */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
@@ -128,6 +148,11 @@ body {
   /* Keyboard handling */
   .keyboard-adjust {
     transition: transform 0.3s ease-in-out;
+  }
+
+  /* Android 키보드 조정 클래스 추가 */
+  .android-keyboard-adjust {
+    transition: height 0.3s ease-in-out;
   }
 
   /* AI Response Content Styling */
@@ -264,6 +289,37 @@ body {
   .android-keyboard-adjust {
     height: calc(100vh - env(keyboard-inset-height, 0px));
   }
+
+  /* Android에서 과도한 공백 방지 */
+  .android-chat-fix {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* Android Chrome 키보드 열릴 때 채팅 영역 조정 */
+  .android-keyboard-open {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden;
+  }
+
+  .android-keyboard-open .chat-messages-container {
+    height: calc(100vh - 200px) !important;
+    max-height: calc(100vh - 200px) !important;
+  }
+}
+
+/* Android landscape 모드 최적화 */
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .chat-container-height {
+    height: calc(100vh - 120px);
+    max-height: calc(100vh - 120px);
+  }
+
+  .android-keyboard-open .chat-container-height {
+    height: calc(100vh - 160px);
+    max-height: calc(100vh - 160px);
+  }
 }
 
 /* Enhanced AI Response Styling */
@@ -290,13 +346,13 @@ body {
   .ai-response-content {
     @apply text-black bg-white;
   }
-  
+
   .ai-response-content h1,
   .ai-response-content h2,
   .ai-response-content h3 {
     @apply break-after-avoid;
   }
-  
+
   .ai-response-content pre,
   .ai-response-content blockquote {
     @apply break-inside-avoid;
