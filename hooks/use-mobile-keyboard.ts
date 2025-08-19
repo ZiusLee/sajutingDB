@@ -39,31 +39,60 @@ export function useMobileKeyboard() {
           setKeyboardHeight(calculatedKeyboardHeight)
           document.body.classList.add("keyboard-open")
 
-          // 채팅 입력창을 키보드 높이만큼 올리기
+          const chatContainer = document.querySelector(".chat-messages-container") as HTMLElement
           const chatInput = document.querySelector(".chat-input-container") as HTMLElement
-          if (chatInput) {
-            chatInput.style.bottom = `${calculatedKeyboardHeight}px`
-          }
 
-          // 스크롤 조정은 약간의 지연 후 실행
-          setTimeout(() => {
-            const chatContainer = document.querySelector(".chat-messages-container") as HTMLElement
-            if (chatContainer) {
-              const maxScroll = chatContainer.scrollHeight - chatContainer.clientHeight
-              if (chatContainer.scrollTop >= maxScroll - 50) {
-                chatContainer.scrollTop = maxScroll
+          if (chatContainer && chatInput) {
+            const contentHeight = chatContainer.scrollHeight
+            const containerHeight = chatContainer.clientHeight
+            const scrollRatio = contentHeight / containerHeight
+            const currentScrollTop = chatContainer.scrollTop
+            const maxScroll = contentHeight - containerHeight
+            const scrollPercentage = maxScroll > 0 ? currentScrollTop / maxScroll : 0
+
+            console.log("[v0] Keyboard analysis:", {
+              contentHeight,
+              containerHeight,
+              scrollRatio,
+              scrollPercentage,
+              keyboardHeight: calculatedKeyboardHeight,
+            })
+
+            // 콘텐츠가 짧을 때 (스크롤이 거의 없을 때) 특별 처리
+            if (scrollRatio < 1.5) {
+              // 짧은 콘텐츠: 키보드 높이를 더 정확히 계산하여 적용
+              const adjustedKeyboardHeight = Math.min(calculatedKeyboardHeight, viewportHeight * 0.4)
+              chatInput.style.bottom = `${adjustedKeyboardHeight}px`
+
+              // 전체 컨테이너 높이를 키보드만큼 줄임
+              chatContainer.style.maxHeight = `calc(var(--available-height) - ${adjustedKeyboardHeight}px)`
+            } else {
+              // 긴 콘텐츠: 기존 방식 사용하되 스크롤 위치 고려
+              const dynamicKeyboardHeight = calculatedKeyboardHeight * (1 - scrollPercentage * 0.3)
+              chatInput.style.bottom = `${dynamicKeyboardHeight}px`
+
+              // 스크롤이 하단 근처에 있을 때만 자동 스크롤
+              if (scrollPercentage > 0.8) {
+                setTimeout(() => {
+                  chatContainer.scrollTop = maxScroll
+                }, 100)
               }
             }
-          }, 100)
+          }
         } else {
           setIsKeyboardOpen(false)
           setKeyboardHeight(0)
           document.body.classList.remove("keyboard-open")
 
-          // 키보드가 닫힐 때 input 위치 원복
           const chatInput = document.querySelector(".chat-input-container") as HTMLElement
+          const chatContainer = document.querySelector(".chat-messages-container") as HTMLElement
+
           if (chatInput) {
             chatInput.style.bottom = "0px"
+          }
+
+          if (chatContainer) {
+            chatContainer.style.maxHeight = ""
           }
         }
       }
