@@ -106,6 +106,9 @@ body {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    /* 채팅 영역에서도 바운스 효과 방지 */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
   }
 
   .chat-input-area {
@@ -125,18 +128,6 @@ body {
     height: var(--viewport-height, 100vh);
   }
 
-  /* Mobile viewport optimizations */
-  .min-h-screen-mobile {
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
-
-  .h-screen-mobile {
-    height: 100vh;
-    height: 100dvh;
-  }
-
-  /* 기존 하드코딩된 높이 제거하고 flexbox 기반으로 변경 */
   .chat-container-height {
     flex: 1;
     min-height: 0;
@@ -164,6 +155,9 @@ body {
   .mobile-scroll {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    /* 모바일 스크롤에서 바운스 효과 완전 차단 */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
   }
 
   /* Prevent input zoom on iOS */
@@ -237,6 +231,9 @@ body {
     /* Prevent text selection highlighting issues */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    /* 스크롤 바운스 효과 방지로 키보드 공백 문제 해결 */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
   }
 
   /* Ensure buttons maintain consistent styling across browsers */
@@ -327,7 +324,9 @@ body {
 
   .mobile-optimized {
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
+    /* 모바일 최적화에서 바운스 효과 방지 */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
   }
 }
 
