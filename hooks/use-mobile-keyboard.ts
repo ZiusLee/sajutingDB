@@ -28,17 +28,24 @@ export function useMobileKeyboard() {
 
       // 모바일에서만 키보드 감지 실행
       if (window.innerWidth <= 768) {
-        const currentHeight = window.visualViewport?.height || window.innerHeight
-        const windowHeight = window.innerHeight
-        const heightDiff = windowHeight - currentHeight
+        const documentHeight = document.documentElement.clientHeight
+        const viewportHeight = window.visualViewport?.height || window.innerHeight
+        const calculatedKeyboardHeight = documentHeight - viewportHeight
 
         const keyboardThreshold = 150
 
-        if (heightDiff > keyboardThreshold) {
+        if (calculatedKeyboardHeight > keyboardThreshold) {
           setIsKeyboardOpen(true)
-          setKeyboardHeight(heightDiff)
+          setKeyboardHeight(calculatedKeyboardHeight)
           document.body.classList.add("keyboard-open")
 
+          // 채팅 입력창을 키보드 높이만큼 올리기
+          const chatInput = document.querySelector(".chat-input-container") as HTMLElement
+          if (chatInput) {
+            chatInput.style.bottom = `${calculatedKeyboardHeight}px`
+          }
+
+          // 스크롤 조정은 약간의 지연 후 실행
           setTimeout(() => {
             const chatContainer = document.querySelector(".chat-messages-container") as HTMLElement
             if (chatContainer) {
@@ -52,6 +59,12 @@ export function useMobileKeyboard() {
           setIsKeyboardOpen(false)
           setKeyboardHeight(0)
           document.body.classList.remove("keyboard-open")
+
+          // 키보드가 닫힐 때 input 위치 원복
+          const chatInput = document.querySelector(".chat-input-container") as HTMLElement
+          if (chatInput) {
+            chatInput.style.bottom = "0px"
+          }
         }
       }
     }
