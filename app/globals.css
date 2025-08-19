@@ -86,35 +86,50 @@ body {
     text-wrap: balance;
   }
 
+  /* 새로운 자연스러운 키보드 처리 시스템 */
+  .chat-layout {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .chat-messages-area {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .chat-input-area {
+    flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* CSS 변수를 활용한 동적 높이 조정 */
+  .dynamic-viewport {
+    height: var(--viewport-height, 100vh);
+    max-height: var(--viewport-height, 100vh);
+  }
+
   /* Mobile viewport optimizations */
   .min-h-screen-mobile {
     min-height: 100vh;
-    min-height: 100dvh; /* Dynamic viewport height for mobile */
+    min-height: 100dvh;
   }
 
   .h-screen-mobile {
     height: 100vh;
-    height: 100dvh; /* Dynamic viewport height for mobile */
+    height: 100dvh;
   }
 
-  /* Android 브라우저 특화 채팅 컨테이너 높이 최적화 */
+  /* 기존 하드코딩된 높이 제거하고 flexbox 기반으로 변경 */
   .chat-container-height {
-    height: calc(100vh - 140px); /* 기본값 */
-    height: calc(100dvh - 140px); /* 동적 viewport 높이 */
-  }
-
-  /* Android Chrome에서 키보드 열릴 때 높이 조정 */
-  @media screen and (max-width: 768px) {
-    .chat-container-height {
-      height: calc(100vh - 140px);
-      max-height: calc(100vh - 140px);
-    }
-
-    /* Android Chrome 키보드 감지 시 */
-    .android-keyboard-open .chat-container-height {
-      height: calc(100vh - 200px);
-      max-height: calc(100vh - 200px);
-    }
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   /* Safe area utilities */
@@ -177,6 +192,15 @@ body {
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* 키보드 처리를 위한 새로운 클래스들 */
+  .keyboard-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .keyboard-open {
+    height: var(--viewport-height, 100vh);
   }
 }
 
@@ -285,40 +309,21 @@ body {
 }
 
 /* Android specific optimizations */
-@media screen and (max-width: 768px) and (orientation: portrait) {
-  .android-keyboard-adjust {
-    height: calc(100vh - env(keyboard-inset-height, 0px));
+@media screen and (max-width: 768px) {
+  .chat-layout {
+    height: var(--viewport-height, 100vh);
   }
 
-  /* Android에서 과도한 공백 방지 */
-  .android-chat-fix {
-    min-height: auto !important;
-    height: auto !important;
-  }
-
-  /* Android Chrome 키보드 열릴 때 채팅 영역 조정 */
-  .android-keyboard-open {
-    height: 100vh !important;
-    max-height: 100vh !important;
-    overflow: hidden;
-  }
-
-  .android-keyboard-open .chat-messages-container {
-    height: calc(100vh - 200px) !important;
-    max-height: calc(100vh - 200px) !important;
+  .mobile-optimized {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 }
 
-/* Android landscape 모드 최적화 */
-@media screen and (max-width: 768px) and (orientation: landscape) {
-  .chat-container-height {
-    height: calc(100vh - 120px);
-    max-height: calc(100vh - 120px);
-  }
-
-  .android-keyboard-open .chat-container-height {
-    height: calc(100vh - 160px);
-    max-height: calc(100vh - 160px);
+/* iOS와 Android 공통 키보드 처리 */
+@supports (height: 100dvh) {
+  .chat-layout {
+    height: 100dvh;
   }
 }
 
