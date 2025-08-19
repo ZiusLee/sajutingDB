@@ -96,7 +96,7 @@ export default function SajuChatPage() {
                 // Create chat saju data structure from profile
                 const chatSajuData = {
                   saju: profile.saju,
-                  name: profile.name,
+                  name: profile.name, // profile.name을 우선적으로 사용 (saju_sessions 테이블의 name)
                   gender: profile.gender,
                   interpretation: "",
                   returnPath: "/",

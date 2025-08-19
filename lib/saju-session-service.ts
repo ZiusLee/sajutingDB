@@ -700,7 +700,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     return {
       id: data.id,
-      name: data.name || "Unknown",
+      name: data.name || sajuJsonb.name || "Unknown",
       gender: data.gender || "unknown",
       birthYear: birthInfo?.solar_year?.toString() || "",
       birthMonth: birthInfo?.solar_month?.toString().padStart(2, "0") || "",
@@ -742,6 +742,7 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
         hourBranchSibseong: sajuJsonb.hourBranchSibseong || "",
         elements: sajuJsonb.elements || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
         daeun: daeunData,
+        name: data.name || sajuJsonb.name || "Unknown",
       },
     }
   } catch (error) {

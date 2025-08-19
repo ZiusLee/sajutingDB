@@ -505,7 +505,7 @@ export default function SajuDiagram({
   }
 
   const dayMasterInfo = getDayMasterInfo()
-  const displayName = name || "사용자"
+  const displayName = name || saju.name || "사용자"
 
   // Card layout for mobile chat
   if (variant === "card") {
