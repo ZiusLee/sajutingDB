@@ -80,6 +80,9 @@ export default function LoginPage() {
 
     try {
       console.log("Starting Kakao login...")
+
+      localStorage.setItem("auth_flow_type", "login")
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
@@ -108,6 +111,9 @@ export default function LoginPage() {
 
     try {
       console.log("Starting Google login...")
+
+      localStorage.setItem("auth_flow_type", "login")
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

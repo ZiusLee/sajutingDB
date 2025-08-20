@@ -166,8 +166,8 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           localStorage.setItem("auth_pending_saju_data", currentSajuData)
         }
 
-        // auth callback에서 onboarding 완료 후 chat으로 가야 함을 표시
         localStorage.setItem("auth_return_action", "continue_to_chat")
+        localStorage.setItem("auth_flow_type", "signup")
 
         const redirectTo = `${window.location.origin}/auth/callback`
         console.log("Redirect URL:", redirectTo)

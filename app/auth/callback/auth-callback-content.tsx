@@ -34,19 +34,56 @@ export default function AuthCallbackContent() {
           const authUserId = data.session.user.id
           console.log("Auth callback successful, user ID:", authUserId)
 
-          // Check for onboarding completion flow
           const authReturnAction = localStorage.getItem("auth_return_action")
           const pendingSajuData = localStorage.getItem("auth_pending_saju_data")
           const pendingSessionId = localStorage.getItem("pending_session_link")
+          const isSignupFlow = authReturnAction === "continue_to_chat" // This indicates signup from onboarding
 
           console.log("Auth callback state:", {
             authReturnAction,
             hasPendingSajuData: !!pendingSajuData,
             pendingSessionId,
+            isSignupFlow,
           })
 
-          if (authReturnAction === "continue_to_chat" && pendingSajuData && pendingSessionId) {
-            console.log("Processing onboarding completion flow")
+          if (!isSignupFlow) {
+            console.log("This is a login flow, checking if user exists in our database")
+
+            try {
+              const { data: existingUser, error: userCheckError } = await supabase
+                .from("saju_sessions")
+                .select("id")
+                .eq("auth_user_id", authUserId)
+                .limit(1)
+
+              if (userCheckError) {
+                console.error("Error checking existing user:", userCheckError)
+              } else if (!existingUser || existingUser.length === 0) {
+                console.log("User not found in our system, redirecting to signup")
+                toast({
+                  title: "계정을 찾을 수 없습니다",
+                  description: "먼저 사주 프로필을 생성해주세요.",
+                  variant: "destructive",
+                })
+
+                // Sign out the user since they need to go through onboarding
+                await supabase.auth.signOut()
+
+                setTimeout(() => {
+                  router.push("/?showOnboarding=true")
+                }, 2000)
+                return
+              } else {
+                console.log("Existing user found, proceeding with login")
+              }
+            } catch (error) {
+              console.error("Error checking user existence:", error)
+            }
+          }
+
+          // Handle signup flow from onboarding
+          if (isSignupFlow && pendingSajuData && pendingSessionId) {
+            console.log("Processing onboarding completion flow (signup)")
 
             try {
               // 1. Update the saju_session with auth_user_id
@@ -86,7 +123,7 @@ export default function AuthCallbackContent() {
                 console.log("All data prepared, redirecting to chat...")
 
                 toast({
-                  title: "로그인 완료",
+                  title: "회원가입 완료",
                   description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
                 })
 
@@ -108,13 +145,13 @@ export default function AuthCallbackContent() {
               console.error("Error in onboarding completion flow:", error)
               toast({
                 title: "오류 발생",
-                description: "로그인 처리 중 오류가 발생했습니다.",
+                description: "회원가입 처리 중 오류가 발생했습니다.",
                 variant: "destructive",
               })
             }
           }
 
-          // Check if there's an existing anonymous saju_session that needs auth_user_id update
+          // Handle existing user login flow
           const sessionId = localStorage.getItem("saju_session_id")
           let linkedAnySession = false
 
