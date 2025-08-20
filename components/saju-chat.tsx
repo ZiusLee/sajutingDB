@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import type { BirthInfo } from "@/types/birth-date"
 import { toast } from "sonner"
@@ -15,13 +14,12 @@ import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
-import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
-import { SiteHeader } from "@/components/site-header"
 import { SignupDialog } from "@/components/signup-dialog"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Reverting back to original Supabase client creation method
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
+import Sidebar from "@/components/sidebar"
 
 interface SajuChatProps {
   saju: any
@@ -138,7 +136,7 @@ export default function SajuChat({
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
   const [showSignupDialog, setShowSignupDialog] = useState(false)
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient() // Using original createClientComponentClient() method
   const [chatStreamState, setChatStreamState] = useState<{
     isStreaming: boolean
     currentMessageId: string | null
@@ -749,12 +747,8 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-transparent">
-        <SiteHeader />
-      </div>
-
-      <div className="hidden lg:block w-80 flex-shrink-0 bg-white/80 backdrop-blur-sm border-r border-gray-200/50">
+    <div className="flex h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
+      <div className="hidden lg:block lg:w-80 border-r border-gray-200/50 bg-white">
         <Sidebar
           saju={stableSaju}
           name={name}
@@ -767,34 +761,20 @@ export default function SajuChat({
           onNewChat={handleNewChat}
         />
       </div>
-      <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-[66.67vw] max-w-sm p-0">
-          <Sidebar
-            saju={stableSaju}
-            name={name}
-            gender={gender}
-            birthInfo={chatData.stableBirthInfo}
-            sessionId={sessionId}
-            roomType={roomType}
-            currentChatRoomId={effectiveChatRoomId}
-            onChatRoomSelect={handleChatRoomSelect}
-            onNewChat={handleNewChat}
-          />
-        </SheetContent>
-      </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen bg-white lg:pt-0">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
-          <div className="px-3 sm:px-6 py-2 sm:py-6 space-y-6 sm:space-y-8 pb-4">
+
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
+          <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
-              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3 mt-2">
+              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-1">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
 
             {messages.length === 0 && !isInitialQuestionsMode && (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-                <div className="mb-8">
-                  <h1 className="text-3xl md:text-4xl font-bold text-black leading-tight mb-4">
+              <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
+                <div className="mb-6">
+                  <h1 className="text-2xl md:text-3xl font-bold text-black leading-tight mb-3">
                     오늘은 어떤 것이
                     <br />
                     궁금하세요?
@@ -989,31 +969,26 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div
-          className={`border-t bg-white p-3 sm:p-4 flex-shrink-0 chat-input-container ${
-            isKeyboardOpen ? "ios-keyboard-adjust" : "pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4"
-          }`}
-          style={isKeyboardOpen ? { paddingBottom: `max(12px, ${keyboardHeight}px)` } : {}}
-        >
+        <div className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
               variant="outline"
               size="sm"
-              className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
+              className="absolute right-3 sm:right-4 bottom-16 sm:bottom-18 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 z-10"
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
           )}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
                     key={i}
                     variant="outline"
                     size="sm"
-                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 min-w-fit"
+                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-2.5 sm:px-3 py-1 sm:py-1.5 min-w-fit"
                     onClick={() => handleSuggestedQuestionClick(q)}
                   >
                     {q}
@@ -1027,7 +1002,7 @@ export default function SajuChat({
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
-                  className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
+                  className="h-9 sm:h-11 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
                   disabled={isLoading || isInitialQuestionsMode}
                 />
                 <Button
@@ -1043,7 +1018,7 @@ export default function SajuChat({
               <Button
                 type="submit"
                 size="icon"
-                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800 transition-all duration-200"
                 disabled={!input.trim() || isLoading || isInitialQuestionsMode}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -1054,8 +1029,8 @@ export default function SajuChat({
 
         <SignupDialog
           open={showSignupDialog}
-          onOpenChange={setShowSignupDialog}
-          onSelectProvider={handleSignupProvider}
+          onClose={() => setShowSignupDialog(false)}
+          onSignup={handleSignupProvider}
         />
       </div>
     </div>
