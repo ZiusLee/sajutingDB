@@ -746,7 +746,7 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-full w-full bg-background">
+    <div className="flex h-full w-full bg-background overflow-hidden">
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
@@ -757,7 +757,7 @@ export default function SajuChat({
             )}
 
             {messages.length === 0 && !isInitialQuestionsMode && (
-              <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
+              <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
                 <div className="mb-6">
                   <h1 className="text-2xl md:text-3xl font-bold text-black leading-tight mb-3">
                     오늘은 어떤 것이
