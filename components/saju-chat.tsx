@@ -19,6 +19,7 @@ import { SignupDialog } from "@/components/signup-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Reverting back to original Supabase client creation method
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
+import Sidebar from "@/components/sidebar"
 
 interface SajuChatProps {
   saju: any
@@ -746,7 +747,21 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex flex-col h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
+    <div className="flex h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
+      <div className="hidden lg:block lg:w-80 border-r border-gray-200/50 bg-white">
+        <Sidebar
+          saju={stableSaju}
+          name={name}
+          gender={gender}
+          birthInfo={chatData.stableBirthInfo}
+          sessionId={sessionId}
+          roomType={roomType}
+          currentChatRoomId={effectiveChatRoomId}
+          onChatRoomSelect={handleChatRoomSelect}
+          onNewChat={handleNewChat}
+        />
+      </div>
+
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
@@ -1014,8 +1029,8 @@ export default function SajuChat({
 
         <SignupDialog
           open={showSignupDialog}
-          onOpenChange={setShowSignupDialog}
-          onSelectProvider={handleSignupProvider}
+          onClose={() => setShowSignupDialog(false)}
+          onSignup={handleSignupProvider}
         />
       </div>
     </div>
