@@ -185,6 +185,8 @@ body {
     /* Prevent zoom on iOS */
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
@@ -196,6 +198,8 @@ body {
     /* Prevent text selection highlighting issues */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    height: 100%;
+    overflow: hidden;
   }
 
   /* Ensure buttons maintain consistent styling across browsers */
