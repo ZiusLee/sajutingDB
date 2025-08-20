@@ -210,8 +210,8 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
 
               <div className="pt-4 border-t">
-                <p className="text-sm text-gray-500">공고일자: 2025년 8월 6일</p>
-                <p className="text-sm text-gray-500">시행일자: 2025년 8월 6일</p>
+                <p className="text-sm text-gray-500">공고일자: 2025년 8월 18일</p>
+                <p className="text-sm text-gray-500">시행일자: 2025년 8월 18일</p>
               </div>
             </div>
           </ScrollArea>
@@ -283,7 +283,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
 
               <div>
-                <h4 className="font-semibold mb-2">제5조 (개���정보 처리 위탁)</h4>
+                <h4 className="font-semibold mb-2">제5조 (개인정보 처리 위탁)</h4>
                 <p className="text-gray-600 mb-2">
                   회사는 원활한 서비스 제공을 위해 일부 업무를 외부에 위탁할 수 있습니다:
                 </p>
@@ -306,8 +306,8 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               </div>
 
               <div className="pt-4 border-t">
-                <p className="text-sm text-gray-500">공고일자: 2025년 8월 6일</p>
-                <p className="text-sm text-gray-500">시행일자: 2025년 8월 6일</p>
+                <p className="text-sm text-gray-500">공고일자: 2025년 8월 18일</p>
+                <p className="text-sm text-gray-500">시행일자: 2025년 8월 18일</p>
               </div>
             </div>
           </ScrollArea>

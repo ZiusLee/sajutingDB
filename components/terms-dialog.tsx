@@ -263,6 +263,21 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                       <li>서비스 이용 중 타인 명예훼손, 불법·미풍양속 위반 행위</li>
                     </ul>
                   </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제8조의2 (요금제 변경 및 환불 정책)</h3>
+                    <ul className="list-decimal list-inside space-y-1 ml-4">
+                      <li>회원은 서비스 화면에서 요금제 변경을 요청할 수 있습니다.</li>
+                      <li>
+                        상위 요금제(업그레이드)로 변경 시 기존 요금제는 즉시 종료되며 남은 이용기간 및 핑은 환불되지
+                        않습니다. 변경된 요금제는 즉시 적용되며 회원은 해당 요금 전액을 즉시 결제합니다.
+                      </li>
+                      <li>
+                        하위 요금제(다운그레이드)는 다음 결제일부터 적용되며, 그 전까지는 기존 요금제가 유지됩니다.
+                      </li>
+                      <li>요금제 변경 시 일할계산 환불 및 부분 환불은 제공되지 않습니다.</li>
+                    </ul>
+                  </div>
                 </div>
               </section>
 
@@ -418,6 +433,19 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                           <li>보너스핑은 환불 대상이 아니며, 유효기간 내 미사용 시 자동 소멸됩니다.</li>
                         </ul>
                       </div>
+                      <div>
+                        <h4 className="font-medium">제4항 (요금제 변경에 따른 환불정책)</h4>
+                        <ul className="list-decimal list-inside space-y-1 ml-4">
+                          <li>
+                            상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 핑은 즉시 소멸되며 환불되지 않습니다.
+                          </li>
+                          <li>
+                            하위 요금제로 변경 요청 시 변경은 다음 결제일부터 적용되며 그 이전에 결제된 요금은 환불되지
+                            않습니다.
+                          </li>
+                          <li>변경 신청 후 서비스 이용을 중단하더라도 이미 결제된 요금은 환불되지 않습니다.</li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
 
@@ -442,9 +470,9 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
 
               <section className="pt-4 border-t">
                 <p className="text-xs text-muted-foreground">
-                  <strong>공고일자:</strong> 2025년 8월 6일
+                  <strong>공고일자:</strong> 2025년 8월 18일
                   <br />
-                  <strong>시행일자:</strong> 2025년 8월 6일
+                  <strong>시행일자:</strong> 2025년 8월 18일
                 </p>
               </section>
             </div>

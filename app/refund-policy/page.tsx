@@ -81,6 +81,23 @@ export default function RefundPolicyPage() {
 
             <Separator className="my-6" />
 
+            <section aria-labelledby="article-2-2" className="space-y-3">
+              <h2 id="article-2-2" className="text-xl font-semibold">
+                {"제2조의2 (요금제 변경에 따른 환불정책)"}
+              </h2>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>{"상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 핑은 즉시 소멸되며 환불되지 않습니다."}</li>
+                <li>
+                  {
+                    "하위 요금제로 변경 요청 시 변경은 다음 결제일부터 적용되며 그 이전에 결제된 요금은 환불되지 않습니다."
+                  }
+                </li>
+                <li>{"변경 신청 후 서비스 이용을 중단하더라도 이미 결제된 요금은 환불되지 않습니다."}</li>
+              </ul>
+            </section>
+
+            <Separator className="my-6" />
+
             <section aria-labelledby="article-3" className="space-y-3">
               <h2 id="article-3" className="text-xl font-semibold">
                 {"제3조 (보너스핑 환불 불가)"}
@@ -113,9 +130,9 @@ export default function RefundPolicyPage() {
 
             <div className="pt-4 border-t">
               <p className="text-sm text-neutral-500">
-                <strong>공고일자:</strong> 2025년 8월 6일
+                <strong>공고일자:</strong> 2025년 8월 18일
                 <br />
-                <strong>시행일자:</strong> 2025년 8월 6일
+                <strong>시행일자:</strong> 2025년 8월 18일
               </p>
             </div>
           </CardContent>
