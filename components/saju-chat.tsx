@@ -784,17 +784,17 @@ export default function SajuChat({
       </Sheet>
       <div className="flex-1 flex flex-col min-w-0 h-screen bg-white lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
-          <div className="px-2 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
+          <div className="px-3 sm:px-6 py-1 sm:py-4 space-y-3 sm:space-y-6 pb-2 sm:pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
-              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-1.5 sm:p-2 mt-1">
+              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3 mt-1 sm:mt-2">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
 
             {messages.length === 0 && !isInitialQuestionsMode && (
-              <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
-                <div className="mb-6">
-                  <h1 className="text-2xl md:text-3xl font-bold text-black leading-tight mb-3">
+              <div className="flex flex-col items-center justify-center min-h-[50vh] sm:min-h-[60vh] text-center px-4">
+                <div className="mb-6 sm:mb-8">
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-black leading-tight mb-3 sm:mb-4">
                     오늘은 어떤 것이
                     <br />
                     궁금하세요?
@@ -990,7 +990,7 @@ export default function SajuChat({
           </div>
         </div>
         <div
-          className={`border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container transition-all duration-300 ease-in-out ${
+          className={`border-t bg-white p-2 sm:p-4 flex-shrink-0 chat-input-container transition-all duration-300 ease-in-out ${
             isKeyboardOpen ? "fixed bottom-0 left-0 right-0 z-50" : "relative"
           }`}
           style={{
@@ -1006,22 +1006,22 @@ export default function SajuChat({
               onClick={scrollToBottom}
               variant="outline"
               size="sm"
-              className={`absolute right-3 sm:right-4 bottom-16 sm:bottom-18 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 z-10 ${
-                isKeyboardOpen ? "bottom-16 sm:bottom-18" : "bottom-16 sm:bottom-18"
+              className={`absolute right-4 sm:right-6 bottom-16 sm:bottom-20 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 z-10 ${
+                isKeyboardOpen ? "bottom-16 sm:bottom-20" : "bottom-16 sm:bottom-20"
               }`}
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
           )}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {suggestedQuestions.map((q, i) => (
                   <Button
                     key={i}
                     variant="outline"
                     size="sm"
-                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-2.5 sm:px-3 py-1 sm:py-1.5 min-w-fit"
+                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 min-w-fit"
                     onClick={() => handleSuggestedQuestionClick(q)}
                   >
                     {q}
@@ -1035,7 +1035,7 @@ export default function SajuChat({
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
-                  className="h-9 sm:h-11 rounded-full pl-3 sm:pl-4 pr-11 sm:pr-13 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
+                  className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
                   disabled={isLoading || isInitialQuestionsMode}
                   onFocus={() => {
                     // Scroll input into view on mobile
