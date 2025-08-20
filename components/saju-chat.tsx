@@ -20,6 +20,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // R
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 import Sidebar from "@/components/sidebar"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 
 interface SajuChatProps {
   saju: any
@@ -748,6 +749,23 @@ export default function SajuChat({
 
   return (
     <div className="flex h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
+      <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-80 p-0 lg:hidden">
+          <Sidebar
+            saju={stableSaju}
+            name={name}
+            gender={gender}
+            birthInfo={chatData.stableBirthInfo}
+            sessionId={sessionId}
+            roomType={roomType}
+            currentChatRoomId={effectiveChatRoomId}
+            onChatRoomSelect={handleChatRoomSelect}
+            onNewChat={handleNewChat}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Desktop sidebar - unchanged */}
       <div className="hidden lg:block lg:w-80 border-r border-gray-200/50 bg-white">
         <Sidebar
           saju={stableSaju}
@@ -767,7 +785,7 @@ export default function SajuChat({
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-1">
-                💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
+                💬 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
 
