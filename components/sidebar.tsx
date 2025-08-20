@@ -74,10 +74,8 @@ export default function Sidebar({
 
     setCreatingNewChat(true)
     try {
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
       onNewChat()
-      router.push(`/saju-chat/${roomType}?roomId=${tempId}`)
+      router.push("/saju-chat")
       toast.success("새로운 대화를 시작했습니다")
     } catch (error) {
       console.error("❌ Error creating new chat:", error)
