@@ -746,13 +746,7 @@ export default function SajuChat({
   }
 
   return (
-    <div
-      className="flex flex-col h-full overflow-hidden bg-white"
-      style={{
-        height: isKeyboardOpen ? `calc(100vh - ${keyboardHeight}px)` : "100vh",
-        maxHeight: isKeyboardOpen ? `calc(100vh - ${keyboardHeight}px)` : "100vh",
-      }}
-    >
+    <div className="flex flex-col h-screen overflow-hidden bg-white">
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
@@ -960,15 +954,13 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div
-          className={`border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container transition-all duration-300 ease-in-out`}
-        >
+        <div className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
               variant="outline"
               size="sm"
-              className={`absolute right-3 sm:right-4 bottom-16 sm:bottom-18 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 z-10`}
+              className="absolute right-3 sm:right-4 bottom-16 sm:bottom-18 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 z-10"
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
