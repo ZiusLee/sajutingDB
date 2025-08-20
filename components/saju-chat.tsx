@@ -798,7 +798,7 @@ export default function SajuChat({
             )}
 
             {messages.length === 0 && !isInitialQuestionsMode && (
-              <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
+              <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
                 <div className="mb-6">
                   <h1 className="text-2xl md:text-3xl font-bold text-black leading-tight mb-3">
                     오늘은 어떤 것이
