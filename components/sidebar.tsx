@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2, MessageSquare } from "lucide-react"
 import SajuDiagram from "@/components/saju-diagram"
-import { getChatRooms, createChatRoom, deleteChatRoom, type ChatRoom } from "@/lib/chat-room-service"
+import { getChatRooms, deleteChatRoom, type ChatRoom } from "@/lib/chat-room-service"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -74,14 +74,10 @@ export default function Sidebar({
 
     setCreatingNewChat(true)
     try {
-      const newRoom = await createChatRoom({
-        sessionId,
-        title: "새로운 대화",
-        roomType,
-      })
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       onNewChat()
-      router.push(`/saju-chat/${roomType}?roomId=${newRoom.id}`)
+      router.push(`/saju-chat/${roomType}?roomId=${tempId}`)
       toast.success("새로운 대화를 시작했습니다")
     } catch (error) {
       console.error("❌ Error creating new chat:", error)
