@@ -86,23 +86,22 @@ body {
     text-wrap: balance;
   }
 
-  /* Mobile viewport optimizations */
+  /* Updated mobile viewport optimizations with better Safari support */
   .min-h-screen-mobile {
     min-height: 100vh;
-    min-height: 100dvh; /* Dynamic viewport height for mobile */
+    min-height: 100svh; /* Small viewport height - ensures content fits when address bar is visible */
   }
 
   .h-screen-mobile {
     height: 100vh;
-    height: 100dvh; /* Dynamic viewport height for mobile */
+    height: 100svh; /* Small viewport height for consistent Safari behavior */
     height: -webkit-fill-available; /* iOS Safari specific height fallback */
   }
 
-  /* Enhanced mobile keyboard and chat container utilities */
+  /* Simplified chat container height for better mobile compatibility */
   .chat-container-height {
-    height: calc(100vh - 140px);
-    height: calc(100dvh - 140px);
-    height: calc(-webkit-fill-available - 140px); /* Updated chat container height calculation for better mobile viewport handling */
+    height: calc(100vh - 80px);
+    height: calc(100svh - 80px); /* Use small viewport height for consistent behavior */
   }
 
   .chat-messages-container {

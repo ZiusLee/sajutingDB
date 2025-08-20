@@ -746,7 +746,7 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-white">
+    <div className="flex flex-col h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
