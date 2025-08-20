@@ -19,7 +19,7 @@ import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SiteHeader } from "@/components/site-header"
 import { SignupDialog } from "@/components/signup-dialog"
-import { getSupabase } from "@/lib/supabase-client" // Import getSupabase from lib/supabase-client instead of creating new client
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Reverting back to original Supabase client creation method
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 
@@ -138,7 +138,7 @@ export default function SajuChat({
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
   const [showSignupDialog, setShowSignupDialog] = useState(false)
-  const supabase = getSupabase() // Use getSupabase() instead of createClientComponentClient() to ensure proper env vars
+  const supabase = createClientComponentClient() // Using original createClientComponentClient() method
   const [chatStreamState, setChatStreamState] = useState<{
     isStreaming: boolean
     currentMessageId: string | null
