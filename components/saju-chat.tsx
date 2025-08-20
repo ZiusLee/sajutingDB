@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
-import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SignupDialog } from "@/components/signup-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Reverting back to original Supabase client creation method
 import { useRouter } from "next/navigation"
@@ -117,7 +116,6 @@ export default function SajuChat({
   onChatRoomPersisted,
 }: SajuChatProps) {
   const { user } = useAuth()
-  const { isKeyboardOpen, keyboardHeight } = useMobileKeyboard()
   const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
   const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
   const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
@@ -746,9 +744,16 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex flex-col h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
+    <div
+      className="flex flex-col h-svh max-h-svh overflow-hidden bg-white touch-action-manipulation"
+      style={{ height: "100svh", maxHeight: "100svh" }}
+    >
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0 overflow-hidden">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden chat-messages-container"
+          style={{ maxHeight: "calc(100% - 80px)" }}
+        >
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-1">
@@ -954,7 +959,7 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container">
+        <div className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container min-h-[80px] max-h-[80px] overflow-hidden">
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
