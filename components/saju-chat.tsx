@@ -193,6 +193,8 @@ export default function SajuChat({
 
   const prevMessageCountRef = useRef(0) // Declare prevMessageCountRef
 
+  const viewportHeight = window.innerHeight - keyboardHeight
+
   // Auto-show signup dialog after 3 seconds for non-authenticated users
   useEffect(() => {
     if (!user) {
@@ -748,7 +750,13 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
+    <div
+      className="flex overflow-hidden bg-white"
+      style={{
+        height: "100svh",
+        ...(isKeyboardOpen && { height: `${viewportHeight}px` }),
+      }}
+    >
       <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-80 p-0 lg:hidden">
           <Sidebar
@@ -781,7 +789,18 @@ export default function SajuChat({
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0 overflow-hidden">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto chat-messages-container"
+          style={{
+            backgroundColor: "white",
+            ...(isKeyboardOpen && {
+              maxHeight: `calc(${viewportHeight}px - 80px)`,
+              overscrollBehavior: "contain",
+              position: "relative",
+            }),
+          }}
+        >
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-1">
@@ -987,7 +1006,16 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container">
+        <div
+          className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container"
+          style={{
+            ...(isKeyboardOpen && {
+              position: "sticky",
+              bottom: 0,
+              zIndex: 10,
+            }),
+          }}
+        >
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
