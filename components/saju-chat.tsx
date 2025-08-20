@@ -119,7 +119,7 @@ export default function SajuChat({
   onChatRoomPersisted,
 }: SajuChatProps) {
   const { user } = useAuth()
-  const { isKeyboardOpen, keyboardHeight, viewportHeight } = useMobileKeyboard()
+  const { isKeyboardOpen } = useMobileKeyboard()
   const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
   const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
   const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
@@ -748,12 +748,7 @@ export default function SajuChat({
   }
 
   return (
-    <div
-      className="flex overflow-hidden bg-white"
-      style={{
-        height: isKeyboardOpen ? `${viewportHeight}px` : "100svh",
-      }}
-    >
+    <div className="flex overflow-hidden bg-white keyboard-aware-container">
       <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-80 p-0 lg:hidden">
           <Sidebar
@@ -788,14 +783,11 @@ export default function SajuChat({
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0 overflow-hidden">
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto chat-messages-container"
+          className="flex-1 overflow-y-auto chat-messages-container keyboard-aware-chat"
           style={{
             backgroundColor: "white",
-            ...(isKeyboardOpen && {
-              maxHeight: `${viewportHeight - 80}px`,
-              overscrollBehavior: "contain",
-              position: "relative",
-            }),
+            overscrollBehavior: "contain",
+            position: "relative",
           }}
         >
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">

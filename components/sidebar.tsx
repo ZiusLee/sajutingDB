@@ -75,7 +75,7 @@ export default function Sidebar({
     setCreatingNewChat(true)
     try {
       onNewChat()
-      router.push("/saju-chat")
+      router.push(`/saju-chat/${roomType}`)
       toast.success("새로운 대화를 시작했습니다")
     } catch (error) {
       console.error("❌ Error creating new chat:", error)
