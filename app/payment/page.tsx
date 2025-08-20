@@ -6,6 +6,7 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { getTossClientKey } from "@/app/actions/payment"
+import { trackIntegratedEvents, trackEvent } from "@/lib/analytics"
 
 // Toss Payments types
 declare global {
@@ -34,6 +35,8 @@ function PaymentContent() {
   const [scriptLoaded, setScriptLoaded] = useState(false)
 
   useEffect(() => {
+    trackIntegratedEvents.pageView("payment")
+
     const packageId = searchParams.get("packageId")
     const name = searchParams.get("name")
     const coins = searchParams.get("coins")
@@ -43,7 +46,7 @@ function PaymentContent() {
     const userEmail = searchParams.get("userEmail") || "skyywwind@gmail.com"
 
     if (packageId && name && coins && price) {
-      setPaymentData({
+      const data = {
         packageId,
         name,
         coins: Number.parseInt(coins),
@@ -51,6 +54,17 @@ function PaymentContent() {
         price: Number.parseInt(price),
         isSubscription,
         userEmail,
+      }
+      setPaymentData(data)
+
+      trackEvent("payment_page_view", {
+        packageId: data.packageId,
+        packageName: data.name,
+        amount: data.price,
+        coins: data.coins,
+        bonus: data.bonus || 0,
+        isSubscription: data.isSubscription,
+        userEmail: data.userEmail,
       })
     }
   }, []) // Empty dependency array to run only once
@@ -98,9 +112,26 @@ function PaymentContent() {
   const handlePayment = useCallback(async () => {
     if (!paymentData || !tossPayments) return
 
+    trackEvent("payment_attempt", {
+      packageId: paymentData.packageId,
+      packageName: paymentData.name,
+      amount: paymentData.price,
+      coins: paymentData.coins,
+      bonus: paymentData.bonus || 0,
+      isSubscription: paymentData.isSubscription,
+      paymentMethod: "card",
+    })
+
     setIsLoading(true)
     try {
       const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      trackEvent("payment_method_selected", {
+        method: "card",
+        packageId: paymentData.packageId,
+        amount: paymentData.price,
+        isSubscription: paymentData.isSubscription,
+      })
 
       if (paymentData.isSubscription) {
         // Subscription billing
@@ -123,6 +154,14 @@ function PaymentContent() {
       }
     } catch (error) {
       console.error("Payment error:", error)
+
+      trackEvent("payment_error", {
+        packageId: paymentData.packageId,
+        amount: paymentData.price,
+        error: error instanceof Error ? error.message : "Unknown error",
+        isSubscription: paymentData.isSubscription,
+      })
+
       toast({
         title: "결제 오류",
         description: "결제 중 오류가 발생했습니다. 다시 시도해주세요.",

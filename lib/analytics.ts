@@ -52,6 +52,41 @@ export const identifyAmplitudeUser = (userId: string, userProperties?: Record<st
   }
 }
 
+const getCommonParameters = () => {
+  if (typeof window === "undefined") return {}
+
+  return {
+    timestamp: new Date().toISOString(),
+    session_id: sessionStorage.getItem("session_id") || "unknown",
+    user_agent: navigator.userAgent,
+    screen_resolution: `${screen.width}x${screen.height}`,
+    viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+    language: navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    referrer: document.referrer || "direct",
+    page_url: window.location.href,
+    page_path: window.location.pathname,
+  }
+}
+
+const getUserContext = () => {
+  if (typeof window === "undefined") return {}
+
+  const visitCount = Number.parseInt(localStorage.getItem("visit_count") || "0")
+  const firstVisit = localStorage.getItem("first_visit_date")
+  const lastVisit = localStorage.getItem("last_visit_date")
+
+  return {
+    visit_count: visitCount,
+    is_returning_user: visitCount > 1,
+    first_visit_date: firstVisit,
+    last_visit_date: lastVisit,
+    days_since_first_visit: firstVisit
+      ? Math.floor((Date.now() - new Date(firstVisit).getTime()) / (1000 * 60 * 60 * 24))
+      : 0,
+  }
+}
+
 // 1. 통합된 이벤트 (props로 세분화)
 export const trackIntegratedEvents = {
   // 페이지 뷰
@@ -112,252 +147,230 @@ export const trackIntegratedEvents = {
   },
 }
 
-// 2. AI 기능 이벤트
 export const trackAIEvents = {
-  messageSent: (messageLength: number, roomType?: string) => {
+  messageSent: (messageLength: number, roomType?: string, messageType?: "question" | "followup" | "clarification") => {
     trackEvent("AI_message_sent", {
       message_length: messageLength,
+      message_character_count: messageLength,
       room_type: roomType,
-      timestamp: new Date().toISOString(),
+      message_type: messageType,
+      conversation_turn: Number.parseInt(sessionStorage.getItem("conversation_turn") || "1"),
+      session_duration: Date.now() - Number.parseInt(sessionStorage.getItem("session_start") || "0"),
+      ...getCommonParameters(),
+      ...getUserContext(),
+    })
+  },
+
+  responseReceived: (responseLength: number, responseTime: number, roomType?: string) => {
+    trackEvent("AI_response_received", {
+      response_length: responseLength,
+      response_time_ms: responseTime,
+      room_type: roomType,
+      conversation_turn: Number.parseInt(sessionStorage.getItem("conversation_turn") || "1"),
+      ...getCommonParameters(),
+    })
+  },
+
+  conversationCompleted: (totalMessages: number, totalDuration: number, roomType?: string) => {
+    trackEvent("AI_conversation_completed", {
+      total_messages: totalMessages,
+      total_duration_ms: totalDuration,
+      room_type: roomType,
+      avg_message_length: 0, // 계산 필요
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 }
 
-// 3. 사용자 세션 이벤트
 export const trackUserEvents = {
-  sessionStart: () => {
+  sessionStart: (entryPoint?: string, utmSource?: string) => {
+    // 세션 ID 생성 및 저장
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    sessionStorage.setItem("session_id", sessionId)
+    sessionStorage.setItem("session_start", Date.now().toString())
+
+    // 방문 횟수 업데이트
+    const visitCount = Number.parseInt(localStorage.getItem("visit_count") || "0") + 1
+    localStorage.setItem("visit_count", visitCount.toString())
+    localStorage.setItem("last_visit_date", new Date().toISOString())
+
+    if (visitCount === 1) {
+      localStorage.setItem("first_visit_date", new Date().toISOString())
+    }
+
     trackEvent("USER_session_start", {
-      timestamp: new Date().toISOString(),
+      session_id: sessionId,
+      entry_point: entryPoint || "direct",
+      utm_source: utmSource,
+      is_first_session: visitCount === 1,
+      visit_number: visitCount,
+      device_type: /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? "mobile" : "desktop",
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  firstVisit: () => {
+  firstVisit: (acquisitionChannel?: string) => {
     trackEvent("USER_first_visit", {
-      timestamp: new Date().toISOString(),
+      acquisition_channel: acquisitionChannel || "organic",
+      landing_page: window.location.pathname,
+      ...getCommonParameters(),
     })
   },
 
-  returnVisit: () => {
+  returnVisit: (daysSinceLastVisit?: number) => {
     trackEvent("USER_return_visit", {
-      timestamp: new Date().toISOString(),
+      days_since_last_visit: daysSinceLastVisit || 0,
+      return_frequency: daysSinceLastVisit && daysSinceLastVisit < 7 ? "frequent" : "occasional",
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  profileCreated: () => {
+  profileCreated: (profileCompleteness?: number, creationMethod?: "onboarding" | "manual") => {
     trackEvent("USER_profile_created", {
-      timestamp: new Date().toISOString(),
+      profile_completeness: profileCompleteness || 0,
+      creation_method: creationMethod || "onboarding",
+      time_to_create: Date.now() - Number.parseInt(sessionStorage.getItem("session_start") || "0"),
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  engagementHigh: (duration: number) => {
+  engagementHigh: (duration: number, interactionCount?: number, pageDepth?: number) => {
     trackEvent("USER_engagement_high", {
-      duration: duration,
-      timestamp: new Date().toISOString(),
+      session_duration: duration,
+      interaction_count: interactionCount || 0,
+      page_depth: pageDepth || 1,
+      engagement_score: Math.min(100, (duration / 1000 / 60) * 10 + (interactionCount || 0) * 5), // 간단한 점수 계산
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  chatSessionStart: (roomType: string) => {
+  chatSessionStart: (roomType: string, isFirstChat?: boolean) => {
     trackEvent("USER_chat_session_start", {
       room_type: roomType,
-      timestamp: new Date().toISOString(),
+      is_first_chat: isFirstChat || false,
+      chat_session_id: `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      user_onboarding_completed: localStorage.getItem("onboarding_completed") === "true",
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  memoryBankAccessed: () => {
+  memoryBankAccessed: (accessType?: "search" | "browse" | "direct", searchQuery?: string) => {
     trackEvent("USER_memory_bank_accessed", {
-      timestamp: new Date().toISOString(),
+      access_type: accessType || "direct",
+      search_query: searchQuery,
+      memory_bank_size: 0, // 실제 메모리 뱅크 크기로 대체 필요
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 }
 
-// 4. 전환 지표 이벤트
 export const trackConversionEvents = {
-  sajuProfileComplete: () => {
+  sajuProfileComplete: (completionTime?: number, profileAccuracy?: number) => {
     trackEvent("CONVERSION_saju_profile_complete", {
-      timestamp: new Date().toISOString(),
+      completion_time_ms: completionTime || 0,
+      profile_accuracy: profileAccuracy || 0,
+      conversion_step: "profile_creation",
+      funnel_stage: "activation",
+      time_to_conversion: Date.now() - Number.parseInt(sessionStorage.getItem("session_start") || "0"),
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  firstChatComplete: () => {
+  firstChatComplete: (chatDuration?: number, messageCount?: number, satisfactionScore?: number) => {
     trackEvent("CONVERSION_first_chat_complete", {
-      timestamp: new Date().toISOString(),
+      chat_duration_ms: chatDuration || 0,
+      message_count: messageCount || 0,
+      satisfaction_score: satisfactionScore || 0,
+      conversion_step: "first_interaction",
+      funnel_stage: "engagement",
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  userRetentionDay7: () => {
+  userRetentionDay7: (totalSessions?: number, totalChatTime?: number, featureUsage?: string[]) => {
     trackEvent("CONVERSION_user_retention_day7", {
-      timestamp: new Date().toISOString(),
+      total_sessions: totalSessions || 0,
+      total_chat_time_ms: totalChatTime || 0,
+      features_used: featureUsage || [],
+      retention_quality: totalSessions && totalSessions > 3 ? "high" : "low",
+      conversion_step: "retention",
+      funnel_stage: "loyalty",
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 }
 
-// 5. 행동 패턴 이벤트
 export const trackBehaviorEvents = {
-  scrollDepth75: (page: string) => {
+  scrollDepth75: (page: string, timeToScroll?: number, contentHeight?: number) => {
     trackEvent("BEHAVIOR_scroll_depth_75", {
       page: page,
-      timestamp: new Date().toISOString(),
+      scroll_depth: 75,
+      time_to_scroll_ms: timeToScroll || 0,
+      content_height: contentHeight || 0,
+      scroll_speed: timeToScroll ? ((contentHeight || 0) / timeToScroll) * 1000 : 0,
+      engagement_indicator: "high_scroll",
+      ...getCommonParameters(),
     })
   },
 
-  timeOnPage5Min: (page: string) => {
+  timeOnPage5Min: (page: string, exactTime?: number, interactionCount?: number) => {
     trackEvent("BEHAVIOR_time_on_page_5min", {
       page: page,
-      timestamp: new Date().toISOString(),
+      exact_time_ms: exactTime || 300000,
+      interaction_count: interactionCount || 0,
+      engagement_quality: interactionCount && interactionCount > 5 ? "active" : "passive",
+      engagement_indicator: "long_session",
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 
-  multipleQuestions: (questionCount: number) => {
+  multipleQuestions: (questionCount: number, sessionDuration?: number, topicVariety?: number) => {
     trackEvent("BEHAVIOR_multiple_questions", {
       question_count: questionCount,
-      timestamp: new Date().toISOString(),
+      session_duration_ms: sessionDuration || 0,
+      topic_variety: topicVariety || 1,
+      avg_question_interval: sessionDuration ? sessionDuration / questionCount : 0,
+      engagement_indicator: "high_curiosity",
+      user_intent: questionCount > 10 ? "deep_exploration" : "casual_inquiry",
+      ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 }
 
-// 6. 성능 이벤트
 export const trackPerformanceEvents = {
-  pageLoadSlow: (page: string, loadTime: number) => {
+  pageLoadSlow: (page: string, loadTime: number, connectionType?: string, deviceType?: string) => {
     trackEvent("PERFORMANCE_page_load_slow", {
       page: page,
-      load_time: loadTime,
-      timestamp: new Date().toISOString(),
-    })
-  },
-}
-
-// 7. 온보딩 생명주기 이벤트
-export const trackOnboardingEvents = {
-  started: () => {
-    trackEvent("onboarding_started", {
-      timestamp: new Date().toISOString(),
+      load_time_ms: loadTime,
+      connection_type: connectionType || "unknown",
+      device_type: deviceType || (/Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? "mobile" : "desktop"),
+      performance_threshold: 3000, // 3초 기준
+      performance_impact: loadTime > 5000 ? "high" : "medium",
+      user_experience_score: Math.max(0, 100 - loadTime / 100), // 간단한 UX 점수
+      ...getCommonParameters(),
     })
   },
 
-  completed: () => {
-    trackEvent("onboarding_completed", {
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  abandoned: (step: string) => {
-    trackEvent("onboarding_abandoned", {
-      step: step,
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  resumed: (step: string) => {
-    trackEvent("onboarding_resumed", {
-      step: step,
-      timestamp: new Date().toISOString(),
-    })
-  },
-}
-
-// 8. 온보딩 세부 이벤트
-export const trackOnboardingDetailEvents = {
-  // 이름 입력
-  inputInteraction: (field: "name", action: "focused" | "blurred" | "typed" | "cleared") => {
-    trackEvent("input_interaction", {
-      field: field,
-      action: action,
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  // 성별 선택
-  genderInteraction: (
-    action: "clicked" | "hovered" | "changed" | "completed" | "confirmed",
-    value?: "male" | "female",
-  ) => {
-    trackEvent("gender_interaction", {
-      action: action,
-      value: value,
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  // 도시 선택
-  cityInteraction: (
-    action:
-      | "search_focused"
-      | "search_typed"
-      | "search_cleared"
-      | "search_submitted"
-      | "dropdown_opened"
-      | "dropdown_closed"
-      | "result_clicked"
-      | "result_hovered"
-      | "no_results"
-      | "selected"
-      | "confirmed"
-      | "completed",
-  ) => {
-    trackEvent("city_interaction", {
-      action: action,
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  // 생년월일/시간
-  birthInfoInteraction: (
-    field: "date" | "time" | "time_unknown",
-    action: "focused" | "typed" | "validated" | "error" | "checked" | "unchecked" | "completed",
-  ) => {
-    trackEvent("birth_info_interaction", {
-      field: field,
-      action: action,
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  // 고민 선택
-  concernInteraction: (
-    action:
-      | "option_clicked"
-      | "option_hovered"
-      | "option_selected"
-      | "option_deselected"
-      | "max_reached"
-      | "selection_completed"
-      | "step_completed",
-    concernType?:
-      | "crush"
-      | "breakup"
-      | "health"
-      | "marriage"
-      | "money"
-      | "study"
-      | "relationship_lover"
-      | "career_worry"
-      | "job_prepare"
-      | "values"
-      | "workplace_relationship"
-      | "friend_relationship"
-      | "family",
-  ) => {
-    trackEvent("concern_interaction", {
-      action: action,
-      concern_type: concernType,
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  // 페이지 로딩
-  pageLoadEvent: (type: "onboarding_loaded" | "assets_loaded") => {
-    trackEvent("page_load_event", {
-      type: type,
-      timestamp: new Date().toISOString(),
-    })
-  },
-
-  // API 상태
-  apiStatus: (endpoint: "saju_calculation" | "user_data_sync", status: "started" | "completed" | "failed") => {
-    trackEvent("api_status", {
+  apiResponseSlow: (endpoint: string, responseTime: number, statusCode?: number) => {
+    trackEvent("PERFORMANCE_api_response_slow", {
       endpoint: endpoint,
-      status: status,
-      timestamp: new Date().toISOString(),
+      response_time_ms: responseTime,
+      status_code: statusCode || 200,
+      performance_threshold: 2000, // 2초 기준
+      performance_impact: responseTime > 5000 ? "high" : "medium",
+      ...getCommonParameters(),
     })
   },
 }
@@ -574,5 +587,141 @@ export const quickTrack = {
   // 온보딩 단계 완료
   completeOnboardingStep: (step: string) => {
     trackOnboardingDetailEvents.apiStatus("user_data_sync", "completed")
+  },
+}
+
+// 7. 온보딩 생명주기 이벤트
+export const trackOnboardingEvents = {
+  started: () => {
+    trackEvent("onboarding_started", {
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  completed: () => {
+    trackEvent("onboarding_completed", {
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  abandoned: (step: string) => {
+    trackEvent("onboarding_abandoned", {
+      step: step,
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  resumed: (step: string) => {
+    trackEvent("onboarding_resumed", {
+      step: step,
+      timestamp: new Date().toISOString(),
+    })
+  },
+}
+
+// 8. 온보딩 세부 이벤트
+export const trackOnboardingDetailEvents = {
+  // 이름 입력
+  inputInteraction: (field: "name", action: "focused" | "blurred" | "typed" | "cleared") => {
+    trackEvent("input_interaction", {
+      field: field,
+      action: action,
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  // 성별 선택
+  genderInteraction: (
+    action: "clicked" | "hovered" | "changed" | "completed" | "confirmed",
+    value?: "male" | "female",
+  ) => {
+    trackEvent("gender_interaction", {
+      action: action,
+      value: value,
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  // 도시 선택
+  cityInteraction: (
+    action:
+      | "search_focused"
+      | "search_typed"
+      | "search_cleared"
+      | "search_submitted"
+      | "dropdown_opened"
+      | "dropdown_closed"
+      | "result_clicked"
+      | "result_hovered"
+      | "no_results"
+      | "selected"
+      | "confirmed"
+      | "completed",
+  ) => {
+    trackEvent("city_interaction", {
+      action: action,
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  // 생년월일/시간
+  birthInfoInteraction: (
+    field: "date" | "time" | "time_unknown",
+    action: "focused" | "typed" | "validated" | "error" | "checked" | "unchecked" | "completed",
+  ) => {
+    trackEvent("birth_info_interaction", {
+      field: field,
+      action: action,
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  // 고민 선택
+  concernInteraction: (
+    action:
+      | "option_clicked"
+      | "option_hovered"
+      | "option_selected"
+      | "option_deselected"
+      | "max_reached"
+      | "selection_completed"
+      | "step_completed",
+    concernType?:
+      | "crush"
+      | "breakup"
+      | "health"
+      | "marriage"
+      | "money"
+      | "study"
+      | "relationship_lover"
+      | "career_worry"
+      | "job_prepare"
+      | "values"
+      | "workplace_relationship"
+      | "friend_relationship"
+      | "family",
+  ) => {
+    trackEvent("concern_interaction", {
+      action: action,
+      concern_type: concernType,
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  // 페이지 로딩
+  pageLoadEvent: (type: "onboarding_loaded" | "assets_loaded") => {
+    trackEvent("page_load_event", {
+      type: type,
+      timestamp: new Date().toISOString(),
+    })
+  },
+
+  // API 상태
+  apiStatus: (endpoint: "saju_calculation" | "user_data_sync", status: "started" | "completed" | "failed") => {
+    trackEvent("api_status", {
+      endpoint: endpoint,
+      status: status,
+      timestamp: new Date().toISOString(),
+    })
   },
 }

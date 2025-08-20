@@ -1,3 +1,5 @@
+"use client"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -6,6 +8,7 @@ import { calculateSaju } from "@/lib/saju"
 import SajuResult from "@/components/saju-result"
 import SocialShareButtons from "@/components/social-share-buttons"
 import { getSajuDataByUuid } from "@/lib/saju-session-service"
+import { trackIntegratedEvents, trackEvent } from "@/lib/analytics"
 
 export default async function ResultPage({
   searchParams,
@@ -23,6 +26,16 @@ export default async function ResultPage({
   }
 }) {
   const { date, hour, minute, timeUnknown, name, gender, saju: sajuParam, location = "서울특별시", uuid } = searchParams
+
+  const trackResultView = () => {
+    trackIntegratedEvents.pageView("saju_result")
+    trackEvent("saju_result_view", {
+      method: uuid ? "uuid" : sajuParam ? "param" : "direct",
+      hasName: !!name,
+      hasGender: !!gender,
+      timeUnknown: timeUnknown === "true",
+    })
+  }
 
   // If no parameters are provided, show a message and link to home
   if (!date && !uuid && !sajuParam) {
@@ -59,6 +72,21 @@ export default async function ResultPage({
 
       return (
         <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if (typeof window !== 'undefined' && window.trackIntegratedEvents) {
+                  window.trackIntegratedEvents.pageView("saju_result");
+                  window.trackEvent("saju_result_view", {
+                    method: "uuid",
+                    hasName: ${!!userData.name},
+                    hasGender: ${!!userData.gender},
+                    timeUnknown: false
+                  });
+                }
+              `,
+            }}
+          />
           <Card className="w-full mx-auto border-0 sm:border sm:max-w-md">
             <CardHeader>
               <CardTitle className="text-center text-2xl">사주팔자 결과</CardTitle>
@@ -95,6 +123,27 @@ export default async function ResultPage({
 
                 {/* 소셜미디어 공유 버튼 추가 */}
                 <div className="py-2">
+                  <script
+                    dangerouslySetInnerHTML={{
+                      __html: `
+                        document.addEventListener('DOMContentLoaded', function() {
+                          const shareButtons = document.querySelectorAll('[data-share-platform]');
+                          shareButtons.forEach(button => {
+                            button.addEventListener('click', function() {
+                              const platform = this.getAttribute('data-share-platform');
+                              if (typeof window !== 'undefined' && window.trackEvent) {
+                                window.trackEvent('social_share_click', {
+                                  platform: platform,
+                                  content_type: 'saju_result',
+                                  method: 'uuid'
+                                });
+                              }
+                            });
+                          });
+                        });
+                      `,
+                    }}
+                  />
                   <SocialShareButtons />
                 </div>
 
@@ -109,6 +158,16 @@ export default async function ResultPage({
                           ? `uuid=${uuid}`
                           : `saju=${sajuParam || encodeURIComponent(JSON.stringify(formattedSaju))}&name=${encodeURIComponent(userData.name || "")}&gender=${encodeURIComponent(userData.gender || "")}`
                       }`}
+                      onClick={() => {
+                        if (typeof window !== "undefined" && window.trackEvent) {
+                          window.trackEvent("ai_consultation_start", {
+                            from: "result_page",
+                            method: "uuid",
+                            hasName: !!userData.name,
+                            hasGender: !!userData.gender,
+                          })
+                        }
+                      }}
                     >
                       AI 상담 시작하기
                     </Link>
@@ -142,6 +201,21 @@ export default async function ResultPage({
 
       return (
         <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if (typeof window !== 'undefined' && window.trackIntegratedEvents) {
+                  window.trackIntegratedEvents.pageView("saju_result");
+                  window.trackEvent("saju_result_view", {
+                    method: "param",
+                    hasName: ${!!name},
+                    hasGender: ${!!gender},
+                    timeUnknown: ${timeUnknown === "true"}
+                  });
+                }
+              `,
+            }}
+          />
           <Card className="w-full mx-auto border-0 sm:border sm:max-w-md">
             <CardHeader>
               <CardTitle className="text-center text-2xl">사주팔자 결과</CardTitle>
@@ -214,6 +288,27 @@ export default async function ResultPage({
 
                 {/* 소셜미디어 공유 버튼 추가 */}
                 <div className="py-2">
+                  <script
+                    dangerouslySetInnerHTML={{
+                      __html: `
+                        document.addEventListener('DOMContentLoaded', function() {
+                          const shareButtons = document.querySelectorAll('[data-share-platform]');
+                          shareButtons.forEach(button => {
+                            button.addEventListener('click', function() {
+                              const platform = this.getAttribute('data-share-platform');
+                              if (typeof window !== 'undefined' && window.trackEvent) {
+                                window.trackEvent('social_share_click', {
+                                  platform: platform,
+                                  content_type: 'saju_result',
+                                  method: 'param'
+                                });
+                              }
+                            });
+                          });
+                        });
+                      `,
+                    }}
+                  />
                   <SocialShareButtons />
                 </div>
 
@@ -308,6 +403,16 @@ export default async function ResultPage({
                               )
                             }&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}`
                       }`}
+                      onClick={() => {
+                        if (typeof window !== "undefined" && window.trackEvent) {
+                          window.trackEvent("ai_consultation_start", {
+                            from: "result_page",
+                            method: "param",
+                            hasName: !!name,
+                            hasGender: !!gender,
+                          })
+                        }
+                      }}
                     >
                       AI 상담 시작하기
                     </Link>
@@ -389,6 +494,21 @@ export default async function ResultPage({
 
     return (
       <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.trackIntegratedEvents) {
+                window.trackIntegratedEvents.pageView("saju_result");
+                window.trackEvent("saju_result_view", {
+                  method: "direct",
+                  hasName: ${!!name},
+                  hasGender: ${!!gender},
+                  timeUnknown: ${isTimeUnknown}
+                });
+              }
+            `,
+          }}
+        />
         <Card className="w-full mx-auto border-0 sm:border sm:max-w-md">
           <CardHeader>
             <CardTitle className="text-center text-2xl">사주팔자 결과</CardTitle>
@@ -431,6 +551,27 @@ export default async function ResultPage({
 
               {/* 소셜미디어 공유 버튼 추가 */}
               <div className="py-2">
+                <script
+                  dangerouslySetInnerHTML={{
+                    __html: `
+                      document.addEventListener('DOMContentLoaded', function() {
+                        const shareButtons = document.querySelectorAll('[data-share-platform]');
+                        shareButtons.forEach(button => {
+                          button.addEventListener('click', function() {
+                            const platform = this.getAttribute('data-share-platform');
+                            if (typeof window !== 'undefined' && window.trackEvent) {
+                              window.trackEvent('social_share_click', {
+                                platform: platform,
+                                content_type: 'saju_result',
+                                method: 'direct'
+                              });
+                            }
+                          });
+                        });
+                      });
+                    `,
+                  }}
+                />
                 <SocialShareButtons />
               </div>
 
@@ -445,6 +586,16 @@ export default async function ResultPage({
                         ? `uuid=${uuid}`
                         : `saju=${sajuParam || encodeURIComponent(JSON.stringify(saju))}&name=${encodeURIComponent(name || "")}&gender=${encodeURIComponent(gender || "")}`
                     }`}
+                    onClick={() => {
+                      if (typeof window !== "undefined" && window.trackEvent) {
+                        window.trackEvent("ai_consultation_start", {
+                          from: "result_page",
+                          method: "direct",
+                          hasName: !!name,
+                          hasGender: !!gender,
+                        })
+                      }
+                    }}
                   >
                     AI 상담 시작하기
                   </Link>

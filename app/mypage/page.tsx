@@ -15,6 +15,7 @@ import { getDefaultSajuSession, getSajuProfileBySessionId, setDefaultSajuSession
 import BirthDateFormClient from "@/components/birth-date-form-client"
 import type { Saju } from "@/lib/saju" // Import Saju type
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
+import { trackEvent } from "@/lib/analytics"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -167,11 +168,27 @@ export default function MyPage() {
     loadUserData()
   }, [router, supabase])
 
+  useEffect(() => {
+    if (!isLoading && sajuProfiles.length > 0) {
+      trackEvent("USER_memory_bank_accessed", {
+        profiles_count: sajuProfiles.length,
+        has_default_profile: !!defaultProfile,
+        user_id: authUserId,
+      })
+    }
+  }, [isLoading, sajuProfiles.length, defaultProfile, authUserId])
+
   const handleSetAsMain = async (profile: SajuProfile) => {
     if (!authUserId) return
     try {
       const success = await setDefaultSajuSession(authUserId, profile.id)
       if (success) {
+        trackEvent("profile_main_set", {
+          profile_name: profile.name,
+          profile_id: profile.id,
+          user_id: authUserId,
+        })
+
         setDefaultProfile(profile)
         const calculatedElements = calculateElementsFromSaju(
           profile.saju.yearStem,
@@ -405,6 +422,13 @@ export default function MyPage() {
       setTimeout(() => {
         setRecentlyAddedId(null)
       }, 3000)
+
+      trackEvent("USER_profile_created", {
+        profile_id: sessionId,
+        total_profiles: sajuProfiles.length + 1,
+        user_id: authUserId,
+        creation_source: "mypage",
+      })
     } catch (error) {
       console.error("Error refreshing data:", error)
       toast({ title: "데이터 새로고침 오류", variant: "destructive" })

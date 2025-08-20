@@ -2,6 +2,8 @@
 
 import type React from "react"
 
+import type { ReactElement } from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,8 +24,9 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, Shield } from "lucide-react"
+import { trackIntegratedEvents, trackAuthEvents, trackError, trackUserEvents } from "@/lib/analytics"
 
-export default function RegisterPage() {
+export default function RegisterPage(): ReactElement {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -43,24 +46,36 @@ export default function RegisterPage() {
     setError("")
     setSuccess("")
 
+    trackIntegratedEvents.registerClick()
+    trackIntegratedEvents.formSubmit("register")
+    trackAuthEvents.signUp("email")
+
     // Validation
     if (!email || !password || !confirmPassword || !name) {
-      setError("모든 필드를 입력해주세요.")
+      const errorMsg = "모든 필드를 입력해주세요."
+      setError(errorMsg)
+      trackError(`Registration validation error: ${errorMsg}`, "register_page")
       return
     }
 
     if (password !== confirmPassword) {
-      setError("비밀번호가 일치하��� 않습니다.")
+      const errorMsg = "비밀번호가 일치하지 않습니다."
+      setError(errorMsg)
+      trackError(`Registration validation error: ${errorMsg}`, "register_page")
       return
     }
 
     if (password.length < 6) {
-      setError("비밀번호는 최소 6자 이상이어야 합니다.")
+      const errorMsg = "비밀번호는 최소 6자 이상이어야 합니다."
+      setError(errorMsg)
+      trackError(`Registration validation error: ${errorMsg}`, "register_page")
       return
     }
 
     if (!privacyConsent) {
-      setError("개인정보 처리방침에 동의해주세요.")
+      const errorMsg = "개인정보 처리방침에 동의해주세요."
+      setError(errorMsg)
+      trackError(`Registration validation error: ${errorMsg}`, "register_page")
       return
     }
 
@@ -78,6 +93,7 @@ export default function RegisterPage() {
       })
 
       if (error) {
+        trackError(`Registration error: ${error.message}`, "register_page")
         setError(error.message)
         return
       }
@@ -85,6 +101,9 @@ export default function RegisterPage() {
       if (data.user) {
         // Store user name in localStorage for immediate use
         localStorage.setItem("user_name", name)
+
+        trackUserEvents.profileCreated()
+        trackIntegratedEvents.apiCall("user_register")
 
         setSuccess("회원가입이 완료되었습니다! 사주 프로필을 생성해주세요.")
 
@@ -94,7 +113,9 @@ export default function RegisterPage() {
         }, 2000)
       }
     } catch (err) {
-      setError("회원가입 중 오류가 발생했습니다.")
+      const errorMsg = "회원가입 중 오류가 발생했습니다."
+      trackError(`Registration exception: ${err instanceof Error ? err.message : "Unknown error"}`, "register_page")
+      setError(errorMsg)
     } finally {
       setIsLoading(false)
     }
@@ -117,7 +138,7 @@ export default function RegisterPage() {
 회사는 원칙적으로 이용자의 개인정보를 외부에 제공하지 않습니다.
 
 4. 개인정보 처리의 위탁
-회사는 서비스 향상을 위해 개인정�� 처리업무를 외부 전문업체에 위탁할 수 있습니다.
+회사는 서비스 향상을 위해 개인정 처리업무를 외부 전문업체에 위탁할 수 있습니다.
 
 5. 정보주체의 권리·의무 및 행사방법
 이용자는 개인정보 열람, 정정·삭제, 처리정지 요구 등의 권리를 행사할 수 있습니다.

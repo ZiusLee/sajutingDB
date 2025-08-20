@@ -59,6 +59,21 @@ export default async function DaeunAnalysisPage({
 
       return (
         <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if (typeof window !== 'undefined' && window.trackIntegratedEvents && window.trackEvent) {
+                  window.trackIntegratedEvents.pageView("daeun_analysis");
+                  window.trackEvent("daeun_analysis_view", {
+                    method: "uuid",
+                    hasName: ${!!userData.name},
+                    hasGender: ${!!userData.gender},
+                    timeUnknown: false
+                  });
+                }
+              `,
+            }}
+          />
           <Card className="w-full mx-auto border-0 sm:border sm:max-w-md">
             <CardHeader>
               <CardTitle className="text-center text-2xl">10년 대운 상세분석</CardTitle>
@@ -92,7 +107,7 @@ export default async function DaeunAnalysisPage({
                 <CardContent>
                   <p className="text-sm mb-4">
                     대운(大運)은 10년 단위로 변화하는 큰 운의 흐름으로, 인생의 주요 시기별 특성을 보여줍니다. 각 대운은
-                    천간(天干)��� 지지(地支)의 조합으로 이루어지며, 이는 해당 시기의 기회와 도전을 나타냅니다.
+                    천간(天干)과 지지(地支)의 조합으로 이루어지며, 이는 해당 시기의 기회와 도전을 나타냅니다.
                   </p>
 
                   <Separator className="my-4" />
@@ -141,13 +156,28 @@ export default async function DaeunAnalysisPage({
     }
   }
 
-  // 사주 파라미터가 있는 경우 (채팅 목록에서 돌아온 경우 또는 마이페이지에서 직접 전달된 ������)
+  // 사주 파라미터가 있는 경우 (채팅 목록에서 돌아온 경우 또는 마이페이지에서 직접 전달된 사주 데이터)
   if (sajuParam) {
     try {
       const sajuData = JSON.parse(decodeURIComponent(sajuParam))
 
       return (
         <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if (typeof window !== 'undefined' && window.trackIntegratedEvents && window.trackEvent) {
+                  window.trackIntegratedEvents.pageView("daeun_analysis");
+                  window.trackEvent("daeun_analysis_view", {
+                    method: "sajuParam",
+                    hasName: ${!!name},
+                    hasGender: ${!!gender},
+                    timeUnknown: ${sajuData.timeUnknown || false}
+                  });
+                }
+              `,
+            }}
+          />
           <Card className="w-full mx-auto border-0 sm:border sm:max-w-md">
             <CardHeader>
               <CardTitle className="text-center text-2xl">10년 대운 상세분석</CardTitle>
@@ -329,6 +359,21 @@ export default async function DaeunAnalysisPage({
 
     return (
       <div className="container mx-auto py-6 sm:py-10 px-3 sm:px-6 lg:px-8">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.trackIntegratedEvents && window.trackEvent) {
+                window.trackIntegratedEvents.pageView("daeun_analysis");
+                window.trackEvent("daeun_analysis_view", {
+                  method: "date",
+                  hasName: ${!!name},
+                  hasGender: ${!!gender},
+                  timeUnknown: ${isTimeUnknown}
+                });
+              }
+            `,
+          }}
+        />
         <Card className="w-full mx-auto border-0 sm:border sm:max-w-md">
           <CardHeader>
             <CardTitle className="text-center text-2xl">10년 대운 상세분석</CardTitle>
@@ -410,7 +455,7 @@ export default async function DaeunAnalysisPage({
                 <Link
                   href={`/result?date=${date}&hour=${hour}&minute=${minute}&timeUnknown=${timeUnknown}&name=${name || ""}&gender=${gender || ""}&location=${location || ""}`}
                 >
-                  결과 ��이지로 돌아가기
+                  결과 페이지로 돌아가기
                 </Link>
               </Button>
             </div>

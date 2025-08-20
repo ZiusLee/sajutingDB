@@ -16,6 +16,7 @@ import { SajuLogo } from "./saju-logo"
 import { Checkbox } from "@/components/ui/checkbox"
 import { SignupDialog } from "./signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
+import { trackEvent } from "@/lib/analytics"
 
 interface SajuOnboardingFlowProps {
   onClose: () => void
@@ -69,9 +70,53 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const router = useRouter()
   const supabase = getSupabase()
 
+  useState(() => {
+    trackEvent("onboarding_started", {
+      entry_point: "homepage",
+      user_type: "anonymous",
+    })
+  })
+
   const handleNext = () => {
     if (currentStep < 5) {
+      trackEvent("onboarding_step_completed", {
+        step: currentStep,
+        step_name: getStepName(currentStep),
+        data_entered: getStepData(currentStep),
+      })
+
       setCurrentStep(currentStep + 1)
+
+      trackEvent("onboarding_step_started", {
+        step: currentStep + 1,
+        step_name: getStepName(currentStep + 1),
+      })
+    }
+  }
+
+  const getStepName = (step: number) => {
+    const stepNames = ["", "name_input", "gender_selection", "birth_place", "birth_datetime", "concerns_selection"]
+    return stepNames[step] || "unknown"
+  }
+
+  const getStepData = (step: number) => {
+    switch (step) {
+      case 1:
+        return { name_length: birthInfo.name.length }
+      case 2:
+        return { gender: birthInfo.gender }
+      case 3:
+        return { birth_place: birthInfo.birthPlace }
+      case 4:
+        return {
+          has_date: !!birthInfo.birthDate,
+          has_time: !!birthInfo.birthTime,
+          time_unknown: birthInfo.timeUnknown,
+        }
+      case 5:
+        return { concerns_count: birthInfo.concerns.length }
+      default:
+        return {}
     }
   }
 
@@ -146,6 +191,13 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const handleOAuth = useCallback(
     async (provider: "kakao" | "google") => {
       console.log(`🔐 Starting ${provider} OAuth from onboarding...`)
+
+      trackEvent("auth_attempt", {
+        provider: provider,
+        context: "onboarding_signup",
+        user_type: "anonymous",
+        onboarding_step: "completed",
+      })
 
       try {
         setIsLoadingOAuth(true)
@@ -340,6 +392,22 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         if (userId) {
           console.log("Successfully created anonymous saju session with ID:", userId)
 
+          trackEvent("CONVERSION_saju_profile_complete", {
+            profile_name: birthInfo.name,
+            gender: birthInfo.gender,
+            birth_place: birthInfo.birthPlace,
+            time_unknown: birthInfo.timeUnknown,
+            concerns_count: birthInfo.concerns.length,
+            concerns: birthInfo.concerns,
+            user_type: "anonymous",
+          })
+
+          trackEvent("onboarding_completed", {
+            completion_time: Date.now(),
+            profile_created: true,
+            session_id: userId,
+          })
+
           // Update chat data with the session ID
           const finalChatSajuData = {
             ...chatSajuData,
@@ -355,6 +423,13 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
           setSignupOpen(true) // 로딩 완료 후 signup modal 표시
         } else {
           console.error("Failed to create saju session")
+
+          trackEvent("onboarding_abandoned", {
+            step: 5,
+            step_name: "saju_calculation",
+            reason: "database_error",
+          })
+
           toast({
             title: "데이터 저장 실패",
             description: "사주 정보 저장에 실패했습니다.",
@@ -364,6 +439,14 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         }
       } catch (error) {
         console.error("Error creating saju session:", error)
+
+        trackEvent("onboarding_abandoned", {
+          step: 5,
+          step_name: "saju_calculation",
+          reason: "calculation_error",
+          error: error.message,
+        })
+
         toast({
           title: "오류 발생",
           description: "사주 세션 생성 중 오류가 발생했습니다.",
@@ -373,9 +456,26 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       }
     } catch (error) {
       console.error("Error in saju calculation:", error)
+
+      trackEvent("onboarding_abandoned", {
+        step: 5,
+        step_name: "saju_calculation",
+        reason: "calculation_error",
+        error: error.message,
+      })
+
       toast({ title: "사주 계산 중 오류가 발생했습니다.", variant: "destructive" })
       setIsLoading(false)
     }
+  }
+
+  const handleClose = () => {
+    trackEvent("onboarding_abandoned", {
+      step: currentStep,
+      step_name: getStepName(currentStep),
+      reason: "user_closed",
+    })
+    onClose()
   }
 
   const canProceed = () => {
@@ -589,7 +689,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
           <SajuLogo size="md" />
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onClose}>
+            <Button variant="ghost" size="icon" onClick={handleClose}>
               <X className="h-6 w-6" />
             </Button>
           </div>

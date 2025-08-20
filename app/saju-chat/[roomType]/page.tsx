@@ -10,6 +10,7 @@ import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { SignupDialog } from "@/components/signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
 import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
+import { trackEvent } from "@/lib/analytics"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -337,6 +338,52 @@ export default function SajuChatPage() {
     }
   }, [router, toast, roomType, roomId, supabase])
 
+  useEffect(() => {
+    if (saju && !loading) {
+      trackEvent("USER_chat_session_start", {
+        room_type: roomType,
+        is_logged_in: isLoggedIn,
+        has_default_profile: defaultProfileLoaded,
+        session_id: sessionKey,
+      })
+
+      const isFirstChat = !localStorage.getItem("has_completed_first_chat")
+      if (isFirstChat) {
+        trackEvent("CONVERSION_first_chat_complete", {
+          room_type: roomType,
+          user_type: isLoggedIn ? "authenticated" : "anonymous",
+        })
+        localStorage.setItem("has_completed_first_chat", "true")
+      }
+    }
+  }, [saju, loading, roomType, isLoggedIn, defaultProfileLoaded, sessionKey])
+
+  useEffect(() => {
+    if (!loading) {
+      const isFirstVisit = !localStorage.getItem("user_has_visited")
+      const isReturnVisit = localStorage.getItem("user_has_visited") === "true"
+
+      if (isFirstVisit) {
+        trackEvent("USER_first_visit", {
+          entry_point: "saju_chat",
+          room_type: roomType,
+        })
+        localStorage.setItem("user_has_visited", "true")
+      } else if (isReturnVisit) {
+        trackEvent("USER_return_visit", {
+          entry_point: "saju_chat",
+          room_type: roomType,
+        })
+      }
+
+      trackEvent("USER_session_start", {
+        page: "saju_chat",
+        room_type: roomType,
+        is_logged_in: isLoggedIn,
+      })
+    }
+  }, [loading, roomType, isLoggedIn])
+
   const handleBack = useCallback(() => {
     try {
       const savedReturnPath = localStorage.getItem("chat_return_path")
@@ -435,6 +482,12 @@ export default function SajuChatPage() {
       } finally {
         setIsLoadingOAuth(false)
       }
+
+      trackEvent("auth_attempt", {
+        provider: provider,
+        context: "chat_signup_dialog",
+        user_type: "anonymous",
+      })
     },
     [supabase, toast],
   )

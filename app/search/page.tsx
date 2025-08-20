@@ -12,6 +12,7 @@ import { Search, UserPlus, Users } from "lucide-react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { BottomNavBar } from "@/components/bottom-nav-bar"
 import { toast } from "@/components/ui/use-toast"
+import { trackIntegratedEvents, trackEvent } from "@/lib/analytics"
 
 interface User {
   id: string
@@ -35,6 +36,8 @@ export default function SearchPage() {
 
   // 현재 로그인한 사용자 정보 가져오기
   useEffect(() => {
+    trackIntegratedEvents.pageView("search")
+
     const fetchCurrentUser = async () => {
       const {
         data: { user },
@@ -83,6 +86,12 @@ export default function SearchPage() {
       return
     }
 
+    trackEvent("user_search", {
+      searchTerm: searchTerm.trim(),
+      searchLength: searchTerm.trim().length,
+      searchType: searchTerm.includes("@") ? "email" : "name",
+    })
+
     setIsLoading(true)
     setHasSearched(true)
 
@@ -100,8 +109,20 @@ export default function SearchPage() {
       const filteredUsers = users.filter((user: User) => user.id !== currentUser?.id)
       setSearchResults(filteredUsers)
       setAllUsers(filteredUsers)
+
+      trackEvent("search_results", {
+        searchTerm: searchTerm.trim(),
+        resultCount: filteredUsers.length,
+        hasResults: filteredUsers.length > 0,
+      })
     } catch (error) {
       console.error("Error searching users:", error)
+
+      trackEvent("search_error", {
+        searchTerm: searchTerm.trim(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+
       toast({
         title: "사용자 검색 오류",
         description: "사용자를 검색하는 중 오류가 발생했습니다.",
@@ -114,6 +135,13 @@ export default function SearchPage() {
 
   // 사용자 프로필로 이동
   const navigateToProfile = (user: User) => {
+    trackEvent("profile_visit", {
+      userId: user.id,
+      from: "search",
+      userName: user.user_metadata?.name || "unknown",
+      userEmail: user.email,
+    })
+
     saveToRecentSearches(user)
     router.push(`/profile/${user.id}`)
   }
@@ -130,7 +158,7 @@ export default function SearchPage() {
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">검색</h1>
 
-        {/* 검색 입�� */}
+        {/* 검색 입력 */}
         <div className="flex gap-2 mb-6">
           <Input
             placeholder="이름 또는 이메일로 검색"

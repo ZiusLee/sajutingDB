@@ -12,6 +12,7 @@ import { BottomNavBar } from "@/components/bottom-nav-bar"
 import { ElementDisplay } from "@/components/element-display"
 import { calculateElementsFromSaju } from "@/lib/element-utils"
 import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
+import { trackEvent } from "@/lib/analytics"
 
 // 사주 정보 타입 정의
 interface SajuProfile {
@@ -215,8 +216,24 @@ export default function UserProfilePage() {
     loadUserData()
   }, [userId])
 
+  useEffect(() => {
+    if (!isLoading && userId) {
+      trackEvent("profile_view", {
+        viewed_user_id: userId,
+        is_own_profile: isCurrentUser,
+        profiles_count: sajuProfiles.length,
+      })
+    }
+  }, [isLoading, userId, isCurrentUser, sajuProfiles.length])
+
   // 사주 상세 보기
   const handleViewDetails = (profile: SajuProfile) => {
+    trackEvent("saju_detail_view", {
+      profile_name: profile.name,
+      profile_id: profile.id,
+      viewer_is_owner: isCurrentUser,
+    })
+
     const sajuData = {
       yearStem: profile.saju.yearStem,
       yearBranch: profile.saju.yearBranch,
@@ -262,6 +279,12 @@ export default function UserProfilePage() {
 
   // 궁합 보기
   const handleCheckCompatibility = () => {
+    trackEvent("compatibility_check_attempt", {
+      target_user_id: userId,
+      has_current_user_profile: !!currentUserProfile,
+      has_target_profile: !!defaultProfile,
+    })
+
     if (!currentUserProfile) {
       toast({
         title: "메인 사주 필요",
@@ -314,6 +337,14 @@ export default function UserProfilePage() {
 
     // 궁합 분석 페이지로 이동
     router.push(`/compatibility?user=${encodedUserSaju}&partner=${encodedPartnerData}`)
+
+    if (currentUserProfile && defaultProfile) {
+      trackEvent("compatibility_analysis_start", {
+        user1_name: currentUserProfile.name,
+        user2_name: defaultProfile.name,
+        analysis_type: "saju_compatibility",
+      })
+    }
   }
 
   return (
@@ -344,7 +375,7 @@ export default function UserProfilePage() {
                   variant="outline"
                   size="sm"
                   onClick={handleCheckCompatibility}
-                  className="ml-2"
+                  className="ml-2 bg-transparent"
                   disabled={!currentUserProfile || !defaultProfile}
                 >
                   <Users className="h-4 w-4 mr-1" />

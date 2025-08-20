@@ -1,9 +1,17 @@
+"use client"
+
+import { useEffect } from "react"
 import Link from "next/link"
 import ChargeStation from "@/components/charge-station"
+import { trackIntegratedEvents } from "@/lib/analytics"
 
 export const dynamic = "force-dynamic"
 
-export default async function ChargePage() {
+export default function ChargePage() {
+  useEffect(() => {
+    trackIntegratedEvents.pageView("charge")
+  }, [])
+
   return (
     <main className="min-h-[100dvh] bg-[#1b1c1e] text-white">
       <div className="mx-auto w-full max-w-md md:max-w-lg px-4 md:px-6 py-4 md:py-8">

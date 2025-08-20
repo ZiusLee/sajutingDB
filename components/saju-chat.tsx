@@ -1,5 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
+import type React from "react"
+
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
@@ -21,6 +23,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 import Sidebar from "@/components/sidebar"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { trackEvent } from "@/lib/analytics"
 
 interface SajuChatProps {
   saju: any
@@ -359,6 +362,16 @@ export default function SajuChat({
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
 
+      if (message.role === "assistant") {
+        trackEvent("AI_message_sent", {
+          message_length: message.content.length,
+          response_time: Date.now() - (window.lastUserMessageTime || Date.now()),
+          room_type: roomType,
+          session_id: sessionId,
+          is_logged_in: user !== null,
+        })
+      }
+
       // Clear persistent streaming state
       const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
       localStorage.removeItem(streamKey)
@@ -368,6 +381,13 @@ export default function SajuChat({
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+
+      trackEvent("AI_error", {
+        error_type: "chat_response_error",
+        error_message: error.message,
+        room_type: roomType,
+        session_id: sessionId,
+      })
 
       // Clear persistent streaming state on error
       const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
@@ -508,7 +528,14 @@ export default function SajuChat({
     }
   }
 
-  const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
+  const handleSignupProvider = async (provider: "kakao" | "google") => {
+    trackEvent("auth_attempt", {
+      provider: provider,
+      context: "chat_signup_dialog",
+      user_type: "anonymous",
+      has_chat_history: messages.length > 0,
+    })
+
     try {
       localStorage.setItem("auth_return_url", window.location.href)
 
@@ -703,6 +730,35 @@ export default function SajuChat({
   useEffect(() => {
     restoreScrollPosition()
   }, [roomType])
+
+  const handleUserSubmit = (e: React.FormEvent) => {
+    if (input.trim()) {
+      window.lastUserMessageTime = Date.now()
+
+      trackEvent("user_message_sent", {
+        message_length: input.length,
+        room_type: roomType,
+        session_id: sessionId,
+        is_logged_in: user !== null,
+        message_count: messages.filter((m) => m.role === "user").length + 1,
+      })
+
+      // Check for multiple questions in quick succession
+      const recentUserMessages = messages.filter(
+        (m) => m.role === "user" && Date.now() - new Date(m.createdAt || Date.now()).getTime() < 60000, // within 1 minute
+      )
+
+      if (recentUserMessages.length >= 2) {
+        trackEvent("BEHAVIOR_multiple_questions", {
+          questions_count: recentUserMessages.length + 1,
+          time_window: "1_minute",
+          room_type: roomType,
+        })
+      }
+    }
+
+    handleSubmit(e)
+  }
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
@@ -1031,7 +1087,7 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+            <form onSubmit={handleUserSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
