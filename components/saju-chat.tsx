@@ -959,9 +959,7 @@ export default function SajuChat({
             isKeyboardOpen ? "fixed bottom-0 left-0 right-0 z-50" : "relative"
           }`}
           style={{
-            paddingBottom: isKeyboardOpen
-              ? `${Math.max(8, keyboardHeight > 0 ? keyboardHeight : 0)}px`
-              : "max(8px, env(safe-area-inset-bottom))",
+            paddingBottom: isKeyboardOpen ? "8px" : "max(8px, env(safe-area-inset-bottom))",
             transform: isKeyboardOpen ? "translateY(0)" : "none",
             boxShadow: isKeyboardOpen ? "0 -4px 20px rgba(0,0,0,0.1)" : "none",
           }}
@@ -1005,8 +1003,10 @@ export default function SajuChat({
                     if (window.innerWidth <= 768) {
                       setTimeout(() => {
                         const inputElement = document.activeElement as HTMLInputElement
-                        inputElement?.scrollIntoView({ behavior: "smooth", block: "center" })
-                      }, 300)
+                        if (inputElement) {
+                          inputElement.focus()
+                        }
+                      }, 100)
                     }
                   }}
                 />
