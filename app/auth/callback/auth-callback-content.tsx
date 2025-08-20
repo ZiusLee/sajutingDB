@@ -37,16 +37,20 @@ export default function AuthCallbackContent() {
           const authReturnAction = localStorage.getItem("auth_return_action")
           const pendingSajuData = localStorage.getItem("auth_pending_saju_data")
           const pendingSessionId = localStorage.getItem("pending_session_link")
-          const isSignupFlow = authReturnAction === "continue_to_chat" // This indicates signup from onboarding
+          const authFlowType = localStorage.getItem("auth_flow_type")
+          const isSignupFlow = authReturnAction === "continue_to_chat" || authFlowType === "signup"
+          const isLoginFlow = authFlowType === "login"
 
           console.log("Auth callback state:", {
             authReturnAction,
             hasPendingSajuData: !!pendingSajuData,
             pendingSessionId,
+            authFlowType,
             isSignupFlow,
+            isLoginFlow,
           })
 
-          if (!isSignupFlow) {
+          if (isLoginFlow || (!isSignupFlow && !pendingSajuData)) {
             console.log("This is a login flow, checking if user exists in our database")
 
             try {
@@ -68,6 +72,7 @@ export default function AuthCallbackContent() {
 
                 // Sign out the user since they need to go through onboarding
                 await supabase.auth.signOut()
+                localStorage.removeItem("auth_flow_type")
 
                 setTimeout(() => {
                   router.push("/?showOnboarding=true")
@@ -81,7 +86,6 @@ export default function AuthCallbackContent() {
             }
           }
 
-          // Handle signup flow from onboarding
           if (isSignupFlow && pendingSajuData && pendingSessionId) {
             console.log("Processing onboarding completion flow (signup)")
 
@@ -109,6 +113,7 @@ export default function AuthCallbackContent() {
                 localStorage.removeItem("pending_session_link")
                 localStorage.removeItem("anonymous_session_created")
                 localStorage.removeItem("tempSajuData")
+                localStorage.removeItem("auth_flow_type")
 
                 // 5. Set user authentication flags
                 localStorage.setItem("user_authenticated", "true")
@@ -151,7 +156,6 @@ export default function AuthCallbackContent() {
             }
           }
 
-          // Handle existing user login flow
           const sessionId = localStorage.getItem("saju_session_id")
           let linkedAnySession = false
 
@@ -203,7 +207,6 @@ export default function AuthCallbackContent() {
             }
           }
 
-          // Check for stored auth return URL (from saju-chat)
           const authReturnUrl = localStorage.getItem("auth_return_url")
           let redirectUrl = "/mypage" // default
 
@@ -213,7 +216,6 @@ export default function AuthCallbackContent() {
             localStorage.removeItem("auth_return_url") // Clean up
           }
 
-          // Set user authentication flags
           localStorage.setItem("user_authenticated", "true")
           localStorage.setItem("user_id", authUserId)
           if (data.session.user.user_metadata?.name) {
@@ -223,7 +225,6 @@ export default function AuthCallbackContent() {
             localStorage.setItem("user_email", data.session.user.email)
           }
 
-          // Default redirect with appropriate message
           if (linkedAnySession) {
             toast({
               title: "로그인 완료",
