@@ -518,7 +518,7 @@ export default function SajuChatPage() {
   }
 
   return (
-    <div className="h-screen w-full relative">
+    <div className="h-[100dvh] w-full relative overflow-hidden supports-[height:100dvh]:h-[100dvh] supports-[height:100svh]:h-[100svh]">
       <SajuChat
         saju={saju.saju}
         name={saju.name || "사용자"}

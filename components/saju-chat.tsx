@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
 import SajuDiagram from "@/components/saju-diagram"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import type { BirthInfo } from "@/types/birth-date"
 import { toast } from "sonner"
@@ -15,9 +14,7 @@ import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
-import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
-import { SiteHeader } from "@/components/site-header"
 import { SignupDialog } from "@/components/signup-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Reverting back to original Supabase client creation method
 import { useRouter } from "next/navigation"
@@ -749,41 +746,9 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-transparent">
-        <SiteHeader />
-      </div>
-
-      <div className="hidden lg:block w-80 flex-shrink-0 bg-white/80 backdrop-blur-sm border-r border-gray-200/50">
-        <Sidebar
-          saju={stableSaju}
-          name={name}
-          gender={gender}
-          birthInfo={chatData.stableBirthInfo}
-          sessionId={sessionId}
-          roomType={roomType}
-          currentChatRoomId={effectiveChatRoomId}
-          onChatRoomSelect={handleChatRoomSelect}
-          onNewChat={handleNewChat}
-        />
-      </div>
-      <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-[66.67vw] max-w-sm p-0">
-          <Sidebar
-            saju={stableSaju}
-            name={name}
-            gender={gender}
-            birthInfo={chatData.stableBirthInfo}
-            sessionId={sessionId}
-            roomType={roomType}
-            currentChatRoomId={effectiveChatRoomId}
-            onChatRoomSelect={handleChatRoomSelect}
-            onNewChat={handleNewChat}
-          />
-        </SheetContent>
-      </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen bg-white lg:pt-0">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
+    <div className="flex h-full w-full bg-background">
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-1">

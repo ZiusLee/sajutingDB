@@ -95,12 +95,14 @@ body {
   .h-screen-mobile {
     height: 100vh;
     height: 100dvh; /* Dynamic viewport height for mobile */
+    height: -webkit-fill-available; /* iOS Safari specific height fallback */
   }
 
   /* Enhanced mobile keyboard and chat container utilities */
   .chat-container-height {
     height: calc(100vh - 140px);
     height: calc(100dvh - 140px);
+    height: calc(-webkit-fill-available - 140px); /* Updated chat container height calculation for better mobile viewport handling */
   }
 
   .chat-messages-container {
