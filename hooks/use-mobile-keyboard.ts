@@ -21,24 +21,23 @@ export function useMobileKeyboard() {
       return
     }
 
-    let currentHeight = window.innerHeight // Declare currentHeight variable
+    let currentHeight = window.innerHeight
 
     if (window.visualViewport) {
       const visualHeight = window.visualViewport.height
       const windowHeight = window.innerHeight
       const heightDiff = windowHeight - visualHeight
 
-      // More precise keyboard detection - keyboard is open if visual viewport is significantly smaller
       if (heightDiff > 100) {
         setIsKeyboardOpen(true)
-        setKeyboardHeight(0) // Don't use height diff, just detect keyboard state
+        setKeyboardHeight(heightDiff) // Use actual height difference for container sizing
       } else {
         setIsKeyboardOpen(false)
         setKeyboardHeight(0)
       }
 
-      setViewportHeight(visualHeight) // Use visual viewport height
-      currentHeight = visualHeight // Update currentHeight for later use
+      setViewportHeight(visualHeight)
+      currentHeight = visualHeight
     } else {
       const screenHeight = window.screen.height
 

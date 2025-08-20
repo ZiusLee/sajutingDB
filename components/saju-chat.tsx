@@ -746,7 +746,13 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-full w-full bg-background overflow-hidden">
+    <div
+      className="flex flex-col h-full overflow-hidden bg-white"
+      style={{
+        height: isKeyboardOpen ? `calc(100vh - ${keyboardHeight}px)` : "100vh",
+        maxHeight: isKeyboardOpen ? `calc(100vh - ${keyboardHeight}px)` : "100vh",
+      }}
+    >
       <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
@@ -955,14 +961,7 @@ export default function SajuChat({
           </div>
         </div>
         <div
-          className={`border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container transition-all duration-300 ease-in-out ${
-            isKeyboardOpen ? "fixed bottom-0 left-0 right-0 z-50" : "relative"
-          }`}
-          style={{
-            paddingBottom: isKeyboardOpen ? "8px" : "max(8px, env(safe-area-inset-bottom))",
-            transform: isKeyboardOpen ? "translateY(0)" : "none",
-            boxShadow: isKeyboardOpen ? "0 -4px 20px rgba(0,0,0,0.1)" : "none",
-          }}
+          className={`border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container transition-all duration-300 ease-in-out`}
         >
           {showScrollButton && (
             <Button
@@ -998,17 +997,6 @@ export default function SajuChat({
                   placeholder="무엇이든 물어보세요"
                   className="h-9 sm:h-11 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
                   disabled={isLoading || isInitialQuestionsMode}
-                  onFocus={() => {
-                    // Scroll input into view on mobile
-                    if (window.innerWidth <= 768) {
-                      setTimeout(() => {
-                        const inputElement = document.activeElement as HTMLInputElement
-                        if (inputElement) {
-                          inputElement.focus()
-                        }
-                      }, 100)
-                    }
-                  }}
                 />
                 <Button
                   type="button"
