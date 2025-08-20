@@ -119,7 +119,7 @@ export default function SajuChat({
   onChatRoomPersisted,
 }: SajuChatProps) {
   const { user } = useAuth()
-  const { isKeyboardOpen, keyboardHeight } = useMobileKeyboard()
+  const { isKeyboardOpen, keyboardHeight, viewportHeight } = useMobileKeyboard()
   const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
   const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
   const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
@@ -192,8 +192,6 @@ export default function SajuChat({
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
   const prevMessageCountRef = useRef(0) // Declare prevMessageCountRef
-
-  const viewportHeight = window.innerHeight - keyboardHeight
 
   // Auto-show signup dialog after 3 seconds for non-authenticated users
   useEffect(() => {
@@ -753,8 +751,7 @@ export default function SajuChat({
     <div
       className="flex overflow-hidden bg-white"
       style={{
-        height: "100svh",
-        ...(isKeyboardOpen && { height: `${viewportHeight}px` }),
+        height: isKeyboardOpen ? `${viewportHeight}px` : "100svh",
       }}
     >
       <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
@@ -795,7 +792,7 @@ export default function SajuChat({
           style={{
             backgroundColor: "white",
             ...(isKeyboardOpen && {
-              maxHeight: `calc(${viewportHeight}px - 80px)`,
+              maxHeight: `${viewportHeight - 80}px`,
               overscrollBehavior: "contain",
               position: "relative",
             }),
