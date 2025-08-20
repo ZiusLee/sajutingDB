@@ -40,6 +40,13 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
 
     console.log("Auth user ID:", userId)
 
+    // 현재 사용자 ID를 사주 데이터에 추가
+    if (userId) {
+      sajuData.userId = userId
+      sajuData.authUserId = userId
+      localStorage.setItem("tempSajuData", JSON.stringify(sajuData))
+    }
+
     // Prepare time data for database storage
     const timeData = {
       solar_hour: sajuData.timeUnknown ? null : sajuData.hour,
@@ -58,7 +65,41 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
       name: sajuData.name,
       gender: sajuData.gender,
       auth_user_id: userId, // This can be null for anonymous users
+      is_default: true, // 첫 번째 세션이므로 기본값으로 설정
+      saju: {
+        yearStem: sajuData.yearStem,
+        yearBranch: sajuData.yearBranch,
+        yearStemHanja: sajuData.yearStemHanja,
+        yearBranchHanja: sajuData.yearBranchHanja,
+        monthStem: sajuData.monthStem,
+        monthBranch: sajuData.monthBranch,
+        monthStemHanja: sajuData.monthStemHanja,
+        monthBranchHanja: sajuData.monthBranchHanja,
+        dayStem: sajuData.dayStem,
+        dayBranch: sajuData.dayBranch,
+        dayStemHanja: sajuData.dayStemHanja,
+        dayBranchHanja: sajuData.dayBranchHanja,
+        hourStem: sajuData.hourStem,
+        hourBranch: sajuData.hourBranch,
+        hourStemHanja: sajuData.hourStemHanja,
+        hourBranchHanja: sajuData.hourBranchHanja,
+        dayMaster: sajuData.dayMaster,
+        dayMasterHanja: sajuData.dayMasterHanja,
+        yearAnimal: sajuData.yearAnimal,
+        elements: sajuData.elements,
+        yearStemSibseong: sajuData.yearStemSibseong,
+        monthStemSibseong: sajuData.monthStemSibseong,
+        dayStemSibseong: sajuData.dayStemSibseong,
+        hourStemSibseong: sajuData.hourStemSibseong,
+        yearBranchSibseong: sajuData.yearBranchSibseong,
+        monthBranchSibseong: sajuData.monthBranchSibseong,
+        dayBranchSibseong: sajuData.dayBranchSibseong,
+        hourBranchSibseong: sajuData.hourBranchSibseong,
+      },
+      daeun: sajuData.daeun || null,
     }
+
+    console.log("Creating saju session with data:", sessionData)
 
     const { data: sessionResult, error: sessionError } = await supabase
       .from("saju_sessions")
@@ -172,6 +213,20 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
         console.error("Error inserting interpretation:", interpretationError)
       } else {
         console.log("Interpretation inserted successfully")
+      }
+    }
+
+    // 동기화 완료 후 current_saju에도 사용자 정보 업데이트
+    const currentSaju = localStorage.getItem("current_saju")
+    if (currentSaju && userId) {
+      try {
+        const parsedCurrentSaju = JSON.parse(currentSaju)
+        parsedCurrentSaju.userId = userId
+        parsedCurrentSaju.authUserId = userId
+        parsedCurrentSaju.sessionId = sessionId
+        localStorage.setItem("current_saju", JSON.stringify(parsedCurrentSaju))
+      } catch (error) {
+        console.error("Error updating current_saju with user info:", error)
       }
     }
 

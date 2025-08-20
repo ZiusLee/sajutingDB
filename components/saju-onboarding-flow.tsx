@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,12 +10,12 @@ import { toast } from "@/hooks/use-toast"
 import { calculateSaju, type TimeStandard } from "@/lib/saju"
 import { solarToLunar } from "@/lib/lunar-calendar"
 import { syncLocalStorageToDatabase } from "@/lib/data-sync"
-import { getSupabase } from "@/lib/supabase-client"
-import { updateAuthUserId } from "@/lib/db-service"
 import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } from "@/lib/city-timezone-data"
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { SajuLogo } from "./saju-logo"
 import { Checkbox } from "@/components/ui/checkbox"
+import { SignupDialog } from "./signup-dialog"
+import { getSupabase } from "@/lib/supabase-client"
 
 interface SajuOnboardingFlowProps {
   onClose: () => void
@@ -51,6 +51,8 @@ const concernOptions = [
 export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [signupOpen, setSignupOpen] = useState(false)
+  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false)
   const [birthInfo, setBirthInfo] = useState<BirthInfo>({
     name: "",
     gender: "",
@@ -65,6 +67,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const [citySearchResults, setCitySearchResults] = useState<CityTimezoneData[]>([])
   const [showCityDropdown, setShowCityDropdown] = useState(false)
   const router = useRouter()
+  const supabase = getSupabase()
 
   const handleNext = () => {
     if (currentStep < 5) {
@@ -140,66 +143,78 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     return { hour: 12, minute: 0 }
   }
 
-  const updateUserAuthId = async (sessionId: string) => {
-    try {
-      const supabaseClient = getSupabase()
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession()
+  const handleOAuth = useCallback(
+    async (provider: "kakao" | "google") => {
+      console.log(`🔐 Starting ${provider} OAuth from onboarding...`)
 
-      if (session && session.user) {
-        const authUserId = session.user.id
-        const success = await updateAuthUserId(sessionId, authUserId)
-        if (success) {
-          console.log("Successfully updated auth_user_id for saju session:", sessionId)
+      try {
+        setIsLoadingOAuth(true)
+
+        // 현재 생성된 세션 ID와 사주 데이터 저장
+        const sessionId = localStorage.getItem("saju_session_id")
+        const currentSajuData = localStorage.getItem("current_saju")
+
+        console.log("Preparing OAuth with data:", {
+          sessionId,
+          hasCurrentSajuData: !!currentSajuData,
+        })
+
+        if (sessionId) {
+          localStorage.setItem("pending_session_link", sessionId)
         }
+        if (currentSajuData) {
+          localStorage.setItem("auth_pending_saju_data", currentSajuData)
+        }
+
+        // auth callback에서 onboarding 완료 후 chat으로 가야 함을 표시
+        localStorage.setItem("auth_return_action", "continue_to_chat")
+
+        const redirectTo = `${window.location.origin}/auth/callback`
+        console.log("Redirect URL:", redirectTo)
+
+        const options: any = {
+          redirectTo,
+        }
+
+        if (provider === "google") {
+          options.queryParams = {
+            access_type: "offline",
+            prompt: "consent",
+          }
+          options.scopes = "openid email profile"
+        }
+
+        console.log(`OAuth options for ${provider}:`, options)
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options,
+        })
+
+        if (error) {
+          console.error(`❌ ${provider} OAuth error:`, error)
+          toast({
+            title: "로그인 오류",
+            description: `${provider === "kakao" ? "카카오" : "구글"} 로그인 중 오류가 발생했습니다: ${error.message}`,
+            variant: "destructive",
+          })
+          throw error
+        }
+
+        console.log(`✅ ${provider} OAuth initiated successfully`)
+      } catch (e) {
+        console.error(`❌ ${provider} OAuth start error:`, e)
+        toast({
+          title: "로그인 실패",
+          description: `${provider === "kakao" ? "카카오" : "구글"} 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.`,
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingOAuth(false)
       }
-    } catch (error) {
-      console.error("Error updating auth_user_id:", error)
-    }
-  }
-
-  const navigateToChat = async (sajuResult: any, daeunData: any) => {
-    try {
-      const parsedTime = birthInfo.timeUnknown ? { hour: 12, minute: 0 } : parseTime(birthInfo.birthTime)
-
-      const chatSajuData = {
-        saju: sajuResult,
-        name: birthInfo.name,
-        gender: birthInfo.gender,
-        interpretation: "",
-        returnPath: "/",
-        timeStandard: getTimeStandardFromCity(),
-        birthCityId: birthInfo.birthPlaceId,
-        daeun: daeunData,
-        concerns: birthInfo.concerns,
-        birthInfo: {
-          solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
-          solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
-          solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-          solarHour: parsedTime.hour,
-          solarMinute: parsedTime.minute,
-          lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
-          lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
-          lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-          timeUnknown: birthInfo.timeUnknown,
-          birthCityId: birthInfo.birthPlaceId,
-          timeStandard: getTimeStandardFromCity(),
-        },
-      }
-
-      localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      router.push("/saju-chat/sajuping")
-    } catch (error) {
-      console.error("Navigation error:", error)
-      toast({
-        title: "페이지 이동 중 오류가 발생했습니다",
-        description: "잠시 후 다시 시도해주세요.",
-        variant: "destructive",
-      })
-    }
-  }
+    },
+    [supabase, toast],
+  )
 
   const handleSubmit = async () => {
     if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlaceId || !birthInfo.birthDate) {
@@ -286,60 +301,79 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         concerns: birthInfo.concerns,
       }
 
+      // Store in localStorage for later use
       localStorage.setItem("tempSajuData", JSON.stringify(sajuDataToStore))
       window.sajuInfo = sajuResult
       window.sajuFullData = sajuDataToStore
 
-      const supabaseClient = getSupabase()
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession()
-      const authUserId = session?.user?.id || null
-      const userId = await syncLocalStorageToDatabase(authUserId)
-
-      if (userId) {
-        const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
-        storedData.userId = userId
-        storedData.sessionId = userId // Use the actual database session ID
-        localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-        localStorage.setItem("user_id", userId)
-
-        // Update the chatSajuData with the real session ID
-        const chatSajuData = {
-          saju: sajuResult,
-          name: birthInfo.name,
-          gender: birthInfo.gender,
-          interpretation: "",
-          returnPath: "/",
-          timeStandard: getTimeStandardFromCity(),
+      // Prepare chat data
+      const chatSajuData = {
+        saju: sajuResult,
+        name: birthInfo.name,
+        gender: birthInfo.gender,
+        interpretation: "",
+        returnPath: "/",
+        timeStandard: getTimeStandardFromCity(),
+        birthCityId: birthInfo.birthPlaceId,
+        daeun: daeunData,
+        concerns: birthInfo.concerns,
+        birthInfo: {
+          solarYear: Number.parseInt(year),
+          solarMonth: Number.parseInt(month),
+          solarDay: Number.parseInt(day),
+          solarHour: hour,
+          solarMinute: minute,
+          lunarYear: Number.parseInt(lunarData.year),
+          lunarMonth: Number.parseInt(lunarData.month),
+          lunarDay: Number.parseInt(lunarData.day),
+          timeUnknown: birthInfo.timeUnknown,
           birthCityId: birthInfo.birthPlaceId,
-          daeun: daeunData,
-          concerns: birthInfo.concerns,
-          sessionId: userId,
-          birthInfo: {
-            solarYear: Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
-            solarMonth: Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
-            solarDay: Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-            solarHour: hour,
-            solarMinute: minute,
-            lunarYear: sajuResult.lunarYear || Number.parseInt(parseDate(birthInfo.birthDate)?.year || "2000"),
-            lunarMonth: sajuResult.lunarMonth || Number.parseInt(parseDate(birthInfo.birthDate)?.month || "1"),
-            lunarDay: sajuResult.lunarDay || Number.parseInt(parseDate(birthInfo.birthDate)?.day || "1"),
-            timeUnknown: birthInfo.timeUnknown,
-            birthCityId: birthInfo.birthPlaceId,
-            timeStandard: getTimeStandardFromCity(),
-          },
-        }
-
-        localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
-        await updateUserAuthId(userId)
+          timeStandard: getTimeStandardFromCity(),
+        },
       }
 
-      await navigateToChat(sajuResult, daeunData)
+      // Create saju_session with auth_user_id: null (for anonymous users)
+      try {
+        console.log("Creating anonymous saju_session with auth_user_id: null")
+        const userId = await syncLocalStorageToDatabase(null) // null = anonymous user
+
+        if (userId) {
+          console.log("Successfully created anonymous saju session with ID:", userId)
+
+          // Update chat data with the session ID
+          const finalChatSajuData = {
+            ...chatSajuData,
+            sessionId: userId,
+          }
+
+          localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
+          localStorage.setItem("saju_session_id", userId)
+          localStorage.setItem("anonymous_session_created", "true")
+
+          console.log("Saju session created, showing signup modal")
+          setIsLoading(false)
+          setSignupOpen(true) // 로딩 완료 후 signup modal 표시
+        } else {
+          console.error("Failed to create saju session")
+          toast({
+            title: "데이터 저장 실패",
+            description: "사주 정보 저장에 실패했습니다.",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+        }
+      } catch (error) {
+        console.error("Error creating saju session:", error)
+        toast({
+          title: "오류 발생",
+          description: "사주 세션 생성 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+      }
     } catch (error) {
       console.error("Error in saju calculation:", error)
       toast({ title: "사주 계산 중 오류가 발생했습니다.", variant: "destructive" })
-    } finally {
       setIsLoading(false)
     }
   }
@@ -547,39 +581,43 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-cover bg-center bg-no-repeat z-50 flex flex-col"
-      style={{ backgroundImage: "url(/images/gradient-background.jpeg)" }}
-    >
-      <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
-        <SajuLogo size="md" />
-        <div className="flex items-center gap-4">
-          <Button
-            className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 py-2 text-sm font-medium"
-            onClick={() => router.push("/login")}
-          >
-            로그인
-          </Button>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-6 w-6" />
-          </Button>
-        </div>
-      </header>
+    <>
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-50 flex flex-col"
+        style={{ backgroundImage: "url(/images/gradient-background.jpeg)" }}
+      >
+        <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
+          <SajuLogo size="md" />
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
+        </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20">
-        <div className="flex justify-center mb-8">
-          {[1, 2, 3, 4, 5].map((step) => (
-            <div
-              key={step}
-              className={cn(
-                "w-2 h-2 rounded-full mx-1 transition-colors",
-                step === currentStep ? "bg-gray-800" : step < currentStep ? "bg-gray-600" : "bg-gray-300",
-              )}
-            />
-          ))}
-        </div>
-        {renderStepContent()}
-      </main>
-    </div>
+        <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20">
+          <div className="flex justify-center mb-8">
+            {[1, 2, 3, 4, 5].map((step) => (
+              <div
+                key={step}
+                className={cn(
+                  "w-2 h-2 rounded-full mx-1 transition-colors",
+                  step === currentStep ? "bg-gray-800" : step < currentStep ? "bg-gray-600" : "bg-gray-300",
+                )}
+              />
+            ))}
+          </div>
+          {renderStepContent()}
+        </main>
+      </div>
+
+      {/* Signup Dialog 추가 */}
+      <SignupDialog
+        open={signupOpen}
+        onOpenChange={setSignupOpen}
+        onSelectProvider={handleOAuth}
+        isLoading={isLoadingOAuth}
+      />
+    </>
   )
 }

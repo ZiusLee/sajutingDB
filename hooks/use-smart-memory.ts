@@ -96,7 +96,7 @@ export function useSmartMemory(): UseSmartMemoryReturn {
       const data = await smartMemoryClient.searchMemories(query, options)
       setSearchResults(data)
     } catch (error) {
-      handleError(error, "메모리 검색에 실패했습니다")
+      handleError(error, "메모리 검색��� 실패했습니다")
     } finally {
       setLoading(false)
     }

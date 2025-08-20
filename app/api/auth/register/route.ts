@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
       // Transfer anonymous data to authenticated user
       try {
-        await transferAnonymousDataToUser(session.id)
+        await transferAnonymousDataToUser(authUser.user?.id || "", session.id)
       } catch (transferError) {
         console.error("Error transferring anonymous data:", transferError)
         // Continue with registration even if transfer fails

@@ -11,8 +11,6 @@ import { toast } from "sonner"
 import DaeunDiagram from "@/components/daeun-diagram"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
 import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
@@ -20,10 +18,10 @@ import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import Sidebar from "@/components/sidebar"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SiteHeader } from "@/components/site-header"
-import { useGuestUsage } from "@/hooks/use-guest-usage"
 import { SignupDialog } from "@/components/signup-dialog"
-import { TermsDialog } from "@/components/terms-dialog"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 
 interface SajuChatProps {
   saju: any
@@ -140,9 +138,23 @@ export default function SajuChat({
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
   const [showSignupDialog, setShowSignupDialog] = useState(false)
-  const [showTermsDialog, setShowTermsDialog] = useState(false)
-  const [providerLabel, setProviderLabel] = useState("")
   const supabase = createClientComponentClient()
+  const [chatStreamState, setChatStreamState] = useState<{
+    isStreaming: boolean
+    currentMessageId: string | null
+    pendingContent: string
+  }>({
+    isStreaming: false,
+    currentMessageId: null,
+    pendingContent: "",
+  })
+  const chatStreamRef = useRef({
+    isStreaming: false,
+    messageId: null,
+    content: "",
+  })
+
+  const router = useRouter()
 
   const sessionId = useMemo(() => {
     try {
@@ -180,7 +192,23 @@ export default function SajuChat({
   const stableUserId = useMemo(() => user?.id || null, [user?.id])
   const effectiveChatRoomId = persistedChatRoomId || currentChatRoomId
 
-  const { count, limit, isOverLimit, increment, reset } = useGuestUsage(5)
+  const prevMessageCountRef = useRef(0) // Declare prevMessageCountRef
+
+  // Auto-show signup dialog after 3 seconds for non-authenticated users
+  useEffect(() => {
+    if (!user) {
+      console.log("🕐 Starting 3-second signup timer from page arrival...")
+      const timer = setTimeout(() => {
+        console.log("🕐 3 seconds elapsed since page arrival, showing signup dialog")
+        setShowSignupDialog(true)
+      }, 3000)
+
+      return () => {
+        console.log("🕐 Cleanup signup timer")
+        clearTimeout(timer)
+      }
+    }
+  }, [user]) // Removed chatData.isInitialized dependency
 
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
@@ -224,6 +252,9 @@ export default function SajuChat({
     let isMounted = true
     const initializeChatData = async () => {
       if (!stableSaju) return
+
+      let apiCallMade = false
+
       try {
         const calculatedDaeunData =
           stableSaju?.yearStem && stableBirthInfo?.solarYear && gender
@@ -244,23 +275,43 @@ export default function SajuChat({
         let isFirstRoom = false
 
         if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
-          const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-          if (response.ok) {
-            const result = await response.json()
-            const chatRooms = result.chatRooms || []
-            const sortedRooms = chatRooms.sort(
-              (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-            )
-            isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
+          try {
+            const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+            if (response.ok) {
+              const result = await response.json()
+              const chatRooms = result.chatRooms || []
+              const sortedRooms = chatRooms.sort(
+                (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              )
+              isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
+              apiCallMade = true
+            } else {
+              console.warn("Failed to fetch chat rooms:", response.status)
+            }
+          } catch (error) {
+            console.error("Error fetching chat rooms:", error)
           }
-          pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
-            .filter((msg) => msg.role === "user" || msg.role === "assistant")
-            .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
-            .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+
+          try {
+            pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
+              .filter((msg) => msg.role === "user" || msg.role === "assistant")
+              .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+              .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+          } catch (error) {
+            console.error("Error loading messages:", error)
+            pastMessages = []
+          }
         } else {
           shouldSendInitialQuestions = true
-          const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-          isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
+          if (!apiCallMade) {
+            try {
+              const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+              isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
+            } catch (error) {
+              console.error("Error checking first room:", error)
+              isFirstRoom = true // 에러 시 첫 번째 방으로 간주
+            }
+          }
         }
 
         if (isMounted) {
@@ -279,18 +330,25 @@ export default function SajuChat({
             setInitialQuestionsToSend(questions)
             setIsInitialQuestionsMode(true)
           }
-          // 로그인한 사용자의 새로운 채팅방(첫 번째가 아닌)에서는 자동 질문 비활성화
-          // shouldSendInitialQuestions가 true이지만 isFirstRoom이 false인 경우는 아무것도 하지 않음
         }
       } catch (error) {
         console.error("❌ Error initializing chat data:", error)
+        if (isMounted) {
+          setChatData({
+            calculatedDaeun: null,
+            stableBirthInfo: stableBirthInfo,
+            initialMessages: [],
+            isInitialized: true,
+          })
+          setIsFirstChatRoom(true)
+        }
       }
     }
     initializeChatData()
     return () => {
       isMounted = false
     }
-  }, [stableSaju, stableBirthInfo, gender, name, roomType, effectiveChatRoomId, sessionId, stableConcerns])
+  }, [stableSaju, effectiveChatRoomId, sessionId])
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
     api: "/api/saju-chat",
@@ -301,14 +359,24 @@ export default function SajuChat({
     onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
+
+      // Clear persistent streaming state
+      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+      localStorage.removeItem(streamKey)
+      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+
+      // Clear persistent streaming state on error
+      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+      localStorage.removeItem(streamKey)
+      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     },
   })
-
-  // --- FUNDAMENTAL FIX: useEffect-driven initial question flow ---
 
   useEffect(() => {
     if (
@@ -324,8 +392,6 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
-  // Remove the second question useEffect completely
-
   useEffect(() => {
     const endInitialMode = () => {
       console.log("✅ [Flow] Ending initial questions mode.")
@@ -334,14 +400,11 @@ export default function SajuChat({
     }
 
     if (isInitialQuestionsMode && !isLoading) {
-      // End after first response for both first room and non-first room
       if (messages.length === 2 && messages[1].role === "assistant") {
         endInitialMode()
       }
     }
   }, [isInitialQuestionsMode, isLoading, messages])
-
-  // --- End of fundamental fix ---
 
   useEffect(() => {
     const saveNewMessages = async () => {
@@ -412,11 +475,13 @@ export default function SajuChat({
 
   const handleChatRoomSelect = (chatRoomId: string) => {
     if (window.innerWidth < 1024) setSidebarOpen(false)
-    window.location.href = `/saju-chat/${roomType}?roomId=${chatRoomId}`
+    saveScrollPosition()
+    router.push(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
   }
 
   const handleNewChat = () => {
-    window.location.href = `/saju-chat/${roomType}`
+    saveScrollPosition()
+    router.push(`/saju-chat/${roomType}`)
   }
 
   const scrollToBottom = () => {
@@ -425,34 +490,29 @@ export default function SajuChat({
   }
 
   const scrollToTop = () => {
-    if (chatContainerRef.current)
-      chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
+    if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const scrollToLastUserMessage = () => {
     if (!chatContainerRef.current) return
-    
-    // Find the last user message element
+
     const container = chatContainerRef.current
     const messageElements = container.querySelectorAll('[data-role="user"]')
     const lastUserMessageElement = messageElements[messageElements.length - 1]
-    
+
     if (lastUserMessageElement) {
-      // Scroll so the user message appears at the top of the viewport
       const containerRect = container.getBoundingClientRect()
       const messageRect = lastUserMessageElement.getBoundingClientRect()
-      const scrollTop = container.scrollTop + messageRect.top - containerRect.top
-      
+      const scrollTop = container.scrollTop + messageRect.top - containerRect.top - 20 // 20px 여백
+
       container.scrollTo({ top: scrollTop, behavior: "smooth" })
     }
   }
 
   const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
     try {
-      // Save current location for redirect after auth
       localStorage.setItem("auth_return_url", window.location.href)
-      
-      // Redirect to auth provider
+
       if (provider === "kakao") {
         window.location.href = `/api/auth/login?provider=kakao`
       } else if (provider === "google") {
@@ -465,48 +525,15 @@ export default function SajuChat({
     }
   }
 
-  const handleTermsAgree = async () => {
-    if (!user) return
-
-    try {
-      // Get the current session from localStorage
-      const sessionId = localStorage.getItem("current_session_id") || 
-                       localStorage.getItem("user_id") ||
-                       user.id
-
-      // Update saju_sessions table
-      const { error } = await supabase
-        .from("saju_sessions")
-        .upsert({
-          id: sessionId,
-          auth_user_id: user.id,
-          privacy: true,
-          updated_at: new Date().toISOString()
-        })
-
-      if (error) {
-        console.error("Error updating saju_sessions:", error)
-        toast.error("사용자 정보 업데이트 중 오류가 발생했습니다.")
-        return
-      }
-
-      setShowTermsDialog(false)
-      toast.success("회원가입이 완료되었습니다!")
-      
-    } catch (error) {
-      console.error("Terms agreement error:", error)
-      toast.error("약관 동의 처리 중 오류가 발생했습니다.")
-    }
-  }
-
-  const prevMessageCountRef = useRef(0)
+  const suggestedQuestions = useMemo(
+    () => generateSuggestedQuestions(stableConcerns, roomType),
+    [stableConcerns, roomType],
+  )
 
   useEffect(() => {
-    // Scroll to show new user message at the top when a NEW user message is sent
     if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
       const lastMessage = messages[messages.length - 1]
       if (lastMessage && lastMessage.role === "user") {
-        // Use setTimeout to ensure DOM is updated first
         setTimeout(() => {
           scrollToLastUserMessage()
         }, 100)
@@ -527,63 +554,156 @@ export default function SajuChat({
   }, [messages.length])
 
   useEffect(() => {
-    // Reset guest usage when user logs in
-    if (user) {
-      reset()
-      localStorage.removeItem("previous_user_message_count")
-    }
-  }, [user, reset])
+    const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
 
-  useEffect(() => {
-    // Check if logged in user needs to agree to terms
-    const checkTermsAgreement = async () => {
-      if (!user) return
-
+    // Load persistent stream state on mount
+    const savedStreamState = localStorage.getItem(streamKey)
+    if (savedStreamState) {
       try {
-        const { data: sessionData } = await supabase
-          .from("saju_sessions")
-          .select("privacy")
-          .eq("auth_user_id", user.id)
-          .single()
-
-        if (!sessionData || sessionData.privacy !== true) {
-          // Determine provider label
-          const provider = user.app_metadata?.provider || "unknown"
-          setProviderLabel(provider === "google" ? "Google" : provider === "kakao" ? "Kakao" : provider)
-          setShowTermsDialog(true)
+        const parsedState = JSON.parse(savedStreamState)
+        if (parsedState.isStreaming && parsedState.messageId) {
+          console.log("🔄 Restoring persistent chat stream:", parsedState.messageId)
+          setChatStreamState(parsedState)
+          chatStreamRef.current = parsedState
         }
       } catch (error) {
-        console.error("Error checking terms agreement:", error)
+        console.error("❌ Error loading persistent stream state:", error)
+        localStorage.removeItem(streamKey)
       }
     }
 
-    checkTermsAgreement()
-  }, [user, supabase])
+    if (isLoading && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && lastMessage.role === "assistant") {
+        const newStreamState = {
+          isStreaming: true,
+          messageId: lastMessage.id || `temp-${Date.now()}`,
+          pendingContent: lastMessage.content || "",
+          timestamp: Date.now(),
+        }
+
+        setChatStreamState({
+          isStreaming: true,
+          currentMessageId: newStreamState.messageId,
+          pendingContent: newStreamState.pendingContent,
+        })
+        chatStreamRef.current = {
+          isStreaming: true,
+          messageId: newStreamState.messageId,
+          content: newStreamState.pendingContent,
+        }
+
+        localStorage.setItem(streamKey, JSON.stringify(newStreamState))
+      }
+    } else if (!isLoading && chatStreamState.isStreaming) {
+      // Stream finished, clear persistent state
+      localStorage.removeItem(streamKey)
+      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
+    }
+
+    // Cleanup function
+    return () => {
+      if (chatStreamRef.current.isStreaming) {
+        localStorage.setItem(
+          streamKey,
+          JSON.stringify({
+            isStreaming: chatStreamRef.current.isStreaming,
+            messageId: chatStreamRef.current.messageId,
+            pendingContent: chatStreamRef.current.content,
+            timestamp: Date.now(),
+          }),
+        )
+      }
+    }
+  }, [effectiveChatRoomId, sessionId, isLoading, messages, chatStreamState.isStreaming])
 
   useEffect(() => {
-    // Increment guest usage when user sends a message (not logged in)
-    if (!user && messages.length > 0) {
-      const userMessages = messages.filter((msg: any) => msg.role === "user")
-      const currentUserMessageCount = userMessages.length
-      
-      // localStorage에서 이전 메시지 개수 가져오기
-      const previousCount = parseInt(localStorage.getItem("previous_user_message_count") || "0", 10)
-      
-      // 새로운 사용자 메시지가 있으면 카운트 증가 (자동 초기 메시지 포함)
-      if (currentUserMessageCount > previousCount) {
-        const newMessagesCount = currentUserMessageCount - previousCount
-        for (let i = 0; i < newMessagesCount; i++) {
-          increment()
-        }
-        localStorage.setItem("previous_user_message_count", currentUserMessageCount.toString())
+    const handleBeforeUnload = () => {
+      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+      if (chatStreamRef.current.isStreaming) {
+        localStorage.setItem(
+          streamKey,
+          JSON.stringify({
+            isStreaming: chatStreamRef.current.isStreaming,
+            messageId: chatStreamRef.current.messageId,
+            pendingContent: chatStreamRef.current.content,
+            timestamp: Date.now(),
+          }),
+        )
       }
     }
-  }, [messages, user, increment])
 
-  const suggestedQuestions = useMemo(
-    () => generateSuggestedQuestions(stableConcerns, roomType),
-    [stableConcerns, roomType],
-  )
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [effectiveChatRoomId, sessionId])
+
+  useEffect(() => {
+    // Check for interrupted streams on page load
+    const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
+    const savedStream = localStorage.getItem(streamKey)
+
+    if (savedStream && chatData.isInitialized) {
+      try {
+        const streamState = JSON.parse(savedStream)
+        const timeDiff = Date.now() - (streamState.timestamp || 0)
+
+        // If stream is less than 5 minutes old, try to restore it
+        if (timeDiff < 5 * 60 * 1000 && streamState.isStreaming) {
+          console.log("🔄 Attempting to restore interrupted stream")
+
+          // Check if the message exists in current messages
+          const messageExists = messages.some((msg) => msg.id === streamState.messageId)
+
+          if (!messageExists && streamState.pendingContent) {
+            // Add the partially streamed message back
+            const restoredMessage = {
+              id: streamState.messageId,
+              role: "assistant" as const,
+              content: streamState.pendingContent,
+              createdAt: new Date().toISOString(),
+            }
+
+            // Trigger the AI to continue from where it left off
+            setTimeout(() => {
+              reload()
+            }, 1000)
+          }
+        } else {
+          // Clean up old stream state
+          localStorage.removeItem(streamKey)
+        }
+      } catch (error) {
+        console.error("❌ Error restoring stream state:", error)
+        localStorage.removeItem(streamKey)
+      }
+    }
+  }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
+
+  const saveScrollPosition = () => {
+    if (chatContainerRef.current) {
+      const scrollPosition = chatContainerRef.current.scrollTop
+      sessionStorage.setItem(`chat-scroll-${roomType}`, scrollPosition.toString())
+    }
+  }
+
+  const restoreScrollPosition = () => {
+    const savedPosition = sessionStorage.getItem(`chat-scroll-${roomType}`)
+    if (savedPosition && chatContainerRef.current) {
+      const position = Number.parseInt(savedPosition, 10)
+      if (position > 0) {
+        setTimeout(() => {
+          if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = position
+          }
+        }, 100)
+      }
+    }
+  }
+
+  useEffect(() => {
+    restoreScrollPosition()
+  }, [roomType])
 
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
@@ -615,11 +735,9 @@ export default function SajuChat({
   }
 
   const shouldShowSajuDiagram = (index: number) => {
-    // 첫 번째 채팅룸: 두 번째 메시지(index 1)에서 사주 다이어그램 표시
     if (isFirstChatRoom && index === 1 && messages[index].role === "assistant") {
       return true
     }
-    // 첫 번째가 아닌 채팅룸: 첫 번째 메시지(index 0)에서 사주 다이어그램 표시
     if (!isFirstChatRoom && index === 0 && messages[index].role === "assistant") {
       return true
     }
@@ -627,19 +745,16 @@ export default function SajuChat({
   }
 
   const shouldShowDaeunDiagram = (index: number) => {
-    // 첫 번째 채팅룸에서만 대운 다이어그램 표시 (두 번째 메시지와 함께)
     return isFirstChatRoom && index === 1 && messages[index].role === "assistant"
   }
 
   return (
-    <div className="flex h-screen-mobile bg-white">
-      {/* Mobile Header - only show on mobile */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
+    <div className="flex h-screen bg-gray-50">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-transparent">
         <SiteHeader />
       </div>
 
-      {/* Sidebar for desktop */}
-      <div className="hidden lg:block w-96 flex-shrink-0">
+      <div className="hidden lg:block w-80 flex-shrink-0 bg-white/80 backdrop-blur-sm border-r border-gray-200/50">
         <Sidebar
           saju={stableSaju}
           name={name}
@@ -667,14 +782,57 @@ export default function SajuChat({
           />
         </SheetContent>
       </Sheet>
-      <div className="flex-1 flex flex-col min-w-0 h-screen-mobile pt-16 lg:pt-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen bg-white lg:pt-0">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container chat-container-height">
-          <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-4">
+          <div className="px-3 sm:px-6 py-2 sm:py-6 space-y-6 sm:space-y-8 pb-4">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
-              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3">
+              <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 sm:p-3 mt-2">
                 💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
+
+            {messages.length === 0 && !isInitialQuestionsMode && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+                <div className="mb-8">
+                  <h1 className="text-3xl md:text-4xl font-bold text-black leading-tight mb-4">
+                    오늘은 어떤 것이
+                    <br />
+                    궁금하세요?
+                  </h1>
+                  <p className="text-base text-gray-600">사주를 바탕으로 나와 대화하는 AI Companion</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 w-full max-w-md">
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-xl bg-white border-gray-200 text-left justify-start px-4 hover:bg-gray-50 transition-colors"
+                    onClick={() => handleSuggestedQuestionClick("직장을 어떤 기준으로 선택하면 좋을까?")}
+                  >
+                    <span className="text-lg mr-3">💼</span>
+                    <span className="text-sm font-medium">직장을 어떤 기준으로 선택하면 좋을까?</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-xl bg-white border-gray-200 text-left justify-start px-4 hover:bg-gray-50 transition-colors"
+                    onClick={() => handleSuggestedQuestionClick("올해 나의 결혼운은 어때?")}
+                  >
+                    <span className="text-lg mr-3">💕</span>
+                    <span className="text-sm font-medium">올해 나의 결혼운은 어때?</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-xl bg-white border-gray-200 text-left justify-start px-4 hover:bg-gray-50 transition-colors"
+                    onClick={() => handleSuggestedQuestionClick("이번달 재물운 알려줘")}
+                  >
+                    <span className="text-lg mr-3">💰</span>
+                    <span className="text-sm font-medium">이번달 재물운 알려줘</span>
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {messages.map((message, index) => (
               <div key={message.id || index}>
                 {message.role === "user" ? (
@@ -687,7 +845,6 @@ export default function SajuChat({
                   <div className="space-y-3 sm:space-y-4">
                     {(shouldShowSajuDiagram(index) || shouldShowDaeunDiagram(index)) && (
                       <div className="flex flex-col lg:flex-row gap-4 max-w-full">
-                        {/* 대운 다이어그램을 왼쪽에 배치 */}
                         {shouldShowDaeunDiagram(index) && chatData.calculatedDaeun && (
                           <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0 order-1 lg:order-1">
                             <DaeunDiagram
@@ -698,7 +855,6 @@ export default function SajuChat({
                             />
                           </div>
                         )}
-                        {/* 사주 다이어그램을 오른쪽에 배치 */}
                         {shouldShowSajuDiagram(index) && (
                           <div className="flex-1 w-full lg:max-w-md mx-auto lg:mx-0 order-2 lg:order-2">
                             <SajuDiagram
@@ -725,7 +881,6 @@ export default function SajuChat({
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
-                          // 제목들 스타일링
                           h1: ({ children }) => (
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 mt-8 pb-3 border-b-2 border-gray-200 first:mt-0">
                               {children}
@@ -742,17 +897,14 @@ export default function SajuChat({
                           h4: ({ children }) => (
                             <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2 mt-4">{children}</h4>
                           ),
-                          // 단락 스타일링
                           p: ({ children }) => (
                             <p className="text-base sm:text-lg leading-relaxed text-gray-700 mb-4 last:mb-0">
                               {children}
                             </p>
                           ),
-                          // 구분선 스타일링
                           hr: () => (
                             <hr className="my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                           ),
-                          // 리스트 스타일링
                           ul: ({ children }) => <ul className="space-y-2 mb-4 pl-0">{children}</ul>,
                           ol: ({ children }) => <ol className="space-y-2 mb-4 pl-0 counter-reset-item">{children}</ol>,
                           li: ({ children, ordered }) => (
@@ -766,14 +918,12 @@ export default function SajuChat({
                               <span className="flex-1">{children}</span>
                             </li>
                           ),
-                          // 강조 텍스트 스타일링
                           strong: ({ children }) => (
                             <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
                               {children}
                             </strong>
                           ),
                           em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
-                          // 코드 블록 스타일링
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {
@@ -794,13 +944,11 @@ export default function SajuChat({
                               {children}
                             </pre>
                           ),
-                          // 인용문 스타일링
                           blockquote: ({ children }) => (
                             <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 my-4 italic text-gray-700">
                               {children}
                             </blockquote>
                           ),
-                          // 테이블 스타일링
                           table: ({ children }) => (
                             <div className="overflow-x-auto mb-4">
                               <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
@@ -842,17 +990,25 @@ export default function SajuChat({
           </div>
         </div>
         <div
-          className={`border-t bg-white p-3 sm:p-4 flex-shrink-0 chat-input-container ${
-            isKeyboardOpen ? "ios-keyboard-adjust" : "pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-4"
+          className={`border-t bg-white p-3 sm:p-4 flex-shrink-0 chat-input-container transition-all duration-300 ease-in-out ${
+            isKeyboardOpen ? "fixed bottom-0 left-0 right-0 z-50" : "relative"
           }`}
-          style={isKeyboardOpen ? { paddingBottom: `max(12px, ${keyboardHeight}px)` } : {}}
+          style={{
+            paddingBottom: isKeyboardOpen
+              ? `${Math.max(12, keyboardHeight > 0 ? keyboardHeight : 0)}px`
+              : "max(12px, env(safe-area-inset-bottom))",
+            transform: isKeyboardOpen ? "translateY(0)" : "none",
+            boxShadow: isKeyboardOpen ? "0 -4px 20px rgba(0,0,0,0.1)" : "none",
+          }}
         >
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
               variant="outline"
               size="sm"
-              className="absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow z-10"
+              className={`absolute right-4 sm:right-6 bottom-20 sm:bottom-24 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 z-10 ${
+                isKeyboardOpen ? "bottom-20 sm:bottom-24" : "bottom-20 sm:bottom-24"
+              }`}
             >
               <ArrowDown className="h-4 w-4" />
             </Button>
@@ -873,87 +1029,52 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={(e) => {
-              // Check if user is over limit before submitting
-              const userMessageCount = messages.filter((msg: any) => msg.role === "user").length
-              if (!user && userMessageCount >= limit) {
-                e.preventDefault()
-                setShowSignupDialog(true)
-                return
-              }
-              handleSubmit(e)
-            }} className="flex gap-2 items-center">
+            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
                   onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
-                  className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base"
+                  className="h-10 sm:h-12 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
                   disabled={isLoading || isInitialQuestionsMode}
+                  onFocus={() => {
+                    // Scroll input into view on mobile
+                    if (window.innerWidth <= 768) {
+                      setTimeout(() => {
+                        const inputElement = document.activeElement as HTMLInputElement
+                        inputElement?.scrollIntoView({ behavior: "smooth", block: "center" })
+                      }, 300)
+                    }
+                  }}
                 />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
-                      disabled={isInitialQuestionsMode}
-                    >
-                      <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 sm:w-56 p-2 mb-2" align="end">
-                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">💕</span>궁합 보기
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-xs sm:text-sm">
-                      <span className="mr-2 sm:mr-3 text-sm sm:text-base">👥</span>다른 사람 사주 봐주기
-                    </Button>
-                  </PopoverContent>
-                </Popover>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
+                  disabled={isInitialQuestionsMode}
+                >
+                  <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
               </div>
               <Button
                 type="submit"
                 size="icon"
-                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800"
-                disabled={!input.trim() || isLoading || isInitialQuestionsMode || (!user && messages.filter((msg: any) => msg.role === "user").length >= limit)}
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0 bg-gray-900 hover:bg-gray-800 transition-all duration-200"
+                disabled={!input.trim() || isLoading || isInitialQuestionsMode}
               >
                 <Send className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </form>
-            {/* Message counter for guests - positioned below input like ChatGPT */}
-            {!user && (
-              <div className="flex justify-center mt-2">
-                <div
-                  className={`text-xs text-center ${
-                    messages.filter((msg: any) => msg.role === "user").length >= limit ? "text-red-600" : 
-                    messages.filter((msg: any) => msg.role === "user").length >= limit - 1 ? "text-orange-600" : "text-gray-500"
-                  }`}
-                >
-                  {/* Show remaining messages based on actual user message count */}
-                  무료 메시지 {Math.max(0, limit - messages.filter((msg: any) => msg.role === "user").length)}/{limit}
-                </div>
-              </div>
-            )}
           </div>
         </div>
+
+        <SignupDialog
+          open={showSignupDialog}
+          onOpenChange={setShowSignupDialog}
+          onSelectProvider={handleSignupProvider}
+        />
       </div>
-      
-      {/* Signup Dialog */}
-      <SignupDialog
-        open={showSignupDialog}
-        onOpenChange={setShowSignupDialog}
-        onSelectProvider={handleSignupProvider}
-      />
-      
-      {/* Terms Dialog */}
-      <TermsDialog
-        open={showTermsDialog}
-        onOpenChange={setShowTermsDialog}
-        providerLabel={providerLabel}
-        onAgree={handleTermsAgree}
-      />
     </div>
   )
 }

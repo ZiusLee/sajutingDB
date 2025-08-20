@@ -192,7 +192,7 @@ export default function CompatibilityComparison({
 
           {/* 사주 다이어그램 */}
           <div className="space-y-2">
-            <h4 className="font-medium">��주 다이어그램</h4>
+            <h4 className="font-medium">���주 다이어그램</h4>
             <div className="grid grid-cols-4 gap-1 sm:gap-2">
               <div className="space-y-1 sm:space-y-2">
                 <div className="text-center text-xs sm:text-sm text-muted-foreground">년주</div>

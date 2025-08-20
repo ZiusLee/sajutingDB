@@ -50,7 +50,7 @@ export default function RegisterPage() {
     }
 
     if (password !== confirmPassword) {
-      setError("비밀번호가 일치하지 않습니다.")
+      setError("비밀번호가 일치하��� 않습니다.")
       return
     }
 
@@ -86,11 +86,11 @@ export default function RegisterPage() {
         // Store user name in localStorage for immediate use
         localStorage.setItem("user_name", name)
 
-        setSuccess("회원가입이 완료되었습니다! 이메일을 확인해주세요.")
+        setSuccess("회원가입이 완료되었습니다! 사주 프로필을 생성해주세요.")
 
-        // Redirect to home page after a short delay
+        // Redirect to home page with onboarding trigger after a short delay
         setTimeout(() => {
-          router.push("/")
+          router.push("/?showOnboarding=true")
         }, 2000)
       }
     } catch (err) {
@@ -117,7 +117,7 @@ export default function RegisterPage() {
 회사는 원칙적으로 이용자의 개인정보를 외부에 제공하지 않습니다.
 
 4. 개인정보 처리의 위탁
-회사는 서비스 향상을 위해 개인정보 처리업무를 외부 전문업체에 위탁할 수 있습니다.
+회사는 서비스 향상을 위해 개인정�� 처리업무를 외부 전문업체에 위탁할 수 있습니다.
 
 5. 정보주체의 권리·의무 및 행사방법
 이용자는 개인정보 열람, 정정·삭제, 처리정지 요구 등의 권리를 행사할 수 있습니다.

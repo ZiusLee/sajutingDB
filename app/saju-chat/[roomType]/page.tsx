@@ -7,38 +7,30 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
-import { useGuestUsage } from "@/hooks/use-guest-usage"
 import { SignupDialog } from "@/components/signup-dialog"
-import { TermsDialog } from "@/components/terms-dialog"
 import { getSupabase } from "@/lib/supabase-client"
-
-type Provider = "kakao" | "google" | "apple"
+import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
 
 export default function SajuChatPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const [saju, setSaju] = useState<any>(null)
+  const [saju, setSaju] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [sessionKey, setSessionKey] = useState<string>("")
+  const [defaultProfileLoaded, setDefaultProfileLoaded] = useState(false)
+  const [sessionKey, setSessionKey] = useState("")
   const [isSidebarOpen, setSidebarOpen] = useState(false)
-  const [currentChatRoom, setCurrentChatRoom] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
-
-  // Guest usage limiter
-  const { count, limit, isOverLimit, incrementOncePerVisit } = useGuestUsage(5)
+  const [currentChatRoom, setCurrentChatRoom] = useState(null)
+  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
-  const [termsOpen, setTermsOpen] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
+
   const supabase = getSupabase()
 
-  // Stabilize roomId and roomType to prevent infinite re-renders
   const roomId = useMemo(() => searchParams.get("roomId"), [searchParams])
   const roomType = useMemo(() => params.roomType as string, [params.roomType])
 
-  // Validate room type
   const validRoomTypes = ["sajuping", "tarot", "general"]
   useEffect(() => {
     if (roomType && !validRoomTypes.includes(roomType)) {
@@ -52,7 +44,6 @@ export default function SajuChatPage() {
   }, [])
 
   useEffect(() => {
-    // Store sidebar toggle function globally for site header to access
     if (typeof window !== "undefined") {
       ;(window as any).toggleSajuChatSidebar = handleSidebarToggle
     }
@@ -69,23 +60,178 @@ export default function SajuChatPage() {
 
     const initializePage = async () => {
       try {
-        // 로그인 여부 확인 (localStorage flag 우선, 없으면 Supabase 세션)
-        const authed = localStorage.getItem("user_authenticated") === "true"
-        if (authed) {
-          setIsLoggedIn(true)
-        } else {
-          const { data } = await supabase.auth.getSession()
-          setIsLoggedIn(Boolean(data.session?.user))
-          if (data.session?.user) {
-            localStorage.setItem("user_authenticated", "true")
-            localStorage.setItem("user_id", data.session.user.id)
-          }
+        // Wait a bit for auth state to settle if coming from OAuth
+        const authReturnAction = localStorage.getItem("auth_return_action")
+        if (authReturnAction === "continue_to_chat") {
+          console.log("Coming from OAuth, waiting for auth state to settle...")
+          await new Promise((resolve) => setTimeout(resolve, 1000))
         }
 
-        // 로컬 스토리지에서 사주 데이터 가져오기
+        const { data } = await supabase.auth.getSession()
+        const isAuthenticated = Boolean(data.session?.user)
+
+        console.log("Authentication check:", { isAuthenticated, userId: data.session?.user?.id })
+
+        setIsLoggedIn(isAuthenticated)
+
+        if (isAuthenticated) {
+          console.log("User is authenticated:", data.session?.user.id)
+          localStorage.setItem("user_authenticated", "true")
+          localStorage.setItem("user_id", data.session.user.id)
+
+          console.log("✅ User is authenticated, loading default saju profile first...")
+
+          try {
+            const defaultSession = await getDefaultSajuSession(data.session.user.id)
+
+            if (defaultSession) {
+              console.log("Found default saju session:", defaultSession.id)
+
+              // Get full profile data for the default session
+              const profile = await getSajuProfileBySessionId(defaultSession.id)
+
+              if (profile && isMounted) {
+                console.log("Successfully loaded default saju profile, using as priority")
+
+                // Create chat saju data structure from profile
+                const chatSajuData = {
+                  saju: profile.saju,
+                  name: profile.name, // profile.name을 우선적으로 사용 (saju_sessions 테이블의 name)
+                  gender: profile.gender,
+                  interpretation: "",
+                  returnPath: "/",
+                  timeStandard: "KST",
+                  birthCityId: null,
+                  daeun: profile.saju.daeun,
+                  concerns: [],
+                  userId: data.session.user.id,
+                  authUserId: data.session.user.id,
+                  sessionId: profile.id,
+                  birthInfo: {
+                    solarYear: Number.parseInt(profile.birthYear),
+                    solarMonth: Number.parseInt(profile.birthMonth),
+                    solarDay: Number.parseInt(profile.birthDay),
+                    solarHour: Number.parseInt(profile.birthHour),
+                    solarMinute: Number.parseInt(profile.birthMinute),
+                    lunarYear: Number.parseInt(profile.lunarYear),
+                    lunarMonth: Number.parseInt(profile.lunarMonth),
+                    lunarDay: Number.parseInt(profile.lunarDay),
+                    timeUnknown: profile.timeUnknown,
+                    birthCityId: null,
+                    timeStandard: "KST",
+                  },
+                }
+
+                localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+                localStorage.setItem("saju_session_id", profile.id)
+
+                setSaju(chatSajuData)
+                setDefaultProfileLoaded(true)
+                const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+                setSessionKey(generatedKey)
+
+                let chatRoom = null
+                if (!roomId) {
+                  chatRoom = createTemporaryChatRoom({
+                    sessionId: profile.id,
+                    title: "새로운 대화",
+                    roomType: roomType || "sajuping",
+                    isTemporary: true,
+                  })
+
+                  setCurrentChatRoom(chatRoom)
+                  const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+                  window.history.replaceState({}, "", newUrl)
+                } else {
+                  setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+                }
+
+                setLoading(false)
+                return
+              }
+            } else {
+              console.log("No default saju session found for authenticated user")
+            }
+          } catch (error) {
+            console.error("Error loading default saju session:", error)
+          }
+
+          console.log("No default profile found, checking localStorage as fallback")
+        } else {
+          console.log("User is not authenticated")
+          localStorage.removeItem("user_authenticated")
+          localStorage.removeItem("user_id")
+        }
+
         const savedSaju = localStorage.getItem("current_saju")
 
         if (!savedSaju) {
+          console.log("No saju data found in localStorage")
+
+          // If coming from onboarding, try to get data from tempSajuData
+          const tempSajuData = localStorage.getItem("tempSajuData")
+          if (tempSajuData && isAuthenticated) {
+            console.log("Found tempSajuData, converting to current_saju")
+            const tempData = JSON.parse(tempSajuData)
+
+            // Create chat saju data structure
+            const chatSajuData = {
+              saju: tempData,
+              name: tempData.name,
+              gender: tempData.gender,
+              interpretation: "",
+              returnPath: "/",
+              timeStandard: tempData.timeStandard,
+              birthCityId: tempData.birthCityId,
+              daeun: tempData.daeun,
+              concerns: tempData.concerns || [],
+              userId: data.session.user.id,
+              authUserId: data.session.user.id,
+              sessionId: localStorage.getItem("saju_session_id"),
+              birthInfo: {
+                solarYear: tempData.year,
+                solarMonth: tempData.month,
+                solarDay: tempData.day,
+                solarHour: tempData.hour,
+                solarMinute: tempData.minute,
+                lunarYear: tempData.lunarYear,
+                lunarMonth: tempData.lunarMonth,
+                lunarDay: tempData.lunarDay,
+                timeUnknown: tempData.timeUnknown,
+                birthCityId: tempData.birthCityId,
+                timeStandard: tempData.timeStandard,
+              },
+            }
+
+            localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+            localStorage.removeItem("tempSajuData")
+
+            if (isMounted) {
+              setSaju(chatSajuData)
+              const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+              setSessionKey(generatedKey)
+
+              let chatRoom = null
+              if (!roomId) {
+                chatRoom = createTemporaryChatRoom({
+                  sessionId: chatSajuData.sessionId || `fallback-${Date.now()}`,
+                  title: "새로운 대화",
+                  roomType: roomType || "sajuping",
+                  isTemporary: true,
+                })
+
+                setCurrentChatRoom(chatRoom)
+                const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+                window.history.replaceState({}, "", newUrl)
+              } else {
+                setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+              }
+
+              setLoading(false)
+              return
+            }
+          }
+
           if (isMounted) {
             toast({
               title: "사주 정보가 없습니다",
@@ -99,21 +245,49 @@ export default function SajuChatPage() {
 
         const parsedSaju = JSON.parse(savedSaju)
 
+        // 인증된 사용자인 경우, 현재 사용자의 데이터인지 확인
+        if (isAuthenticated && data.session?.user) {
+          const currentUserId = data.session.user.id
+          const sajuUserId = parsedSaju.userId || parsedSaju.authUserId
+
+          // 사주 데이터가 다른 사용자의 것이라면 삭제하고 홈으로 리다이렉트
+          if (sajuUserId && sajuUserId !== currentUserId) {
+            console.log("Saju data belongs to different user, clearing and redirecting")
+            localStorage.removeItem("current_saju")
+            localStorage.removeItem("tempSajuData")
+            localStorage.removeItem("saju_session_id")
+
+            if (isMounted) {
+              toast({
+                title: "사주 정보가 없습니다",
+                description: "새로운 사주를 입력해주세요.",
+                variant: "destructive",
+              })
+              router.push("/")
+            }
+            return
+          }
+
+          // 현재 사용자 ID를 사주 데이터에 추가
+          if (!sajuUserId) {
+            parsedSaju.userId = currentUserId
+            parsedSaju.authUserId = currentUserId
+            localStorage.setItem("current_saju", JSON.stringify(parsedSaju))
+          }
+        }
+
         if (isMounted) {
           setSaju(parsedSaju)
 
-          // Generate a unique session key for this chat room
           const generatedKey = `chat_${parsedSaju.name || "user"}_${roomType}`
           setSessionKey(generatedKey)
 
-          // Get sessionId for chat room creation
           let sessionId = parsedSaju.sessionId
           if (!sessionId) {
-            const userId = localStorage.getItem("user_id")
-            sessionId = userId || `fallback-${Date.now()}`
+            const sajuSessionId = localStorage.getItem("saju_session_id")
+            sessionId = sajuSessionId || `fallback-${Date.now()}`
           }
 
-          // Auto-create temporary chat room if no roomId is provided
           let chatRoom = null
           if (!roomId) {
             chatRoom = createTemporaryChatRoom({
@@ -125,21 +299,17 @@ export default function SajuChatPage() {
 
             setCurrentChatRoom(chatRoom)
 
-            // Update URL with the temporary room ID without triggering a page reload
             const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
             window.history.replaceState({}, "", newUrl)
           } else {
-            // If roomId exists, we'll handle it in the chat component
             setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
           }
 
-          // 원래 경로 저장 (있는 경우)
           const lastChatData = loadSajuFromLocalStorage("last_chat_saju_data")
           if (lastChatData && lastChatData.returnPath) {
             localStorage.setItem("chat_return_path", lastChatData.returnPath)
           }
 
-          // 마이페이지에서 왔는지 확인 (한 번만 체크하고 플래그 제거)
           const fromMyPage = sessionStorage.getItem("from_mypage")
           if (fromMyPage === "true") {
             sessionStorage.removeItem("from_mypage")
@@ -165,41 +335,20 @@ export default function SajuChatPage() {
     return () => {
       isMounted = false
     }
-  }, [router, toast, roomType, roomId, supabase.auth])
-
-  // Increment guest usage on first mount of chat if not logged in
-  useEffect(() => {
-    if (!loading) {
-      const guest = !isLoggedIn
-      if (guest) {
-        incrementOncePerVisit()
-      }
-    }
-  }, [loading, isLoggedIn, incrementOncePerVisit])
-
-  // Open signup dialog automatically if over limit and guest
-  useEffect(() => {
-    if (!isLoggedIn && isOverLimit) {
-      setSignupOpen(true)
-    }
-  }, [isLoggedIn, isOverLimit])
+  }, [router, toast, roomType, roomId, supabase])
 
   const handleBack = useCallback(() => {
     try {
-      // 저장된 원래 경로가 있으면 그 경로로 이동
       const savedReturnPath = localStorage.getItem("chat_return_path")
 
       if (savedReturnPath) {
-        // 사주 데이터가 있는지 확인
         if (saju) {
-          // URL 유틸리티 함수를 사용하여 사주 데이터를 URL에 추가
           const urlWithSaju = addSajuToUrl(savedReturnPath, saju.saju, saju.name, saju.gender)
           router.push(urlWithSaju)
         } else {
           router.push(savedReturnPath)
         }
       } else if (saju) {
-        // 사주 데이터가 있으면 결과 페이지로 이동
         const sajuParam = encodeURIComponent(JSON.stringify(saju.saju))
         const nameParam = saju.name ? `&name=${encodeURIComponent(saju.name)}` : ""
         const genderParam = saju.gender ? `&gender=${encodeURIComponent(saju.gender)}` : ""
@@ -216,10 +365,8 @@ export default function SajuChatPage() {
 
   const handleChatRoomPersisted = useCallback(
     (newChatRoomId: string) => {
-      // Update the current chat room when it gets persisted
       setCurrentChatRoom((prev: any) => ({ ...prev, id: newChatRoomId, isTemporary: false }))
 
-      // Update URL with the persisted room ID without triggering re-render
       const newUrl = `/saju-chat/${roomType}?roomId=${newChatRoomId}`
       if (window.history.replaceState) {
         window.history.replaceState(null, "", newUrl)
@@ -228,69 +375,125 @@ export default function SajuChatPage() {
     [roomType],
   )
 
-  // Signup flow handlers
-  const onSelectProvider = (provider: Provider) => {
-    if (provider === "apple") return // currently disabled
-    setSelectedProvider(provider)
-    setSignupOpen(false)
-    setTermsOpen(true)
-  }
+  const handleOAuth = useCallback(
+    async (provider: "kakao" | "google") => {
+      console.log(`🔐 Starting ${provider} OAuth...`)
 
-  const startOAuth = async (provider: Provider) => {
-    console.log(`🔐 Starting ${provider} OAuth...`)
+      try {
+        setIsLoadingOAuth(true)
 
-    try {
-      setIsLoading(true)
+        // 현재 URL과 세션 정보를 저장
+        const currentUrl = window.location.href
+        const sessionId = localStorage.getItem("saju_session_id")
 
-      // Store current location for redirect back
-      const currentUrl = window.location.href
-      localStorage.setItem("auth_return_url", currentUrl)
-
-      const redirectTo = `${window.location.origin}/auth/callback`
-      console.log("Redirect URL:", redirectTo)
-
-      const options: any = {
-        redirectTo,
-      }
-
-      // Provider-specific options
-      if (provider === "google") {
-        options.queryParams = {
-          access_type: "offline",
-          prompt: "consent",
+        localStorage.setItem("auth_return_url", currentUrl)
+        if (sessionId) {
+          localStorage.setItem("pending_session_link", sessionId)
         }
-      }
 
-      console.log(`OAuth options for ${provider}:`, options)
+        const redirectTo = `${window.location.origin}/auth/callback`
+        console.log("Redirect URL:", redirectTo)
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options,
-      })
+        const options: any = {
+          redirectTo,
+        }
 
-      if (error) {
-        console.error(`❌ ${provider} OAuth error:`, error)
+        if (provider === "google") {
+          options.queryParams = {
+            access_type: "offline",
+            prompt: "consent",
+          }
+          options.scopes = "openid email profile"
+        }
+
+        console.log(`OAuth options for ${provider}:`, options)
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options,
+        })
+
+        if (error) {
+          console.error(`❌ ${provider} OAuth error:`, error)
+          toast({
+            title: "로그인 오류",
+            description: `${provider === "kakao" ? "카카오" : "구글"} 로그인 중 오류가 발생했습니다: ${error.message}`,
+            variant: "destructive",
+          })
+          throw error
+        }
+
+        console.log(`✅ ${provider} OAuth initiated successfully`)
+        setSignupOpen(false) // signup dialog 닫기
+      } catch (e) {
+        console.error(`❌ ${provider} OAuth start error:`, e)
         toast({
-          title: "로그인 오류",
-          description: `${provider === "kakao" ? "카카오" : "구글"} 로그인 중 오류가 발생했습니다: ${error.message}`,
+          title: "로그인 실패",
+          description: `${provider === "kakao" ? "카카오" : "구글"} 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.`,
           variant: "destructive",
         })
-        throw error
+      } finally {
+        setIsLoadingOAuth(false)
+      }
+    },
+    [supabase, toast],
+  )
+
+  const checkAnonymousSession = useCallback(async () => {
+    console.log("Checking anonymous session. isLoggedIn:", isLoggedIn)
+
+    if (isLoggedIn || defaultProfileLoaded) {
+      console.log("User is logged in or default profile loaded, skipping anonymous session check")
+      localStorage.removeItem("anonymous_session_created")
+      return
+    }
+
+    if (!loading) {
+      const sessionId = localStorage.getItem("saju_session_id")
+      const anonymousSessionCreated = localStorage.getItem("anonymous_session_created")
+      const authReturnAction = localStorage.getItem("auth_return_action")
+
+      // onboarding에서 바로 온 경우는 signup dialog 표시하지 않음
+      if (authReturnAction === "continue_to_chat") {
+        console.log("Came from onboarding, not showing signup dialog")
+        return
       }
 
-      console.log(`✅ ${provider} OAuth initiated successfully`)
-      // OAuth redirect will happen automatically
-    } catch (e) {
-      console.error(`❌ ${provider} OAuth start error:`, e)
-      toast({
-        title: "로그인 실패",
-        description: `${provider === "kakao" ? "카카오" : "구글"} 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.`,
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+      console.log("Session ID from localStorage:", sessionId)
+      console.log("Anonymous session created flag:", anonymousSessionCreated)
+
+      if (sessionId && anonymousSessionCreated === "true") {
+        try {
+          const { data, error } = await supabase
+            .from("saju_sessions")
+            .select("auth_user_id, name")
+            .eq("id", sessionId)
+            .single()
+
+          console.log("Database session check result:", { data, error })
+
+          if (!error && data && data.auth_user_id === null) {
+            console.log("Found anonymous saju_session, showing signup dialog after delay")
+
+            const timer = setTimeout(() => {
+              setSignupOpen(true)
+            }, 2000)
+
+            return () => clearTimeout(timer)
+          } else if (!error && data && data.auth_user_id) {
+            console.log("Session is already linked to authenticated user:", data.auth_user_id)
+            localStorage.removeItem("anonymous_session_created")
+          }
+        } catch (error) {
+          console.error("Error checking saju_session:", error)
+        }
+      }
     }
-  }
+  }, [isLoggedIn, loading, defaultProfileLoaded, supabase])
+
+  useEffect(() => {
+    checkAnonymousSession()
+  }, [isLoggedIn, loading, defaultProfileLoaded, supabase])
 
   if (loading) {
     return (
@@ -315,8 +518,7 @@ export default function SajuChatPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 relative">
-      {/* Chat */}
+    <div className="h-screen w-full relative">
       <SajuChat
         saju={saju.saju}
         name={saju.name || "사용자"}
@@ -335,25 +537,7 @@ export default function SajuChatPage() {
         onChatRoomPersisted={handleChatRoomPersisted}
       />
 
-      {/* Signup Dialog - 게스트 한도 초과 시 자동으로 열림 */}
-      <SignupDialog
-        open={signupOpen}
-        onOpenChange={setSignupOpen}
-        onSelectProvider={onSelectProvider}
-        isOverLimit={!isLoggedIn && isOverLimit}
-        currentCount={count}
-        maxCount={limit}
-      />
-
-      {/* Terms before OAuth */}
-      <TermsDialog
-        open={termsOpen}
-        onOpenChange={setTermsOpen}
-        providerLabel={selectedProvider === "kakao" ? "카카오" : selectedProvider === "google" ? "구글" : "Apple"}
-        onAgree={() => {
-          if (selectedProvider) startOAuth(selectedProvider)
-        }}
-      />
+      <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
     </div>
   )
 }

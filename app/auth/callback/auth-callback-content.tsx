@@ -1,84 +1,240 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useSearchParams } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { getSupabase } from "@/lib/supabase-client"
+import { updateAuthUserId } from "@/lib/db-service"
+import { toast } from "@/hooks/use-toast"
 
 export default function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClientComponentClient()
+  const [isProcessing, setIsProcessing] = useState(true)
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log("🔄 Processing auth callback...")
-        console.log("Search params:", Object.fromEntries(searchParams.entries()))
+        const supabase = getSupabase()
 
-        const code = searchParams.get("code")
-        const error = searchParams.get("error")
-        const errorDescription = searchParams.get("error_description")
+        // Handle the auth callback
+        const { data, error } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("❌ OAuth error from provider:", error, errorDescription)
-          router.push(`/login?error=${encodeURIComponent(error)}`)
+          console.error("Auth callback error:", error)
+          toast({
+            title: "로그인 실패",
+            description: "로그인 처리 중 오류가 발생했습니다.",
+            variant: "destructive",
+          })
+          router.push("/")
           return
         }
 
-        if (code) {
-          console.log("✅ Auth code received, exchanging for session...")
+        if (data.session?.user) {
+          const authUserId = data.session.user.id
+          console.log("Auth callback successful, user ID:", authUserId)
 
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          // Check for onboarding completion flow
+          const authReturnAction = localStorage.getItem("auth_return_action")
+          const pendingSajuData = localStorage.getItem("auth_pending_saju_data")
+          const pendingSessionId = localStorage.getItem("pending_session_link")
 
-          if (exchangeError) {
-            console.error("❌ Session exchange error:", exchangeError)
-            router.push(`/login?error=callback_error`)
-            return
+          console.log("Auth callback state:", {
+            authReturnAction,
+            hasPendingSajuData: !!pendingSajuData,
+            pendingSessionId,
+          })
+
+          if (authReturnAction === "continue_to_chat" && pendingSajuData && pendingSessionId) {
+            console.log("Processing onboarding completion flow")
+
+            try {
+              // 1. Update the saju_session with auth_user_id
+              console.log("Updating auth_user_id for session:", pendingSessionId, "with auth user:", authUserId)
+              const success = await updateAuthUserId(pendingSessionId, authUserId)
+
+              if (success) {
+                console.log("Successfully updated auth_user_id for saju session:", pendingSessionId)
+
+                // 2. Update current_saju data with auth_user_id
+                const sajuData = JSON.parse(pendingSajuData)
+                sajuData.userId = authUserId
+                sajuData.authUserId = authUserId
+                sajuData.sessionId = pendingSessionId
+
+                // 3. Store updated saju data
+                localStorage.setItem("current_saju", JSON.stringify(sajuData))
+                localStorage.setItem("saju_session_id", pendingSessionId)
+
+                // 4. Clean up temporary flags
+                localStorage.removeItem("auth_return_action")
+                localStorage.removeItem("auth_pending_saju_data")
+                localStorage.removeItem("pending_session_link")
+                localStorage.removeItem("anonymous_session_created")
+                localStorage.removeItem("tempSajuData")
+
+                // 5. Set user authentication flags
+                localStorage.setItem("user_authenticated", "true")
+                localStorage.setItem("user_id", authUserId)
+                if (data.session.user.user_metadata?.name) {
+                  localStorage.setItem("user_name", data.session.user.user_metadata.name)
+                }
+                if (data.session.user.email) {
+                  localStorage.setItem("user_email", data.session.user.email)
+                }
+
+                console.log("All data prepared, redirecting to chat...")
+
+                toast({
+                  title: "로그인 완료",
+                  description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
+                })
+
+                // 6. Wait a bit for state to settle, then redirect
+                setTimeout(() => {
+                  console.log("Redirecting to chat after onboarding completion")
+                  window.location.href = "/saju-chat/sajuping"
+                }, 1000)
+                return
+              } else {
+                console.error("Failed to update auth_user_id for session:", pendingSessionId)
+                toast({
+                  title: "세션 연결 실패",
+                  description: "사주 정보 연결에 실패했습니다.",
+                  variant: "destructive",
+                })
+              }
+            } catch (error) {
+              console.error("Error in onboarding completion flow:", error)
+              toast({
+                title: "오류 발생",
+                description: "로그인 처리 중 오류가 발생했습니다.",
+                variant: "destructive",
+              })
+            }
           }
 
-          if (data.user) {
-            console.log("✅ User authenticated:", data.user.id)
+          // Check if there's an existing anonymous saju_session that needs auth_user_id update
+          const sessionId = localStorage.getItem("saju_session_id")
+          let linkedAnySession = false
 
-            // Store user info in localStorage
-            localStorage.setItem("user_authenticated", "true")
-            localStorage.setItem("user_id", data.user.id)
-            if (data.user.email) {
-              localStorage.setItem("user_email", data.user.email)
+          if (sessionId && sessionId !== pendingSessionId) {
+            console.log("Found existing saju_session ID, updating auth_user_id:", sessionId)
+
+            try {
+              // Update auth_user_id for existing session
+              console.log("Updating auth_user_id for session:", sessionId, "with auth user:", authUserId)
+              const success = await updateAuthUserId(sessionId, authUserId)
+
+              if (success) {
+                console.log("Successfully updated auth_user_id for saju session:", sessionId)
+                linkedAnySession = true
+
+                // Update current_saju data if it exists
+                const currentSaju = localStorage.getItem("current_saju")
+                if (currentSaju) {
+                  const sajuData = JSON.parse(currentSaju)
+                  sajuData.userId = authUserId
+                  sajuData.authUserId = authUserId
+                  localStorage.setItem("current_saju", JSON.stringify(sajuData))
+                }
+
+                // Clean up tempSajuData since session is now linked
+                localStorage.removeItem("tempSajuData")
+
+                toast({
+                  title: "로그인 완료",
+                  description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
+                })
+
+                // Check for stored auth return URL (from saju-chat) to return to exact same room
+                const authReturnUrl = localStorage.getItem("auth_return_url")
+                if (authReturnUrl) {
+                  console.log("Returning to original chat room:", authReturnUrl)
+                  localStorage.removeItem("auth_return_url")
+                  window.location.href = authReturnUrl
+                } else {
+                  // Fallback: Navigate to generic chat
+                  window.location.href = "/saju-chat/sajuping"
+                }
+                return
+              } else {
+                console.error("Failed to update auth_user_id for session:", sessionId)
+              }
+            } catch (error) {
+              console.error("Error updating session auth_user_id:", error)
             }
-            if (data.user.user_metadata?.name) {
-              localStorage.setItem("user_name", data.user.user_metadata.name)
-            }
+          }
 
-            // Redirect to original destination
-            const returnUrl = localStorage.getItem("auth_return_url") || "/mypage"
-            localStorage.removeItem("auth_return_url")
+          // Check for stored auth return URL (from saju-chat)
+          const authReturnUrl = localStorage.getItem("auth_return_url")
+          let redirectUrl = "/mypage" // default
 
-            console.log("🔄 Redirecting to:", returnUrl)
-            router.push(returnUrl)
+          if (authReturnUrl) {
+            console.log("Found auth return URL:", authReturnUrl)
+            redirectUrl = authReturnUrl
+            localStorage.removeItem("auth_return_url") // Clean up
+          }
+
+          // Set user authentication flags
+          localStorage.setItem("user_authenticated", "true")
+          localStorage.setItem("user_id", authUserId)
+          if (data.session.user.user_metadata?.name) {
+            localStorage.setItem("user_name", data.session.user.user_metadata.name)
+          }
+          if (data.session.user.email) {
+            localStorage.setItem("user_email", data.session.user.email)
+          }
+
+          // Default redirect with appropriate message
+          if (linkedAnySession) {
+            toast({
+              title: "로그인 완료",
+              description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
+            })
           } else {
-            console.error("❌ No user data received")
-            router.push("/login?error=no_user")
+            toast({
+              title: "로그인 완료",
+              description: "성공적으로 로그인되었습니다.",
+            })
           }
+
+          window.location.href = redirectUrl
         } else {
-          console.error("❌ No auth code found in callback")
-          router.push("/login?error=no_code")
+          console.log("No session found after auth callback")
+          router.push("/")
         }
       } catch (error) {
-        console.error("❌ Auth callback error:", error)
-        router.push("/login?error=callback_error")
+        console.error("Error in auth callback:", error)
+        toast({
+          title: "로그인 오류",
+          description: "로그인 처리 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+        router.push("/")
+      } finally {
+        setIsProcessing(false)
       }
     }
 
     handleAuthCallback()
-  }, [searchParams, router, supabase])
+  }, [router, searchParams])
+
+  if (isProcessing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">로그인 처리 중...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-        <h1 className="text-2xl font-bold text-white mb-2">인증 처리 중...</h1>
-        <p className="text-white/80">잠시만 기다려주세요</p>
+        <p className="text-muted-foreground">로그인 처리가 완료되었습니다.</p>
       </div>
     </div>
   )

@@ -15,8 +15,8 @@ export default function ClientLayout({
 }) {
   const pathname = usePathname()
 
-  // saju-chat 페이지에서는 navbar 숨김
-  const hiddenNavbarPaths = ["/saju-chat"]
+  // 더 이상 헤더를 숨기지 않음
+  const hiddenNavbarPaths: string[] = []
   const shouldHideNavbar = hiddenNavbarPaths.some((path) => pathname?.startsWith(path))
 
   return (

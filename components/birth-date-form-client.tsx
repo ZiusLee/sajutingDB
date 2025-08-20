@@ -245,7 +245,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         interpretation: sajuResult.interpretation,
         yearStemSibseong: sajuResult.yearStemSibseong,
         monthStemSibseong: sajuResult.monthStemSibseong,
-        dayStemSibseong: "본원", // 일주의 천간은 나에 해당하는 부분으로 "본원"으로 저장
+        dayStemSibseong: "본원", // 일주의 천간은 나에 해���하는 부분으로 "본원"으로 저장
         hourStemSibseong: sajuResult.hourStemSibseong,
         yearBranchSibseong: sajuResult.yearBranchSibseong,
         monthBranchSibseong: sajuResult.monthBranchSibseong,
@@ -286,7 +286,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
           const storedData = JSON.parse(localStorage.getItem("tempSajuData") || "{}")
           storedData.userId = userId
           localStorage.setItem("tempSajuData", JSON.stringify(storedData))
-          localStorage.setItem("user_id", userId) // Store user ID in standard location
+          localStorage.setItem("saju_session_id", userId) // Store saju session ID
 
           // After successfully saving saju data to database, ensure session ID is stored
           storedData.sessionId = userId // The userId returned from syncLocalStorageToDatabase is actually the session ID

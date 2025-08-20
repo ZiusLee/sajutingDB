@@ -43,10 +43,54 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, name, gender, saju, roomType, birthInfo, daeun } = await request.json()
 
+    console.log("[v0] Received request data:")
+    console.log("[v0] - userId:", userId)
+    console.log("[v0] - name:", name)
+    console.log("[v0] - gender:", gender)
+    console.log("[v0] - saju exists:", !!saju)
+    console.log("[v0] - daeun exists:", !!daeun)
+    console.log("[v0] - birthInfo exists:", !!birthInfo)
+
+    if (saju) {
+      console.log("[v0] Saju data keys:", Object.keys(saju))
+      console.log("[v0] Saju has sibseong data:", {
+        yearStemSibseong: !!saju.yearStemSibseong,
+        monthStemSibseong: !!saju.monthStemSibseong,
+        dayStemSibseong: !!saju.dayStemSibseong,
+        hourStemSibseong: !!saju.hourStemSibseong,
+      })
+      console.log("[v0] Saju has elements:", !!saju.elements)
+    } else {
+      console.log("[v0] WARNING: No saju data received!")
+    }
+
+    const supabase = createServerSupabaseClient()
+
     // Generate session ID
     const sessionId = uuidv4()
 
-    // Create session data (without birth date fields - those go to birth_info table)
+    let isDefault = false
+    if (userId) {
+      // For authenticated users, check if they have any existing sessions
+      const { data: existingSessions, error: checkError } = await supabase
+        .from("saju_sessions")
+        .select("id")
+        .eq("auth_user_id", userId)
+        .limit(1)
+
+      if (!checkError && (!existingSessions || existingSessions.length === 0)) {
+        isDefault = true // This is the first session for this user
+      }
+    } else {
+      // For anonymous users, this is always their first session
+      isDefault = true
+    }
+
+    if (!saju) {
+      console.error("[v0] ERROR: saju data is required but not provided")
+      return NextResponse.json({ error: "사주 데이터가 필요합니다" }, { status: 400 })
+    }
+
     const sessionData = {
       id: sessionId,
       name: name,
@@ -55,52 +99,29 @@ export async function POST(request: NextRequest) {
       auth_user_id: userId,
       relationship_status: "solo",
       is_beta_applicant: false,
-      // Store only saju data without daeun
-      saju: saju
-        ? JSON.stringify({
-            yearStem: saju.yearStem,
-            yearBranch: saju.yearBranch,
-            yearStemHanja: saju.yearStemHanja,
-            yearBranchHanja: saju.yearBranchHanja,
-            monthStem: saju.monthStem,
-            monthBranch: saju.monthBranch,
-            monthStemHanja: saju.monthStemHanja,
-            monthBranchHanja: saju.monthBranchHanja,
-            dayStem: saju.dayStem,
-            dayBranch: saju.dayBranch,
-            dayStemHanja: saju.dayStemHanja,
-            dayBranchHanja: saju.dayBranchHanja,
-            hourStem: saju.hourStem,
-            hourBranch: saju.hourBranch,
-            hourStemHanja: saju.hourStemHanja,
-            hourBranchHanja: saju.hourBranchHanja,
-            dayMaster: saju.dayMaster,
-            dayMasterHanja: saju.dayMasterHanja,
-            yearAnimal: saju.yearAnimal,
-            elements: saju.elements,
-            yearStemSibseong: saju.yearStemSibseong,
-            monthStemSibseong: saju.monthStemSibseong,
-            dayStemSibseong: saju.dayStemSibseong,
-            hourStemSibseong: saju.hourStemSibseong,
-            yearBranchSibseong: saju.yearBranchSibseong,
-            monthBranchSibseong: saju.monthBranchSibseong,
-            dayBranchSibseong: saju.dayBranchSibseong,
-            hourBranchSibseong: saju.hourBranchSibseong,
-          })
-        : null,
-      // Store daeun in separate column
-      daeun: daeun ? JSON.stringify(daeun) : null,
+      is_default: isDefault,
+      saju: saju, // null 체크 후 직접 저장
+      daeun: daeun || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase.from("saju_sessions").insert(sessionData).select("id").single()
+    console.log("[v0] Final session data structure:")
+    console.log("[v0] - id:", sessionData.id)
+    console.log("[v0] - name:", sessionData.name)
+    console.log("[v0] - gender:", sessionData.gender)
+    console.log("[v0] - is_default:", sessionData.is_default)
+    console.log("[v0] - saju type:", typeof sessionData.saju)
+    console.log("[v0] - daeun type:", typeof sessionData.daeun)
 
-    if (error) {
-      console.error("Error creating saju session:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    const { data, error: sessionError } = await supabase.from("saju_sessions").insert(sessionData).select("id").single()
+
+    if (sessionError) {
+      console.error("[v0] Error creating saju session:", sessionError)
+      return NextResponse.json({ error: sessionError.message }, { status: 500 })
     }
+
+    console.log("[v0] Successfully created session with ID:", data.id)
 
     // If birthInfo is provided, save it to birth_info table
     if (birthInfo) {
@@ -129,7 +150,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If saju is provided, save it to saju_info table as well
     if (saju) {
       const sajuInfoData = {
         user_id: data.id,
@@ -152,6 +172,15 @@ export async function POST(request: NextRequest) {
         day_master: saju.dayMaster,
         day_master_hanja: saju.dayMasterHanja,
         year_animal: saju.yearAnimal,
+        // 십성 정보 올바르게 저장
+        year_stem_sibseong: saju.yearStemSibseong,
+        month_stem_sibseong: saju.monthStemSibseong,
+        day_stem_sibseong: saju.dayStemSibseong,
+        hour_stem_sibseong: saju.hourStemSibseong,
+        year_branch_sibseong: saju.yearBranchSibseong,
+        month_branch_sibseong: saju.monthBranchSibseong,
+        day_branch_sibseong: saju.dayBranchSibseong,
+        hour_branch_sibseong: saju.hourBranchSibseong,
         created_at: new Date().toISOString(),
       }
 

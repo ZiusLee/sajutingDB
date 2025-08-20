@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { SajuLogo } from "@/components/saju-logo"
 import { useAuth } from "@/hooks/use-auth"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { User } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Menu } from "lucide-react"
 
 export function SiteHeader() {
   const { user, isAuthenticated } = useAuth()
@@ -29,18 +30,16 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="fixed top-0 z-50 w-full">
+    <header className="fixed top-0 z-50 w-full bg-transparent">
       <div className="flex h-16 lg:h-20 items-center justify-between px-2 sm:px-4 md:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex items-center">
           {isSajuChat ? (
-            // In saju chat: Logo acts as sidebar toggle
             <button
               onClick={handleLogoClick}
               className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
             >
-              <SajuLogo className="lg:hidden" />
-              <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
+              <Menu className="h-6 w-6 lg:hidden" />
             </button>
           ) : (
             // Normal behavior: Logo links to home
@@ -59,9 +58,21 @@ export function SiteHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 lg:h-10 lg:w-10 bg-black hover:bg-gray-800 text-white"
+                className="h-10 w-10 p-0 hover:opacity-80 rounded-full border border-gray-200 hover:border-gray-300 transition-all"
               >
-                <User className="h-4 w-4 lg:h-5 lg:w-5" />
+                <Avatar className="h-9 w-9">
+                  <AvatarImage
+                    src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                    alt="프로필 사진"
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm font-semibold">
+                    {user?.user_metadata?.name?.charAt(0)?.toUpperCase() ||
+                      user?.user_metadata?.full_name?.charAt(0)?.toUpperCase() ||
+                      user?.email?.charAt(0)?.toUpperCase() ||
+                      "U"}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </SettingsDialog>
           )}

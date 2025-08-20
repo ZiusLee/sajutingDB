@@ -3,14 +3,32 @@ import { supabase } from "./supabase-client"
 /**
  * Transfer data from anonymous user to authenticated user
  */
-export async function transferAnonymousDataToUser(authUserId: string, anonymousUserId?: string): Promise<boolean> {
+export async function transferAnonymousDataToUser(authUserId: string, sessionId?: string): Promise<boolean> {
   try {
-    console.log(`Transferring data from anonymous user ${anonymousUserId || "unknown"} to auth user ${authUserId}`)
+    console.log(`Transferring data from anonymous user to auth user ${authUserId}`)
 
-    // If no anonymous user ID provided, try to get it from localStorage
-    if (!anonymousUserId) {
-      anonymousUserId = localStorage.getItem("user_id") || undefined
-      console.log(`Using anonymous user ID from localStorage: ${anonymousUserId || "not found"}`)
+    const { data: existingSessions, error: existingError } = await supabase
+      .from("saju_sessions")
+      .select("id, name")
+      .eq("auth_user_id", authUserId)
+
+    if (existingError) {
+      console.error("Error checking existing sessions:", existingError)
+      return false
+    }
+
+    if (existingSessions && existingSessions.length > 0) {
+      console.log(
+        `User ${authUserId} already has ${existingSessions.length} existing sessions, skipping anonymous data transfer`,
+      )
+      return true // Return true as this is not an error condition
+    }
+
+    let anonymousUserId = localStorage.getItem("user_id") || localStorage.getItem("saju_session_id")
+
+    if (!anonymousUserId && sessionId) {
+      console.log(`Using provided session ID: ${sessionId}`)
+      anonymousUserId = sessionId
     }
 
     if (!anonymousUserId) {
@@ -18,10 +36,9 @@ export async function transferAnonymousDataToUser(authUserId: string, anonymousU
       return false
     }
 
-    // Check if the anonymous user exists in saju_sessions
     const { data: anonymousUser, error: userError } = await supabase
       .from("saju_sessions")
-      .select("id")
+      .select("id, auth_user_id, name, email, created_at")
       .eq("id", anonymousUserId)
       .single()
 
@@ -30,11 +47,36 @@ export async function transferAnonymousDataToUser(authUserId: string, anonymousU
       return false
     }
 
+    if (anonymousUser.auth_user_id && anonymousUser.auth_user_id !== authUserId) {
+      console.error(
+        `SECURITY ALERT: Session ${anonymousUserId} is already linked to user ${anonymousUser.auth_user_id}, cannot link to ${authUserId}`,
+      )
+      return false
+    }
+
+    if (anonymousUser.auth_user_id === authUserId) {
+      console.log(`Session ${anonymousUserId} is already linked to user ${authUserId}`)
+      return true
+    }
+
+    const sessionCreatedAt = new Date(anonymousUser.created_at)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+
+    if (sessionCreatedAt < oneHourAgo) {
+      console.warn(`Session ${anonymousUserId} is older than 1 hour, requiring additional verification`)
+      // For older sessions, we're more cautious about linking
+      if (!sessionId) {
+        console.log("Skipping transfer of old session without explicit session ID")
+        return false
+      }
+    }
+
     // Update the auth_user_id for the anonymous user
     const { error: updateError } = await supabase
       .from("saju_sessions")
       .update({ auth_user_id: authUserId })
       .eq("id", anonymousUserId)
+      .is("auth_user_id", null) // Only update if not already linked
 
     if (updateError) {
       console.error("Error updating auth_user_id:", updateError)
@@ -42,6 +84,12 @@ export async function transferAnonymousDataToUser(authUserId: string, anonymousU
     }
 
     console.log(`Successfully linked anonymous user ${anonymousUserId} to auth user ${authUserId}`)
+
+    localStorage.removeItem("user_id")
+    localStorage.removeItem("saju_session_id")
+    localStorage.removeItem("pending_session_link")
+    localStorage.removeItem("anonymous_session_created")
+
     return true
   } catch (error) {
     console.error("Error transferring user data:", error)

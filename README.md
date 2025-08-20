@@ -329,7 +329,7 @@ yarn install
 \`\`\`
 
 3. 환경 변수 설정
-`.env.local` 파일을 생성하고 다음 변수를 설정합니다:
+`.env.local` 파일을 생성하고 다음 변수��� 설정합니다:
 \`\`\`
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key

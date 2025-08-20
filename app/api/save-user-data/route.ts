@@ -11,14 +11,16 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerSupabaseClient()
 
+    const isDefault = true // 익명 사용자의 경우 항상 첫 번째 세션
+
     // Create saju session with separated data
     const sessionData = {
       name,
       gender,
       relationship_status: "solo",
       is_beta_applicant: false,
-      // Store only saju data without daeun
-      saju: JSON.stringify({
+      is_default: isDefault, // is_default 추가
+      saju: {
         yearStem: sajuData.yearStem,
         yearBranch: sajuData.yearBranch,
         yearStemHanja: sajuData.yearStemHanja,
@@ -47,9 +49,8 @@ export async function POST(request: NextRequest) {
         monthBranchSibseong: sajuData.monthBranchSibseong,
         dayBranchSibseong: sajuData.dayBranchSibseong,
         hourBranchSibseong: sajuData.hourBranchSibseong,
-      }),
-      // Store daeun data separately
-      daeun: daeunData ? JSON.stringify(daeunData) : null,
+      },
+      daeun: daeunData || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }

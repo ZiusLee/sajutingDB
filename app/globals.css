@@ -97,6 +97,24 @@ body {
     height: 100dvh; /* Dynamic viewport height for mobile */
   }
 
+  /* Enhanced mobile keyboard and chat container utilities */
+  .chat-container-height {
+    height: calc(100vh - 140px);
+    height: calc(100dvh - 140px);
+  }
+
+  .chat-messages-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+  }
+
+  .chat-input-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
   /* Safe area utilities */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
@@ -125,9 +143,9 @@ body {
     font-size: 16px;
   }
 
-  /* Keyboard handling */
+  /* Enhanced keyboard handling with smooth transitions */
   .keyboard-adjust {
-    transition: transform 0.3s ease-in-out;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* AI Response Content Styling */
@@ -257,12 +275,55 @@ body {
   .ios-safe-top {
     padding-top: calc(env(safe-area-inset-top) + 1rem);
   }
+
+  /* iOS keyboard specific adjustments */
+  .ios-keyboard-adjust {
+    transition: padding-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 
-/* Android specific optimizations */
+/* Enhanced Android and mobile keyboard optimizations */
+@media screen and (max-width: 768px) {
+  .chat-input-container.fixed {
+    position: fixed !important;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    border-top: 1px solid hsl(var(--border));
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Prevent viewport jumping on keyboard open */
+  .keyboard-open {
+    position: fixed;
+    width: 100%;
+  }
+
+  /* Smooth input focus transitions */
+  input:focus,
+  textarea:focus {
+    transform: none;
+    transition: all 0.2s ease-in-out;
+  }
+}
+
 @media screen and (max-width: 768px) and (orientation: portrait) {
   .android-keyboard-adjust {
     height: calc(100vh - env(keyboard-inset-height, 0px));
+  }
+
+  /* Better keyboard height detection for Android */
+  .chat-container-keyboard-open {
+    height: calc(100vh - 200px);
+    height: calc(100dvh - 200px);
+  }
+}
+
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .chat-container-keyboard-open {
+    height: calc(100vh - 150px);
+    height: calc(100dvh - 150px);
   }
 }
 
@@ -290,13 +351,13 @@ body {
   .ai-response-content {
     @apply text-black bg-white;
   }
-  
+
   .ai-response-content h1,
   .ai-response-content h2,
   .ai-response-content h3 {
     @apply break-after-avoid;
   }
-  
+
   .ai-response-content pre,
   .ai-response-content blockquote {
     @apply break-inside-avoid;

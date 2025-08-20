@@ -1,79 +1,113 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 
 export function useMobileKeyboard() {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(0)
 
-  useEffect(() => {
+  const updateKeyboardState = useCallback(() => {
+    if (typeof window === "undefined") return
+
     // Set CSS custom property for viewport height
-    const setVH = () => {
-      const vh = window.innerHeight * 0.01
-      document.documentElement.style.setProperty('--vh', `${vh}px`)
+    const vh = window.innerHeight * 0.01
+    document.documentElement.style.setProperty("--vh", `${vh}px`)
+
+    // Only apply keyboard detection on mobile devices
+    if (window.innerWidth > 768) {
+      setIsKeyboardOpen(false)
+      setKeyboardHeight(0)
+      return
     }
 
-    // Initial set
-    setVH()
+    const currentHeight = window.innerHeight
+    const screenHeight = window.screen.height
 
-    // iOS Safari keyboard detection
-    const handleResize = () => {
-      setVH()
-      
-      // Only apply keyboard detection on mobile devices
-      if (window.innerWidth <= 768) {
-        const currentHeight = window.innerHeight
-        const currentWidth = window.innerWidth
-        
-        // Detect keyboard by significant height reduction
-        const heightReduction = window.screen.height - currentHeight
-        const isLandscape = currentWidth > currentHeight
-        
-        // Adjust thresholds based on orientation
-        const keyboardThreshold = isLandscape ? 200 : 300
-        
-        if (heightReduction > keyboardThreshold) {
-          setIsKeyboardOpen(true)
-          setKeyboardHeight(heightReduction)
-        } else {
-          setIsKeyboardOpen(false)
-          setKeyboardHeight(0)
-        }
-      }
-    }
-
-    // Visual viewport API for better keyboard detection (iOS Safari 13+)
+    // Use visual viewport if available (iOS Safari 13+, Chrome 61+)
     if (window.visualViewport) {
-      const handleVisualViewportChange = () => {
-        setVH()
-        
-        if (window.innerWidth <= 768) {
-          const heightDiff = window.innerHeight - window.visualViewport.height
-          
-          if (heightDiff > 150) {
-            setIsKeyboardOpen(true)
-            setKeyboardHeight(heightDiff)
-          } else {
-            setIsKeyboardOpen(false)
-            setKeyboardHeight(0)
-          }
-        }
-      }
+      const visualHeight = window.visualViewport.height
+      const heightDiff = currentHeight - visualHeight
 
-      window.visualViewport.addEventListener('resize', handleVisualViewportChange)
-      
-      return () => {
-        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange)
+      // More precise keyboard detection
+      if (heightDiff > 150) {
+        setIsKeyboardOpen(true)
+        setKeyboardHeight(heightDiff)
+      } else {
+        setIsKeyboardOpen(false)
+        setKeyboardHeight(0)
       }
     } else {
       // Fallback for older browsers
-      window.addEventListener('resize', handleResize)
-      
-      return () => {
-        window.removeEventListener('resize', handleResize)
+      const heightReduction = screenHeight - currentHeight
+      const isLandscape = window.innerWidth > currentHeight
+      const keyboardThreshold = isLandscape ? 200 : 300
+
+      if (heightReduction > keyboardThreshold) {
+        setIsKeyboardOpen(true)
+        setKeyboardHeight(heightReduction)
+      } else {
+        setIsKeyboardOpen(false)
+        setKeyboardHeight(0)
       }
     }
+
+    setViewportHeight(currentHeight)
   }, [])
 
-  return { isKeyboardOpen, keyboardHeight }
+  useEffect(() => {
+    // Initial setup
+    updateKeyboardState()
+
+    // Enhanced event listeners for better keyboard detection
+    if (window.visualViewport) {
+      // Modern browsers with Visual Viewport API
+      window.visualViewport.addEventListener("resize", updateKeyboardState)
+      window.visualViewport.addEventListener("scroll", updateKeyboardState)
+
+      return () => {
+        window.visualViewport?.removeEventListener("resize", updateKeyboardState)
+        window.visualViewport?.removeEventListener("scroll", updateKeyboardState)
+      }
+    } else {
+      // Fallback for older browsers
+      window.addEventListener("resize", updateKeyboardState)
+      window.addEventListener("orientationchange", updateKeyboardState)
+
+      // Additional events for better Android support
+      const handleFocus = () => {
+        setTimeout(updateKeyboardState, 300) // Delay for keyboard animation
+      }
+
+      const handleBlur = () => {
+        setTimeout(updateKeyboardState, 300)
+      }
+
+      document.addEventListener("focusin", handleFocus)
+      document.addEventListener("focusout", handleBlur)
+
+      return () => {
+        window.removeEventListener("resize", updateKeyboardState)
+        window.removeEventListener("orientationchange", updateKeyboardState)
+        document.removeEventListener("focusin", handleFocus)
+        document.removeEventListener("focusout", handleBlur)
+      }
+    }
+  }, [updateKeyboardState])
+
+  return {
+    isKeyboardOpen,
+    keyboardHeight,
+    viewportHeight,
+    // Helper function to get safe bottom padding
+    getSafeBottomPadding: () => {
+      if (isKeyboardOpen) return 12
+      return Math.max(
+        12,
+        Number.parseInt(
+          getComputedStyle(document.documentElement).getPropertyValue("env(safe-area-inset-bottom)") || "0",
+        ),
+      )
+    },
+  }
 }

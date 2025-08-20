@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 import { verify } from "jsonwebtoken"
 
-// JWT 시크릿 키 (실제 프로덕션에서는 환경 변��로 관리)
+// JWT 시크릿 키 (실제 프로덕션에서는 환경 변수로 관리)
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 // 요청에서 사용자 ID 추출
@@ -48,60 +48,87 @@ export function getUserEmail(): string | null {
   return localStorage.getItem("user_email")
 }
 
-// 사주 프로필 저장
+// 사주 프로필 저장 - 사용자별로 분리
 export function saveSajuProfile(profile: any): void {
   if (typeof window === "undefined") return
 
   try {
-    // 기존 프로필 불러오기
-    const profilesStr = localStorage.getItem("saju_profiles")
-    const profiles = profilesStr ? JSON.parse(profilesStr) : []
+    const userId = getUserId()
+    const isAuth = isAuthenticated()
 
     // 고유 ID 생성
     const newProfile = {
       ...profile,
       id: `profile_${Date.now()}`,
       createdAt: new Date().toISOString(),
+      userId: isAuth ? userId : null, // 사용자 ID 추가
     }
 
-    // 프로필 추가 및 저장
-    profiles.push(newProfile)
-    localStorage.setItem("saju_profiles", JSON.stringify(profiles))
-
-    // 인증된 사용자인 경우 사용자 ID와 연결
-    if (isAuthenticated()) {
-      const userId = getUserId()
-      if (userId) {
-        localStorage.setItem(`user_profiles_${userId}`, JSON.stringify(profiles))
-      }
+    if (isAuth && userId) {
+      // 인증된 사용자의 경우 사용자별로 저장
+      const userProfilesStr = localStorage.getItem(`user_profiles_${userId}`)
+      const userProfiles = userProfilesStr ? JSON.parse(userProfilesStr) : []
+      userProfiles.push(newProfile)
+      localStorage.setItem(`user_profiles_${userId}`, JSON.stringify(userProfiles))
+    } else {
+      // 비인증 사용자의 경우 기본 저장소 사용
+      const profilesStr = localStorage.getItem("saju_profiles")
+      const profiles = profilesStr ? JSON.parse(profilesStr) : []
+      profiles.push(newProfile)
+      localStorage.setItem("saju_profiles", JSON.stringify(profiles))
     }
   } catch (error) {
     console.error("사주 프로필 저장 오류:", error)
   }
 }
 
-// 사주 프로필 불러오기
+// 사주 프로필 불러오기 - 현재 사용자의 데이터만
 export function loadSajuProfiles(): any[] {
   if (typeof window === "undefined") return []
 
   try {
-    // 인증된 사용자인 경우 사용자별 프로필 불러오기
-    if (isAuthenticated()) {
-      const userId = getUserId()
-      if (userId) {
-        const userProfilesStr = localStorage.getItem(`user_profiles_${userId}`)
-        if (userProfilesStr) {
-          return JSON.parse(userProfilesStr)
-        }
-      }
-    }
+    const userId = getUserId()
+    const isAuth = isAuthenticated()
 
-    // 기본 프로필 불러오기
-    const profilesStr = localStorage.getItem("saju_profiles")
-    return profilesStr ? JSON.parse(profilesStr) : []
+    if (isAuth && userId) {
+      // 인증된 사용자의 경우 해당 사용자의 프로필만 불러오기
+      const userProfilesStr = localStorage.getItem(`user_profiles_${userId}`)
+      return userProfilesStr ? JSON.parse(userProfilesStr) : []
+    } else {
+      // 비인증 사용자의 경우 기본 프로필 불러오기
+      const profilesStr = localStorage.getItem("saju_profiles")
+      return profilesStr ? JSON.parse(profilesStr) : []
+    }
   } catch (error) {
     console.error("사주 프로필 불러오기 오류:", error)
     return []
+  }
+}
+
+// 현재 사용자의 모든 데이터 삭제 (로그아웃 시 사용)
+export function clearCurrentUserData(): void {
+  if (typeof window === "undefined") return
+
+  try {
+    const userId = getUserId()
+
+    // 사용자별 데이터 삭제
+    if (userId) {
+      localStorage.removeItem(`user_profiles_${userId}`)
+    }
+
+    // 공통 사주 관련 데이터 삭제
+    localStorage.removeItem("current_saju")
+    localStorage.removeItem("tempSajuData")
+    localStorage.removeItem("saju_session_id")
+    localStorage.removeItem("last_chat_saju_data")
+    localStorage.removeItem("chat_return_path")
+    localStorage.removeItem("saved_partners")
+    localStorage.removeItem("saju_profiles")
+
+    console.log("Current user data cleared from localStorage")
+  } catch (error) {
+    console.error("사용자 데이터 삭제 오류:", error)
   }
 }
 

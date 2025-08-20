@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "해당 이메일의 사용자를 찾을 수 없습니다." }, { status: 404 })
     }
 
-    // 사용자의 현재 코인 정보 조회
+    // 사용��의 현재 코인 정보 조회
     const { data: currentData, error: selectError } = await supabase
       .from("user_coins")
       .select("coins")

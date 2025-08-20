@@ -61,7 +61,7 @@ export default function LoginPage() {
 
         if (data.session) {
           console.log("User already logged in, redirecting...")
-          router.push("/mypage")
+          router.push("/saju-chat/sajuping")
         } else {
           console.log("No active session found")
         }
@@ -73,7 +73,6 @@ export default function LoginPage() {
     checkUser()
   }, [router, supabase.auth])
 
-  // Rest of the component remains the same...
   // Handle Kakao login
   const handleKakaoLogin = async () => {
     setIsLoading(true)
@@ -84,7 +83,7 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/saju-chat/sajuping`,
         },
       })
 
@@ -112,7 +111,7 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/mypage`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect_to=/saju-chat/sajuping`,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -161,6 +160,13 @@ export default function LoginPage() {
 
       if (error) {
         console.error("Email login error:", error)
+        if (error.message.includes("Invalid login credentials") || error.message.includes("User not found")) {
+          setError("계정을 찾을 수 없습니다. 먼저 사주프로필을 생성해주세요.")
+          setTimeout(() => {
+            router.push("/?showOnboarding=true")
+          }, 2000)
+          return
+        }
         throw error
       }
 
@@ -175,7 +181,7 @@ export default function LoginPage() {
         localStorage.setItem("user_name", userName)
       }
 
-      router.push("/mypage")
+      router.push("/saju-chat/sajuping")
     } catch (err) {
       console.error("이메일 로그인 오류:", err)
       setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다. 이메일과 비밀번호를 확인해주세요.")
@@ -213,7 +219,6 @@ export default function LoginPage() {
     }
   }
 
-  // Rest of the component remains the same...
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* 컨텐츠 */}
@@ -426,16 +431,6 @@ export default function LoginPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* 회원가입 링크 */}
-          <div className="mt-8 text-center">
-            <p className="text-center text-sm text-muted-foreground">
-              계정이 없으신가요?{" "}
-              <Button variant="link" className="p-0 h-auto font-normal" onClick={() => router.push("/register")}>
-                회원가입
-              </Button>
-            </p>
-          </div>
         </div>
       </div>
     </div>

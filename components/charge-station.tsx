@@ -1,374 +1,541 @@
-'use client'
+"use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Coins, X, Zap, Crown, Gift } from 'lucide-react'
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { X, Check, AlertTriangle } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
-type Pkg = {
+type SubscriptionPkg = {
   id: string
   name: string
   coins: number
   price: number
   crossedPrice?: number
-  bonus?: number
-  accent?: "cyan" | "orange" | "rose"
+  accent?: "cyan" | "green" | "red" | "gray"
   tag?: string
   subtitle?: string
+  period: string
+  isCurrentPlan?: boolean
+  isDowngrade?: boolean
 }
-
-const CYAN = "#28d0ed"
-const ORANGE = "#ffa938"
 
 const KRW = new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW", maximumFractionDigits: 0 })
 function formatKRW(v: number) {
   return KRW.format(v).replace("₩", "₩")
 }
 
-const RECOMMENDED: Pkg = {
-  id: "daily-30",
-  name: "추천구독",
-  coins: 30,
-  price: 9900,
-  crossedPrice: 89500,
-  subtitle: "매일 30핑 제공",
-  accent: "cyan",
-  tag: "구독",
-}
-
-const GENERAL: Pkg[] = [
-  { id: "basic-20", name: "Basic", coins: 20, price: 9900, accent: "orange" },
-  { id: "premium-80", name: "Premium", coins: 80, bonus: 20, price: 29900, crossedPrice: 44900, accent: "cyan" },
-  { id: "heritage-200", name: "Heritage", coins: 200, bonus: 100, price: 49900, crossedPrice: 99900, accent: "rose" },
+const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
+  {
+    id: "starter",
+    name: "Starter",
+    coins: 10,
+    price: 9900,
+    crossedPrice: 14000,
+    subtitle: "하루에 10핑씩 제공",
+    accent: "cyan",
+    period: "주",
+    isCurrentPlan: false,
+  },
+  {
+    id: "plus",
+    name: "Plus",
+    coins: 30,
+    price: 19900,
+    crossedPrice: 42000,
+    subtitle: "하루에 30핑씩 제공",
+    accent: "green",
+    period: "주",
+    isCurrentPlan: false,
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    coins: 100,
+    price: 49900,
+    crossedPrice: 140000,
+    subtitle: "하루에 100핑씩 제공",
+    accent: "red",
+    period: "주",
+    isCurrentPlan: false,
+  },
+  {
+    id: "free",
+    name: "Free Plan",
+    coins: 3,
+    price: 0,
+    subtitle: "하루에 3핑씩 제공",
+    accent: "gray",
+    period: "주",
+    isCurrentPlan: false,
+    isDowngrade: true,
+  },
 ]
 
-async function fetchBalance(): Promise<number> {
-  try {
-    if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_USE_MOCK_API === "true") {
-      await new Promise((r) => setTimeout(r, 250))
-      return 26
-    }
-  } catch {}
-  try {
-    const res = await fetch("/api/user-coins", { cache: "no-store" })
-    const data = await res.json().catch(() => ({}))
-    if (typeof data?.balance === "number") return data.balance
-    if (typeof data?.coins === "number") return data.coins
-    return 0
-  } catch {
-    return 0
-  }
-}
-
-async function postPurchase(delta: number, meta: Record<string, any>) {
-  try {
-    if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_USE_MOCK_API === "true") {
-      await new Promise((r) => setTimeout(r, 400))
-      return { ok: true }
-    }
-  } catch {}
-  const res = await fetch("/api/user-coins", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ delta, type: "purchase", ...meta }),
-  })
-  if (!res.ok) throw new Error("결제 실패")
-  return await res.json().catch(() => ({ ok: true }))
-}
+const BONUS: { id: string; name: string; coins: number; buttonText: string; action: () => void }[] = [
+  {
+    id: "friend-referral",
+    name: "친구추천",
+    coins: 20,
+    buttonText: "초대 코드 복사",
+    action: () => {
+      navigator.clipboard?.writeText("SAJUPING2024")
+    },
+  },
+]
 
 export default function ChargeStation() {
   const { toast } = useToast()
+  const router = useRouter()
+  const { isAuthenticated, user } = useAuth()
   const [balance, setBalance] = useState<number | null>(null)
-  const [autoCharge, setAutoCharge] = useState(false)
-  const [pending, setPending] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Pkg | null>(null)
+  const [userCoins, setUserCoins] = useState({
+    total: 0,
+    subscription: 0,
+    bonus: 0,
+    plan: null,
+  })
+  const [loadingCoins, setLoadingCoins] = useState(false)
+  const [showDowngradeDialog, setShowDowngradeDialog] = useState(false)
+  const [selectedDowngradePkg, setSelectedDowngradePkg] = useState<SubscriptionPkg | null>(null)
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [selectedUpgradePkg, setSelectedUpgradePkg] = useState<SubscriptionPkg | null>(null)
 
-  useEffect(() => {
-    fetchBalance().then(setBalance)
-  }, [])
+  const fetchBalance = async () => {
+    if (!isAuthenticated || !user) return
 
-  const nextChargeDate = useMemo(() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 30)
-    return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, "0")}. ${String(d.getDate()).padStart(2, "0")}`
-  }, [])
-
-  const onPurchase = async (pkg: Pkg) => {
-    const delta = pkg.coins + (pkg.bonus ?? 0)
-    setPending(pkg.id)
-    const old = balance ?? 0
-    setBalance(old + delta)
     try {
-      await postPurchase(delta, { packageId: pkg.id })
-      toast({ title: "결제 완료", description: `${pkg.name} 구매로 ${delta}핑이 적립되었습니다.` })
-    } catch (e: any) {
-      setBalance(old) // revert
-      toast({ title: "결제에 실패했어요", description: e?.message || "다시 시도해주세요.", variant: "destructive" })
+      setLoadingCoins(true)
+      const response = await fetch("/api/user-coins")
+      if (response.ok) {
+        const data = await response.json()
+        const total = (data.subscription_coins || 0) + (data.bonus_coins || 0)
+        setBalance(total)
+        setUserCoins({
+          total,
+          subscription: data.subscription_coins || 0,
+          bonus: data.bonus_coins || 0,
+          plan: data.subscription_plan || "Free Plan",
+        })
+      }
+    } catch (error) {
+      console.error("핑 정보 조회 오류:", error)
     } finally {
-      setPending(null)
-      setSelected(null)
+      setLoadingCoins(false)
     }
   }
 
-  const coinPill = (count: number) => (
-    <div className="inline-flex items-center gap-1 rounded-full bg-[#1b1c1e] px-2 py-1 text-xs text-white/90 ring-1 ring-white/10">
-      <Coins size={14} color={ORANGE} />
-      <span className="tabular-nums">{count}핑</span>
-    </div>
-  )
+  useEffect(() => {
+    fetchBalance()
+  }, [isAuthenticated, user])
+
+  const isDowngrade = (selectedPlan: string, currentPlan: string | null) => {
+    if (!currentPlan || currentPlan === "Free Plan") return false
+
+    const planHierarchy = { free: 0, starter: 1, plus: 2, pro: 3 }
+    const currentLevel = planHierarchy[currentPlan.toLowerCase() as keyof typeof planHierarchy] || 0
+    const selectedLevel = planHierarchy[selectedPlan.toLowerCase() as keyof typeof planHierarchy] || 0
+
+    return selectedLevel < currentLevel
+  }
+
+  const onSubscribe = async (pkg: SubscriptionPkg) => {
+    if (isDowngrade(pkg.id, userCoins.plan)) {
+      setSelectedDowngradePkg(pkg)
+      setShowDowngradeDialog(true)
+      return
+    }
+
+    setSelectedUpgradePkg(pkg)
+    setShowUpgradeDialog(true)
+  }
+
+  const handleDowngradeConfirm = async () => {
+    if (!selectedDowngradePkg) return
+
+    try {
+      console.log("[v0] 다운그레이드 요청 시작:", selectedDowngradePkg.id)
+
+      const response = await fetch("/api/subscription/schedule-downgrade", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user?.id || "temp-user-id"}`, // 임시 인증
+        },
+        body: JSON.stringify({
+          newPlan: selectedDowngradePkg.id,
+          planName: selectedDowngradePkg.name,
+        }),
+      })
+
+      console.log("[v0] 응답 상태:", response.status)
+
+      const responseData = await response.json()
+      console.log("[v0] 응답 데이터:", responseData)
+
+      if (response.ok && responseData.success) {
+        toast({
+          title: "다운그레이드 예약 완료",
+          description: `현재 주차가 끝나면 ${selectedDowngradePkg.name}으로 전환됩니다.`,
+        })
+        fetchBalance()
+      } else {
+        console.error("[v0] 다운그레이드 실패:", responseData.error)
+        throw new Error(responseData.error || "다운그레이드 예약 실패")
+      }
+    } catch (error) {
+      console.error("[v0] 다운그레이드 오류:", error)
+      toast({
+        title: "오류",
+        description: error instanceof Error ? error.message : "다운그레이드 예약 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setShowDowngradeDialog(false)
+      setSelectedDowngradePkg(null)
+    }
+  }
+
+  const handleUpgradeConfirm = async () => {
+    if (!selectedUpgradePkg) return
+
+    const params = new URLSearchParams({
+      packageId: selectedUpgradePkg.id,
+      name: selectedUpgradePkg.name,
+      coins: selectedUpgradePkg.coins.toString(),
+      price: selectedUpgradePkg.price.toString(),
+      isSubscription: "true",
+      period: selectedUpgradePkg.period,
+      userEmail: "skyywwind@gmail.com",
+    })
+
+    setShowUpgradeDialog(false)
+    setSelectedUpgradePkg(null)
+    router.push(`/payment?${params.toString()}`)
+  }
+
+  const handleBonusAction = (bonus: (typeof BONUS)[0]) => {
+    bonus.action()
+    if (bonus.id === "friend-referral") {
+      toast({ title: "초대 코드 복사됨", description: "친구에게 공유해보세요!" })
+    }
+  }
+
+  const handleGoBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back()
+    } else {
+      router.push("/")
+    }
+  }
+
+  const getDiscountPercent = (price: number, crossedPrice?: number) => {
+    if (!crossedPrice) return null
+    const discount = Math.round((1 - price / crossedPrice) * 100)
+    return `-${discount}%`
+  }
+
+  const getAccentColor = (accent?: string) => {
+    switch (accent) {
+      case "cyan":
+        return "#28d0ed"
+      case "green":
+        return "#1ed45a"
+      case "red":
+        return "#ff6363"
+      case "gray":
+        return "#70737c"
+      default:
+        return "#28d0ed"
+    }
+  }
+
+  const getDailyPingAmount = (planName: string | null) => {
+    if (!planName) return 3
+
+    const plan = planName.toLowerCase()
+    if (plan.includes("starter")) return 10
+    if (plan.includes("plus")) return 30
+    if (plan.includes("pro")) return 100
+    return 3
+  }
+
+  const getVisiblePackages = () => {
+    if (!userCoins.plan || userCoins.plan === "Free Plan") {
+      return SUBSCRIPTION_PACKAGES.filter((pkg) => !pkg.isDowngrade)
+    }
+    return SUBSCRIPTION_PACKAGES
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Top bar */}
-      <div className="sticky top-0 z-10 -mx-4 md:-mx-6 bg-[#0f0f10]/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur border-b border-white/5">
-        <div className="mx-auto max-w-md md:max-w-lg px-4 md:px-6 h-12 flex items-center justify-between">
-          <button
-            aria-label="닫기"
-            onClick={() => (typeof window !== "undefined" ? window.history.back() : null)}
-            className="inline-flex items-center justify-center rounded-md p-2 text-white/70 hover:text-white hover:bg-white/5"
-          >
+    <div className="min-h-screen bg-[#1b1c1e] text-white">
+      <div className="sticky top-0 z-10 bg-[#1b1c1e] border-b border-[#70737c]/20">
+        <div className="flex items-center justify-between p-4">
+          <button aria-label="닫기" onClick={handleGoBack} className="p-2 text-[#aeb0b6] hover:text-white">
             <X size={18} />
           </button>
-          <div className="text-sm text-white/50">sajuping.ai</div>
         </div>
       </div>
 
-      {/* Header - balance */}
-      <section className="space-y-2">
-        <div className="flex items-center gap-2 text-lg font-semibold">
-          <span>나의 핑</span>
-          <Coins size={18} color={ORANGE} />
-          <span className="tabular-nums">{balance === null ? "로딩중..." : `${balance}핑`}</span>
-          <span className="ml-2 text-xs text-white/50 rounded bg-white/5 px-2 py-0.5">
-            {autoCharge ? "자동충전 ON" : "자동충전 OFF"}
-          </span>
-        </div>
-        <p className="text-sm leading-6 text-white/60">
-          오프라인 사주보다 10배 합리적인 사주핑에서 마음껏 질문해요!
-        </p>
-      </section>
-
-      {/* Auto-charge banner */}
-      <Card className="bg-[#121315] border-white/10">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className={`h-7 px-3 rounded-full text-xs font-medium flex items-center justify-center ${
-                  autoCharge ? "bg-[rgba(40,208,237,0.15)] text-[${CYAN}]" : "bg-white/5 text-white/70"
-                }`}
-                style={autoCharge ? { color: CYAN } : undefined}
-              >
-                자동충전 {autoCharge ? "ON" : "OFF"}
-              </div>
-              {autoCharge && (
-                <div className="text-xs text-white/50">{nextChargeDate}</div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/60">자동충전</span>
-              <Switch checked={autoCharge} onCheckedChange={setAutoCharge} />
-            </div>
+      <div className="px-4 pb-6 space-y-6">
+        <section className="pt-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-medium text-white">나의 플랜</span>
+            <span className="text-2xl font-medium text-[#28d0ed]">{userCoins.plan}</span>
           </div>
-          <div className="mt-3 text-xs text-white/50">
-            자동충전을 켜두면 월간 구독으로 안정적으로 핑을 받아볼 수 있어요.
-          </div>
-        </CardContent>
-      </Card>
+          <p className="text-[#aeb0b6] text-sm">
+            오프라인 사주보다 10배 합리적인 사주핑에서
+            <br />
+            마음껏 질문하세요!
+          </p>
+        </section>
 
-      {/* Recommended package */}
-      <section className="space-y-3">
-        <div className="text-sm text-white/70">추천 패키지</div>
-        <Card className="bg-[#121315] border-white/10 overflow-hidden">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge
-                  className="bg-[rgba(40,208,237,0.15)] text-[color:var(--c)] border-0"
-                  style={{ ["--c" as any]: CYAN }}
-                >
-                  {RECOMMENDED.name}
-                </Badge>
-                <Badge variant="secondary" className="bg-white/5 border-white/10 text-white/70">
-                  무제한
-                </Badge>
-              </div>
-              <div className="text-xs text-white/50">구독</div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <div className="text-base font-medium">{RECOMMENDED.subtitle}</div>
-                <div className="mt-1 text-xs text-white/50 flex items-center gap-2">
-                  {RECOMMENDED.crossedPrice && (
-                    <span className="line-through decoration-white/30">
-                      {formatKRW(RECOMMENDED.crossedPrice)}
+        {isAuthenticated && (
+          <section className="space-y-3">
+            <h3 className="text-white text-base font-medium">현재 나의 핑</h3>
+            <Card className="bg-[#141415] border-[#70737c]/20">
+              <CardContent className="p-4">
+                <div className="text-center space-y-2">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-[#ffa938] flex items-center justify-center">
+                      <span className="text-black text-sm font-bold">P</span>
+                    </div>
+                    <span className="text-2xl font-bold text-white">
+                      {loadingCoins ? "..." : `${userCoins.total}핑`}
                     </span>
-                  )}
-                  <span className="text-[color:var(--c)]" style={{ ["--c" as any]: CYAN }}>
-                    -89%
-                  </span>
+                  </div>
+                  <div className="text-xs text-[#aeb0b6] space-y-1">
+                    <div>
+                      구독핑: {userCoins.subscription}핑 | 보너스핑: {userCoins.bonus}핑
+                    </div>
+                    <div>구독중에는 구독핑이 보너스핑보다 우선 소진됩니다.</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        <section className="space-y-3">
+          <h3 className="text-[#aeb0b6] text-sm font-medium">현재 플랜</h3>
+          <Card className="bg-[#141415] border-[#70737c]/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-[#aeb0b6] px-2 py-1 bg-[#70737c]/20 rounded text-xs">{userCoins.plan}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
+                      <span className="text-black text-xs font-bold">P</span>
+                    </div>
+                    <span className="text-white text-sm">하루에 {getDailyPingAmount(userCoins.plan)}핑씩</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-[#70737c]/20 rounded-full">
+                  <Check size={14} className="text-[#1ed45a]" />
+                  <span className="text-white text-xs">현재 플랜</span>
                 </div>
               </div>
-              <AlertDialog onOpenChange={(o) => !o && setSelected(null)} open={selected?.id === RECOMMENDED.id}>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    onClick={() => setSelected(RECOMMENDED)}
-                    className="rounded-lg bg-[color:var(--c)] hover:opacity-90 text-black font-semibold"
-                    style={{ ["--c" as any]: CYAN }}
-                  >
-                    {formatKRW(RECOMMENDED.price)}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-[#121315] text-white border-white/10">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>구독 결제 진행</AlertDialogTitle>
-                    <AlertDialogDescription className="text-white/60">
-                      {RECOMMENDED.subtitle} - 매일 {RECOMMENDED.coins}핑을 제공합니다. 계속하시겠어요?
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                      취소
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-[color:var(--c)] text-black hover:opacity-90"
-                      style={{ ["--c" as any]: CYAN }}
-                      onClick={() => onPurchase(RECOMMENDED)}
-                      disabled={pending === RECOMMENDED.id}
-                    >
-                      {pending === RECOMMENDED.id ? "진행중..." : `${formatKRW(RECOMMENDED.price)} 결제`}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+            </CardContent>
+          </Card>
+        </section>
 
-      {/* General packages */}
-      <section className="space-y-3">
-        <div className="text-sm text-white/70">일반 패키지</div>
-        <div className="space-y-3">
-          {GENERAL.map((pkg) => {
-            const hasBonus = typeof pkg.bonus === "number" && pkg.bonus > 0
-            const accentColor =
-              pkg.accent === "cyan" ? CYAN : pkg.accent === "orange" ? ORANGE : "#ff6363"
-            return (
-              <Card key={pkg.id} className="bg-[#121315] border-white/10">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm text-white/70">{pkg.name}</div>
-                        {pkg.name === "Premium" && (
-                          <div className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[rgba(40,208,237,0.15)]" style={{ color: CYAN }}>
-                            <Zap size={12} />
-                            인기
-                          </div>
-                        )}
-                        {pkg.name === "Heritage" && (
-                          <div className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/70">
-                            <Crown size={12} />
-                            베스트
-                          </div>
-                        )}
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        {coinPill(pkg.coins)}
-                        {hasBonus && (
-                          <div className="inline-flex items-center gap-1 rounded-full bg-[rgba(40,208,237,0.15)] px-2 py-1 text-xs"
-                               style={{ color: CYAN }}>
-                            +{pkg.bonus}핑 보너스
-                          </div>
-                        )}
-                      </div>
-                      {pkg.crossedPrice && (
-                        <div className="mt-1 text-xs text-white/50">
-                          <span className="line-through decoration-white/30 mr-2">{formatKRW(pkg.crossedPrice)}</span>
-                          <span className="text-[color:var(--c)]" style={{ ["--c" as any]: CYAN }}>
-                            -{pkg.name === "Premium" ? "33%" : "50%"}
+        <section className="space-y-3">
+          <h3 className="text-white text-base font-medium">일반 패키지</h3>
+          <div className="space-y-3">
+            {getVisiblePackages().map((pkg) => {
+              const discountPercent = getDiscountPercent(pkg.price, pkg.crossedPrice)
+              const accentColor = getAccentColor(pkg.accent)
+              const isCurrentUserPlan = userCoins.plan?.toLowerCase().includes(pkg.id.toLowerCase())
+              const willBeDowngrade = isDowngrade(pkg.id, userCoins.plan)
+
+              return (
+                <Card
+                  key={pkg.id}
+                  className={`bg-[#141415] border-[#70737c]/20 cursor-pointer hover:bg-[#1a1b1d] transition-colors ${
+                    isCurrentUserPlan ? "ring-1 ring-[#28d0ed]/50" : ""
+                  }`}
+                  onClick={() => !isCurrentUserPlan && onSubscribe(pkg)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium" style={{ color: accentColor }}>
+                            {pkg.name}
                           </span>
+                          {willBeDowngrade && (
+                            <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded">
+                              다운그레이드
+                            </span>
+                          )}
                         </div>
-                      )}
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
+                            <span className="text-black text-xs font-bold">P</span>
+                          </div>
+                          <span className="text-white text-sm">{pkg.subtitle}</span>
+                        </div>
+                        {pkg.crossedPrice && discountPercent && (
+                          <div className="flex items-center gap-2">
+                            <span className="line-through text-[#70737c] text-xs">{formatKRW(pkg.crossedPrice)}</span>
+                            <span className="text-xs font-medium" style={{ color: accentColor }}>
+                              {discountPercent}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        {isCurrentUserPlan ? (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-[#70737c]/20 rounded-lg">
+                            <Check size={14} className="text-[#1ed45a]" />
+                            <span className="text-white text-xs">현재 플랜</span>
+                          </div>
+                        ) : (
+                          <Button className="bg-white text-black hover:bg-gray-100 px-4 py-2 rounded-lg font-medium text-sm">
+                            {pkg.price === 0 ? "무료 전환" : `${formatKRW(pkg.price)}/${pkg.period}`}
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </section>
 
-                    <AlertDialog onOpenChange={(o) => !o && setSelected(null)} open={selected?.id === pkg.id}>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          onClick={() => setSelected(pkg)}
-                          variant="secondary"
-                          className="rounded-lg bg-white text-black hover:bg-white/90"
-                        >
-                          {formatKRW(pkg.price)}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-[#121315] text-white border-white/10">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>구매 확인</AlertDialogTitle>
-                          <AlertDialogDescription className="text-white/60">
-                            {pkg.name} 패키지 구매 시 총 {pkg.coins + (pkg.bonus ?? 0)}핑이 즉시 충전됩니다.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                            취소
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-[color:var(--c)] text-black hover:opacity-90"
-                            style={{ ["--c" as any]: accentColor }}
-                            onClick={() => onPurchase(pkg)}
-                            disabled={pending === pkg.id}
-                          >
-                            {pending === pkg.id ? "진행중..." : `${formatKRW(pkg.price)} 결제`}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+        <section className="space-y-3">
+          <h3 className="text-white text-base font-medium">보너스 패키지</h3>
+          <div className="space-y-3">
+            {BONUS.map((bonus) => (
+              <Card key={bonus.id} className="bg-[#141415] border-[#70737c]/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-white text-sm">{bonus.name}</span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
+                          <span className="text-black text-xs font-bold">P</span>
+                        </div>
+                        <span className="text-[#ffa938] text-sm font-medium">{bonus.coins}핑</span>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleBonusAction(bonus)}
+                      className="bg-[#70737c]/20 text-white hover:bg-[#70737c]/30 border-[#70737c]/20 text-sm px-4 rounded-lg"
+                    >
+                      {bonus.buttonText}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            )
-          })}
+            ))}
+          </div>
+        </section>
+
+        <div className="text-center pt-6 pb-4">
+          <div className="inline-flex items-center gap-1 text-[#aeb0b6] text-xs">
+            <div className="w-3 h-3 bg-[#aeb0b6] rounded-sm"></div>
+            <span>sajuping.ai</span>
+          </div>
         </div>
-      </section>
+      </div>
 
-      {/* Bonus section (optional) */}
-      <section className="space-y-3">
-        <div className="text-sm text-white/70">보너스 패키지</div>
-        <Card className="bg-[#121315] border-white/10">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Gift size={18} />
-                <div className="text-sm">첫 결제 보너스 +5핑</div>
-              </div>
-              <div className="text-xs text-white/50">자동 지급</div>
+      {showDowngradeDialog && selectedDowngradePkg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#141415] border border-[#70737c]/20 rounded-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="text-orange-400" size={24} />
+              <h3 className="text-white text-lg font-semibold">다운그레이드 확인</h3>
             </div>
-          </CardContent>
-        </Card>
-      </section>
 
-      {/* Terms */}
-      <p className="text-xs text-white/40">
-        결제 완료 시 핑은 즉시 충전됩니다. 구독은 언제든 해지할 수 있으며, 일부 결제수단은 지원되지 않을 수 있어요.
-      </p>
+            <div className="space-y-3 mb-6">
+              <p className="text-[#aeb0b6] text-sm">선택하신 요금제로 변경하시겠습니까?</p>
+              <div className="bg-[#70737c]/10 p-3 rounded-lg">
+                <p className="text-white text-sm font-medium mb-2">다운그레이드 안내</p>
+                <ul className="text-[#aeb0b6] text-xs space-y-1">
+                  <li>
+                    • <strong>현재 주차 종료 후</strong> 변경됩니다
+                  </li>
+                  <li>
+                    • 그때까지는 <strong>기존 요금제가 유지</strong>됩니다
+                  </li>
+                  <li>
+                    • 핑 제공량도 <strong>기존 기준으로 유지</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>다음 결제부터 새 요금제 금액으로 결제</strong>됩니다
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowDowngradeDialog(false)
+                  setSelectedDowngradePkg(null)
+                }}
+                className="flex-1 bg-[#70737c]/20 text-white hover:bg-[#70737c]/30"
+              >
+                취소
+              </Button>
+              <Button onClick={handleDowngradeConfirm} className="flex-1 bg-orange-500 text-white hover:bg-orange-600">
+                확인
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUpgradeDialog && selectedUpgradePkg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#141415] border border-[#70737c]/20 rounded-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="text-blue-400" size={24} />
+              <h3 className="text-white text-lg font-semibold">업그레이드 확인</h3>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <p className="text-[#aeb0b6] text-sm">선택하신 요금제로 즉시 전환하시겠습니까?</p>
+              <div className="bg-[#70737c]/10 p-3 rounded-lg">
+                <p className="text-white text-sm font-medium mb-2">업그레이드 안내</p>
+                <ul className="text-[#aeb0b6] text-xs space-y-1">
+                  <li>
+                    • 업그레이드 시 <strong>현재 요금제는 즉시 종료</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>새 요금제 금액이 즉시 결제</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>오늘부터 새로운 핑 제공량이 적용</strong>됩니다
+                  </li>
+                  <li>
+                    • <strong>남은 기간 및 핑은 환불되지 않습니다</strong>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowUpgradeDialog(false)
+                  setSelectedUpgradePkg(null)
+                }}
+                className="flex-1 bg-[#70737c]/20 text-white hover:bg-[#70737c]/30"
+              >
+                취소
+              </Button>
+              <Button onClick={handleUpgradeConfirm} className="flex-1 bg-blue-500 text-white hover:bg-blue-600">
+                확인
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
