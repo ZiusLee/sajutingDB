@@ -1,4 +1,7 @@
+"use client"
+
 import { sendGAEvent } from "@next/third-parties/google"
+import React from "react"
 
 declare global {
   interface Window {
@@ -331,7 +334,6 @@ export const trackBehaviorEvents = {
       engagement_quality: interactionCount && interactionCount > 5 ? "active" : "passive",
       engagement_indicator: "long_session",
       ...getCommonParameters(),
-      ...getUserContext(),
     })
   },
 
@@ -724,4 +726,153 @@ export const trackOnboardingDetailEvents = {
       timestamp: new Date().toISOString(),
     })
   },
+}
+
+export const PAGE_TRACKING_CONFIG = {
+  home: {
+    events: ["USER_session_start", "USER_first_visit"],
+    autoTrack: ["pageView", "scrollDepth", "timeOnPage"],
+  },
+  login: {
+    events: ["login_attempt", "login_success", "login_error"],
+    autoTrack: ["pageView", "formInteraction"],
+  },
+  register: {
+    events: ["register_attempt", "register_success", "register_error"],
+    autoTrack: ["pageView", "formInteraction"],
+  },
+  "saju-chat": {
+    events: ["USER_chat_session_start", "AI_message_sent"],
+    autoTrack: ["pageView", "chatInteraction"],
+  },
+  onboarding: {
+    events: ["onboarding_started", "onboarding_step_completed"],
+    autoTrack: ["pageView", "stepProgress"],
+  },
+  mypage: {
+    events: ["USER_memory_bank_accessed", "profile_view"],
+    autoTrack: ["pageView", "profileInteraction"],
+  },
+  result: {
+    events: ["saju_result_view", "social_share"],
+    autoTrack: ["pageView", "resultInteraction"],
+  },
+  payment: {
+    events: ["begin_checkout", "purchase"],
+    autoTrack: ["pageView", "paymentFlow"],
+  },
+} as const
+
+export const useAutoTracking = (pageName: keyof typeof PAGE_TRACKING_CONFIG) => {
+  const config = PAGE_TRACKING_CONFIG[pageName]
+
+  React.useEffect(() => {
+    // 페이지뷰 자동 추적
+    if (config.autoTrack.includes("pageView")) {
+      trackIntegratedEvents.pageView(pageName as any)
+    }
+
+    // 스크롤 깊이 자동 추적
+    if (config.autoTrack.includes("scrollDepth")) {
+      const handleScroll = () => {
+        const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100
+        if (scrollPercent >= 75) {
+          trackBehaviorEvents.scrollDepth75(pageName)
+          window.removeEventListener("scroll", handleScroll)
+        }
+      }
+      window.addEventListener("scroll", handleScroll)
+      return () => window.removeEventListener("scroll", handleScroll)
+    }
+
+    // 페이지 체류 시간 자동 추적
+    if (config.autoTrack.includes("timeOnPage")) {
+      const startTime = Date.now()
+      const timer = setTimeout(() => {
+        trackBehaviorEvents.timeOnPage5Min(pageName, Date.now() - startTime)
+      }, 300000) // 5분
+      return () => clearTimeout(timer)
+    }
+  }, [pageName, config])
+
+  return {
+    trackPageEvent: (eventType: string, params?: Record<string, any>) => {
+      if (config.events.includes(eventType as any)) {
+        trackEvent(eventType, { page: pageName, ...params })
+      }
+    },
+  }
+}
+
+export const useFormTracking = (formName: string) => {
+  return {
+    onSubmit: (success: boolean, errorMessage?: string) => {
+      trackIntegratedEvents.formSubmit(formName as any)
+      if (!success && errorMessage) {
+        trackError(errorMessage, formName)
+      }
+    },
+    onFieldFocus: (fieldName: string) => {
+      trackEvent("form_field_focus", { form: formName, field: fieldName })
+    },
+    onFieldBlur: (fieldName: string, hasValue: boolean) => {
+      trackEvent("form_field_blur", { form: formName, field: fieldName, has_value: hasValue })
+    },
+  }
+}
+
+export const useChatTracking = (roomType: string) => {
+  const [sessionStarted, setSessionStarted] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!sessionStarted) {
+      trackUserEvents.chatSessionStart(roomType, true)
+      setSessionStarted(true)
+    }
+  }, [roomType, sessionStarted])
+
+  return {
+    trackMessage: (messageLength: number, messageType?: "question" | "followup") => {
+      trackAIEvents.messageSent(messageLength, roomType, messageType)
+    },
+    trackResponse: (responseLength: number, responseTime: number) => {
+      trackAIEvents.responseReceived(responseLength, responseTime, roomType)
+    },
+    trackFeedback: (rating: "positive" | "negative") => {
+      trackChatEvents.provideFeedback(rating)
+    },
+  }
+}
+
+export const usePerformanceTracking = (pageName: string) => {
+  React.useEffect(() => {
+    // 페이지 로드 시간 측정
+    const startTime = performance.now()
+
+    const handleLoad = () => {
+      const loadTime = performance.now() - startTime
+      if (loadTime > 3000) {
+        // 3초 이상이면 느린 로딩으로 간주
+        trackPerformanceEvents.pageLoadSlow(pageName, loadTime)
+      }
+    }
+
+    if (document.readyState === "complete") {
+      handleLoad()
+    } else {
+      window.addEventListener("load", handleLoad)
+      return () => window.removeEventListener("load", handleLoad)
+    }
+  }, [pageName])
+}
+
+export const usePageAnalytics = (pageName: keyof typeof PAGE_TRACKING_CONFIG) => {
+  const autoTracking = useAutoTracking(pageName)
+  usePerformanceTracking(pageName)
+
+  return {
+    ...autoTracking,
+    form: useFormTracking,
+    chat: useChatTracking,
+  }
 }
