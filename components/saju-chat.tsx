@@ -1052,7 +1052,7 @@ export default function SajuChat({
           </div>
         </div>
         <div
-          className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container"
+          className="border-t bg-white p-2 sm:p-3 pb-1 sm:pb-2 flex-shrink-0 chat-input-container"
           style={{
             ...(isKeyboardOpen && {
               position: "sticky",

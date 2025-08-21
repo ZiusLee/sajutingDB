@@ -7,15 +7,47 @@ import { useAuth } from "@/hooks/use-auth"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Menu } from "lucide-react"
+import { useState, useEffect } from "react"
 
 export function SiteHeader() {
   const { user, isAuthenticated } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
+  const [isScrollingDown, setIsScrollingDown] = useState(false)
+  const [lastScrollY, setLastScrollY] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
+
   // Check if we're in saju chat or mypage
   const isSajuChat = pathname?.includes("/saju-chat/")
-  //const isMyPage = pathname === "/mypage"
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024) // lg breakpoint
+    }
+
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
+
+  useEffect(() => {
+    if (!isMobile) return
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+
+      // Only hide/show if scrolled more than 10px to avoid jitter
+      if (Math.abs(currentScrollY - lastScrollY) < 10) return
+
+      setIsScrollingDown(currentScrollY > lastScrollY && currentScrollY > 100)
+      setLastScrollY(currentScrollY)
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [lastScrollY, isMobile])
 
   const handleLogoClick = () => {
     if (isSajuChat) {
@@ -37,7 +69,11 @@ export function SiteHeader() {
           {isSajuChat ? (
             <button
               onClick={handleLogoClick}
-              className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
+              className={`flex items-center space-x-2 hover:opacity-80 transition-all duration-300 ${
+                isMobile && isScrollingDown
+                  ? "lg:opacity-100 opacity-0 translate-y-[-10px]"
+                  : "opacity-100 translate-y-0"
+              }`}
             >
               <Menu className="h-6 w-6 lg:hidden" />
             </button>
@@ -58,7 +94,11 @@ export function SiteHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 p-0 hover:opacity-80 rounded-full border border-gray-200 hover:border-gray-300 transition-all"
+                className={`h-10 w-10 p-0 hover:opacity-80 rounded-full border border-gray-200 hover:border-gray-300 transition-all duration-300 ${
+                  isMobile && isScrollingDown
+                    ? "lg:opacity-100 opacity-0 translate-y-[-10px]"
+                    : "opacity-100 translate-y-0"
+                }`}
               >
                 <Avatar className="h-9 w-9">
                   <AvatarImage
@@ -80,7 +120,11 @@ export function SiteHeader() {
           {/* Login button for non-logged-in users */}
           {!isAuthenticated && (
             <Button
-              className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-3 sm:px-4 lg:px-6 py-2 text-sm lg:text-base font-medium"
+              className={`bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-3 sm:px-4 lg:px-6 py-2 text-sm lg:text-base font-medium transition-all duration-300 ${
+                isMobile && isScrollingDown
+                  ? "lg:opacity-100 opacity-0 translate-y-[-10px]"
+                  : "opacity-100 translate-y-0"
+              }`}
               onClick={() => router.push("/login")}
             >
               로그인
