@@ -4,7 +4,9 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Activity, Eye } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { CheckCircle, XCircle, AlertCircle, RefreshCw, Activity, Eye, Send, Plus, Trash2 } from "lucide-react"
 import { sendGAEvent } from "@next/third-parties/google"
 
 declare global {
@@ -86,6 +88,21 @@ export function AnalyticsDebug() {
   const [eventLog, setEventLog] = useState<Array<{ timestamp: string; event: string; parameters: any }>>([])
   const [isMonitoring, setIsMonitoring] = useState(false)
   const [selectedPage, setSelectedPage] = useState<keyof typeof PAGE_EVENTS>("home")
+
+  const [customEventName, setCustomEventName] = useState("")
+  const [customParameters, setCustomParameters] = useState<Array<{ key: string; value: string }>>([
+    { key: "", value: "" },
+  ])
+  const [jsonParameters, setJsonParameters] = useState("")
+  const [useJsonMode, setUseJsonMode] = useState(false)
+  const [testHistory, setTestHistory] = useState<
+    Array<{
+      timestamp: string
+      eventName: string
+      parameters: any
+      success: boolean
+    }>
+  >([])
 
   useEffect(() => {
     if (isMonitoring && typeof window !== "undefined") {
@@ -192,6 +209,123 @@ export function AnalyticsDebug() {
     }
   }
 
+  const sendCustomEvent = () => {
+    try {
+      let parameters: any = {}
+
+      if (useJsonMode) {
+        try {
+          parameters = JSON.parse(jsonParameters || "{}")
+        } catch (error) {
+          alert("JSON 형식이 올바르지 않습니다.")
+          return
+        }
+      } else {
+        parameters = customParameters.reduce((acc, param) => {
+          if (param.key && param.value) {
+            // 숫자인지 확인하고 변환
+            const numValue = Number(param.value)
+            acc[param.key] = isNaN(numValue) ? param.value : numValue
+          }
+          return acc
+        }, {} as any)
+      }
+
+      // 공통 테스트 매개변수 추가
+      parameters.test_mode = true
+      parameters.debug_timestamp = new Date().toISOString()
+      parameters.debug_source = "analytics_debug_page"
+
+      sendGAEvent("event", customEventName, parameters)
+
+      // 테스트 히스토리에 추가
+      setTestHistory((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString("ko-KR"),
+          eventName: customEventName,
+          parameters,
+          success: true,
+        },
+        ...prev.slice(0, 9), // 최대 10개까지만 보관
+      ])
+
+      alert(`커스텀 이벤트 "${customEventName}"가 전송되었습니다!`)
+    } catch (error) {
+      console.error("Custom GA Event error:", error)
+      setTestHistory((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString("ko-KR"),
+          eventName: customEventName,
+          parameters: useJsonMode ? jsonParameters : customParameters,
+          success: false,
+        },
+        ...prev.slice(0, 9),
+      ])
+      alert("이벤트 전송 중 오류가 발생했습니다.")
+    }
+  }
+
+  const addParameter = () => {
+    setCustomParameters((prev) => [...prev, { key: "", value: "" }])
+  }
+
+  const removeParameter = (index: number) => {
+    setCustomParameters((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateParameter = (index: number, field: "key" | "value", value: string) => {
+    setCustomParameters((prev) => prev.map((param, i) => (i === index ? { ...param, [field]: value } : param)))
+  }
+
+  const loadPresetEvent = (eventType: string) => {
+    const presets = {
+      page_view: {
+        name: "page_view",
+        parameters: [
+          { key: "page_title", value: "테스트 페이지" },
+          { key: "page_location", value: window.location.href },
+          { key: "page_referrer", value: document.referrer || "direct" },
+        ],
+      },
+      purchase: {
+        name: "purchase",
+        parameters: [
+          { key: "transaction_id", value: "test_" + Date.now() },
+          { key: "value", value: "10000" },
+          { key: "currency", value: "KRW" },
+          {
+            key: "items",
+            value: JSON.stringify([{ item_id: "saju_reading", item_name: "사주 상담", quantity: 1, price: 10000 }]),
+          },
+        ],
+      },
+      login: {
+        name: "login",
+        parameters: [
+          { key: "method", value: "email" },
+          { key: "user_id", value: "test_user_123" },
+        ],
+      },
+      saju_calculation: {
+        name: "saju_calculation_start",
+        parameters: [
+          { key: "birth_year", value: "1990" },
+          { key: "birth_month", value: "5" },
+          { key: "birth_day", value: "15" },
+          { key: "birth_hour", value: "14" },
+          { key: "gender", value: "male" },
+        ],
+      },
+    }
+
+    const preset = presets[eventType as keyof typeof presets]
+    if (preset) {
+      setCustomEventName(preset.name)
+      setCustomParameters([...preset.parameters, { key: "", value: "" }])
+      setUseJsonMode(false)
+    }
+  }
+
   const StatusIcon = ({ condition }: { condition: boolean }) => {
     if (isLoading) {
       return <RefreshCw className="h-4 w-4 animate-spin text-gray-500" />
@@ -200,7 +334,7 @@ export function AnalyticsDebug() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-0">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -275,6 +409,169 @@ export function AnalyticsDebug() {
               사주 이벤트 테스트
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            커스텀 이벤트 테스트
+          </CardTitle>
+          <CardDescription>원하는 이벤트 이름과 매개변수를 직접 입력하여 GA4로 전송할 수 있습니다</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* 프리셋 이벤트 버튼들 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">프리셋 이벤트 로드</label>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => loadPresetEvent("page_view")}>
+                페이지뷰
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => loadPresetEvent("purchase")}>
+                구매
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => loadPresetEvent("login")}>
+                로그인
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => loadPresetEvent("saju_calculation")}>
+                사주계산
+              </Button>
+            </div>
+          </div>
+
+          {/* 이벤트 이름 입력 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">이벤트 이름</label>
+            <Input
+              placeholder="예: custom_button_click, user_engagement, conversion_complete"
+              value={customEventName}
+              onChange={(e) => setCustomEventName(e.target.value)}
+            />
+          </div>
+
+          {/* 매개변수 입력 모드 선택 */}
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium">매개변수 입력 방식:</label>
+            <div className="flex gap-2">
+              <Button size="sm" variant={!useJsonMode ? "default" : "outline"} onClick={() => setUseJsonMode(false)}>
+                키-값 입력
+              </Button>
+              <Button size="sm" variant={useJsonMode ? "default" : "outline"} onClick={() => setUseJsonMode(true)}>
+                JSON 입력
+              </Button>
+            </div>
+          </div>
+
+          {/* 키-값 입력 모드 */}
+          {!useJsonMode && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">매개변수</label>
+                <Button size="sm" variant="outline" onClick={addParameter}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  추가
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {customParameters.map((param, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <Input
+                      placeholder="키 (예: category, value, user_id)"
+                      value={param.key}
+                      onChange={(e) => updateParameter(index, "key", e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="값 (예: button, 100, user123)"
+                      value={param.value}
+                      onChange={(e) => updateParameter(index, "value", e.target.value)}
+                      className="flex-1"
+                    />
+                    {customParameters.length > 1 && (
+                      <Button size="sm" variant="outline" onClick={() => removeParameter(index)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* JSON 입력 모드 */}
+          {useJsonMode && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">매개변수 (JSON 형식)</label>
+              <Textarea
+                placeholder={`{
+  "category": "engagement",
+  "action": "click",
+  "label": "header_button",
+  "value": 1,
+  "user_id": "user123",
+  "custom_parameter": "test_value"
+}`}
+                value={jsonParameters}
+                onChange={(e) => setJsonParameters(e.target.value)}
+                rows={8}
+                className="font-mono text-sm"
+              />
+            </div>
+          )}
+
+          {/* 전송 버튼 */}
+          <div className="flex gap-2">
+            <Button
+              onClick={sendCustomEvent}
+              disabled={!status.gtagLoaded || !customEventName.trim()}
+              className="flex-1"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              커스텀 이벤트 전송
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCustomEventName("")
+                setCustomParameters([{ key: "", value: "" }])
+                setJsonParameters("")
+              }}
+            >
+              초기화
+            </Button>
+          </div>
+
+          {/* 테스트 히스토리 */}
+          {testHistory.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium">테스트 히스토리</h4>
+                <Button size="sm" variant="ghost" onClick={() => setTestHistory([])}>
+                  히스토리 지우기
+                </Button>
+              </div>
+              <div className="bg-muted p-3 rounded-lg max-h-80 overflow-y-auto">
+                {testHistory.map((test, index) => (
+                  <div
+                    key={index}
+                    className="text-sm font-mono mb-3 last:mb-0 border-b border-border pb-2 last:border-b-0"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-muted-foreground">[{test.timestamp}]</span>
+                      <span className={`font-semibold ${test.success ? "text-green-600" : "text-red-600"}`}>
+                        {test.eventName}
+                      </span>
+                      <Badge variant={test.success ? "default" : "destructive"} className="text-xs">
+                        {test.success ? "성공" : "실패"}
+                      </Badge>
+                    </div>
+                    <div className="text-muted-foreground text-xs pl-4">{JSON.stringify(test.parameters, null, 2)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -368,7 +665,7 @@ export function AnalyticsDebug() {
                   로그 지우기
                 </Button>
               </div>
-              <div className="bg-muted p-3 rounded-lg max-h-60 overflow-y-auto">
+              <div className="bg-muted p-3 rounded-lg max-h-80 overflow-y-auto">
                 {eventLog.map((log, index) => (
                   <div key={index} className="text-sm font-mono mb-2 last:mb-0">
                     <span className="text-muted-foreground">[{log.timestamp}]</span>{" "}

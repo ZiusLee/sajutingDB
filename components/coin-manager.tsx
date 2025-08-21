@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Coins, Calendar } from "lucide-react"
+import { Calendar } from "lucide-react"
 import { motion } from "framer-motion"
+import { TicketIcon } from "@/components/ticket-icon"
 
 interface CoinManagerProps {
   coins: number
@@ -25,10 +26,10 @@ export function CoinManager({ coins, lastCheckIn, onCheckIn }: CoinManagerProps)
                 animate={{ rotate: [0, 10, -10, 10, 0] }}
                 transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, repeatDelay: 3 }}
               >
-                <Coins className="h-6 w-6 text-amber-500 mr-2" />
+                <TicketIcon className="text-amber-500 mr-2" size={24} />
               </motion.div>
               <div>
-                <p className="text-sm text-amber-300/70">보유 코인</p>
+                <p className="text-sm text-amber-300/70">보유 질문권</p>
                 <p className="text-xl font-bold text-amber-400">{coins}개</p>
               </div>
             </div>

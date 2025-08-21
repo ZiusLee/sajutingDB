@@ -1,5 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useMemo } from "react"
+import type React from "react"
+
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
@@ -20,6 +22,9 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // R
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 import Sidebar from "@/components/sidebar"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { trackEvent } from "@/lib/analytics"
+import { SuggestedQuestionsAgent } from "@/lib/suggested-questions-agent"
 
 interface SajuChatProps {
   saju: any
@@ -106,22 +111,24 @@ export default function SajuChat({
   saju,
   name,
   gender,
+  initialInterpretation,
   roomType,
   onBack,
+  isLoggedIn,
   sessionKey,
   birthInfo,
-  concerns,
-  isSidebarOpen: externalSidebarOpen,
-  onSidebarToggle: externalSidebarToggle,
+  concerns = [],
+  isSidebarOpen,
+  onSidebarToggle,
   currentChatRoomId,
   temporaryChatRoom,
   onChatRoomPersisted,
 }: SajuChatProps) {
   const { user } = useAuth()
-  const { isKeyboardOpen, keyboardHeight } = useMobileKeyboard()
+  const { isKeyboardOpen } = useMobileKeyboard()
   const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
-  const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
-  const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
+  const internalIsSidebarOpen = isSidebarOpen ?? internalSidebarOpen
+  const setSidebarOpen = onSidebarToggle ? () => onSidebarToggle() : setInternalSidebarOpen
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
@@ -348,15 +355,29 @@ export default function SajuChat({
     }
   }, [stableSaju, effectiveChatRoomId, sessionId])
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
+  const [dynamicSuggestedQuestions, setDynamicSuggestedQuestions] = useState<string[]>([])
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
+  const [showDynamicQuestions, setShowDynamicQuestions] = useState(false)
+
+  const { messages, input, setInput, handleSubmit, isLoading, error, reload, stop } = useAIChat({
     api: "/api/saju-chat",
-    id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
-    initialMessages: transitionMessages ?? chatData.initialMessages,
     body: aiChatBody,
-    experimental_throttle: 50,
-    onFinish: (message) => {
+    streamProtocol: "data",
+    onFinish: async (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
+
+      if (message.role === "assistant") {
+        trackEvent("AI_message_sent", {
+          message_length: message.content.length,
+          response_time: Date.now() - (window.lastUserMessageTime || Date.now()),
+          room_type: roomType,
+          session_id: sessionId,
+          is_logged_in: user !== null,
+        })
+
+        await generateDynamicSuggestedQuestions(message)
+      }
 
       // Clear persistent streaming state
       const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
@@ -368,6 +389,13 @@ export default function SajuChat({
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
 
+      trackEvent("AI_error", {
+        error_type: "chat_response_error",
+        error_message: error.message,
+        room_type: roomType,
+        session_id: sessionId,
+      })
+
       // Clear persistent streaming state on error
       const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
       localStorage.removeItem(streamKey)
@@ -375,6 +403,32 @@ export default function SajuChat({
       chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     },
   })
+
+  const generateDynamicSuggestedQuestions = async (assistantMessage: any) => {
+    try {
+      setIsGeneratingQuestions(true)
+
+      const response = await SuggestedQuestionsAgent.generateQuestions({
+        messages: [...messages, assistantMessage],
+        saju: stableSaju,
+        roomType,
+        concerns,
+        name,
+        gender,
+      })
+
+      if (response.questions.length > 0) {
+        setDynamicSuggestedQuestions(response.questions)
+        setShowDynamicQuestions(true)
+        console.log("🤖 Generated dynamic questions:", response.questions)
+      }
+    } catch (error) {
+      console.error("Failed to generate dynamic questions:", error)
+      // 실패 시 기본 질문 유지
+    } finally {
+      setIsGeneratingQuestions(false)
+    }
+  }
 
   useEffect(() => {
     if (
@@ -386,9 +440,9 @@ export default function SajuChat({
     ) {
       console.log("📤 [Flow] Sending first question...")
       setInitialQuestionsSent((prev) => ({ ...prev, q1: true }))
-      append({ role: "user", content: initialQuestionsToSend[0] })
+      setInput(initialQuestionsToSend[0])
     }
-  }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
+  }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, setInput, initialQuestionsSent.q1])
 
   useEffect(() => {
     const endInitialMode = () => {
@@ -468,6 +522,7 @@ export default function SajuChat({
   const handleSuggestedQuestionClick = (question: string) => {
     if (isLoading) return
     setInput(question)
+    setShowDynamicQuestions(false)
     setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
   }
 
@@ -507,7 +562,14 @@ export default function SajuChat({
     }
   }
 
-  const handleSignupProvider = async (provider: "kakao" | "google" | "apple") => {
+  const handleSignupProvider = async (provider: "kakao" | "google") => {
+    trackEvent("auth_attempt", {
+      provider: provider,
+      context: "chat_signup_dialog",
+      user_type: "anonymous",
+      has_chat_history: messages.length > 0,
+    })
+
     try {
       localStorage.setItem("auth_return_url", window.location.href)
 
@@ -527,6 +589,13 @@ export default function SajuChat({
     () => generateSuggestedQuestions(stableConcerns, roomType),
     [stableConcerns, roomType],
   )
+
+  const displayQuestions = useMemo(() => {
+    if (showDynamicQuestions && dynamicSuggestedQuestions.length > 0) {
+      return dynamicSuggestedQuestions
+    }
+    return suggestedQuestions
+  }, [showDynamicQuestions, dynamicSuggestedQuestions, suggestedQuestions])
 
   useEffect(() => {
     if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
@@ -703,6 +772,35 @@ export default function SajuChat({
     restoreScrollPosition()
   }, [roomType])
 
+  const handleUserSubmit = (e: React.FormEvent) => {
+    if (input.trim()) {
+      window.lastUserMessageTime = Date.now()
+
+      trackEvent("user_message_sent", {
+        message_length: input.length,
+        room_type: roomType,
+        session_id: sessionId,
+        is_logged_in: user !== null,
+        message_count: messages.filter((m) => m.role === "user").length + 1,
+      })
+
+      // Check for multiple questions in quick succession
+      const recentUserMessages = messages.filter(
+        (m) => m.role === "user" && Date.now() - new Date(m.createdAt || Date.now()).getTime() < 60000, // within 1 minute
+      )
+
+      if (recentUserMessages.length >= 2) {
+        trackEvent("BEHAVIOR_multiple_questions", {
+          questions_count: recentUserMessages.length + 1,
+          time_window: "1_minute",
+          room_type: roomType,
+        })
+      }
+    }
+
+    handleSubmit(e)
+  }
+
   if (!chatData.isInitialized || isFirstChatRoom === null) {
     return (
       <div className="flex h-screen-mobile items-center justify-center bg-background">
@@ -714,7 +812,7 @@ export default function SajuChat({
     )
   }
 
-  if (!stableSaju || !aiChatBody.compressedSaju) {
+  if (!stableSaju) {
     return (
       <div className="flex h-screen-mobile items-center justify-center bg-background p-4 text-center">
         <div>
@@ -747,7 +845,24 @@ export default function SajuChat({
   }
 
   return (
-    <div className="flex h-svh overflow-hidden bg-white" style={{ height: "100svh" }}>
+    <div className="flex overflow-hidden bg-white keyboard-aware-container">
+      <Sheet open={internalIsSidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-80 p-0 lg:hidden">
+          <Sidebar
+            saju={stableSaju}
+            name={name}
+            gender={gender}
+            birthInfo={chatData.stableBirthInfo}
+            sessionId={sessionId}
+            roomType={roomType}
+            currentChatRoomId={effectiveChatRoomId}
+            onChatRoomSelect={handleChatRoomSelect}
+            onNewChat={handleNewChat}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Desktop sidebar - unchanged */}
       <div className="hidden lg:block lg:w-80 border-r border-gray-200/50 bg-white">
         <Sidebar
           saju={stableSaju}
@@ -762,17 +877,25 @@ export default function SajuChat({
         />
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto chat-messages-container">
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-white lg:pt-0 overflow-hidden">
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto chat-messages-container keyboard-aware-chat"
+          style={{
+            backgroundColor: "white",
+            overscrollBehavior: "contain",
+            position: "relative",
+          }}
+        >
           <div className="px-3 sm:px-4 py-1 sm:py-3 space-y-3 sm:space-y-4 pb-2">
             {temporaryChatRoom?.isTemporary && !persistedChatRoomId && (
               <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-1">
-                💬 새로운 대화가 시작되었습니다. 첫 메시지를 보내면 대화가 저장됩니다.
+                💬 첫 메시지를 보내면 대화가 저장됩니다.
               </div>
             )}
 
             {messages.length === 0 && !isInitialQuestionsMode && (
-              <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
+              <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
                 <div className="mb-6">
                   <h1 className="text-2xl md:text-3xl font-bold text-black leading-tight mb-3">
                     오늘은 어떤 것이
@@ -969,7 +1092,16 @@ export default function SajuChat({
             )}
           </div>
         </div>
-        <div className="border-t bg-white p-2 sm:p-3 flex-shrink-0 chat-input-container">
+        <div
+          className="border-t bg-white p-2 sm:p-3 pb-1 sm:pb-2 flex-shrink-0 chat-input-container"
+          style={{
+            ...(isKeyboardOpen && {
+              position: "sticky",
+              bottom: 0,
+              zIndex: 10,
+            }),
+          }}
+        >
           {showScrollButton && (
             <Button
               onClick={scrollToBottom}
@@ -983,12 +1115,16 @@ export default function SajuChat({
           <div className="space-y-1.5">
             {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
               <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-                {suggestedQuestions.map((q, i) => (
+                {displayQuestions.map((q, i) => (
                   <Button
-                    key={i}
+                    key={`${showDynamicQuestions ? "dynamic" : "static"}-${i}`}
                     variant="outline"
                     size="sm"
-                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-2.5 sm:px-3 py-1 sm:py-1.5 min-w-fit"
+                    className={`rounded-full whitespace-nowrap border-gray-200 text-xs sm:text-sm px-2.5 sm:px-3 py-1 sm:py-1.5 min-w-fit ${
+                      showDynamicQuestions
+                        ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
                     onClick={() => handleSuggestedQuestionClick(q)}
                   >
                     {q}
@@ -996,11 +1132,23 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+            {showDynamicQuestions && (
+              <div className="flex justify-center mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowDynamicQuestions(false)}
+                >
+                  기본 질문 보기
+                </Button>
+              </div>
+            )}
+            <form onSubmit={handleUserSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
-                  onChange={handleInputChange}
+                  onChange={(e) => setInput(e.target.value)}
                   placeholder="무엇이든 물어보세요"
                   className="h-9 sm:h-11 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
                   disabled={isLoading || isInitialQuestionsMode}

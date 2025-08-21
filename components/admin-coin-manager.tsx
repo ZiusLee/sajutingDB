@@ -35,12 +35,12 @@ export default function AdminCoinManager() {
       if (response.ok) {
         setResult({
           success: true,
-          message: data.message || `${email} 사용자에게 ${amount}코인이 추가되었습니다.`,
+          message: data.message || `${email} 사용자에게 ${amount}질문권이 추가되었습니다.`,
         })
       } else {
         setResult({
           success: false,
-          message: data.error || "코인 추가 중 오류가 발생했습니다.",
+          message: data.error || "질문권 추가 중 오류가 발생했습니다.",
         })
       }
     } catch (error) {
@@ -56,8 +56,8 @@ export default function AdminCoinManager() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>사용자 코인 관리</CardTitle>
-        <CardDescription>특정 사용자에게 코인을 추가합니다.</CardDescription>
+        <CardTitle>사용자 질문권 관리</CardTitle>
+        <CardDescription>특정 사용자에게 질문권을 추가합니다.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,7 +73,7 @@ export default function AdminCoinManager() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="amount">코인 수량</Label>
+            <Label htmlFor="amount">질문권 수량</Label>
             <Input
               id="amount"
               type="number"
@@ -84,7 +84,7 @@ export default function AdminCoinManager() {
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "처리 중..." : "코인 추가하기"}
+            {loading ? "처리 중..." : "질문권 추가하기"}
           </Button>
         </form>
       </CardContent>

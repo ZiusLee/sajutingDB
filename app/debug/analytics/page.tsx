@@ -1,21 +1,19 @@
-import { AnalyticsDebug } from '@/components/analytics-debug'
-import { Metadata } from 'next'
+import { AnalyticsDebug } from "@/components/analytics-debug"
+import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: 'Google Analytics 디버그 - 사주핑',
-  description: 'Google Analytics 설정 상태를 확인하고 테스트합니다.',
-  robots: 'noindex, nofollow',
+  title: "Google Analytics 디버그 - 사주핑",
+  description: "Google Analytics 설정 상태를 확인하고 테스트합니다.",
+  robots: "noindex, nofollow",
 }
 
 export default function AnalyticsDebugPage() {
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-8 px-4 min-h-screen">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Google Analytics 디버그</h1>
-          <p className="text-muted-foreground">
-            Google Analytics (G-YFCCKXZDEN)가 제대로 설정되었는지 확인해보세요
-          </p>
+          <p className="text-muted-foreground">Google Analytics (G-YFCCKXZDEN)가 제대로 설정되었는지 확인해보세요</p>
         </div>
 
         <AnalyticsDebug />
@@ -24,10 +22,10 @@ export default function AnalyticsDebugPage() {
           <h2 className="font-semibold mb-2">확인 단계:</h2>
           <ol className="list-decimal list-inside space-y-2 text-sm">
             <li>
-              <strong>실시간 보고서:</strong> 
-              <a 
-                href="https://analytics.google.com/analytics/web/" 
-                target="_blank" 
+              <strong>실시간 보고서:</strong>
+              <a
+                href="https://analytics.google.com/analytics/web/"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:underline ml-1"
               >
@@ -44,12 +42,11 @@ export default function AnalyticsDebugPage() {
               </ul>
             </li>
             <li>
-              <strong>Google Tag Assistant:</strong> Chrome 확장 프로그램을 설치하여 
-              실시간 태그 동작 확인
+              <strong>Google Tag Assistant:</strong> Chrome 확장 프로그램을 설치하여 실시간 태그 동작 확인
             </li>
             <li>
-              <strong>테스트 이벤트:</strong> 위의 "테스트 이벤트 전송" 버튼을 클릭하고 
-              GA 실시간 보고서에서 이벤트 수신 확인
+              <strong>테스트 이벤트:</strong> 위의 "테스트 이벤트 전송" 버튼을 클릭하고 GA 실시간 보고서에서 이벤트 수신
+              확인
             </li>
           </ol>
         </div>

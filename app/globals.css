@@ -89,19 +89,18 @@ body {
   /* Updated mobile viewport optimizations with better Safari support */
   .min-h-screen-mobile {
     min-height: 100vh;
-    min-height: 100svh; /* Small viewport height - ensures content fits when address bar is visible */
+    min-height: 100dvh; /* Dynamic viewport height - ensures content fits when address bar is visible */
   }
 
   .h-screen-mobile {
     height: 100vh;
-    height: 100svh; /* Small viewport height for consistent Safari behavior */
+    height: 100dvh; /* Dynamic viewport height for consistent Safari behavior */
     height: -webkit-fill-available; /* iOS Safari specific height fallback */
   }
 
   /* Simplified chat container height for better mobile compatibility */
   .chat-container-height {
-    height: calc(100vh - 80px);
-    height: calc(100svh - 80px); /* Use small viewport height for consistent behavior */
+    height: calc(100dvh - 80px); /* Use dynamic viewport height */
   }
 
   .chat-messages-container {
@@ -114,6 +113,19 @@ body {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* Modern keyboard-aware container */
+  .keyboard-aware-container {
+    height: 100dvh; /* Dynamic viewport height automatically handles keyboard */
+    min-height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .keyboard-aware-chat {
+    height: calc(100dvh - 140px); /* Dynamic height minus header and input */
+    max-height: calc(100dvh - 140px);
+    min-height: calc(100dvh - 140px);
   }
 
   /* Safe area utilities */
@@ -185,6 +197,9 @@ body {
     /* Prevent zoom on iOS */
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    height: 100%;
+    /* Keep overflow hidden to prevent main site scroll */
+    overflow: hidden;
   }
 
   body {
@@ -196,6 +211,9 @@ body {
     /* Prevent text selection highlighting issues */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    height: 100%;
+    /* Keep overflow hidden to prevent main site scroll */
+    overflow: hidden;
   }
 
   /* Ensure buttons maintain consistent styling across browsers */

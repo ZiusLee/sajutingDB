@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import LandingPageClient from "@/components/landing-page-client"
+import { trackIntegratedEvents, trackUserEvents } from "@/lib/analytics"
 
 export default function HomePage() {
   const router = useRouter()
@@ -12,6 +13,9 @@ export default function HomePage() {
   const supabase = createClientComponentClient()
 
   useEffect(() => {
+    trackIntegratedEvents.pageView("home")
+    trackUserEvents.sessionStart()
+
     const handleUserRedirection = async () => {
       try {
         // Check if user is authenticated
@@ -21,6 +25,14 @@ export default function HomePage() {
 
         if (!session?.user) {
           // Not authenticated, show landing page
+          const isFirstVisit = !localStorage.getItem("user_visited_before")
+          if (isFirstVisit) {
+            localStorage.setItem("user_visited_before", "true")
+            trackUserEvents.firstVisit()
+          } else {
+            trackUserEvents.returnVisit()
+          }
+
           setShowLanding(true)
           setIsLoading(false)
           return

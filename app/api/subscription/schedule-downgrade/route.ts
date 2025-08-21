@@ -31,7 +31,10 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single()
 
-    if (fetchError && fetchError.code !== "PGRST116") {
+    if (fetchError) {
+      if (fetchError.code === "PGRST116") {
+        return NextResponse.json({ error: "활성 구독이 없습니다." }, { status: 400 })
+      }
       console.error("구독 조회 오류:", fetchError)
       return NextResponse.json({ error: "구독 정보 조회 중 오류가 발생했습니다." }, { status: 500 })
     }
@@ -40,26 +43,70 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "활성 구독이 없습니다." }, { status: 400 })
     }
 
+    const currentPlan = currentSubscription.subscription_type || currentSubscription.package_id
+    if (currentPlan === newPlan) {
+      return NextResponse.json({ error: "현재 플랜과 동일한 플랜입니다." }, { status: 400 })
+    }
+
     const scheduledDate = new Date()
     scheduledDate.setDate(scheduledDate.getDate() + 7) // 7일 후
 
-    const { error: insertError } = await supabase.from("subscription_charges").insert({
-      user_id: user.id,
-      subscription_order_id: currentSubscription.id,
-      charge_date: scheduledDate.toISOString().split("T")[0],
-      status: "scheduled",
-      change_type: "downgrade",
-      current_plan: currentSubscription.subscription_type || currentSubscription.package_id,
-      scheduled_plan_change: newPlan,
-      coins_added: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      scheduled_date: scheduledDate.toISOString(),
-    })
+    const { data: userCoins, error: coinsError } = await supabase
+      .from("user_coins")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
 
-    if (insertError) {
-      console.error("다운그레이드 예약 저장 오류:", insertError)
-      return NextResponse.json({ error: "다운그레이드 예약 저장 중 오류가 발생했습니다." }, { status: 500 })
+    if (coinsError && coinsError.code !== "PGRST116") {
+      console.error("사용자 코인 정보 조회 오류:", {
+        error: coinsError,
+        message: coinsError.message,
+        details: coinsError.details,
+        hint: coinsError.hint,
+        code: coinsError.code,
+      })
+      return NextResponse.json({ error: "사용자 정보 조회 중 오류가 발생했습니다." }, { status: 500 })
+    }
+
+    // Update user_coins table with scheduled plan change
+    const updateData = {
+      scheduled_plan_change: newPlan,
+      scheduled_date: scheduledDate.toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    let updateError
+    if (userCoins) {
+      // Update existing record
+      const { error } = await supabase.from("user_coins").update(updateData).eq("user_id", user.id)
+      updateError = error
+    } else {
+      // Create new record if doesn't exist
+      const { error } = await supabase.from("user_coins").insert({
+        user_id: user.id,
+        coins: 0,
+        bonus_coins: 0,
+        subscription_coins: 0,
+        ...updateData,
+        created_at: new Date().toISOString(),
+      })
+      updateError = error
+    }
+
+    if (updateError) {
+      console.error("다운그레이드 예약 저장 오류:", {
+        error: updateError,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        code: updateError.code,
+      })
+      return NextResponse.json(
+        {
+          error: `다운그레이드 예약 저장 중 오류가 발생했습니다: ${updateError.message || "알 수 없는 오류"}`,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
@@ -69,7 +116,16 @@ export async function POST(request: NextRequest) {
       planName,
     })
   } catch (error) {
-    console.error("다운그레이드 예약 API 오류:", error)
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 })
+    console.error("다운그레이드 예약 API 오류:", {
+      error: error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    return NextResponse.json(
+      {
+        error: `서버 오류가 발생했습니다: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
+      },
+      { status: 500 },
+    )
   }
 }

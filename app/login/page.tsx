@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { getSupabase } from "@/lib/supabase-client"
+import { trackIntegratedEvents, trackAuthEvents, trackError } from "@/lib/analytics"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,8 +30,12 @@ export default function LoginPage() {
 
   // Check for error params
   useEffect(() => {
+    trackIntegratedEvents.pageView("login")
+
     const errorParam = searchParams.get("error")
     if (errorParam) {
+      trackError(`Login callback error: ${errorParam}`, "login_page")
+
       switch (errorParam) {
         case "callback_error":
           setError("로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.")
@@ -78,8 +83,14 @@ export default function LoginPage() {
     setIsLoading(true)
     setError("")
 
+    trackIntegratedEvents.loginClick("kakao")
+    trackAuthEvents.signIn("kakao")
+
     try {
       console.log("Starting Kakao login...")
+
+      localStorage.setItem("auth_flow_type", "login")
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
@@ -89,6 +100,7 @@ export default function LoginPage() {
 
       if (error) {
         console.error("Kakao login error:", error)
+        trackError(`Kakao login error: ${error.message}`, "login_page")
         throw error
       }
 
@@ -106,8 +118,14 @@ export default function LoginPage() {
     setIsLoading(true)
     setError("")
 
+    trackIntegratedEvents.loginClick("google")
+    trackAuthEvents.signIn("google")
+
     try {
       console.log("Starting Google login...")
+
+      localStorage.setItem("auth_flow_type", "login")
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -121,6 +139,7 @@ export default function LoginPage() {
 
       if (error) {
         console.error("Google login error:", error)
+        trackError(`Google login error: ${error.message}`, "login_page")
         throw error
       }
 
@@ -138,6 +157,10 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     setError("")
+
+    trackIntegratedEvents.loginClick("email")
+    trackIntegratedEvents.formSubmit("login")
+    trackAuthEvents.signIn("email")
 
     if (!email) {
       setError("이메일을 입력해주세요.")
@@ -160,6 +183,8 @@ export default function LoginPage() {
 
       if (error) {
         console.error("Email login error:", error)
+        trackError(`Email login error: ${error.message}`, "login_page")
+
         if (error.message.includes("Invalid login credentials") || error.message.includes("User not found")) {
           setError("계정을 찾을 수 없습니다. 먼저 사주프로필을 생성해주세요.")
           setTimeout(() => {
@@ -197,6 +222,8 @@ export default function LoginPage() {
     setError("")
     setSuccess("")
 
+    trackIntegratedEvents.formSubmit("password_reset")
+
     if (!email) {
       setError("이메일을 입력해주세요.")
       setIsLoading(false)
@@ -213,6 +240,7 @@ export default function LoginPage() {
       setSuccess("비밀번호 재설정 링크가 이메일로 전송되었습니다. 이메일을 확인해주세요.")
     } catch (err) {
       console.error("비밀번호 재설정 오류:", err)
+      trackError(`Password reset error: ${err instanceof Error ? err.message : "Unknown error"}`, "login_page")
       setError(err instanceof Error ? err.message : "비밀번호 재설정 요청 중 오류가 발생했습니다.")
     } finally {
       setIsLoading(false)

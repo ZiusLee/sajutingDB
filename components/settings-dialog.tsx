@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { TicketIcon } from "@/components/ticket-icon"
 
 interface SettingsDialogProps {
   children: React.ReactNode
@@ -43,7 +44,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
         })
       }
     } catch (error) {
-      console.error("핑 갯수 조회 오류:", error)
+      console.error("질문권 갯수 조회 오류:", error)
     } finally {
       setLoadingCoins(false)
     }
@@ -140,15 +141,13 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
               <span className="flex-1 text-left">정기결제</span>
               <div className="flex flex-col items-end gap-1 mr-2">
                 <div className="flex items-center gap-1">
-                  <div className="w-4 h-4 rounded-full bg-yellow-500 flex items-center justify-center">
-                    <span className="text-black text-xs font-bold">P</span>
-                  </div>
+                  <TicketIcon className="text-yellow-500" size={16} />
                   <span className="text-sm font-medium text-yellow-600">
-                    {loadingCoins ? "..." : `${userCoins.total}핑`}
+                    {loadingCoins ? "..." : `${userCoins.total}질문권`}
                   </span>
                 </div>
                 <div className="text-xs text-gray-500">
-                  구독핑 {userCoins.subscription} + 보너스핑 {userCoins.bonus}
+                  구독질문권 {userCoins.subscription} + 보너스질문권 {userCoins.bonus}
                 </div>
               </div>
               <ChevronRight className="h-4 w-4" />
