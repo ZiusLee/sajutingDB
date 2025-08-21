@@ -20,6 +20,7 @@ export function SiteHeader() {
 
   // Check if we're in saju chat or mypage
   const isSajuChat = pathname?.includes("/saju-chat/")
+  const isChargePage = pathname === "/charge"
 
   useEffect(() => {
     const checkMobile = () => {
@@ -79,10 +80,12 @@ export function SiteHeader() {
             </button>
           ) : (
             // Normal behavior: Logo links to home
-            <Link href="/" className="flex items-center space-x-2">
-              <SajuLogo className="lg:hidden" />
-              <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
-            </Link>
+            !isChargePage && (
+              <Link href="/" className="flex items-center space-x-2">
+                <SajuLogo className="lg:hidden" />
+                <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
+              </Link>
+            )
           )}
         </div>
 

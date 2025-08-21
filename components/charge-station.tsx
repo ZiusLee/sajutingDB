@@ -437,7 +437,6 @@ export default function ChargeStation() {
 
         <div className="text-center pt-6 pb-4">
           <div className="inline-flex items-center gap-1 text-[#aeb0b6] text-xs">
-            <div className="w-3 h-3 bg-[#aeb0b6] rounded-sm"></div>
             <span>sajuping.ai</span>
           </div>
         </div>
