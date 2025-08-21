@@ -105,6 +105,7 @@ export default function Sidebar({
 
   const handleChatRoomClick = (chatRoomId: string) => {
     onChatRoomSelect(chatRoomId)
+    router.push(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
   }
 
   const formatRelativeTime = (dateString: string) => {
