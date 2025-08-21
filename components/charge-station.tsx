@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
+import { TicketIcon } from "@/components/ticket-icon"
 
 type SubscriptionPkg = {
   id: string
@@ -34,7 +35,7 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     coins: 10,
     price: 9900,
     crossedPrice: 14000,
-    subtitle: "하루에 10핑씩 제공",
+    subtitle: "하루에 10질문권씩 제공",
     accent: "cyan",
     period: "주",
     isCurrentPlan: false,
@@ -45,7 +46,7 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     coins: 30,
     price: 19900,
     crossedPrice: 42000,
-    subtitle: "하루에 30핑씩 제공",
+    subtitle: "하루에 30질문권씩 제공",
     accent: "green",
     period: "주",
     isCurrentPlan: false,
@@ -56,7 +57,7 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     coins: 100,
     price: 49900,
     crossedPrice: 140000,
-    subtitle: "하루에 100핑씩 제공",
+    subtitle: "하루에 100질문권씩 제공",
     accent: "red",
     period: "주",
     isCurrentPlan: false,
@@ -66,7 +67,7 @@ const SUBSCRIPTION_PACKAGES: SubscriptionPkg[] = [
     name: "Free Plan",
     coins: 3,
     price: 0,
-    subtitle: "하루에 3핑씩 제공",
+    subtitle: "하루에 3질문권씩 제공",
     accent: "gray",
     period: "주",
     isCurrentPlan: false,
@@ -121,7 +122,7 @@ export default function ChargeStation() {
         })
       }
     } catch (error) {
-      console.error("핑 정보 조회 오류:", error)
+      console.error("질문권 정보 조회 오류:", error)
     } finally {
       setLoadingCoins(false)
     }
@@ -294,23 +295,21 @@ export default function ChargeStation() {
 
         {isAuthenticated && (
           <section className="space-y-3">
-            <h3 className="text-white text-base font-medium">현재 나의 핑</h3>
+            <h3 className="text-white text-base font-medium">현재 나의 질문권</h3>
             <Card className="bg-[#141415] border-[#70737c]/20">
               <CardContent className="p-4">
                 <div className="text-center space-y-2">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-[#ffa938] flex items-center justify-center">
-                      <span className="text-black text-sm font-bold">P</span>
-                    </div>
+                    <TicketIcon className="text-[#ffa938]" size={24} />
                     <span className="text-2xl font-bold text-white">
-                      {loadingCoins ? "..." : `${userCoins.total}핑`}
+                      {loadingCoins ? "..." : `${userCoins.total}질문권`}
                     </span>
                   </div>
                   <div className="text-xs text-[#aeb0b6] space-y-1">
                     <div>
-                      구독핑: {userCoins.subscription}핑 | 보너스핑: {userCoins.bonus}핑
+                      구독질문권: {userCoins.subscription}질문권 | 보너스질문권: {userCoins.bonus}질문권
                     </div>
-                    <div>구독중에는 구독핑이 보너스핑보다 우선 소진됩니다.</div>
+                    <div>구독중에는 구독질문권이 보너스질문권보다 우선 소진됩니다.</div>
                   </div>
                 </div>
               </CardContent>
@@ -326,10 +325,8 @@ export default function ChargeStation() {
                 <div className="flex items-center gap-3">
                   <span className="text-[#aeb0b6] px-2 py-1 bg-[#70737c]/20 rounded text-xs">{userCoins.plan}</span>
                   <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
-                      <span className="text-black text-xs font-bold">P</span>
-                    </div>
-                    <span className="text-white text-sm">하루에 {getDailyPingAmount(userCoins.plan)}핑씩</span>
+                    <TicketIcon className="text-[#ffa938]" size={20} />
+                    <span className="text-white text-sm">하루에 {getDailyPingAmount(userCoins.plan)}질문권씩</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1 bg-[#70737c]/20 rounded-full">
@@ -372,9 +369,7 @@ export default function ChargeStation() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
-                            <span className="text-black text-xs font-bold">P</span>
-                          </div>
+                          <TicketIcon className="text-[#ffa938]" size={20} />
                           <span className="text-white text-sm">{pkg.subtitle}</span>
                         </div>
                         {pkg.crossedPrice && discountPercent && (
@@ -416,10 +411,8 @@ export default function ChargeStation() {
                     <div className="flex items-center gap-3">
                       <span className="text-white text-sm">{bonus.name}</span>
                       <div className="flex items-center gap-1">
-                        <div className="w-5 h-5 rounded-full bg-[#ffa938] flex items-center justify-center">
-                          <span className="text-black text-xs font-bold">P</span>
-                        </div>
-                        <span className="text-[#ffa938] text-sm font-medium">{bonus.coins}핑</span>
+                        <TicketIcon className="text-[#ffa938]" size={20} />
+                        <span className="text-[#ffa938] text-sm font-medium">{bonus.coins}질문권</span>
                       </div>
                     </div>
                     <Button
@@ -463,7 +456,7 @@ export default function ChargeStation() {
                     • 그때까지는 <strong>기존 요금제가 유지</strong>됩니다
                   </li>
                   <li>
-                    • 핑 제공량도 <strong>기존 기준으로 유지</strong>됩니다
+                    • 질문권 제공량도 <strong>기존 기준으로 유지</strong>됩니다
                   </li>
                   <li>
                     • <strong>다음 결제부터 새 요금제 금액으로 결제</strong>됩니다
@@ -510,10 +503,10 @@ export default function ChargeStation() {
                     • <strong>새 요금제 금액이 즉시 결제</strong>됩니다
                   </li>
                   <li>
-                    • <strong>오늘부터 새로운 핑 제공량이 적용</strong>됩니다
+                    • <strong>오늘부터 새로운 질문권 제공량이 적용</strong>됩니다
                   </li>
                   <li>
-                    • <strong>남은 기간 및 핑은 환불되지 않습니다</strong>
+                    • <strong>남은 기간 및 질문권은 환불되지 않습니다</strong>
                   </li>
                 </ul>
               </div>

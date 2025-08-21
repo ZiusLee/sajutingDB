@@ -10,7 +10,7 @@ export function AboutSajuping() {
       <div className="flex justify-center mb-8">
         <Image
           src="/images/sajuping_character.png"
-          alt="사주핑 캐��터"
+          alt="사주핑 캐릭터"
           width={150}
           height={150}
           className="animate-bounce-slow"
@@ -112,17 +112,18 @@ export function AboutSajuping() {
                   <Coffee className="h-6 w-6 text-amber-700 flex-shrink-0 mt-1" />
                   <p className="text-lg">
                     <span className="font-semibold">수많은 카페 노마드 작업과 밤샘 코딩 끝에,</span>
-                    드���어 사주핑이 세상에 나오게 되었어요. 우리의 목표는 단 하나! 당신의 하루가 조금 더 설레고, 조금
-                    더 용기 있고, 조금 더 행복해지는 것. 그 작은 변화를 위한 동반자가 되고 싶었답니다. ☕
+                    드디어 사주핑이 세상에 나오게 되었어요. 우리의 목표는 단 하나! 당신의 하루가 조금 더 설레고, 조금 더
+                    용기 있고, 조금 더 행복해지는 것. 그 작은 변화를 위한 동반자가 되고 싶었답니다. ☕
                   </p>
                 </div>
 
                 <div className="flex items-start gap-4">
                   <Heart className="h-6 w-6 text-red-500 flex-shrink-0 mt-1" />
                   <p className="text-lg">
+                    {/* 변경된 부분 */}
                     <span className="font-semibold">사주핑의 이름에는 특별한 의미가 있어요.</span>
-                    '사주'와 '핑'의 만남! 핑(Ping)은 메시지를 보내고 응답을 기다린다는 IT 용어인데요, 우주가 당신에게
-                    보내는 메시지를 사주핑이 귀엽게 전달해드린다는 의미를 담았답니다. 우주의 메시지, 받아보실래요? 💌
+                    '사주'와 '핑'의 만남! 핑(Ping)은 질문권을 의미하는 IT 용어인데요, 우주가 당신에게 보내는 메시지를
+                    사주핑이 귀엽게 전달해드린다는 의미를 담았답니다. 우주의 메시지, 받아보실래요? 💌
                   </p>
                 </div>
               </div>
