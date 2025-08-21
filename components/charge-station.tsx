@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { X, Check, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Check, AlertTriangle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -157,13 +157,10 @@ export default function ChargeStation() {
     if (!selectedDowngradePkg) return
 
     try {
-      console.log("[v0] 다운그레이드 요청 시작:", selectedDowngradePkg.id)
-
       const response = await fetch("/api/subscription/schedule-downgrade", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.id || "temp-user-id"}`, // 임시 인증
         },
         body: JSON.stringify({
           newPlan: selectedDowngradePkg.id,
@@ -171,10 +168,7 @@ export default function ChargeStation() {
         }),
       })
 
-      console.log("[v0] 응답 상태:", response.status)
-
       const responseData = await response.json()
-      console.log("[v0] 응답 데이터:", responseData)
 
       if (response.ok && responseData.success) {
         toast({
@@ -183,11 +177,9 @@ export default function ChargeStation() {
         })
         fetchBalance()
       } else {
-        console.error("[v0] 다운그레이드 실패:", responseData.error)
         throw new Error(responseData.error || "다운그레이드 예약 실패")
       }
     } catch (error) {
-      console.error("[v0] 다운그레이드 오류:", error)
       toast({
         title: "오류",
         description: error instanceof Error ? error.message : "다운그레이드 예약 중 오류가 발생했습니다.",
@@ -225,9 +217,20 @@ export default function ChargeStation() {
   }
 
   const handleGoBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back()
-    } else {
+    try {
+      if (typeof window !== "undefined") {
+        // Try to go back in history first
+        if (window.history.length > 1) {
+          window.history.back()
+        } else {
+          // Fallback to home page
+          router.push("/")
+        }
+      } else {
+        router.push("/")
+      }
+    } catch (error) {
+      // Final fallback
       router.push("/")
     }
   }
@@ -271,11 +274,15 @@ export default function ChargeStation() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1b1c1e] text-white">
-      <div className="sticky top-0 z-10 bg-[#1b1c1e] border-b border-[#70737c]/20">
+    <>
+      <div className="sticky top-0 z-10 bg-[#1b1c1e]/95 backdrop-blur-sm border-b border-[#70737c]/20">
         <div className="flex items-center justify-between p-4">
-          <button aria-label="닫기" onClick={handleGoBack} className="p-2 text-[#aeb0b6] hover:text-white">
-            <X size={18} />
+          <button
+            aria-label="뒤로 가기"
+            onClick={handleGoBack}
+            className="p-2 text-[#aeb0b6] hover:text-white transition-colors"
+          >
+            <ArrowLeft size={18} />
           </button>
         </div>
       </div>
@@ -529,6 +536,6 @@ export default function ChargeStation() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

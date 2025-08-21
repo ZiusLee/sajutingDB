@@ -13,18 +13,20 @@ export default function ChargePage() {
   }, [])
 
   return (
-    <main className="min-h-[100dvh] bg-[#1b1c1e] text-white">
-      <div className="mx-auto w-full max-w-md md:max-w-lg px-4 md:px-6 py-4 md:py-8">
-        <ChargeStation />
+    <main className="h-screen bg-[#1b1c1e] text-white overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-md md:max-w-lg">
+          <ChargeStation />
 
-        <div className="mt-6 text-center">
-          <Link
-            href="/refund-policy"
-            className="text-sm text-[#aeb0b6] hover:text-white underline underline-offset-4"
-            aria-label="환불 및 유효기간 규정 보기"
-          >
-            환불 및 유효기간 규정 보기
-          </Link>
+          <div className="mt-6 text-center px-4 pb-8">
+            <Link
+              href="/refund-policy"
+              className="text-sm text-[#aeb0b6] hover:text-white underline underline-offset-4"
+              aria-label="환불 및 유효기간 규정 보기"
+            >
+              환불 및 유효기간 규정 보기
+            </Link>
+          </div>
         </div>
       </div>
     </main>
