@@ -107,17 +107,47 @@ export async function createChatRoom(data: CreateChatRoomRequest): Promise<ChatR
   return result.chatRoom
 }
 
+const requestCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_DURATION = 5000 // 5 seconds
+
 // Get all chat rooms for a session (excluding temporary ones)
 export async function getChatRooms(sessionId: string): Promise<ChatRoom[]> {
-  const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+  const cacheKey = `chatrooms-${sessionId}`
+  const cached = requestCache.get(cacheKey)
+  const now = Date.now()
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || "Failed to fetch chat rooms")
+  if (cached && now - cached.timestamp < CACHE_DURATION) {
+    console.log("[v0] Using cached chat rooms")
+    return cached.data
   }
 
-  const result = await response.json()
-  return result.chatRooms.filter((room: ChatRoom) => !room.isTemporary)
+  console.log("[v0] Fetching chat rooms from API for session:", sessionId)
+
+  try {
+    const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("[v0] API Error:", response.status, errorText)
+
+      if (response.status === 429 || errorText.includes("Too Many Requests")) {
+        throw new Error("Too Many Requests - please wait a moment")
+      }
+
+      const error = JSON.parse(errorText)
+      throw new Error(error.error || "Failed to fetch chat rooms")
+    }
+
+    const result = await response.json()
+    const chatRooms = result.chatRooms.filter((room: ChatRoom) => !room.isTemporary)
+
+    requestCache.set(cacheKey, { data: chatRooms, timestamp: now })
+
+    return chatRooms
+  } catch (error) {
+    console.error("[v0] Error in getChatRooms:", error)
+    throw error
+  }
 }
 
 // Get a specific chat room with session info

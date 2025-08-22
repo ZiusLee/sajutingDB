@@ -49,25 +49,37 @@ export default function Sidebar({
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
   const [loadingChatRooms, setLoadingChatRooms] = useState(false)
   const [creatingNewChat, setCreatingNewChat] = useState(false)
+  const [lastFetchTime, setLastFetchTime] = useState(0)
 
-  // Load chat rooms
   useEffect(() => {
     const loadChatRooms = async () => {
+      const now = Date.now()
+      if (now - lastFetchTime < 1000) {
+        return
+      }
+
       setLoadingChatRooms(true)
+      setLastFetchTime(now)
+
       try {
         if (sessionId) {
+          console.log("[v0] Loading chat rooms for session:", sessionId)
           const rooms = await getChatRooms(sessionId)
+          console.log("[v0] Loaded chat rooms:", rooms.length)
           setChatRooms(rooms)
         }
       } catch (error) {
         console.error("❌ Error loading chat rooms:", error)
+        if (!error.message?.includes("Too Many Requests")) {
+          toast.error("대화 목록을 불러올 수 없습니다")
+        }
       } finally {
         setLoadingChatRooms(false)
       }
     }
 
     loadChatRooms()
-  }, [sessionId])
+  }, [sessionId, lastFetchTime])
 
   const handleNewChat = async () => {
     if (creatingNewChat) return
@@ -104,8 +116,13 @@ export default function Sidebar({
   }
 
   const handleChatRoomClick = (chatRoomId: string) => {
-    onChatRoomSelect(chatRoomId)
-    router.push(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
+    console.log("[v0] Clicking chat room:", chatRoomId, "Current room:", currentChatRoomId)
+
+    if (chatRoomId !== currentChatRoomId) {
+      onChatRoomSelect(chatRoomId)
+      router.replace(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
+      console.log("[v0] Navigating to:", `/saju-chat/${roomType}?roomId=${chatRoomId}`)
+    }
   }
 
   const formatRelativeTime = (dateString: string) => {
