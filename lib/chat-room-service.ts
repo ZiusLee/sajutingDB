@@ -104,11 +104,28 @@ export async function createChatRoom(data: CreateChatRoomRequest): Promise<ChatR
   }
 
   const result = await response.json()
+
+  // Clear cache for this session
+  chatRoomCache.delete(`chatRooms_${data.sessionId}`)
+
   return result.chatRoom
 }
 
-// Get all chat rooms for a session (excluding temporary ones)
+// Get all chat rooms for a session (excluding temporary ones) with caching
+const chatRoomCache = new Map<string, { data: ChatRoom[]; timestamp: number }>()
+const CACHE_DURATION = 30000 // 30 seconds
+
 export async function getChatRooms(sessionId: string): Promise<ChatRoom[]> {
+  // Check cache first
+  const cacheKey = `chatRooms_${sessionId}`
+  const cached = chatRoomCache.get(cacheKey)
+
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log("[v0] Using cached chat rooms")
+    return cached.data
+  }
+
+  console.log("[v0] Fetching fresh chat rooms from API")
   const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
 
   if (!response.ok) {
@@ -117,7 +134,12 @@ export async function getChatRooms(sessionId: string): Promise<ChatRoom[]> {
   }
 
   const result = await response.json()
-  return result.chatRooms.filter((room: ChatRoom) => !room.isTemporary)
+  const chatRooms = result.chatRooms.filter((room: ChatRoom) => !room.isTemporary)
+
+  // Cache the results
+  chatRoomCache.set(cacheKey, { data: chatRooms, timestamp: Date.now() })
+
+  return chatRooms
 }
 
 // Get a specific chat room with session info
@@ -154,6 +176,10 @@ export async function updateChatRoom(chatRoomId: string, data: UpdateChatRoomReq
   }
 
   const result = await response.json()
+
+  // Clear all cache entries (we don't know which session this room belongs to)
+  chatRoomCache.clear()
+
   return result.chatRoom
 }
 
@@ -167,6 +193,9 @@ export async function deleteChatRoom(chatRoomId: string): Promise<void> {
     const error = await response.json()
     throw new Error(error.error || "Failed to delete chat room")
   }
+
+  // Clear all cache entries
+  chatRoomCache.clear()
 }
 
 // Generate smart title based on first message

@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator"
 
 export const metadata = {
   title: "환불 및 유효기간 규정 - 사주핑",
-  description: "사주핑 핑(포인트) 환불 및 유효기간 정책 안내",
+  description: "사주핑 질문권 환불 및 유효기간 정책 안내",
 }
 
 export default function RefundPolicyPage() {
@@ -26,7 +26,7 @@ export default function RefundPolicyPage() {
             <CardTitle className="text-2xl md:text-3xl font-bold">{"환불 및 유효기간 규정"}</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-neutral max-w-none">
-            <p className="text-neutral-600">{"사주핑 핑(포인트) 환불 및 유효기간에 대한 기준을 안내드립니다."}</p>
+            <p className="text-neutral-600">{"사주핑 질문권 환불 및 유효기간에 대한 기준을 안내드립니다."}</p>
 
             <Separator className="my-6" />
 
@@ -36,14 +36,14 @@ export default function RefundPolicyPage() {
               </h2>
               <ul className="list-disc pl-5 space-y-2">
                 <li>
-                  <strong>핑:</strong> 회원이 유료서비스 또는 콘텐츠 구매 시 사용할 수 있도록 유상으로 충전하는
-                  사이버머니입니다. 핑은 마지막 이용일로부터 5년 동안 사용하지 않을 경우 「상사소멸시효」에 따라 소멸될
-                  수 있습니다.
+                  <strong>질문권:</strong> 회원이 구독을 통해 부여받거나 추가 결제를 통해 충전하여, 사주
+                  해석·상담·리포트 등 유료콘텐츠 이용 시 차감되는 디지털 이용권을 의미합니다. 질문권은 마지막
+                  이용일로부터 5년 동안 사용하지 않을 경우 「상사소멸시효」에 따라 소멸될 수 있습니다.
                 </li>
                 <li>
-                  <strong>보너스핑:</strong> 회사가 이벤트, 프로모션 등으로 무상 지급하는 가상의 데이터입니다.
-                  보너스핑은 환불되지 않으며, 유효기간은 회사 정책에 따릅니다. 유효기간 경과 시 자동 소멸되며, 소멸된
-                  보너스핑은 환불 불가합니다.
+                  <strong>보너스 질문권:</strong> 회사가 이벤트, 프로모션 등으로 무상 지급하는 질문권을 의미하며
+                  환불되지 않습니다. 보너스 질문권은 유효기간은 회사 정책에 따릅니다. 유효기간 경과 시 자동 소멸되며,
+                  소멸된 보너스 질문권은 환불 불가합니다.
                 </li>
               </ul>
             </section>
@@ -56,11 +56,9 @@ export default function RefundPolicyPage() {
               </h2>
               <ul className="list-disc pl-5 space-y-2">
                 <li>
-                  {
-                    "구매한 핑(포인트)은 1회도 사용하지 않은 경우에 한하여, 구매일로부터 7일 이내 전액 환불이 가능합니다."
-                  }
+                  "구독형 유료서비스는 결제와 동시에 이용이 개시되므로, 결제 완료 후에는 청약철회(환불)가 불가합니다."
                 </li>
-                <li>{"전액 환불 시, 결제 대행 수수료 등 환불 처리에 소요되는 실비가 공제될 수 있습니다."}</li>
+                <li>{"단, 관계 법령상 환불 의무가 있는 경우(과오금 결제 등)에는 해당 법령에 따라 처리합니다."}</li>
                 <li>{"환불은 결제 시 사용한 동일한 결제 수단으로만 진행됩니다."}</li>
               </ul>
             </section>
@@ -69,13 +67,17 @@ export default function RefundPolicyPage() {
 
             <section aria-labelledby="article-2" className="space-y-3">
               <h2 id="article-2" className="text-xl font-semibold">
-                {"제2조 (부분 사용 후 환불 불가 및 유효기간)"}
+                {"제2조 (환불정책)"}
               </h2>
               <ul className="list-disc pl-5 space-y-2">
-                <li>{"구매한 핑(포인트)을 1회 이상 사용한 경우, 잔여 핑에 대해서는 환불이 불가합니다."}</li>
-                <li>{"구매한 핑(포인트)의 이용기간과 환불 가능 기간은 결제일로부터 1년입니다."}</li>
-                <li>{"유효기간이 경과하면 잔여 핑은 자동 소멸되며, 소멸된 핑은 환불되지 않습니다."}</li>
-                <li>{"서비스 이용 중 이용자의 귀책사유로 계정이 정지·탈퇴된 경우 잔여 핑은 환불되지 않습니다."}</li>
+                <li>
+                  {
+                    "구독은 결제 시점부터 즉시 효력이 발생하며, 결제일로부터 1일이라도 경과하거나 질문권을 사용한 경우 환불이 불가합니다."
+                  }
+                </li>
+                <li>{"부분 환불, 잔여기간 환불, 잔여 질문권 환불은 제공되지 않습니다."}</li>
+                <li>{"보너스 질문권은 환불되지 않습니다."}</li>
+                <li>{"서비스 이용 중 이용자의 귀책사유로 계정이 정지·탈퇴된 경우 잔여 질문권은 환불되지 않습니다."}</li>
               </ul>
             </section>
 
@@ -86,7 +88,9 @@ export default function RefundPolicyPage() {
                 {"제2조의2 (요금제 변경에 따른 환불정책)"}
               </h2>
               <ul className="list-disc pl-5 space-y-2">
-                <li>{"상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 핑은 즉시 소멸되며 환불되지 않습니다."}</li>
+                <li>
+                  {"상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 질문권은 즉시 소멸되며 환불되지 않습니다."}
+                </li>
                 <li>
                   {
                     "하위 요금제로 변경 요청 시 변경은 다음 결제일부터 적용되며 그 이전에 결제된 요금은 환불되지 않습니다."
@@ -100,12 +104,16 @@ export default function RefundPolicyPage() {
 
             <section aria-labelledby="article-3" className="space-y-3">
               <h2 id="article-3" className="text-xl font-semibold">
-                {"제3조 (보너스핑 환불 불가)"}
+                {"제3조 (보너스 질문권 환불 불가)"}
               </h2>
               <ul className="list-disc pl-5 space-y-2">
-                <li>{"보너스핑은 환불 대상이 아니며, 유효기간 내 미사용 시 자동 소멸됩니다."}</li>
-                <li>{"핑과 보너스핑을 모두 보유한 경우, 유효기간이 먼저 도래하는 보너스핑이 우선 차감됩니다."}</li>
-                <li>{"부정 취득된 보너스핑은 회수되며, 양도·매매는 불가합니다."}</li>
+                <li>{"보너스 질문권은 환불 대상이 아니며, 유효기간 내 미사용 시 자동 소멸됩니다."}</li>
+                <li>
+                  {
+                    "질문권과 보너스 질문권을 모두 보유한 경우, 유효기간이 먼저 도래하는 보너스 질문권이 우선 차감됩니다."
+                  }
+                </li>
+                <li>{"부정 취득된 보너스 질문권은 회수되며, 양도·매매는 불가합니다."}</li>
               </ul>
             </section>
 
@@ -113,7 +121,20 @@ export default function RefundPolicyPage() {
 
             <section aria-labelledby="article-4" className="space-y-3">
               <h2 id="article-4" className="text-xl font-semibold">
-                {"제4조 (과오금)"}
+                {"제4조 (자동결제 및 해지)"}
+              </h2>
+              <p>
+                {
+                  "구독 서비스는 결제일을 기준으로 매월/매년 자동 갱신됩니다. 이용자가 갱신을 원하지 않는 경우, 차기 결제일 이전에 반드시 해지 신청을 해야 하며, 결제 완료 후에는 환불되지 않습니다."
+                }
+              </p>
+            </section>
+
+            <Separator className="my-6" />
+
+            <section aria-labelledby="article-5" className="space-y-3">
+              <h2 id="article-5" className="text-xl font-semibold">
+                {"제5조 (과오금)"}
               </h2>
               <p>
                 {
@@ -130,9 +151,9 @@ export default function RefundPolicyPage() {
 
             <div className="pt-4 border-t">
               <p className="text-sm text-neutral-500">
-                <strong>공고일자:</strong> 2025년 8월 18일
+                <strong>공고일자:</strong> 2025년 8월 22일
                 <br />
-                <strong>시행일자:</strong> 2025년 8월 18일
+                <strong>시행일자:</strong> 2025년 8월 22일
               </p>
             </div>
           </CardContent>

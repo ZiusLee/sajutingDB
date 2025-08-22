@@ -1,7 +1,6 @@
 "use client"
-import { useState, useRef, useEffect, useMemo } from "react"
 import type React from "react"
-
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
@@ -41,6 +40,7 @@ interface SajuChatProps {
   currentChatRoomId?: string
   temporaryChatRoom?: any
   onChatRoomPersisted?: (newChatRoomId: string) => void
+  setCurrentChatRoomId?: (newChatRoomId: string) => void
 }
 
 const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): string[] => {
@@ -120,6 +120,7 @@ export default function SajuChat({
   currentChatRoomId,
   temporaryChatRoom,
   onChatRoomPersisted,
+  setCurrentChatRoomId,
 }: SajuChatProps) {
   const { user } = useAuth()
   const { isKeyboardOpen } = useMobileKeyboard()
@@ -492,11 +493,31 @@ export default function SajuChat({
     setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
   }
 
-  const handleChatRoomSelect = (chatRoomId: string) => {
-    if (window.innerWidth < 1024) setSidebarOpen(false)
-    saveScrollPosition()
-    router.push(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
-  }
+  const saveScrollPosition = useCallback(() => {
+    if (chatContainerRef.current) {
+      const scrollPosition = chatContainerRef.current.scrollTop
+      sessionStorage.setItem(`chat-scroll-${roomType}`, scrollPosition.toString())
+    }
+  }, [roomType])
+
+  const handleChatRoomSelect = useCallback(
+    (chatRoomId: string) => {
+      console.log("[v0] Chat room selected:", chatRoomId)
+
+      if (window.innerWidth < 1024) setSidebarOpen(false)
+      saveScrollPosition()
+
+      router.replace(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
+
+      if (setCurrentChatRoomId) {
+        console.log("[v0] Setting current chat room ID:", chatRoomId)
+        setCurrentChatRoomId(chatRoomId)
+      } else {
+        console.warn("[v0] setCurrentChatRoomId is not available")
+      }
+    },
+    [roomType, setSidebarOpen, saveScrollPosition, setCurrentChatRoomId, router],
+  )
 
   const handleNewChat = () => {
     saveScrollPosition()
@@ -512,21 +533,32 @@ export default function SajuChat({
     if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
   }
 
-  const scrollToLastUserMessage = () => {
+  const scrollToLastUserMessage = useCallback(() => {
     if (!chatContainerRef.current) return
 
     const container = chatContainerRef.current
     const messageElements = container.querySelectorAll('[data-role="user"]')
     const lastUserMessageElement = messageElements[messageElements.length - 1]
 
-    if (lastUserMessageElement) {
-      const containerRect = container.getBoundingClientRect()
-      const messageRect = lastUserMessageElement.getBoundingClientRect()
-      const scrollTop = container.scrollTop + messageRect.top - containerRect.top - 20 // 20px 여백
+    if (!lastUserMessageElement) return
 
-      container.scrollTo({ top: scrollTop, behavior: "smooth" })
+    try {
+      const containerClientHeight = container.clientHeight // Moved this line above the usage
+      const elementOffsetTop = (lastUserMessageElement as HTMLElement).offsetTop
+      const containerScrollTop = container.scrollTop
+      const offset = 20 // 20px margin
+
+      const targetScrollPosition =
+        elementOffsetTop - containerClientHeight + (lastUserMessageElement as HTMLElement).offsetHeight + offset
+
+      container.scrollTo({
+        top: Math.max(0, targetScrollPosition),
+        behavior: "smooth",
+      })
+    } catch (error) {
+      console.error("Error scrolling to last user message:", error)
     }
-  }
+  }, [])
 
   const handleSignupProvider = async (provider: "kakao" | "google") => {
     trackEvent("auth_attempt", {
@@ -709,13 +741,6 @@ export default function SajuChat({
       }
     }
   }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
-
-  const saveScrollPosition = () => {
-    if (chatContainerRef.current) {
-      const scrollPosition = chatContainerRef.current.scrollTop
-      sessionStorage.setItem(`chat-scroll-${roomType}`, scrollPosition.toString())
-    }
-  }
 
   const restoreScrollPosition = () => {
     const savedPosition = sessionStorage.getItem(`chat-scroll-${roomType}`)
