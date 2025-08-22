@@ -241,35 +241,6 @@ async function processMemoryImmediate(
   }
 }
 
-const sajuCache = new Map<string, any>()
-
-function getCacheKey(year: number, month: number, day: number, hour: number, minute: number, gender: string): string {
-  return `${year}-${month}-${day}-${hour}-${minute}-${gender}`
-}
-
-function getCachedSaju(year: number, month: number, day: number, hour: number, minute: number, gender: string) {
-  const key = getCacheKey(year, month, day, hour, minute, gender)
-  return sajuCache.get(key)
-}
-
-function setCachedSaju(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-  gender: string,
-  saju: any,
-) {
-  const key = getCacheKey(year, month, day, hour, minute, gender)
-  sajuCache.set(key, saju)
-
-  if (sajuCache.size > 1000) {
-    const firstKey = sajuCache.keys().next().value
-    sajuCache.delete(firstKey)
-  }
-}
-
 export async function POST(req: Request) {
   console.log("==================================================")
   console.log("🚀🚀🚀 SAJU CHAT API CALLED 🚀🚀🚀")
@@ -570,21 +541,12 @@ export async function POST(req: Request) {
       try {
         console.log("🚀 파트너 정보 감지, 사주 계산:", parsedInfo.partnerInfo)
 
-        const cachedPartnerSaju = getCachedSaju(
-          parsedInfo.partnerInfo.year,
-          parsedInfo.partnerInfo.month,
-          parsedInfo.partnerInfo.day,
-          parsedInfo.partnerInfo.hour || 12,
-          parsedInfo.partnerInfo.minute || 0,
-          parsedInfo.partnerInfo.gender || "unknown",
-        )
-
-        let partnerSaju = parsedInfo.partnerInfo.calculatedSaju || cachedPartnerSaju
+        let partnerSaju = parsedInfo.partnerInfo.calculatedSaju
         let lunarDate = parsedInfo.partnerInfo.lunarDate
 
-        // GPT에서 이미 계산된 사주가 없고 캐시에도 없으면 직접 계산
+        // GPT에서 이미 계산된 사주가 없으면 직접 계산
         if (!partnerSaju) {
-          console.log("🔄 캐시 미스, 새로운 사주 계산 시작")
+          console.log("🔄 GPT에서 사주 계산이 안됨, 직접 계산 시작")
 
           lunarDate = solarToLunar(
             parsedInfo.partnerInfo.year,
@@ -611,18 +573,6 @@ export async function POST(req: Request) {
             lunarDate.monthBranch,
             "동경135도",
           )
-
-          setCachedSaju(
-            parsedInfo.partnerInfo.year,
-            parsedInfo.partnerInfo.month,
-            parsedInfo.partnerInfo.day,
-            parsedInfo.partnerInfo.hour || 12,
-            parsedInfo.partnerInfo.minute || 0,
-            parsedInfo.partnerInfo.gender || "unknown",
-            partnerSaju,
-          )
-        } else if (cachedPartnerSaju) {
-          console.log("✅ 캐시에서 사주 정보 사용")
         } else {
           console.log("✅ GPT에서 이미 계산된 사주 사용")
         }
@@ -805,17 +755,7 @@ ${index + 1}. **${person.name}**
           console.log("Complete text length:", completeText.length)
           console.log("About to call processMemoryAsync...")
           console.log("==================================================")
-
-          if (typeof setImmediate !== "undefined") {
-            setImmediate(() => {
-              processMemoryAsync(userId, chatRoomId || "unknown", userMessageVar, completeText, memoryContext)
-            })
-          } else {
-            // Fallback for environments without setImmediate
-            setTimeout(() => {
-              processMemoryAsync(userId, chatRoomId || "unknown", userMessageVar, completeText, memoryContext)
-            }, 0)
-          }
+          processMemoryAsync(userId, chatRoomId || "unknown", userMessageVar, completeText, memoryContext)
         })
         .catch((error) => {
           console.error("❌❌❌ MEMORY PROCESSING FAILED:", error)

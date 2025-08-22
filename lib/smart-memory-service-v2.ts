@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { openai } from "@ai-sdk/openai"
-import { generateObject } from "ai"
+import { generateObject, generateText } from "ai"
 import { z } from "zod"
-import type { DuplicateCheckResult, QualityAssessment } from "@/types/memory"
+import type { DuplicateCheckResult, QualityAssessment, SmartContext } from "@/types/memory"
 
 // Environment variable validation
 function getSupabaseConfig() {
@@ -59,12 +59,11 @@ const QueryUnderstandingSchema = z.object({
 
 class SmartMemoryServiceV2 {
   private supabase: any
-  private embeddingCache = new Map<string, number[]>()
 
   constructor() {
     try {
       const { url, serviceKey } = getSupabaseConfig()
-
+      
       this.supabase = createClient(url, serviceKey, {
         auth: {
           autoRefreshToken: false,
@@ -149,7 +148,7 @@ class SmartMemoryServiceV2 {
       /^(음|아|어|그)$/i,
     ]
 
-    return genericPatterns.some((pattern) => pattern.test(content.trim()))
+    return genericPatterns.some(pattern => pattern.test(content.trim()))
   }
 
   // AI generated content detection
@@ -164,21 +163,21 @@ class SmartMemoryServiceV2 {
       /인공지능.*판단/i,
     ]
 
-    return aiPatterns.some((pattern) => pattern.test(content))
+    return aiPatterns.some(pattern => pattern.test(content))
   }
 
   // Uniqueness calculation
   private calculateUniqueness(content: string): number {
     const words = content.split(/\s+/)
     const wordCount = new Map<string, number>()
-
-    words.forEach((word) => {
+    
+    words.forEach(word => {
       if (word.length > 2) {
         wordCount.set(word, (wordCount.get(word) || 0) + 1)
       }
     })
 
-    const repeatedWords = Array.from(wordCount.values()).filter((count) => count > 1)
+    const repeatedWords = Array.from(wordCount.values()).filter(count => count > 1)
     const repetitionRatio = repeatedWords.length / words.length
 
     return Math.max(0.3, 1 - repetitionRatio * 2)
@@ -187,7 +186,7 @@ class SmartMemoryServiceV2 {
   // Quality reasoning generation
   private generateQualityReasoning(factors: any, finalScore: number): string {
     const issues = []
-
+    
     if (factors.length < 0.8) issues.push("내용이 너무 짧음")
     if (factors.generic < 0.8) issues.push("일반적인 내용")
     if (factors.aiGenerated < 0.8) issues.push("AI 생성 컨텐츠로 추정")
@@ -205,19 +204,10 @@ class SmartMemoryServiceV2 {
   private async enhancedDuplicateCheck(
     userId: string,
     memory: any,
-    embedding: number[],
+    embedding: number[]
   ): Promise<DuplicateCheckResult> {
     try {
       console.log(`🔍 Enhanced duplicate check for: "${memory.content.slice(0, 50)}..."`)
-
-      if (memory.content.length < 10) {
-        return {
-          isDuplicate: false,
-          similarity: 0,
-          strategy: "exact_text",
-          confidence: 0,
-        }
-      }
 
       // Step 1: Exact text matching
       const exactMatch = await this.findExactTextMatch(userId, memory.content, memory.type)
@@ -226,47 +216,66 @@ class SmartMemoryServiceV2 {
         return {
           isDuplicate: true,
           similarity: 1.0,
-          strategy: "exact_text",
+          strategy: 'exact_text',
           existingMemory: exactMatch,
           confidence: 0.95,
         }
       }
 
       // Step 2: Same type semantic matching
-      const typeThreshold = Math.max(0.7, this.getTypeSpecificThreshold(memory.type))
+      const typeThreshold = this.getTypeSpecificThreshold(memory.type)
       const sameTypeMatch = await this.findSameTypeSemanticMatch(
-        userId,
-        memory.content,
-        embedding,
-        memory.type,
-        typeThreshold,
+        userId, 
+        memory.content, 
+        embedding, 
+        memory.type, 
+        typeThreshold
       )
-
+      
       if (sameTypeMatch && sameTypeMatch.similarity >= typeThreshold) {
         console.log(`🎯 Same-type semantic match found (${memory.type}, score: ${sameTypeMatch.similarity})`)
         return {
           isDuplicate: true,
           similarity: sameTypeMatch.similarity,
-          strategy: "same_type_semantic",
+          strategy: 'same_type_semantic',
           existingMemory: sameTypeMatch,
           confidence: sameTypeMatch.similarity,
         }
       }
 
       // Step 3: Cross-type contradiction detection
-      console.log("✅ No duplicates found (optimized check)")
+      const contradictionMatch = await this.findCrossTypeContradiction(
+        userId,
+        memory.content,
+        embedding,
+        memory.type
+      )
+
+      if (contradictionMatch) {
+        console.log(`🎯 Cross-type contradiction found (score: ${contradictionMatch.similarity})`)
+        return {
+          isDuplicate: true,
+          similarity: contradictionMatch.similarity,
+          strategy: 'cross_type_contradiction',
+          existingMemory: contradictionMatch,
+          confidence: contradictionMatch.similarity * 0.8,
+        }
+      }
+
+      console.log("✅ No duplicates found")
       return {
         isDuplicate: false,
         similarity: 0,
-        strategy: "exact_text",
+        strategy: 'exact_text',
         confidence: 0,
       }
+
     } catch (error) {
-      console.error("Duplicate check failed:", error)
+      console.error("❌ Enhanced duplicate check failed:", error)
       return {
         isDuplicate: false,
         similarity: 0,
-        strategy: "exact_text",
+        strategy: 'exact_text',
         confidence: 0,
       }
     }
@@ -278,7 +287,7 @@ class SmartMemoryServiceV2 {
     content: string,
     embedding: number[],
     type: string,
-    threshold: number,
+    threshold: number
   ): Promise<any> {
     try {
       // Try to use the stored function first
@@ -295,7 +304,7 @@ class SmartMemoryServiceV2 {
 
       // Fallback: if function doesn't exist, use vector similarity with manual query
       console.log("🔄 Stored function not available, using fallback vector search")
-
+      
       const { data: memories, error: queryError } = await this.supabase
         .from("smart_contexts")
         .select("*, relevance_embedding")
@@ -319,7 +328,7 @@ class SmartMemoryServiceV2 {
             bestSimilarity = similarity
             bestMatch = {
               ...memory,
-              similarity,
+              similarity
             }
           }
         }
@@ -337,11 +346,11 @@ class SmartMemoryServiceV2 {
     userId: string,
     content: string,
     embedding: number[],
-    currentType: string,
+    currentType: string
   ): Promise<any> {
     try {
       const contradictionTypes = this.getContradictionTypes(currentType)
-
+    
       if (contradictionTypes.length === 0) return null
 
       // Try to use the stored function first
@@ -383,7 +392,7 @@ class SmartMemoryServiceV2 {
             bestSimilarity = similarity
             bestMatch = {
               ...memory,
-              similarity,
+              similarity
             }
           }
         }
@@ -399,11 +408,11 @@ class SmartMemoryServiceV2 {
   // Contradiction types mapping
   private getContradictionTypes(currentType: string): string[] {
     const contradictions: Record<string, string[]> = {
-      identity: ["goal"],
-      goal: ["identity"],
-      emotion: ["emotion"],
-      situation: ["situation"],
-      relationship: ["relationship"],
+      identity: ['goal'],
+      goal: ['identity'],
+      emotion: ['emotion'],
+      situation: ['situation'],
+      relationship: ['relationship'],
     }
 
     return contradictions[currentType] || []
@@ -415,12 +424,12 @@ class SmartMemoryServiceV2 {
       identity: 0.92,
       goal: 0.85,
       emotion: 0.82,
-      relationship: 0.9,
+      relationship: 0.90,
       interest: 0.83,
       preference: 0.85,
       situation: 0.78,
-      experience: 0.9,
-      belief: 0.9,
+      experience: 0.90,
+      belief: 0.90,
       skill: 0.85,
     }
 
@@ -429,13 +438,6 @@ class SmartMemoryServiceV2 {
 
   // Embedding generation with environment support
   async generateEmbedding(text: string, retries = 3): Promise<number[]> {
-    const cacheKey = text.slice(0, 100) // Use first 100 chars as cache key
-    const cached = this.embeddingCache.get(cacheKey)
-    if (cached) {
-      console.log("🎯 Embedding cache hit")
-      return cached
-    }
-
     for (let i = 0; i < retries; i++) {
       try {
         // Client-side: use API endpoint
@@ -454,16 +456,7 @@ class SmartMemoryServiceV2 {
           }
 
           const data = await response.json()
-          const embedding = data.embedding
-
-          this.embeddingCache.set(cacheKey, embedding)
-
-          if (this.embeddingCache.size > 500) {
-            const firstKey = this.embeddingCache.keys().next().value
-            this.embeddingCache.delete(firstKey)
-          }
-
-          return embedding
+          return data.embedding
         }
 
         // Server-side: direct OpenAI API call
@@ -491,16 +484,7 @@ class SmartMemoryServiceV2 {
         }
 
         const data = await response.json()
-        const embedding = data.data[0].embedding
-
-        this.embeddingCache.set(cacheKey, embedding)
-
-        if (this.embeddingCache.size > 500) {
-          const firstKey = this.embeddingCache.keys().next().value
-          this.embeddingCache.delete(firstKey)
-        }
-
-        return embedding
+        return data.data[0].embedding
       } catch (error) {
         console.error(`임베딩 생성 실패 (시도 ${i + 1}/${retries}):`, error)
         if (i === retries - 1) throw error
@@ -540,7 +524,7 @@ class SmartMemoryServiceV2 {
 
       const result = await generateObject({
         model: openai("gpt-4o-mini"),
-        mode: "tool",
+        mode: 'tool',
         schema: MemoryExtractionSchema,
         temperature: 0.1,
         prompt: `사용자의 발언에서만 사용자에 대한 새로운 사실 정보를 추출하세요. AI의 발언은 사용자의 발언을 이해하기 위한 맥락으로만 사용하고, AI의 발언 내용 자체를 정보로 추출해서는 안 됩니다.${memoryContext}
@@ -634,7 +618,7 @@ AI: ${assistantResponse}
     try {
       const result = await generateObject({
         model: openai("gpt-4o-mini"),
-        mode: "tool",
+        mode: 'tool',
         schema: QueryUnderstandingSchema,
         temperature: 0.3,
         prompt: `다음 질문/메시지를 분석하여 메모리 검색에 필요한 정보를 추출하세요.
@@ -689,10 +673,10 @@ AI: ${assistantResponse}
 
         // Enhanced duplicate check
         const duplicateCheck = await this.enhancedDuplicateCheck(userId, memory, embedding)
-
+        
         if (duplicateCheck.isDuplicate && duplicateCheck.confidence > 0.8) {
           console.log(`🔄 High-confidence duplicate found (${duplicateCheck.strategy}), updating existing.`)
-
+          
           try {
             const existingMemory = duplicateCheck.existingMemory!
             const { error: updateError } = await this.supabase
@@ -701,7 +685,10 @@ AI: ${assistantResponse}
                 reference_count: (existingMemory.reference_count || 0) + 1,
                 last_referenced: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-                quality_score: Math.max(existingMemory.quality_score || 0.5, qualityAssessment.score),
+                quality_score: Math.max(
+                  existingMemory.quality_score || 0.5,
+                  qualityAssessment.score
+                ),
                 usage_count: (existingMemory.usage_count || 0) + 1,
               })
               .eq("id", existingMemory.id)
@@ -709,8 +696,8 @@ AI: ${assistantResponse}
             if (updateError) {
               console.error("❌ Failed to update existing memory:", updateError)
             } else {
-              savedMemories.push({
-                ...existingMemory,
+              savedMemories.push({ 
+                ...existingMemory, 
                 action: "updated",
                 duplicate_strategy: duplicateCheck.strategy,
               })
@@ -770,8 +757,8 @@ AI: ${assistantResponse}
               console.error("⚠️ Failed to create conversation link (memory still saved):", linkError)
             }
 
-            savedMemories.push({
-              ...newMemory,
+            savedMemories.push({ 
+              ...newMemory, 
               action: "created",
               quality_assessment: qualityAssessment,
             })
@@ -793,17 +780,17 @@ AI: ${assistantResponse}
   private generateSemanticHash(content: string): string {
     const normalized = content
       .toLowerCase()
-      .replace(/[^\w\s]/g, "")
-      .replace(/\s+/g, " ")
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
       .trim()
 
     let hash = 0
     for (let i = 0; i < normalized.length; i++) {
       const char = normalized.charCodeAt(i)
-      hash = (hash << 5) - hash + char
+      hash = ((hash << 5) - hash) + char
       hash = hash & hash
     }
-
+    
     return hash.toString(36)
   }
 
@@ -848,104 +835,109 @@ AI: ${assistantResponse}
     embedding: number[],
     understanding: any,
     limit: number,
-  ): Promise<any[]> {
-    try {
-      // Try to use the stored function first
-      const { data: highQualityResults, error: hqError } = await this.supabase.rpc("find_quality_memories", {
-        p_user_id: userId,
-        p_query_embedding: embedding,
-        p_memory_types: understanding.memoryTypes?.length > 0 ? understanding.memoryTypes : null,
-        p_min_quality_score: 0.6,
-        p_similarity_threshold: 0.15,
-        p_result_limit: limit * 2,
-      })
+): Promise<any[]> {
+  try {
+    // Try to use the stored function first
+    const { data: highQualityResults, error: hqError } = await this.supabase.rpc("find_quality_memories", {
+      p_user_id: userId,
+      p_query_embedding: embedding,
+      p_memory_types: understanding.memoryTypes?.length > 0 ? understanding.memoryTypes : null,
+      p_min_quality_score: 0.6,
+      p_similarity_threshold: 0.15,
+      p_result_limit: limit * 2,
+    })
 
-      if (!hqError && highQualityResults && highQualityResults.length > 0) {
-        console.log(`🔍 High-quality search results: ${highQualityResults.length}개`)
+    if (!hqError && highQualityResults && highQualityResults.length > 0) {
+      console.log(`🔍 High-quality search results: ${highQualityResults.length}개`)
+      
+      const scoredResults = highQualityResults.map(result => ({
+        ...result,
+        effective_score: this.calculateEffectiveScore(
+          result.relevance_score || 0,
+          result.quality_score || 0.5,
+          result.importance_score || 0.5,
+          result.usage_count || 0
+        ),
+      }))
 
-        const scoredResults = highQualityResults.map((result) => ({
-          ...result,
-          effective_score: this.calculateEffectiveScore(
-            result.relevance_score || 0,
-            result.quality_score || 0.5,
-            result.importance_score || 0.5,
-            result.usage_count || 0,
-          ),
-        }))
-
-        scoredResults.sort((a, b) => b.effective_score - a.effective_score)
-        return scoredResults.slice(0, limit)
-      }
-
-      // Fallback: if function doesn't exist, use manual vector search
-      console.log("🔄 Stored function not available, using fallback vector search")
-
-      let dbQuery = this.supabase
-        .from("smart_contexts")
-        .select("*, relevance_embedding")
-        .eq("user_id", userId)
-        .gte("quality_score", 0.3)
-        .order("quality_score", { ascending: false })
-        .limit(limit * 3)
-
-      // Add type filter if specified
-      if (understanding.memoryTypes?.length > 0) {
-        dbQuery = dbQuery.in("type", understanding.memoryTypes)
-      }
-
-      const { data, error } = await dbQuery
-
-      if (error || !data || data.length === 0) {
-        console.error("Fallback vector search error:", error)
-        return []
-      }
-
-      // Calculate relevance scores using cosine similarity
-      const scoredResults = data
-        .map((memory) => {
-          if (!memory.relevance_embedding) {
-            return null
-          }
-
-          const relevanceScore = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
-
-          // Apply similarity threshold
-          if (relevanceScore < 0.1) {
-            return null
-          }
-
-          return {
-            ...memory,
-            relevance_score: relevanceScore,
-            effective_score: this.calculateEffectiveScore(
-              relevanceScore,
-              memory.quality_score || 0.5,
-              memory.importance_score || 0.5,
-              memory.usage_count || 0,
-            ),
-          }
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.effective_score - a.effective_score)
-
-      console.log(`🔍 Fallback vector search results: ${scoredResults.length}개`)
+      scoredResults.sort((a, b) => b.effective_score - a.effective_score)
       return scoredResults.slice(0, limit)
-    } catch (error) {
-      console.error("Quality-aware vector search failed:", error)
+    }
+
+    // Fallback: if function doesn't exist, use manual vector search
+    console.log("🔄 Stored function not available, using fallback vector search")
+
+    let dbQuery = this.supabase
+      .from("smart_contexts")
+      .select("*, relevance_embedding")
+      .eq("user_id", userId)
+      .gte("quality_score", 0.3)
+      .order("quality_score", { ascending: false })
+      .limit(limit * 3)
+
+    // Add type filter if specified
+    if (understanding.memoryTypes?.length > 0) {
+      dbQuery = dbQuery.in("type", understanding.memoryTypes)
+    }
+
+    const { data, error } = await dbQuery
+
+    if (error || !data || data.length === 0) {
+      console.error("Fallback vector search error:", error)
       return []
     }
+
+    // Calculate relevance scores using cosine similarity
+    const scoredResults = data
+      .map(memory => {
+        if (!memory.relevance_embedding) {
+          return null
+        }
+
+        const relevanceScore = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
+        
+        // Apply similarity threshold
+        if (relevanceScore < 0.1) {
+          return null
+        }
+
+        return {
+          ...memory,
+          relevance_score: relevanceScore,
+          effective_score: this.calculateEffectiveScore(
+            relevanceScore,
+            memory.quality_score || 0.5,
+            memory.importance_score || 0.5,
+            memory.usage_count || 0
+          ),
+        }
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.effective_score - a.effective_score)
+
+    console.log(`🔍 Fallback vector search results: ${scoredResults.length}개`)
+    return scoredResults.slice(0, limit)
+  } catch (error) {
+    console.error("Quality-aware vector search failed:", error)
+    return []
   }
+}
 
   // Calculate effective score
   private calculateEffectiveScore(
     relevanceScore: number,
     qualityScore: number,
     importanceScore: number,
-    usageCount: number,
+    usageCount: number
   ): number {
     const usageBonus = Math.min(0.2, usageCount * 0.02)
-
-    return relevanceScore * 0.5 + qualityScore * 0.25 + importanceScore * 0.15 + usageBonus * 0.1
+    
+    return (
+      relevanceScore * 0.5 +
+      qualityScore * 0.25 +
+      importanceScore * 0.15 +
+      usageBonus * 0.1
+    )
   }
 
   // Get high-quality recent memories
@@ -965,7 +957,7 @@ AI: ${assistantResponse}
         .eq("user_id", userId)
         .order("updated_at", { ascending: false })
         .limit(limit)
-
+      
       return this.formatMemoryContext(fallbackData || [], "최근 활동")
     }
 
@@ -973,11 +965,7 @@ AI: ${assistantResponse}
   }
 
   // Get high-quality fallback memories
-  private async getHighQualityFallbackMemories(
-    userId: string,
-    preferredTypes: string[],
-    limit: number,
-  ): Promise<string> {
+  private async getHighQualityFallbackMemories(userId: string, preferredTypes: string[], limit: number): Promise<string> {
     if (preferredTypes.length === 0) {
       return await this.getHighQualityRecentMemories(userId, limit)
     }
@@ -1075,7 +1063,8 @@ AI: ${assistantResponse}
     Object.entries(grouped).forEach(([type, mems]: [string, any]) => {
       context += `### ${typeNames[type] || type}\n`
       mems.forEach((memory: any) => {
-        const qualityIndicator = memory.quality_score >= 0.7 ? "⭐" : memory.quality_score >= 0.5 ? "✓" : "⚠️"
+        const qualityIndicator = memory.quality_score >= 0.7 ? "⭐" : 
+                                memory.quality_score >= 0.5 ? "✓" : "⚠️"
         const confidence = memory.confidence ? ` (확신도: ${memory.confidence})` : ""
         context += `${qualityIndicator} ${memory.content}${confidence}\n`
       })
@@ -1121,13 +1110,13 @@ AI: ${assistantResponse}
         throw error
       }
 
-      const scoredResults = (data || []).map((result) => ({
+      const scoredResults = (data || []).map(result => ({
         ...result,
         effective_score: this.calculateEffectiveScore(
           result.relevance_score || 0,
           result.quality_score || 0.5,
           result.importance_score || 0.5,
-          result.usage_count || 0,
+          result.usage_count || 0
         ),
       }))
 
