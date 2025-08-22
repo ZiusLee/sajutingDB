@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 import Sidebar from "@/components/sidebar"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { trackEvent } from "@/lib/analytics"
+import { getCachedDaeunInfo, setCachedDaeunInfo, generateSajuKey } from "@/lib/saju-cache"
 
 interface SajuChatProps {
   saju: any
@@ -213,6 +214,40 @@ export default function SajuChat({
     }
   }, [user]) // Removed chatData.isInitialized dependency
 
+  const calculatedDaeun = useMemo(() => {
+    if (!stableSaju?.yearStem || !stableBirthInfo?.solarYear || !gender) {
+      return null
+    }
+
+    // 캐시 키 생성
+    const sajuKey = generateSajuKey(stableSaju, stableBirthInfo)
+    if (!sajuKey) return null
+
+    // 캐시에서 먼저 확인
+    const cached = getCachedDaeunInfo(sajuKey)
+    if (cached) {
+      console.log("🚀 대운 정보 캐시에서 로드:", sajuKey)
+      return cached
+    }
+
+    // 캐시에 없으면 계산
+    console.log("🔄 대운 정보 새로 계산:", sajuKey)
+    const calculated = calculateDaeunInfo(
+      { yearStem: stableSaju.yearStem, monthStem: stableSaju.monthStem, monthBranch: stableSaju.monthBranch },
+      stableBirthInfo.solarYear,
+      stableBirthInfo.solarMonth,
+      stableBirthInfo.solarDay,
+      gender,
+      stableBirthInfo.solarHour,
+      stableBirthInfo.solarMinute,
+      stableBirthInfo.timeUnknown,
+    )
+
+    // 계산 결과 캐싱
+    setCachedDaeunInfo(sajuKey, calculated)
+    return calculated
+  }, [stableSaju, stableBirthInfo, gender])
+
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
     const compressedSajuObject =
@@ -256,23 +291,78 @@ export default function SajuChat({
     const initializeChatData = async () => {
       if (!stableSaju) return
 
+      if (stableSaju.isOptimizedLoad && stableSaju.preloadedDaeun) {
+        console.log("🚀 Using optimized load - skipping unnecessary recalculations")
+
+        try {
+          let pastMessages: any[] = []
+          let shouldSendInitialQuestions = false
+          let isFirstRoom = false
+
+          // 메시지와 채팅룸 정보만 로드
+          if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
+            try {
+              const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+              if (response.ok) {
+                const result = await response.json()
+                const chatRooms = result.chatRooms || []
+                const sortedRooms = chatRooms.sort(
+                  (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+                )
+                isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
+              }
+            } catch (error) {
+              console.error("Error fetching chat rooms:", error)
+            }
+
+            try {
+              pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
+                .filter((msg) => msg.role === "user" || msg.role === "assistant")
+                .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+                .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+            } catch (error) {
+              console.error("Error loading messages:", error)
+              pastMessages = []
+            }
+          } else {
+            shouldSendInitialQuestions = true
+            try {
+              const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+              isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
+            } catch (error) {
+              console.error("Error checking first room:", error)
+              isFirstRoom = true
+            }
+          }
+
+          if (isMounted) {
+            setChatData({
+              calculatedDaeun: stableSaju.preloadedDaeun, // 미리 로드된 대운 사용
+              stableBirthInfo: stableBirthInfo,
+              initialMessages: pastMessages,
+              isInitialized: true,
+            })
+            setLastSavedMessageCount(pastMessages.length)
+            setIsFirstChatRoom(isFirstRoom)
+
+            if (shouldSendInitialQuestions && isFirstRoom) {
+              const questions = getInitialUserQuestions(name, roomType, stableConcerns)
+              setInitialQuestionsToSend(questions)
+              setIsInitialQuestionsMode(true)
+            }
+          }
+          return
+        } catch (error) {
+          console.error("❌ Error in optimized initialization:", error)
+          // 최적화 실패 시 일반 로직으로 폴백
+        }
+      }
+
+      console.log("📊 Using standard load - performing full calculations")
+
       let apiCallMade = false
 
       try {
-        const calculatedDaeunData =
-          stableSaju?.yearStem && stableBirthInfo?.solarYear && gender
-            ? calculateDaeunInfo(
-                { yearStem: stableSaju.yearStem, monthStem: stableSaju.monthStem, monthBranch: stableSaju.monthBranch },
-                stableBirthInfo.solarYear,
-                stableBirthInfo.solarMonth,
-                stableBirthInfo.solarDay,
-                gender,
-                stableBirthInfo.solarHour,
-                stableBirthInfo.solarMinute,
-                stableBirthInfo.timeUnknown,
-              )
-            : null
-
         let pastMessages: any[] = []
         let shouldSendInitialQuestions = false
         let isFirstRoom = false
@@ -312,14 +402,14 @@ export default function SajuChat({
               isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
             } catch (error) {
               console.error("Error checking first room:", error)
-              isFirstRoom = true // 에러 시 첫 번째 방으로 간주
+              isFirstRoom = true
             }
           }
         }
 
         if (isMounted) {
           setChatData({
-            calculatedDaeun: calculatedDaeunData,
+            calculatedDaeun: calculatedDaeun, // useMemo에서 계산된 값 사용
             stableBirthInfo: stableBirthInfo,
             initialMessages: pastMessages,
             isInitialized: true,
@@ -327,7 +417,6 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
-          // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
           if (shouldSendInitialQuestions && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
@@ -351,7 +440,7 @@ export default function SajuChat({
     return () => {
       isMounted = false
     }
-  }, [stableSaju, effectiveChatRoomId, sessionId])
+  }, [stableSaju, effectiveChatRoomId, sessionId, calculatedDaeun])
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
     api: "/api/saju-chat",
@@ -505,7 +594,6 @@ export default function SajuChat({
       console.log("[v0] Chat room selected:", chatRoomId)
 
       if (window.innerWidth < 1024) setSidebarOpen(false)
-      saveScrollPosition()
 
       router.replace(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
 
@@ -516,11 +604,10 @@ export default function SajuChat({
         console.warn("[v0] setCurrentChatRoomId is not available")
       }
     },
-    [roomType, setSidebarOpen, saveScrollPosition, setCurrentChatRoomId, router],
+    [router, roomType, setSidebarOpen],
   )
 
   const handleNewChat = () => {
-    saveScrollPosition()
     router.push(`/saju-chat/${roomType}`)
   }
 
@@ -743,22 +830,28 @@ export default function SajuChat({
   }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
 
   const restoreScrollPosition = () => {
-    const savedPosition = sessionStorage.getItem(`chat-scroll-${roomType}`)
-    if (savedPosition && chatContainerRef.current) {
-      const position = Number.parseInt(savedPosition, 10)
-      if (position > 0) {
-        setTimeout(() => {
-          if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = position
-          }
-        }, 100)
-      }
+    if (chatContainerRef.current) {
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+        }
+      }, 100)
     }
   }
 
   useEffect(() => {
     restoreScrollPosition()
   }, [roomType])
+
+  useEffect(() => {
+    if (chatData.isInitialized && messages.length > 0 && chatContainerRef.current) {
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+        }
+      }, 200)
+    }
+  }, [chatData.isInitialized, roomType])
 
   const handleUserSubmit = (e: React.FormEvent) => {
     if (input.trim()) {

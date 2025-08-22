@@ -131,6 +131,8 @@ export default function SajuChatPage() {
                     birthCityId: null,
                     timeStandard: "KST",
                   },
+                  isOptimizedLoad: true,
+                  preloadedDaeun: profile.saju.daeun,
                 }
 
                 localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
@@ -196,7 +198,7 @@ export default function SajuChatPage() {
           // If coming from onboarding, try to get data from tempSajuData
           const tempSajuData = localStorage.getItem("tempSajuData")
           if (tempSajuData && isAuthenticated) {
-            console.log("Found tempSajuData, converting to current_saju")
+            console.log("Found tempSajuData, converting to current_saju with optimization")
             const tempData = JSON.parse(tempSajuData)
 
             // Create chat saju data structure
@@ -223,9 +225,11 @@ export default function SajuChatPage() {
                 lunarMonth: tempData.lunarMonth,
                 lunarDay: tempData.lunarDay,
                 timeUnknown: tempData.timeUnknown,
-                birthCityId: tempData.birthCityId,
+                birthCityId: null,
                 timeStandard: tempData.timeStandard,
               },
+              isOptimizedLoad: true,
+              preloadedDaeun: tempData.daeun,
             }
 
             localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
@@ -583,8 +587,72 @@ export default function SajuChatPage() {
         setMultipleDefaultsOpen(false)
         setMultipleDefaultSessions([])
 
-        // Reload the page to use the newly selected default session
-        window.location.reload()
+        console.log("Loading selected default session:", sessionId)
+
+        try {
+          const profile = await getSajuProfileBySessionId(sessionId)
+
+          if (profile) {
+            const chatSajuData = {
+              saju: profile.saju,
+              name: profile.name,
+              gender: profile.gender,
+              interpretation: "",
+              returnPath: "/",
+              timeStandard: "KST",
+              birthCityId: null,
+              daeun: profile.saju.daeun,
+              concerns: [],
+              userId: data.session.user.id,
+              authUserId: data.session.user.id,
+              sessionId: profile.id,
+              birthInfo: {
+                solarYear: Number.parseInt(profile.birthYear),
+                solarMonth: Number.parseInt(profile.birthMonth),
+                solarDay: Number.parseInt(profile.birthDay),
+                solarHour: Number.parseInt(profile.birthHour),
+                solarMinute: Number.parseInt(profile.birthMinute),
+                lunarYear: Number.parseInt(profile.lunarYear),
+                lunarMonth: Number.parseInt(profile.lunarMonth),
+                lunarDay: Number.parseInt(profile.lunarDay),
+                timeUnknown: profile.timeUnknown,
+                birthCityId: null,
+                timeStandard: "KST",
+              },
+              isOptimizedLoad: true,
+              preloadedDaeun: profile.saju.daeun,
+            }
+
+            localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+            localStorage.setItem("saju_session_id", profile.id)
+
+            setSaju(chatSajuData)
+            setDefaultProfileLoaded(true)
+            const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+            setSessionKey(generatedKey)
+
+            // 채팅룸 설정
+            let chatRoom = null
+            if (!roomId) {
+              chatRoom = createTemporaryChatRoom({
+                sessionId: profile.id,
+                title: "새로운 대화",
+                roomType: roomType || "sajuping",
+                isTemporary: true,
+              })
+
+              setCurrentChatRoom(chatRoom)
+              const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+              window.history.replaceState({}, "", newUrl)
+            } else {
+              setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+            }
+          }
+        } catch (error) {
+          console.error("Error loading selected session:", error)
+          // 에러 시에만 새로고침
+          window.location.reload()
+        }
       } else {
         toast({
           title: "오류",

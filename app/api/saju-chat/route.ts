@@ -8,6 +8,7 @@ import { parseMessageWithGPT } from "@/lib/gpt-date-parser"
 import { smartMemoryServiceV2 } from "@/lib/smart-memory-service-v2"
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
+import { getCachedTodaySaju, setCachedTodaySaju } from "@/lib/saju-cache"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -27,6 +28,14 @@ const ENABLE_SMART_MEMORY = process.env.ENABLE_SMART_MEMORY !== "false" // 기�
 
 // 🚀 로그 최적화: 현재 날짜 정보를 가져오는 함수
 function getCurrentDateInfo() {
+  // 캐시에서 먼저 확인
+  const cached = getCachedTodaySaju()
+  if (cached) {
+    console.log("🚀 오늘의 사주 캐시에서 로드")
+    return cached.dateInfo
+  }
+
+  console.log("🔄 오늘의 사주 새로 계산")
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth() + 1
@@ -54,7 +63,7 @@ function getCurrentDateInfo() {
       "동경135도",
     )
 
-    return {
+    const dateInfo = {
       year,
       month,
       day,
@@ -66,6 +75,10 @@ function getCurrentDateInfo() {
       formattedDate: `${year}년 ${month}월 ${day}일`,
       formattedDateWithGanji: `${year}년 ${month}월 ${day}일 (${todaySaju.dayStem}${todaySaju.dayBranch})`,
     }
+
+    // 계산 결과 캐싱
+    setCachedTodaySaju(todaySaju, dateInfo)
+    return dateInfo
   } catch (error) {
     if (shouldLog("ERROR")) {
       console.error("날짜 계산 실패:", error)
