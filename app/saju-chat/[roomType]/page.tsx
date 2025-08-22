@@ -58,14 +58,27 @@ export default function SajuChatPage() {
 
   useEffect(() => {
     let isMounted = true
+    let initTimeout: NodeJS.Timeout
 
     const initializePage = async () => {
       try {
+        initTimeout = setTimeout(() => {
+          if (isMounted) {
+            console.error("❌ Initialization timeout after 10 seconds")
+            setLoading(false)
+            toast({
+              title: "로딩 시간 초과",
+              description: "페이지 로딩이 지연되고 있습니다. 새로고침해주세요.",
+              variant: "destructive",
+            })
+          }
+        }, 10000)
+
         // Wait a bit for auth state to settle if coming from OAuth
         const authReturnAction = localStorage.getItem("auth_return_action")
         if (authReturnAction === "continue_to_chat") {
           console.log("Coming from OAuth, waiting for auth state to settle...")
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+          await new Promise((resolve) => setTimeout(resolve, 2000))
         }
 
         const { data } = await supabase.auth.getSession()
@@ -83,13 +96,20 @@ export default function SajuChatPage() {
           console.log("✅ User is authenticated, loading default saju profile first...")
 
           try {
-            const defaultSession = await getDefaultSajuSession(data.session.user.id)
+            const defaultSessionPromise = getDefaultSajuSession(data.session.user.id)
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("API timeout")), 5000))
 
-            if (defaultSession) {
+            const defaultSession = await Promise.race([defaultSessionPromise, timeoutPromise])
+
+            if (defaultSession && isMounted) {
               console.log("Found default saju session:", defaultSession.id)
 
-              // Get full profile data for the default session
-              const profile = await getSajuProfileBySessionId(defaultSession.id)
+              const profilePromise = getSajuProfileBySessionId(defaultSession.id)
+              const profileTimeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Profile API timeout")), 5000),
+              )
+
+              const profile = await Promise.race([profilePromise, profileTimeoutPromise])
 
               if (profile && isMounted) {
                 console.log("Successfully loaded default saju profile, using as priority")
@@ -97,7 +117,7 @@ export default function SajuChatPage() {
                 // Create chat saju data structure from profile
                 const chatSajuData = {
                   saju: profile.saju,
-                  name: profile.name, // profile.name을 우선적으로 사용 (saju_sessions 테이블의 name)
+                  name: profile.name,
                   gender: profile.gender,
                   interpretation: "",
                   returnPath: "/",
@@ -147,6 +167,7 @@ export default function SajuChatPage() {
                   setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
                 }
 
+                clearTimeout(initTimeout)
                 setLoading(false)
                 return
               }
@@ -228,12 +249,14 @@ export default function SajuChatPage() {
                 setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
               }
 
+              clearTimeout(initTimeout)
               setLoading(false)
               return
             }
           }
 
           if (isMounted) {
+            clearTimeout(initTimeout)
             toast({
               title: "사주 정보가 없습니다",
               description: "먼저 사주를 입력해주세요.",
@@ -259,6 +282,7 @@ export default function SajuChatPage() {
             localStorage.removeItem("saju_session_id")
 
             if (isMounted) {
+              clearTimeout(initTimeout)
               toast({
                 title: "사주 정보가 없습니다",
                 description: "새로운 사주를 입력해주세요.",
@@ -316,11 +340,14 @@ export default function SajuChatPage() {
             sessionStorage.removeItem("from_mypage")
           }
 
+          clearTimeout(initTimeout)
           setLoading(false)
         }
       } catch (error) {
         console.error("❌ Error loading saju data:", error)
         if (isMounted) {
+          clearTimeout(initTimeout)
+          setLoading(false)
           toast({
             title: "데이터 로딩 오류",
             description: "사주 데이터를 불러오는 중 오류가 발생했습니다.",
@@ -335,6 +362,9 @@ export default function SajuChatPage() {
 
     return () => {
       isMounted = false
+      if (initTimeout) {
+        clearTimeout(initTimeout)
+      }
     }
   }, [router, toast, roomType, roomId, supabase])
 
@@ -421,6 +451,11 @@ export default function SajuChatPage() {
     },
     [roomType],
   )
+
+  const handleSetCurrentChatRoomId = useCallback((chatRoomId: string) => {
+    console.log("[v0] Page: Setting current chat room ID to:", chatRoomId)
+    setCurrentChatRoom({ id: chatRoomId, isTemporary: chatRoomId.startsWith("temp-") })
+  }, [])
 
   const handleOAuth = useCallback(
     async (provider: "kakao" | "google") => {
@@ -588,6 +623,7 @@ export default function SajuChatPage() {
         currentChatRoomId={currentChatRoom?.id}
         temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
         onChatRoomPersisted={handleChatRoomPersisted}
+        setCurrentChatRoomId={handleSetCurrentChatRoomId}
       />
 
       <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
