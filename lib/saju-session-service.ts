@@ -265,12 +265,12 @@ export async function linkSessionToUser(sessionId: string): Promise<boolean> {
 
     if (verifyError) {
       console.error("Error verifying session update:", verifyError)
-      return false
+    } else {
+      console.log(
+        `Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}, is_default: ${verifyData.is_default}`,
+      )
     }
 
-    console.log(
-      `Verification: Session ${sessionId} now has auth_user_id: ${verifyData.auth_user_id}, is_default: ${verifyData.is_default}`,
-    )
     return true
   } catch (error) {
     console.error("Error in linkSessionToUser:", error)
@@ -590,27 +590,91 @@ export async function getUserSajuSessions(authUserId: string): Promise<any[]> {
 
 /**
  * Get the default saju session for a user
+ * If multiple default sessions exist, return them all for user selection
  */
 export async function getDefaultSajuSession(authUserId: string): Promise<any | null> {
   try {
+    console.log(`[DEBUG] getDefaultSajuSession called for user: ${authUserId}`)
     const supabase = createClientComponentClient()
 
-    const { data, error } = await supabase
+    const { data: allDefaults, error: checkError } = await supabase
       .from("saju_sessions")
       .select("*")
       .eq("auth_user_id", authUserId)
       .eq("is_default", true)
-      .single()
 
-    if (error) {
-      console.error("Error getting default saju session:", error)
+    console.log(`[DEBUG] Query result - data:`, allDefaults)
+    console.log(`[DEBUG] Query result - error:`, checkError)
+
+    if (checkError) {
+      console.error("Error checking default saju sessions:", checkError)
       return null
     }
 
-    return data
+    // If no default sessions found
+    if (!allDefaults || allDefaults.length === 0) {
+      console.log(`[DEBUG] No default sessions found for user ${authUserId}`)
+      return null
+    }
+
+    // If exactly one default session, return it
+    if (allDefaults.length === 1) {
+      console.log(`[DEBUG] Found exactly one default session: ${allDefaults[0].id}`)
+      return allDefaults[0]
+    }
+
+    // If multiple default sessions found, throw a special error
+    console.warn(`[DEBUG] Found ${allDefaults.length} default sessions for user ${authUserId}`)
+    const error = new Error("MULTIPLE_DEFAULT_SESSIONS")
+    ;(error as any).sessions = allDefaults
+    throw error
   } catch (error) {
+    if (error instanceof Error && error.message === "MULTIPLE_DEFAULT_SESSIONS") {
+      console.log(`[DEBUG] Throwing MULTIPLE_DEFAULT_SESSIONS error`)
+      // Re-throw the special error for handling in the calling code
+      throw error
+    }
     console.error("Error in getDefaultSajuSession:", error)
     return null
+  }
+}
+
+/**
+ * Resolve multiple default sessions by letting user choose one
+ */
+export async function resolveMultipleDefaultSessions(authUserId: string, chosenSessionId: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient()
+
+    // First, set all sessions to not default
+    const { error: resetError } = await supabase
+      .from("saju_sessions")
+      .update({ is_default: false })
+      .eq("auth_user_id", authUserId)
+      .eq("is_default", true)
+
+    if (resetError) {
+      console.error("Error resetting default sessions:", resetError)
+      return false
+    }
+
+    // Then set the chosen session as default
+    const { error: setError } = await supabase
+      .from("saju_sessions")
+      .update({ is_default: true })
+      .eq("id", chosenSessionId)
+      .eq("auth_user_id", authUserId)
+
+    if (setError) {
+      console.error("Error setting chosen session as default:", setError)
+      return false
+    }
+
+    console.log(`Successfully set session ${chosenSessionId} as the only default for user ${authUserId}`)
+    return true
+  } catch (error) {
+    console.error("Error in resolveMultipleDefaultSessions:", error)
+    return false
   }
 }
 
@@ -619,6 +683,7 @@ export async function getDefaultSajuSession(authUserId: string): Promise<any | n
  */
 export async function getSajuProfileBySessionId(sessionId: string): Promise<any | null> {
   try {
+    console.log(`[DEBUG] getSajuProfileBySessionId called for session: ${sessionId}`)
     const supabase = createClientComponentClient()
 
     const { data, error } = await supabase
@@ -627,6 +692,9 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
       .eq("id", sessionId)
       .single()
 
+    console.log(`[DEBUG] Session query result - data:`, data)
+    console.log(`[DEBUG] Session query result - error:`, error)
+
     if (error) {
       console.error("Error getting saju profile by session ID:", error)
       return null
@@ -634,9 +702,11 @@ export async function getSajuProfileBySessionId(sessionId: string): Promise<any 
 
     // Get birth_info using user_id (which contains session_id)
     const { data: birthInfo } = await supabase.from("birth_info").select("*").eq("user_id", sessionId).single()
+    console.log(`[DEBUG] Birth info query result:`, birthInfo)
 
     // Get saju_info using user_id (which contains session_id)
     const { data: sajuInfo } = await supabase.from("saju_info").select("*").eq("user_id", sessionId).single()
+    console.log(`[DEBUG] Saju info query result:`, sajuInfo)
 
     const sajuJsonb = data?.saju || {}
 
