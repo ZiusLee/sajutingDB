@@ -308,14 +308,21 @@ export default function SajuChat({
           }
         } else {
           shouldSendInitialQuestions = true
-          if (!apiCallMade) {
+          if (!apiCallMade && sessionId) {
             try {
               const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-              isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
+              if (response.ok) {
+                const result = await response.json()
+                isFirstRoom = !(result.chatRooms?.length > 0)
+              } else {
+                isFirstRoom = true
+              }
             } catch (error) {
               console.error("Error checking first room:", error)
               isFirstRoom = true // 에러 시 첫 번째 방으로 간주
             }
+          } else if (!sessionId) {
+            isFirstRoom = true
           }
         }
 
