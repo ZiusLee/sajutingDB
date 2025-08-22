@@ -45,11 +45,30 @@ export async function getSessionMessages(sessionId: string, chatRoomId?: string)
     }
 
     const response = await fetch(`/api/messages?${params}`)
+
     if (!response.ok) {
-      throw new Error("Failed to fetch messages")
+      const errorText = await response.text()
+      console.error("Error fetching messages:", response.status, errorText)
+
+      // Handle rate limit errors specifically
+      if (response.status === 429 || errorText.includes("Too Many")) {
+        console.warn("Rate limit exceeded, returning empty messages array")
+        return []
+      }
+
+      throw new Error(`Failed to fetch messages: ${response.status} ${errorText}`)
     }
 
-    const data = await response.json()
+    const responseText = await response.text()
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error("Failed to parse JSON response:", responseText)
+      console.error("Parse error:", parseError)
+      return []
+    }
+
     return data.messages || []
   } catch (error) {
     console.error("Error fetching session messages:", error)
@@ -176,10 +195,26 @@ export async function saveMessages(
     })
 
     if (!response.ok) {
-      throw new Error("Failed to save messages")
+      const errorText = await response.text()
+      console.error("Error saving messages:", response.status, errorText)
+
+      if (response.status === 429 || errorText.includes("Too Many")) {
+        console.warn("Rate limit exceeded while saving messages")
+        return { savedCount: 0, messageIds: [] }
+      }
+
+      throw new Error(`Failed to save messages: ${response.status} ${errorText}`)
     }
 
-    const data = await response.json()
+    const responseText = await response.text()
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error("Failed to parse save response:", responseText)
+      return { savedCount: 0, messageIds: [] }
+    }
+
     return {
       savedCount: data.savedCount || 0,
       messageIds: data.messageIds || [],
