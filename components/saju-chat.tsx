@@ -622,10 +622,14 @@ export default function SajuChat({
         localStorage.setItem(streamKey, JSON.stringify(newStreamState))
       }
     } else if (!isLoading && chatStreamState.isStreaming) {
-      // Stream finished, clear persistent state
-      localStorage.removeItem(streamKey)
-      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
-      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
+      const clearStreamState = () => {
+        localStorage.removeItem(streamKey)
+        setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+        chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
+      }
+
+      // Wait a bit to ensure the final message content is fully rendered
+      setTimeout(clearStreamState, 100)
     }
 
     // Cleanup function
@@ -939,7 +943,7 @@ export default function SajuChat({
                         )}
                       </div>
                     )}
-                    <div className="ai-response-content">
+                    <div className="ai-response-content break-words overflow-wrap-anywhere">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
@@ -986,6 +990,9 @@ export default function SajuChat({
                             </strong>
                           ),
                           em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
+                          del: ({ children }) => (
+                            <del className="line-through text-gray-500 opacity-75">{children}</del>
+                          ),
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {
@@ -1029,7 +1036,7 @@ export default function SajuChat({
                           ),
                         }}
                       >
-                        {message.content}
+                        {message.content || ""}
                       </ReactMarkdown>
                     </div>
                     <MessageFeedbackButtons
@@ -1100,7 +1107,7 @@ export default function SajuChat({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
+                  className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full shrink-0"
                   disabled={isInitialQuestionsMode}
                 >
                   <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
