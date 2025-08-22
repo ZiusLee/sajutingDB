@@ -589,6 +589,53 @@ export async function getUserSajuSessions(authUserId: string): Promise<any[]> {
 }
 
 /**
+ * Get all saju sessions for a user with birth info
+ */
+export async function getUserSajuSessionsWithBirthInfo(authUserId: string): Promise<any[]> {
+  try {
+    const supabase = createClientComponentClient()
+
+    const { data: sessions, error } = await supabase
+      .from("saju_sessions")
+      .select("*")
+      .eq("auth_user_id", authUserId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching saju sessions:", error)
+      return []
+    }
+
+    if (!sessions || sessions.length === 0) {
+      return []
+    }
+
+    // 각 세션에 대해 birth_info를 별도로 가져오기
+    const sessionsWithBirthInfo = await Promise.all(
+      sessions.map(async (session) => {
+        const { data: birthInfo } = await supabase
+          .from("birth_info")
+          .select("solar_year, solar_month, solar_day")
+          .eq("user_id", session.id)
+          .single()
+
+        return {
+          ...session,
+          birthYear: birthInfo?.solar_year?.toString() || "N/A",
+          birthMonth: birthInfo?.solar_month?.toString().padStart(2, "0") || "N/A",
+          birthDay: birthInfo?.solar_day?.toString().padStart(2, "0") || "N/A",
+        }
+      }),
+    )
+
+    return sessionsWithBirthInfo
+  } catch (error) {
+    console.error("Error in getUserSajuSessionsWithBirthInfo:", error)
+    return []
+  }
+}
+
+/**
  * Get the default saju session for a user
  * If multiple default sessions exist, return them all for user selection
  */

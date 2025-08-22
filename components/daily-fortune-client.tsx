@@ -9,9 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
+import {
+  getDefaultSajuSession,
+  getSajuProfileBySessionId,
+  getUserSajuSessionsWithBirthInfo,
+} from "@/lib/saju-session-service"
 import { FortuneSlotMachine } from "./fortune-slot-machine-gpt"
 import { TalismanCollection } from "./talisman-collection"
+import { SelectDefaultSajuDialog } from "./select-default-saju-dialog"
 
 export default function DailyFortuneClient() {
   const [isLoading, setIsLoading] = useState(true)
@@ -22,6 +27,8 @@ export default function DailyFortuneClient() {
   const [lastCheckIn, setLastCheckIn] = useState<string | null>(null)
   const [talismans, setTalismans] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState("fortune")
+  const [selectDefaultOpen, setSelectDefaultOpen] = useState(false)
+  const [availableSessions, setAvailableSessions] = useState<any[]>([])
   const supabase = createClientComponentClient()
   const { toast } = useToast()
 
@@ -58,15 +65,9 @@ export default function DailyFortuneClient() {
       const defaultSession = await getDefaultSajuSession(userId)
 
       if (!defaultSession) {
-        // 대표 사주가 없으면 사주 세션 목록 가져오기
-        const { data: sessions, error: sessionsError } = await supabase
-          .from("saju_sessions")
-          .select("*")
-          .eq("auth_user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
+        const sessionsWithBirthInfo = await getUserSajuSessionsWithBirthInfo(userId)
 
-        if (sessionsError || !sessions || sessions.length === 0) {
+        if (!sessionsWithBirthInfo || sessionsWithBirthInfo.length === 0) {
           toast({
             title: "사주 정보 없음",
             description: "사주 정보를 먼저 등록해주세요.",
@@ -74,11 +75,10 @@ export default function DailyFortuneClient() {
           return
         }
 
-        setDefaultSession(sessions[0])
-
-        // 사주 프로필 정보 가져오기
-        const profile = await getSajuProfileBySessionId(sessions[0].id)
-        setSajuProfile(profile)
+        // 사용자가 선택할 수 있도록 다이얼로그 표시
+        setAvailableSessions(sessionsWithBirthInfo)
+        setSelectDefaultOpen(true)
+        return
       } else {
         setDefaultSession(defaultSession)
 
@@ -251,11 +251,75 @@ export default function DailyFortuneClient() {
     }
   }
 
+  const handleSelectDefaultSaju = async (sessionId: string) => {
+    if (!user) return
+
+    try {
+      // 선택된 세션을 대표사주로 설정
+      const { error } = await supabase
+        .from("saju_sessions")
+        .update({ is_default: true })
+        .eq("id", sessionId)
+        .eq("auth_user_id", user.id)
+
+      if (error) throw error
+
+      // 다른 세션들의 기본값 해제
+      await supabase
+        .from("saju_sessions")
+        .update({ is_default: false })
+        .eq("auth_user_id", user.id)
+        .neq("id", sessionId)
+
+      // 선택된 세션으로 프로필 로드
+      const profile = await getSajuProfileBySessionId(sessionId)
+      if (profile) {
+        setSajuProfile(profile)
+        setDefaultSession({ id: sessionId })
+      }
+
+      setSelectDefaultOpen(false)
+      setAvailableSessions([])
+
+      toast({
+        title: "대표 사주 설정 완료",
+        description: "선택한 사주가 대표 사주로 설정되었습니다.",
+      })
+    } catch (error) {
+      console.error("대표사주 설정 오류:", error)
+      toast({
+        title: "설정 오류",
+        description: "대표 사주를 설정하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSelectDefaultCancel = () => {
+    setSelectDefaultOpen(false)
+    setAvailableSessions([])
+    // 홈으로 리다이렉트
+    window.location.href = "/"
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-4 text-lg">로딩 중...</p>
+      </div>
+    )
+  }
+
+  if (selectDefaultOpen) {
+    return (
+      <div className="container max-w-md mx-auto p-4 pb-20">
+        <SelectDefaultSajuDialog
+          open={selectDefaultOpen}
+          sessions={availableSessions}
+          onSelectSession={handleSelectDefaultSaju}
+          onCancel={handleSelectDefaultCancel}
+        />
       </div>
     )
   }
@@ -296,7 +360,7 @@ export default function DailyFortuneClient() {
               size="sm"
               onClick={checkInForCoins}
               disabled={lastCheckIn === new Date().toISOString().split("T")[0]}
-              className="border-amber-500 text-amber-400 hover:bg-amber-500/20"
+              className="border-amber-500 text-amber-400 hover:bg-amber-500/20 bg-transparent"
             >
               {lastCheckIn === new Date().toISOString().split("T")[0] ? "출석 완료" : "출석 체크"}
             </Button>

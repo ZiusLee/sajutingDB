@@ -13,9 +13,11 @@ import {
   getDefaultSajuSession,
   getSajuProfileBySessionId,
   resolveMultipleDefaultSessions,
+  getUserSajuSessionsWithBirthInfo,
 } from "@/lib/saju-session-service"
 import { trackEvent } from "@/lib/analytics"
 import { MultipleDefaultSessionsDialog } from "@/components/multiple-default-sessions-dialog"
+import { SelectDefaultSajuDialog } from "@/components/select-default-saju-dialog"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -33,6 +35,8 @@ export default function SajuChatPage() {
   const [signupOpen, setSignupOpen] = useState(false)
   const [multipleDefaultsOpen, setMultipleDefaultsOpen] = useState(false)
   const [multipleDefaultSessions, setMultipleDefaultSessions] = useState<any[]>([])
+  const [selectDefaultOpen, setSelectDefaultOpen] = useState(false)
+  const [availableSessions, setAvailableSessions] = useState<any[]>([])
 
   const supabase = getSupabase()
 
@@ -171,6 +175,16 @@ export default function SajuChatPage() {
               }
             } else {
               console.log(`[DEBUG] No default saju session found for authenticated user`)
+
+              const sessionsWithBirthInfo = await getUserSajuSessionsWithBirthInfo(data.session.user.id)
+
+              if (sessionsWithBirthInfo && sessionsWithBirthInfo.length > 0) {
+                console.log(`Found ${sessionsWithBirthInfo.length} sessions without default, showing selection dialog`)
+                setAvailableSessions(sessionsWithBirthInfo)
+                setSelectDefaultOpen(true)
+                setLoading(false)
+                return
+              }
             }
           } catch (error) {
             if (error instanceof Error && error.message === "MULTIPLE_DEFAULT_SESSIONS") {
@@ -676,6 +690,111 @@ export default function SajuChatPage() {
     router.push("/")
   }
 
+  const handleSelectDefaultSaju = async (sessionId: string) => {
+    try {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session?.user) return
+
+      // 선택된 세션을 대표사주로 설정
+      const { error: updateError } = await supabase
+        .from("saju_sessions")
+        .update({ is_default: true })
+        .eq("id", sessionId)
+        .eq("auth_user_id", data.session.user.id)
+
+      if (updateError) throw updateError
+
+      // 다른 세션들의 기본값 해제
+      await supabase
+        .from("saju_sessions")
+        .update({ is_default: false })
+        .eq("auth_user_id", data.session.user.id)
+        .neq("id", sessionId)
+
+      setSelectDefaultOpen(false)
+      setAvailableSessions([])
+
+      console.log("Loading selected default session:", sessionId)
+
+      try {
+        const profile = await getSajuProfileBySessionId(sessionId)
+
+        if (profile) {
+          const chatSajuData = {
+            saju: profile.saju,
+            name: profile.name,
+            gender: profile.gender,
+            interpretation: "",
+            returnPath: "/",
+            timeStandard: "KST",
+            birthCityId: null,
+            daeun: profile.saju.daeun,
+            concerns: [],
+            userId: data.session.user.id,
+            authUserId: data.session.user.id,
+            sessionId: profile.id,
+            birthInfo: {
+              solarYear: Number.parseInt(profile.birthYear),
+              solarMonth: Number.parseInt(profile.birthMonth),
+              solarDay: Number.parseInt(profile.birthDay),
+              solarHour: Number.parseInt(profile.birthHour),
+              solarMinute: Number.parseInt(profile.birthMinute),
+              lunarYear: Number.parseInt(profile.lunarYear),
+              lunarMonth: Number.parseInt(profile.lunarMonth),
+              lunarDay: Number.parseInt(profile.lunarDay),
+              timeUnknown: profile.timeUnknown,
+              birthCityId: null,
+              timeStandard: "KST",
+            },
+            isOptimizedLoad: true,
+            preloadedDaeun: profile.saju.daeun,
+          }
+
+          localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+          localStorage.setItem("saju_session_id", profile.id)
+
+          setSaju(chatSajuData)
+          setDefaultProfileLoaded(true)
+          const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+          setSessionKey(generatedKey)
+
+          // 채팅룸 설정
+          let chatRoom = null
+          if (!roomId) {
+            chatRoom = createTemporaryChatRoom({
+              sessionId: profile.id,
+              title: "새로운 대화",
+              roomType: roomType || "sajuping",
+              isTemporary: true,
+            })
+
+            setCurrentChatRoom(chatRoom)
+            const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+            window.history.replaceState({}, "", newUrl)
+          } else {
+            setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+          }
+        }
+      } catch (error) {
+        console.error("Error loading selected session:", error)
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error("Error setting default saju:", error)
+      toast({
+        title: "오류",
+        description: "대표 사주 설정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSelectDefaultCancel = () => {
+    setSelectDefaultOpen(false)
+    setAvailableSessions([])
+    router.push("/")
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -699,6 +818,28 @@ export default function SajuChatPage() {
           sessions={multipleDefaultSessions}
           onSelectSession={handleMultipleDefaultsSelect}
           onCancel={handleMultipleDefaultsCancel}
+        />
+      </div>
+    )
+  }
+
+  if (selectDefaultOpen) {
+    return (
+      <div className="h-[100dvh] w-full relative supports-[height:100dvh]:h-[100dvh] supports-[height:100svh]:h-[100svh] overflow-hidden">
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">대표 사주 선택</h2>
+            <p className="text-muted-foreground mb-4">
+              대표 사주가 설정되지 않았습니다. 기존 사주 중에서 선택해주세요.
+            </p>
+          </div>
+        </div>
+
+        <SelectDefaultSajuDialog
+          open={selectDefaultOpen}
+          sessions={availableSessions}
+          onSelectSession={handleSelectDefaultSaju}
+          onCancel={handleSelectDefaultCancel}
         />
       </div>
     )
@@ -745,6 +886,13 @@ export default function SajuChatPage() {
         sessions={multipleDefaultSessions}
         onSelectSession={handleMultipleDefaultsSelect}
         onCancel={handleMultipleDefaultsCancel}
+      />
+
+      <SelectDefaultSajuDialog
+        open={selectDefaultOpen}
+        sessions={availableSessions}
+        onSelectSession={handleSelectDefaultSaju}
+        onCancel={handleSelectDefaultCancel}
       />
     </div>
   )
