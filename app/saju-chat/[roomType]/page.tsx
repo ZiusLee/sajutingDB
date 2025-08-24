@@ -93,28 +93,53 @@ export default function SajuChatPage() {
             console.log("[v0] User just completed signup flow, skipping timeout check")
             localStorage.removeItem("authenticated_session_created") // Clean up flag
           } else {
-            console.log("[v0] User is authenticated, starting 3-second timeout to check for any saju_sessions")
+            console.log("[v0] User is authenticated, starting retry mechanism to check for saju_sessions")
 
-            noSessionsTimeout = setTimeout(async () => {
+            const checkSessionsWithRetry = async (attempt = 1, maxAttempts = 4) => {
               if (!isMounted) return
 
-              console.log("[v0] 3 seconds elapsed, checking if user has any saju_sessions")
+              console.log(`[v0] Attempt ${attempt}/${maxAttempts}: Checking if user has any saju_sessions`)
+
               try {
                 const allSessions = await getUserSajuSessionsWithBirthInfo(data.session!.user.id)
-                console.log("[v0] Found sessions after timeout:", allSessions?.length || 0)
+                console.log(`[v0] Found sessions on attempt ${attempt}:`, allSessions?.length || 0)
 
-                if (!allSessions || allSessions.length === 0) {
-                  console.log("[v0] No saju_sessions found after 3 seconds, redirecting to homepage")
-                  router.push("/")
-                  return
+                if (allSessions && allSessions.length > 0) {
+                  console.log(`[v0] Sessions found on attempt ${attempt}, proceeding with normal flow`)
+                  return true // Sessions found, stop retrying
+                }
+
+                if (attempt < maxAttempts) {
+                  // Wait longer between each attempt (1s, 2s, 3s)
+                  const delay = attempt * 1000
+                  console.log(`[v0] No sessions found on attempt ${attempt}, retrying in ${delay}ms`)
+
+                  setTimeout(() => {
+                    checkSessionsWithRetry(attempt + 1, maxAttempts)
+                  }, delay)
+                } else {
+                  console.log(`[v0] No saju_sessions found after ${maxAttempts} attempts, redirecting to homepage`)
+                  router.push("/?showOnboarding=true")
                 }
               } catch (error) {
-                console.error("[v0] Error checking sessions after timeout:", error)
-                // If there's an error checking sessions, also redirect to homepage
-                console.log("[v0] Error occurred, redirecting to homepage as fallback")
-                router.push("/")
+                console.error(`[v0] Error checking sessions on attempt ${attempt}:`, error)
+
+                if (attempt < maxAttempts) {
+                  const delay = attempt * 1000
+                  console.log(`[v0] Error on attempt ${attempt}, retrying in ${delay}ms`)
+
+                  setTimeout(() => {
+                    checkSessionsWithRetry(attempt + 1, maxAttempts)
+                  }, delay)
+                } else {
+                  console.log(`[v0] Error persisted after ${maxAttempts} attempts, redirecting to homepage as fallback`)
+                  router.push("/?showOnboarding=true")
+                }
               }
-            }, 3000)
+            }
+
+            // Start the retry mechanism
+            checkSessionsWithRetry()
           }
 
           console.log("User is authenticated:", data.session?.user.id)
