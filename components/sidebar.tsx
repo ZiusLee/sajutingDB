@@ -125,6 +125,7 @@ export default function Sidebar({
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
   const [loadingChatRooms, setLoadingChatRooms] = useState(false)
   const [creatingNewChat, setCreatingNewChat] = useState(false)
+  const [profileUpdateTrigger, setProfileUpdateTrigger] = useState(0)
 
   const formatRelativeTime = useCallback((dateString: string) => {
     const date = new Date(dateString)
@@ -222,6 +223,23 @@ export default function Sidebar({
     [onChatRoomSelect],
   )
 
+  const handleProfileUpdate = useCallback(
+    (updatedProfile: any) => {
+      console.log("[v0] Profile updated in sidebar:", updatedProfile)
+      // 프로필 업데이트 트리거 증가로 컴포넌트 리렌더링 유도
+      setProfileUpdateTrigger((prev) => prev + 1)
+
+      // 채팅룸 캐시 무효화
+      const cacheKey = `chatRooms_${sessionId}`
+      sessionStorage.removeItem(cacheKey)
+      sessionStorage.removeItem(`${cacheKey}_time`)
+
+      // 채팅룸 목록 새로고침
+      loadChatRooms()
+    },
+    [sessionId, loadChatRooms],
+  )
+
   const chatRoomList = useMemo(() => {
     if (loadingChatRooms) {
       return (
@@ -277,6 +295,7 @@ export default function Sidebar({
           lunarDay={birthInfo?.lunarDay}
           timeUnknown={birthInfo?.timeUnknown}
           location="서울특별시"
+          onProfileUpdate={handleProfileUpdate}
         />
       </div>
 

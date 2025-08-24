@@ -15,7 +15,10 @@ export interface PartnerInfo {
   saju?: any
 }
 
-export async function syncLocalStorageToDatabase(authUserId?: string | null): Promise<string | null> {
+export async function syncLocalStorageToDatabase(
+  authUserId?: string | null,
+  setAsDefault = true,
+): Promise<string | null> {
   try {
     console.log("Starting data sync to database...")
 
@@ -47,6 +50,23 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
       localStorage.setItem("tempSajuData", JSON.stringify(sajuData))
     }
 
+    let shouldSetAsDefault = setAsDefault
+    if (setAsDefault && userId) {
+      const { data: existingDefaults, error: checkError } = await supabase
+        .from("saju_sessions")
+        .select("id")
+        .eq("auth_user_id", userId)
+        .eq("is_default", true)
+        .limit(1)
+
+      if (checkError) {
+        console.error("Error checking existing default profiles:", checkError)
+      } else if (existingDefaults && existingDefaults.length > 0) {
+        console.log("User already has a default profile, setting new profile as non-default")
+        shouldSetAsDefault = false
+      }
+    }
+
     // Prepare time data for database storage
     const timeData = {
       solar_hour: sajuData.timeUnknown ? null : sajuData.hour,
@@ -65,7 +85,7 @@ export async function syncLocalStorageToDatabase(authUserId?: string | null): Pr
       name: sajuData.name,
       gender: sajuData.gender,
       auth_user_id: userId, // This can be null for anonymous users
-      is_default: true, // 첫 번째 세션이므로 기본값으로 설정
+      is_default: shouldSetAsDefault, // Use calculated default value instead of always true
       saju: {
         yearStem: sajuData.yearStem,
         yearBranch: sajuData.yearBranch,

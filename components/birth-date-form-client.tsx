@@ -25,9 +25,14 @@ import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 interface BirthDateFormClientProps {
   onSuccess?: (sessionId: string) => void
   redirectAfterSave?: boolean
+  setAsDefault?: boolean // Add new prop to control default setting
 }
 
-export default function BirthDateFormClient({ onSuccess, redirectAfterSave = true }: BirthDateFormClientProps) {
+export default function BirthDateFormClient({
+  onSuccess,
+  redirectAfterSave = true,
+  setAsDefault = true,
+}: BirthDateFormClientProps) {
   const [birthdate, setBirthdate] = useState("")
   const [time, setTime] = useState<string>("")
   const [timeUnknown, setTimeUnknown] = useState(false)
@@ -245,7 +250,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         interpretation: sajuResult.interpretation,
         yearStemSibseong: sajuResult.yearStemSibseong,
         monthStemSibseong: sajuResult.monthStemSibseong,
-        dayStemSibseong: "본원", // 일주의 천간은 나에 해���하는 부분으로 "본원"으로 저장
+        dayStemSibseong: "본원", // 일주의 천간은 나에 해하는 부분으로 "본원"으로 저장
         hourStemSibseong: sajuResult.hourStemSibseong,
         yearBranchSibseong: sajuResult.yearBranchSibseong,
         monthBranchSibseong: sajuResult.monthBranchSibseong,
@@ -278,7 +283,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
         } = await supabase.auth.getSession()
         const authUserId = session?.user?.id || null
 
-        userId = await syncLocalStorageToDatabase(authUserId)
+        userId = await syncLocalStorageToDatabase(authUserId, setAsDefault) // Pass setAsDefault parameter
 
         if (userId) {
           console.log("Successfully saved saju data to database with user ID:", userId)
@@ -392,7 +397,7 @@ export default function BirthDateFormClient({ onSuccess, redirectAfterSave = tru
     }
   }
 
-  // 시간 입력값 파��� 함수
+  // 시간 입력값 파 함수
   const parseTimeInput = (input: string): { hour: number; minute: number } => {
     // 기본값
     let hour = 0

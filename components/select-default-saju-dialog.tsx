@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Calendar, User, AlertTriangle } from "lucide-react"
+import { Calendar, User, AlertTriangle, Info } from "lucide-react"
 
 interface SelectDefaultSajuDialogProps {
   open: boolean
@@ -25,6 +25,10 @@ export function SelectDefaultSajuDialog({ open, sessions, onSelectSession, onCan
   }
 
   const formatBirthDate = (session: any) => {
+    if (session.solar_year && session.solar_month && session.solar_day) {
+      return `${session.solar_year}년 ${session.solar_month}월 ${session.solar_day}일 (양력)`
+    }
+    // 기존 데이터 구조 호환성 유지
     if (session.birthYear && session.birthMonth && session.birthDay) {
       return `${session.birthYear}년 ${session.birthMonth}월 ${session.birthDay}일`
     }
@@ -37,14 +41,26 @@ export function SelectDefaultSajuDialog({ open, sessions, onSelectSession, onCan
         <DialogHeader>
           <DialogTitle>대표 사주 선택</DialogTitle>
           <DialogDescription>
-            대표 사주가 설정되지 않았습니다. 기존 사주 중에서 대표 사주로 사용할 것을 선택해주세요.
+            대표 사주가 설정되지 않았습니다. 기존 사주 중에서 <strong>본인의 사주</strong>를 대표 사주로 선택해주세요.
           </DialogDescription>
         </DialogHeader>
+
+        <Alert className="border-blue-200 bg-blue-50">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>대표 사주는 본인을 표현합니다.</strong> 선택하신 사주가 본인의 것이 맞는지 생년월일을 다시 한번
+            확인해주세요. 다른 사람의 사주를 보고 싶으시다면 오른쪽 상단의 "프로필 추가" 버튼을 이용해주세요.
+          </AlertDescription>
+        </Alert>
 
         <Alert className="border-amber-200 bg-amber-50">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
-            <strong>중요:</strong> 대표 사주로 설정하면 앞으로 다시 변경할 수 없습니다. 신중하게 선택해주세요.
+            <strong>⚠️ 매우 중요한 선택입니다!</strong>
+            <br />
+            대표 사주로 설정하면 <strong>절대 다시 변경할 수 없습니다.</strong> 대표 사주는 모든 운세와 상담에서
+            기본으로 사용되며, 잘못 선택하면 다른 사람의 운세가 섞여서 나올 수 있습니다.
+            <strong>반드시 본인의 정확한 생년월일인지 확인</strong>하고 신중하게 선택해주세요.
           </AlertDescription>
         </Alert>
 
@@ -67,7 +83,7 @@ export function SelectDefaultSajuDialog({ open, sessions, onSelectSession, onCan
                 </div>
                 <CardDescription className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  생년월일: {formatBirthDate(session)}
+                  <strong>생년월일: {formatBirthDate(session)}</strong>
                 </CardDescription>
               </CardHeader>
 
@@ -114,7 +130,7 @@ export function SelectDefaultSajuDialog({ open, sessions, onSelectSession, onCan
             취소
           </Button>
           <Button onClick={handleConfirm} disabled={!selectedSessionId}>
-            대표 사주로 설정
+            ⚠️ 대표 사주로 최종 확정 (변경 불가)
           </Button>
         </div>
       </DialogContent>
