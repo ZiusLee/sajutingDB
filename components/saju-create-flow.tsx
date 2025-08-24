@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,13 +14,8 @@ import { DEFAULT_CITY_ID, getCityById, searchCities, type CityTimezoneData } fro
 import { calculateDaeunInfo } from "@/lib/daeun-calculator"
 import { SajuLogo } from "./saju-logo"
 import { Checkbox } from "@/components/ui/checkbox"
-import { SignupDialog } from "./signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
 import { trackEvent } from "@/lib/analytics"
-
-interface SajuOnboardingFlowProps {
-  onClose: () => void
-}
 
 interface BirthInfo {
   name: string
@@ -49,11 +44,9 @@ const concernOptions = [
   { id: "family", label: "가족 관계", icon: "👨‍👩‍👧‍👦" },
 ]
 
-export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
+export function SajuCreateFlow() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
-  const [signupOpen, setSignupOpen] = useState(false)
-  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false)
   const [birthInfo, setBirthInfo] = useState<BirthInfo>({
     name: "",
     gender: "",
@@ -71,15 +64,15 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   const supabase = getSupabase()
 
   useState(() => {
-    trackEvent("onboarding_started", {
-      entry_point: "homepage",
-      user_type: "anonymous",
+    trackEvent("saju_create_started", {
+      entry_point: "saju_create_page",
+      user_type: "authenticated",
     })
   })
 
   const handleNext = () => {
     if (currentStep < 5) {
-      trackEvent("onboarding_step_completed", {
+      trackEvent("saju_create_step_completed", {
         step: currentStep,
         step_name: getStepName(currentStep),
         data_entered: getStepData(currentStep),
@@ -87,7 +80,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
       setCurrentStep(currentStep + 1)
 
-      trackEvent("onboarding_step_started", {
+      trackEvent("saju_create_step_started", {
         step: currentStep + 1,
         step_name: getStepName(currentStep + 1),
       })
@@ -188,86 +181,6 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     return { hour: 12, minute: 0 }
   }
 
-  const handleOAuth = useCallback(
-    async (provider: "kakao" | "google") => {
-      console.log(`🔐 Starting ${provider} OAuth from onboarding...`)
-
-      trackEvent("auth_attempt", {
-        provider: provider,
-        context: "onboarding_signup",
-        user_type: "anonymous",
-        onboarding_step: "completed",
-      })
-
-      try {
-        setIsLoadingOAuth(true)
-
-        // 현재 생성된 세션 ID와 사주 데이터 저장
-        const sessionId = localStorage.getItem("saju_session_id")
-        const currentSajuData = localStorage.getItem("current_saju")
-
-        console.log("Preparing OAuth with data:", {
-          sessionId,
-          hasCurrentSajuData: !!currentSajuData,
-        })
-
-        if (sessionId) {
-          localStorage.setItem("pending_session_link", sessionId)
-        }
-        if (currentSajuData) {
-          localStorage.setItem("auth_pending_saju_data", currentSajuData)
-        }
-
-        localStorage.setItem("auth_return_action", "continue_to_chat")
-        localStorage.setItem("auth_flow_type", "signup")
-
-        const redirectTo = `${window.location.origin}/auth/callback`
-        console.log("Redirect URL:", redirectTo)
-
-        const options: any = {
-          redirectTo,
-        }
-
-        if (provider === "google") {
-          options.queryParams = {
-            access_type: "offline",
-            prompt: "consent",
-          }
-          options.scopes = "openid email profile"
-        }
-
-        console.log(`OAuth options for ${provider}:`, options)
-
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider,
-          options,
-        })
-
-        if (error) {
-          console.error(`❌ ${provider} OAuth error:`, error)
-          toast({
-            title: "로그인 오류",
-            description: `${provider === "kakao" ? "카카오" : "구글"} 로그인 중 오류가 발생했습니다: ${error.message}`,
-            variant: "destructive",
-          })
-          throw error
-        }
-
-        console.log(`✅ ${provider} OAuth initiated successfully`)
-      } catch (e) {
-        console.error(`❌ ${provider} OAuth start error:`, e)
-        toast({
-          title: "로그인 실패",
-          description: `${provider === "kakao" ? "카카오" : "구글"} 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.`,
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoadingOAuth(false)
-      }
-    },
-    [supabase, toast],
-  )
-
   const handleSubmit = async () => {
     if (!birthInfo.name || !birthInfo.gender || !birthInfo.birthPlaceId || !birthInfo.birthDate) {
       toast({ title: "필수 정보를 입력해주세요", variant: "destructive" })
@@ -281,6 +194,15 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     setIsLoading(true)
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.user) {
+        toast({ title: "인증이 필요합니다", variant: "destructive" })
+        router.push("/login")
+        return
+      }
+
       const parsedDate = parseDate(birthInfo.birthDate)
       const parsedTime = birthInfo.timeUnknown ? { hour: 12, minute: 0 } : parseTime(birthInfo.birthTime)
 
@@ -384,13 +306,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         },
       }
 
-      // Create saju_session with auth_user_id: null (for anonymous users)
       try {
-        console.log("Creating anonymous saju_session with auth_user_id: null")
-        const userId = await syncLocalStorageToDatabase(null) // null = anonymous user
+        console.log("Creating saju_session for authenticated user with is_default: true")
+        const userId = await syncLocalStorageToDatabase(session.user.id) // authenticated user
 
         if (userId) {
-          console.log("Successfully created anonymous saju session with ID:", userId)
+          console.log("Successfully created saju session with ID:", userId)
 
           trackEvent("CONVERSION_saju_profile_complete", {
             profile_name: birthInfo.name,
@@ -399,32 +320,38 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             time_unknown: birthInfo.timeUnknown,
             concerns_count: birthInfo.concerns.length,
             concerns: birthInfo.concerns,
-            user_type: "anonymous",
+            user_type: "authenticated",
           })
 
-          trackEvent("onboarding_completed", {
+          trackEvent("saju_create_completed", {
             completion_time: Date.now(),
             profile_created: true,
             session_id: userId,
           })
 
-          // Update chat data with the session ID
+          // Update chat data with the session ID and user info
           const finalChatSajuData = {
             ...chatSajuData,
             sessionId: userId,
+            userId: session.user.id,
+            authUserId: session.user.id,
           }
 
           localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
           localStorage.setItem("saju_session_id", userId)
-          localStorage.setItem("anonymous_session_created", "true")
+          localStorage.removeItem("tempSajuData")
 
-          console.log("Saju session created, showing signup modal")
-          setIsLoading(false)
-          setSignupOpen(true) // 로딩 완료 후 signup modal 표시
+          console.log("Saju session created, redirecting to chat")
+          toast({
+            title: "사주 프로필 생성 완료",
+            description: "사주 채팅을 시작할 수 있습니다.",
+          })
+
+          router.push("/saju-chat/sajuping")
         } else {
           console.error("Failed to create saju session")
 
-          trackEvent("onboarding_abandoned", {
+          trackEvent("saju_create_abandoned", {
             step: 5,
             step_name: "saju_calculation",
             reason: "database_error",
@@ -440,7 +367,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
       } catch (error) {
         console.error("Error creating saju session:", error)
 
-        trackEvent("onboarding_abandoned", {
+        trackEvent("saju_create_abandoned", {
           step: 5,
           step_name: "saju_calculation",
           reason: "calculation_error",
@@ -457,7 +384,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     } catch (error) {
       console.error("Error in saju calculation:", error)
 
-      trackEvent("onboarding_abandoned", {
+      trackEvent("saju_create_abandoned", {
         step: 5,
         step_name: "saju_calculation",
         reason: "calculation_error",
@@ -470,12 +397,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   }
 
   const handleClose = () => {
-    trackEvent("onboarding_abandoned", {
+    trackEvent("saju_create_abandoned", {
       step: currentStep,
       step_name: getStepName(currentStep),
       reason: "user_closed",
     })
-    onClose()
+    router.push("/")
   }
 
   const canProceed = () => {
@@ -681,43 +608,33 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
   }
 
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-50 flex flex-col"
-        style={{ backgroundImage: "url(/images/gradient-background.jpeg)" }}
-      >
-        <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
-          <SajuLogo size="md" />
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handleClose}>
-              <X className="h-6 w-6" />
-            </Button>
-          </div>
-        </header>
+    <div
+      className="fixed inset-0 bg-cover bg-center bg-no-repeat z-50 flex flex-col"
+      style={{ backgroundImage: "url(/images/gradient-background.jpeg)" }}
+    >
+      <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
+        <SajuLogo size="md" />
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={handleClose}>
+            <X className="h-6 w-6" />
+          </Button>
+        </div>
+      </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20">
-          <div className="flex justify-center mb-8">
-            {[1, 2, 3, 4, 5].map((step) => (
-              <div
-                key={step}
-                className={cn(
-                  "w-2 h-2 rounded-full mx-1 transition-colors",
-                  step === currentStep ? "bg-gray-800" : step < currentStep ? "bg-gray-600" : "bg-gray-300",
-                )}
-              />
-            ))}
-          </div>
-          {renderStepContent()}
-        </main>
-      </div>
-
-      {/* Signup Dialog 추가 */}
-      <SignupDialog
-        open={signupOpen}
-        onOpenChange={setSignupOpen}
-        onSelectProvider={handleOAuth}
-        isLoading={isLoadingOAuth}
-      />
-    </>
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20">
+        <div className="flex justify-center mb-8">
+          {[1, 2, 3, 4, 5].map((step) => (
+            <div
+              key={step}
+              className={cn(
+                "w-2 h-2 rounded-full mx-1 transition-colors",
+                step === currentStep ? "bg-gray-800" : step < currentStep ? "bg-gray-600" : "bg-gray-300",
+              )}
+            />
+          ))}
+        </div>
+        {renderStepContent()}
+      </main>
+    </div>
   )
 }

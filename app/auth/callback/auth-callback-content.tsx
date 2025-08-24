@@ -90,61 +90,12 @@ export default function AuthCallbackContent() {
             console.log("Processing onboarding completion flow (signup)")
 
             try {
-              console.log("Validating session before linking:", pendingSessionId)
-
-              // First, verify the session exists and is not already linked
-              const { data: existingSession, error: sessionCheckError } = await supabase
-                .from("saju_sessions")
-                .select("id, auth_user_id")
-                .eq("id", pendingSessionId)
-                .single()
-
-              if (sessionCheckError || !existingSession) {
-                console.error("Session not found or error checking session:", sessionCheckError)
-                toast({
-                  title: "세션 오류",
-                  description: "사주 세션을 찾을 수 없습니다. 다시 시도해주세요.",
-                  variant: "destructive",
-                })
-                // Redirect to onboarding to recreate session
-                setTimeout(() => {
-                  router.push("/?showOnboarding=true")
-                }, 2000)
-                return
-              }
-
-              if (existingSession.auth_user_id && existingSession.auth_user_id !== authUserId) {
-                console.error("Session already linked to different user:", existingSession.auth_user_id)
-                toast({
-                  title: "세션 충돌",
-                  description: "이미 다른 계정에 연결된 세션입니다.",
-                  variant: "destructive",
-                })
-                setTimeout(() => {
-                  router.push("/?showOnboarding=true")
-                }, 2000)
-                return
-              }
-
               // 1. Update the saju_session with auth_user_id
               console.log("Updating auth_user_id for session:", pendingSessionId, "with auth user:", authUserId)
               const success = await updateAuthUserId(pendingSessionId, authUserId)
 
               if (success) {
                 console.log("Successfully updated auth_user_id for saju session:", pendingSessionId)
-
-                const { data: verifySession, error: verifyError } = await supabase
-                  .from("saju_sessions")
-                  .select("auth_user_id")
-                  .eq("id", pendingSessionId)
-                  .single()
-
-                if (verifyError || !verifySession || verifySession.auth_user_id !== authUserId) {
-                  console.error("Session linking verification failed:", verifyError, verifySession)
-                  throw new Error("Session linking verification failed")
-                }
-
-                console.log("Session linking verified successfully")
 
                 // 2. Update current_saju data with auth_user_id
                 const sajuData = JSON.parse(pendingSajuData)
@@ -167,7 +118,6 @@ export default function AuthCallbackContent() {
                 // 5. Set user authentication flags
                 localStorage.setItem("user_authenticated", "true")
                 localStorage.setItem("user_id", authUserId)
-                localStorage.setItem("authenticated_session_created", "true") // Added flag to prevent redirect loop
                 if (data.session.user.user_metadata?.name) {
                   localStorage.setItem("user_name", data.session.user.user_metadata.name)
                 }
@@ -190,75 +140,19 @@ export default function AuthCallbackContent() {
                 return
               } else {
                 console.error("Failed to update auth_user_id for session:", pendingSessionId)
-                throw new Error("Failed to update auth_user_id")
+                toast({
+                  title: "세션 연결 실패",
+                  description: "사주 정보 연결에 실패했습니다.",
+                  variant: "destructive",
+                })
               }
             } catch (error) {
               console.error("Error in onboarding completion flow:", error)
-
-              console.log("Attempting fallback: creating new session from saju data")
-              try {
-                const sajuData = JSON.parse(pendingSajuData)
-
-                // Create a new session directly with the auth_user_id
-                const { data: newSession, error: createError } = await supabase
-                  .from("saju_sessions")
-                  .insert({
-                    name: sajuData.name,
-                    gender: sajuData.gender,
-                    auth_user_id: authUserId,
-                    is_default: true,
-                    saju: sajuData,
-                  })
-                  .select("id")
-                  .single()
-
-                if (createError || !newSession) {
-                  throw new Error("Failed to create fallback session")
-                }
-
-                console.log("Fallback session created successfully:", newSession.id)
-
-                // Update localStorage with new session
-                sajuData.userId = authUserId
-                sajuData.authUserId = authUserId
-                sajuData.sessionId = newSession.id
-                localStorage.setItem("current_saju", JSON.stringify(sajuData))
-                localStorage.setItem("saju_session_id", newSession.id)
-                localStorage.setItem("user_authenticated", "true")
-                localStorage.setItem("user_id", authUserId)
-                localStorage.setItem("authenticated_session_created", "true")
-
-                // Clean up temporary data
-                localStorage.removeItem("auth_return_action")
-                localStorage.removeItem("auth_pending_saju_data")
-                localStorage.removeItem("pending_session_link")
-                localStorage.removeItem("anonymous_session_created")
-                localStorage.removeItem("tempSajuData")
-                localStorage.removeItem("auth_flow_type")
-
-                toast({
-                  title: "회원가입 완료",
-                  description: "사주 정보가 계정에 성공적으로 연결되었습니다.",
-                })
-
-                setTimeout(() => {
-                  window.location.href = "/saju-chat/sajuping"
-                }, 1000)
-                return
-              } catch (fallbackError) {
-                console.error("Fallback session creation also failed:", fallbackError)
-                toast({
-                  title: "오류 발생",
-                  description: "회원가입 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
-                  variant: "destructive",
-                })
-
-                // As last resort, redirect to onboarding to start over
-                setTimeout(() => {
-                  router.push("/?showOnboarding=true")
-                }, 2000)
-                return
-              }
+              toast({
+                title: "오류 발생",
+                description: "회원가입 처리 중 오류가 발생했습니다.",
+                variant: "destructive",
+              })
             }
           }
 

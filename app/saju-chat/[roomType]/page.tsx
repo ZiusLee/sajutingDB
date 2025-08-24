@@ -69,7 +69,6 @@ export default function SajuChatPage() {
 
   useEffect(() => {
     let isMounted = true
-    let noSessionsTimeout: NodeJS.Timeout | null = null
 
     const initializePage = async () => {
       try {
@@ -88,60 +87,6 @@ export default function SajuChatPage() {
         setIsLoggedIn(isAuthenticated)
 
         if (isAuthenticated) {
-          const authenticatedSessionCreated = localStorage.getItem("authenticated_session_created")
-          if (authenticatedSessionCreated === "true") {
-            console.log("[v0] User just completed signup flow, skipping timeout check")
-            localStorage.removeItem("authenticated_session_created") // Clean up flag
-          } else {
-            console.log("[v0] User is authenticated, starting retry mechanism to check for saju_sessions")
-
-            const checkSessionsWithRetry = async (attempt = 1, maxAttempts = 4) => {
-              if (!isMounted) return
-
-              console.log(`[v0] Attempt ${attempt}/${maxAttempts}: Checking if user has any saju_sessions`)
-
-              try {
-                const allSessions = await getUserSajuSessionsWithBirthInfo(data.session!.user.id)
-                console.log(`[v0] Found sessions on attempt ${attempt}:`, allSessions?.length || 0)
-
-                if (allSessions && allSessions.length > 0) {
-                  console.log(`[v0] Sessions found on attempt ${attempt}, proceeding with normal flow`)
-                  return true // Sessions found, stop retrying
-                }
-
-                if (attempt < maxAttempts) {
-                  // Wait longer between each attempt (1s, 2s, 3s)
-                  const delay = attempt * 1000
-                  console.log(`[v0] No sessions found on attempt ${attempt}, retrying in ${delay}ms`)
-
-                  setTimeout(() => {
-                    checkSessionsWithRetry(attempt + 1, maxAttempts)
-                  }, delay)
-                } else {
-                  console.log(`[v0] No saju_sessions found after ${maxAttempts} attempts, redirecting to homepage`)
-                  router.push("/?showOnboarding=true")
-                }
-              } catch (error) {
-                console.error(`[v0] Error checking sessions on attempt ${attempt}:`, error)
-
-                if (attempt < maxAttempts) {
-                  const delay = attempt * 1000
-                  console.log(`[v0] Error on attempt ${attempt}, retrying in ${delay}ms`)
-
-                  setTimeout(() => {
-                    checkSessionsWithRetry(attempt + 1, maxAttempts)
-                  }, delay)
-                } else {
-                  console.log(`[v0] Error persisted after ${maxAttempts} attempts, redirecting to homepage as fallback`)
-                  router.push("/?showOnboarding=true")
-                }
-              }
-            }
-
-            // Start the retry mechanism
-            checkSessionsWithRetry()
-          }
-
           console.log("User is authenticated:", data.session?.user.id)
           localStorage.setItem("user_authenticated", "true")
           localStorage.setItem("user_id", data.session.user.id)
@@ -154,12 +99,6 @@ export default function SajuChatPage() {
             console.log(`[DEBUG] getDefaultSajuSession returned:`, defaultSession)
 
             if (defaultSession) {
-              if (noSessionsTimeout) {
-                console.log("[v0] Found default session, clearing timeout")
-                clearTimeout(noSessionsTimeout)
-                noSessionsTimeout = null
-              }
-
               console.log("Found default saju session:", defaultSession.id)
 
               // Get full profile data for the default session
@@ -240,29 +179,21 @@ export default function SajuChatPage() {
               const sessionsWithBirthInfo = await getUserSajuSessionsWithBirthInfo(data.session.user.id)
 
               if (sessionsWithBirthInfo && sessionsWithBirthInfo.length > 0) {
-                if (noSessionsTimeout) {
-                  console.log("[v0] Found sessions without default, clearing timeout")
-                  clearTimeout(noSessionsTimeout)
-                  noSessionsTimeout = null
-                }
-
                 console.log(`Found ${sessionsWithBirthInfo.length} sessions without default, showing selection dialog`)
                 setAvailableSessions(sessionsWithBirthInfo)
                 setSelectDefaultOpen(true)
                 setLoading(false)
                 return
               } else {
-                console.log("[v0] No sessions found at all, letting timeout handle redirect")
+                console.log("No saju sessions found for authenticated user, redirecting to saju_create")
+                if (isMounted) {
+                  router.push("/saju_create")
+                }
+                return
               }
             }
           } catch (error) {
             if (error instanceof Error && error.message === "MULTIPLE_DEFAULT_SESSIONS") {
-              if (noSessionsTimeout) {
-                console.log("[v0] Found multiple default sessions, clearing timeout")
-                clearTimeout(noSessionsTimeout)
-                noSessionsTimeout = null
-              }
-
               console.log("Multiple default sessions found, showing selection dialog")
               setMultipleDefaultSessions((error as any).sessions)
               setMultipleDefaultsOpen(true)
@@ -287,12 +218,6 @@ export default function SajuChatPage() {
           // If coming from onboarding, try to get data from tempSajuData
           const tempSajuData = localStorage.getItem("tempSajuData")
           if (tempSajuData && isAuthenticated) {
-            if (noSessionsTimeout) {
-              console.log("[v0] Found tempSajuData, clearing timeout")
-              clearTimeout(noSessionsTimeout)
-              noSessionsTimeout = null
-            }
-
             console.log("Found tempSajuData, converting to current_saju with optimization")
             const tempData = JSON.parse(tempSajuData)
 
@@ -356,11 +281,6 @@ export default function SajuChatPage() {
             }
           }
 
-          if (isAuthenticated) {
-            console.log("[v0] Authenticated user with no saju data, letting timeout handle redirect")
-            return
-          }
-
           if (isMounted) {
             toast({
               title: "사주 정보가 없습니다",
@@ -370,12 +290,6 @@ export default function SajuChatPage() {
             router.push("/")
           }
           return
-        }
-
-        if (noSessionsTimeout) {
-          console.log("[v0] Found saved saju data, clearing timeout")
-          clearTimeout(noSessionsTimeout)
-          noSessionsTimeout = null
         }
 
         const parsedSaju = JSON.parse(savedSaju)
@@ -469,9 +383,6 @@ export default function SajuChatPage() {
 
     return () => {
       isMounted = false
-      if (noSessionsTimeout) {
-        clearTimeout(noSessionsTimeout)
-      }
     }
   }, [router, toast, roomType, roomId, supabase])
 
