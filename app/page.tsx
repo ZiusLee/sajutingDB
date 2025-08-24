@@ -10,6 +10,7 @@ export default function HomePage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [showLanding, setShowLanding] = useState(false)
+  const [autoShowOnboarding, setAutoShowOnboarding] = useState(false)
   const supabase = createClientComponentClient()
 
   useEffect(() => {
@@ -38,8 +39,31 @@ export default function HomePage() {
           return
         }
 
-        console.log("✅ User is authenticated, redirecting to saju chat...")
-        router.push("/saju-chat/sajuping")
+        console.log("✅ User is authenticated, checking for saju sessions...")
+
+        // Check if user has any saju sessions
+        const { data: sessions, error } = await supabase
+          .from("saju_sessions")
+          .select("id")
+          .eq("auth_user_id", session.user.id) // Fixed column name from user_id to auth_user_id
+          .limit(1)
+
+        if (error) {
+          console.error("Error checking saju sessions:", error)
+          setShowLanding(true)
+          setIsLoading(false)
+          return
+        }
+
+        if (sessions && sessions.length > 0) {
+          console.log("✅ User has saju sessions, redirecting to saju chat...")
+          router.push("/saju-chat/sajuping")
+        } else {
+          console.log("✅ User has no saju sessions, auto-triggering profile creation...")
+          setAutoShowOnboarding(true)
+          setShowLanding(true)
+          setIsLoading(false)
+        }
       } catch (error) {
         console.error("Error checking authentication:", error)
         setShowLanding(true)
@@ -62,7 +86,7 @@ export default function HomePage() {
   }
 
   if (showLanding) {
-    return <LandingPageClient />
+    return <LandingPageClient autoShowOnboarding={autoShowOnboarding} />
   }
 
   return null

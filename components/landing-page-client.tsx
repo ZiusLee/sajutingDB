@@ -7,6 +7,10 @@ import ScrollVelocity from "@/components/ScrollVelocity"
 import { useAuth } from "@/contexts/auth-context"
 import BusinessBar from "@/components/business-bar"
 
+interface LandingPageClientProps {
+  autoShowOnboarding?: boolean
+}
+
 const questionChips = [
   { icon: "💼", text: "직장을 어떤 기준으로 선택하면 좋을까?" },
   { icon: "💕", text: "올해 나의 결혼운은 어때?" },
@@ -38,7 +42,7 @@ const questionChips = [
   { icon: "🌟", text: "내 재능을 가장 잘 발휘할 수 있는 분야는?" },
 ]
 
-export default function LandingPageClient() {
+export default function LandingPageClient({ autoShowOnboarding = false }: LandingPageClientProps) {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [userCoins, setUserCoins] = useState({ total: 0, subscription: 0, bonus: 0, plan: null })
   const [loadingCoins, setLoadingCoins] = useState(false)
@@ -97,6 +101,12 @@ export default function LandingPageClient() {
       router.replace("/", undefined)
     }
   }, [searchParams, router])
+
+  useEffect(() => {
+    if (autoShowOnboarding) {
+      setShowOnboarding(true)
+    }
+  }, [autoShowOnboarding])
 
   const handleStartSaju = () => {
     setShowOnboarding(true)

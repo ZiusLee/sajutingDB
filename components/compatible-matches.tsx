@@ -42,7 +42,7 @@ export default function CompatibleMatches({
         console.log("Current window.sajuInfo:", window.sajuInfo)
         console.log("Current window.sajuFullData:", window.sajuFullData)
 
-        // 전역 ���수에서 데이터를 가져와 병합
+        // 전역 수에서 데이터를 가져와 병합
         if (window.sajuFullData) {
           // 중요한 필드들을 명시적으로 복사
           if (window.sajuFullData.year) sajuData.year = String(window.sajuFullData.year)
@@ -74,7 +74,7 @@ export default function CompatibleMatches({
 
         localStorage.setItem("tempSajuData", JSON.stringify(sajuData))
 
-        // 전역 변수로 사주 정보 저장 (다른 컴포넌트에서 접근 가능하���록)
+        // 전역 변수로 사주 정보 저장 (다른 컴포넌트에서 접근 가능하록)
         window.sajuFullData = sajuData
       } catch (e) {
         console.error("Error saving saju data:", e)
@@ -82,7 +82,7 @@ export default function CompatibleMatches({
     }
 
     // activate 페이지로 이동
-    router.push("/activate")
+    router.push("/saju-onboarding")
   }
 
   // Extract matches based on gender and relationship status
@@ -101,7 +101,7 @@ export default function CompatibleMatches({
             age: 28,
             birthYear: "1996년생",
             saju: "갑인-을사-병오-정미",
-            compatibility: "당신에게 부족한 금(金)과 수(水) 오����� 풍부하여 상호 보완적인 관계",
+            compatibility: "당신에게 부족한 금(金)과 수(水) 오 풍부하여 상호 보완적인 관계",
             compatibilityScore: 85,
             imageUrl: "/placeholder.svg?height=150&width=150",
           },
@@ -233,7 +233,7 @@ export default function CompatibleMatches({
             name: "김○○",
             age: 28,
             birthYear: "1996년생",
-            saju: "��인-을사-병오-정미",
+            saju: "갑인-을사-병오-정미",
             compatibility: "당신에게 부족한 금(金)과 수(水) 오행이 풍부하여 상호 보완적인 관계",
             compatibilityScore: 85,
             imageUrl: "/placeholder.svg?height=150&width=150",
@@ -243,7 +243,7 @@ export default function CompatibleMatches({
             name: "이○○",
             age: 30,
             birthYear: "1994년생",
-            saju: "임신-���유-갑술-을해",
+            saju: "임신-계유-갑술-을해",
             compatibility: "당신의 부족한 수(水) 오행을 보완해주고 오행 균형이 좋은 관계",
             compatibilityScore: 92,
             imageUrl: "/placeholder.svg?height=150&width=150",
@@ -389,7 +389,7 @@ export default function CompatibleMatches({
             age: 35,
             birthYear: "1989년생",
             saju: "기사-경오-신미-임신",
-            compatibility: "서로의 ��성을 존중��며 오랜 시간 함께할 수 있는 안정적인 관계",
+            compatibility: "서로의 성성을 존중며 오랜 시간 함께할 수 있는 안정적인 관계",
             compatibilityScore: 89,
             imageUrl: "/placeholder.svg?height=150&width=150",
           },
