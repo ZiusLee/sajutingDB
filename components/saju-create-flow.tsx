@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowRight, Check, MapPin, X } from "lucide-react"
+import { ArrowRight, Check, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { calculateSaju, type TimeStandard } from "@/lib/saju"
@@ -614,11 +614,7 @@ export function SajuCreateFlow() {
     >
       <header className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center">
         <SajuLogo size="md" />
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleClose}>
-            <X className="h-6 w-6" />
-          </Button>
-        </div>
+        <div className="flex items-center gap-4"></div>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20">
