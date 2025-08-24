@@ -281,6 +281,11 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
     setIsLoading(true)
 
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const isAuthenticated = !!user
+
       const parsedDate = parseDate(birthInfo.birthDate)
       const parsedTime = birthInfo.timeUnknown ? { hour: 12, minute: 0 } : parseTime(birthInfo.birthTime)
 
@@ -384,13 +389,12 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
         },
       }
 
-      // Create saju_session with auth_user_id: null (for anonymous users)
       try {
-        console.log("Creating anonymous saju_session with auth_user_id: null")
-        const userId = await syncLocalStorageToDatabase(null) // null = anonymous user
+        console.log(`Creating saju_session for ${isAuthenticated ? "authenticated" : "anonymous"} user`)
+        const userId = await syncLocalStorageToDatabase(isAuthenticated ? user.id : null)
 
         if (userId) {
-          console.log("Successfully created anonymous saju session with ID:", userId)
+          console.log("Successfully created saju session with ID:", userId)
 
           trackEvent("CONVERSION_saju_profile_complete", {
             profile_name: birthInfo.name,
@@ -399,7 +403,7 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
             time_unknown: birthInfo.timeUnknown,
             concerns_count: birthInfo.concerns.length,
             concerns: birthInfo.concerns,
-            user_type: "anonymous",
+            user_type: isAuthenticated ? "authenticated" : "anonymous",
           })
 
           trackEvent("onboarding_completed", {
@@ -416,11 +420,18 @@ export function SajuOnboardingFlow({ onClose }: SajuOnboardingFlowProps) {
 
           localStorage.setItem("current_saju", JSON.stringify(finalChatSajuData))
           localStorage.setItem("saju_session_id", userId)
-          localStorage.setItem("anonymous_session_created", "true")
 
-          console.log("Saju session created, showing signup modal")
-          setIsLoading(false)
-          setSignupOpen(true) // 로딩 완료 후 signup modal 표시
+          if (isAuthenticated) {
+            console.log("User is authenticated, redirecting to chat")
+            localStorage.setItem("authenticated_session_created", "true")
+            setIsLoading(false)
+            router.push("/saju-chat/sajuping")
+          } else {
+            console.log("User is anonymous, showing signup modal")
+            localStorage.setItem("anonymous_session_created", "true")
+            setIsLoading(false)
+            setSignupOpen(true)
+          }
         } else {
           console.error("Failed to create saju session")
 
