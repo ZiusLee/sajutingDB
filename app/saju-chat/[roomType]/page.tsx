@@ -88,28 +88,34 @@ export default function SajuChatPage() {
         setIsLoggedIn(isAuthenticated)
 
         if (isAuthenticated) {
-          console.log("[v0] User is authenticated, starting 3-second timeout to check for any saju_sessions")
+          const authenticatedSessionCreated = localStorage.getItem("authenticated_session_created")
+          if (authenticatedSessionCreated === "true") {
+            console.log("[v0] User just completed signup flow, skipping timeout check")
+            localStorage.removeItem("authenticated_session_created") // Clean up flag
+          } else {
+            console.log("[v0] User is authenticated, starting 3-second timeout to check for any saju_sessions")
 
-          noSessionsTimeout = setTimeout(async () => {
-            if (!isMounted) return
+            noSessionsTimeout = setTimeout(async () => {
+              if (!isMounted) return
 
-            console.log("[v0] 3 seconds elapsed, checking if user has any saju_sessions")
-            try {
-              const allSessions = await getUserSajuSessionsWithBirthInfo(data.session!.user.id)
-              console.log("[v0] Found sessions after timeout:", allSessions?.length || 0)
+              console.log("[v0] 3 seconds elapsed, checking if user has any saju_sessions")
+              try {
+                const allSessions = await getUserSajuSessionsWithBirthInfo(data.session!.user.id)
+                console.log("[v0] Found sessions after timeout:", allSessions?.length || 0)
 
-              if (!allSessions || allSessions.length === 0) {
-                console.log("[v0] No saju_sessions found after 3 seconds, redirecting to homepage")
+                if (!allSessions || allSessions.length === 0) {
+                  console.log("[v0] No saju_sessions found after 3 seconds, redirecting to homepage")
+                  router.push("/")
+                  return
+                }
+              } catch (error) {
+                console.error("[v0] Error checking sessions after timeout:", error)
+                // If there's an error checking sessions, also redirect to homepage
+                console.log("[v0] Error occurred, redirecting to homepage as fallback")
                 router.push("/")
-                return
               }
-            } catch (error) {
-              console.error("[v0] Error checking sessions after timeout:", error)
-              // If there's an error checking sessions, also redirect to homepage
-              console.log("[v0] Error occurred, redirecting to homepage as fallback")
-              router.push("/")
-            }
-          }, 3000)
+            }, 3000)
+          }
 
           console.log("User is authenticated:", data.session?.user.id)
           localStorage.setItem("user_authenticated", "true")
