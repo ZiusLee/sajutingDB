@@ -677,12 +677,7 @@ export default function SajuChat({
 
   useEffect(() => {
     if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage && lastMessage.role === "user") {
-        setTimeout(() => {
-          scrollToLastUserMessage()
-        }, 100)
-      }
+      // No automatic scrolling - user controls scroll position
     }
     prevMessageCountRef.current = messages.length
   }, [messages])
@@ -830,27 +825,15 @@ export default function SajuChat({
   }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
 
   const restoreScrollPosition = () => {
-    if (chatContainerRef.current) {
-      setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-        }
-      }, 100)
-    }
+    // No automatic scroll restoration
   }
 
   useEffect(() => {
-    restoreScrollPosition()
+    // No automatic scroll on room type change
   }, [roomType])
 
   useEffect(() => {
-    if (chatData.isInitialized && messages.length > 0 && chatContainerRef.current) {
-      setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-        }
-      }, 200)
-    }
+    // No automatic scroll on initialization
   }, [chatData.isInitialized, roomType])
 
   const handleUserSubmit = (e: React.FormEvent) => {
