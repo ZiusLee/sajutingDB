@@ -824,6 +824,47 @@ export default function SajuChat({
     }
   }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
 
+  useEffect(() => {
+    const container = chatContainerRef.current
+    if (!container) return
+
+    // Preserve scroll position when streaming state changes
+    const savedScrollTop = container.scrollTop
+
+    const preserveScroll = () => {
+      if (container.scrollTop !== savedScrollTop) {
+        container.scrollTop = savedScrollTop
+      }
+    }
+
+    // Use requestAnimationFrame to preserve scroll after DOM updates
+    const rafId = requestAnimationFrame(preserveScroll)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+    }
+  }, [chatStreamState.isStreaming, isLoading])
+
+  useEffect(() => {
+    const container = chatContainerRef.current
+    if (!container || messages.length <= prevMessageCountRef.current || isTransitioningRef.current) {
+      prevMessageCountRef.current = messages.length
+      return
+    }
+
+    // Store current scroll position before message update
+    const scrollTop = container.scrollTop
+
+    // Restore scroll position after DOM update
+    requestAnimationFrame(() => {
+      if (container.scrollTop !== scrollTop) {
+        container.scrollTop = scrollTop
+      }
+    })
+
+    prevMessageCountRef.current = messages.length
+  }, [messages])
+
   const restoreScrollPosition = () => {
     // No automatic scroll restoration
   }
