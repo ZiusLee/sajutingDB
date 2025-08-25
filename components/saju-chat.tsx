@@ -1045,7 +1045,7 @@ export default function SajuChat({
                               saju={stableSaju}
                               name={name}
                               gender={gender}
-                              variant="card"
+                              variant="chat"
                               solarYear={chatData.stableBirthInfo?.solarYear}
                               solarMonth={chatData.stableBirthInfo?.solarMonth}
                               solarDay={chatData.stableBirthInfo?.solarDay}
