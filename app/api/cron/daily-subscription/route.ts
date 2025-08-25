@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
         const { data: updateResult, error: updateError } = await supabase
           .from("user_coins")
           .update({
-            subscription_coins: (user.subscription_coins || 0) + dailyCoins,
+            subscription_coins: dailyCoins, // Set to exact daily amount, don't accumulate
             last_daily_charge: koreanToday,
             updated_at: koreanNow,
           })
@@ -194,17 +194,17 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(
-          `[Daily Charge] Successfully charged ${dailyCoins} subscription_coins to user ${user.user_id}`,
+          `[Daily Charge] Successfully set ${dailyCoins} subscription_coins for user ${user.user_id}`,
           updateResult?.[0],
         )
         processedUsers.push({
           user_id: user.user_id,
           type: "subscription",
           plan: user.subscription_plan,
-          coins_added: dailyCoins,
+          coins_set: dailyCoins, // Changed from coins_added to coins_set
           status: "success",
           previous_coins: user.subscription_coins || 0,
-          new_coins: (user.subscription_coins || 0) + dailyCoins,
+          new_coins: dailyCoins, // Set to exact daily amount
         })
         successCount++
       } catch (userError) {
@@ -213,7 +213,7 @@ export async function GET(request: NextRequest) {
           user_id: user.user_id,
           type: "subscription",
           plan: user.subscription_plan,
-          coins_added: 0,
+          coins_set: 0, // Changed from coins_added to coins_set
           status: "error",
           error: userError instanceof Error ? userError.message : "Unknown error",
         })
