@@ -1797,21 +1797,7 @@ export default function SajuDiagram({
 
   return (
     <div className="space-y-4">
-      <ProfileInfo
-        name={displayName}
-        dayMasterInfo={dayMasterInfo}
-        birthInfo={{
-          birthYear: defaultProfile?.birthYear,
-          birthMonth: defaultProfile?.birthMonth,
-          birthDay: defaultProfile?.birthDay,
-          birthHour: defaultProfile?.birthHour,
-          birthMinute: defaultProfile?.birthMinute,
-          timeUnknown: defaultProfile?.timeUnknown,
-          location: defaultProfile?.location,
-          gender: defaultProfile?.gender,
-        }}
-        variant="chat"
-      />
+      {/* ProfileInfo component removed - only showing saju details */}
 
       <div className="flex items-center gap-2">
         <h3 className="font-medium">사주팔자 상세</h3>
