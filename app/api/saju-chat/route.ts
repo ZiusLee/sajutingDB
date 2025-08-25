@@ -311,17 +311,18 @@ export async function POST(req: Request) {
           // 현재 코인 정보 조회 (구독 질문권, 보너스 질문권 분리)
           const { data: coinData, error: selectError } = await supabase
             .from("user_coins")
-            .select("subscription_coins, bonus_coins")
+            .select("subscription_coins, bonus_coins, subscription_plan")
             .eq("user_id", userId)
             .single()
 
           if (selectError && selectError.code === "PGRST116") {
-            // 사용자 코인 데이터가 없으면 새로 생성 (0 코인으로 시작)
+            // 사용자 코인 데이터가 없으면 새로 생성 (3 코인으로 시작)
             console.log("💰 새 사용자 코인 계정 생성")
             await supabase.from("user_coins").insert({
               user_id: userId,
-              subscription_coins: 0,
+              subscription_coins: 3, // Start with 3 coins for free tier
               bonus_coins: 0,
+              subscription_plan: "free", // Set default plan to free
             })
           } else if (!selectError && coinData) {
             const subscriptionCoins = coinData.subscription_coins || 0

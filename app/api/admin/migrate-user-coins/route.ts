@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
     // Create user_coins records for users who don't have them
     const newUserCoins = usersWithoutCoins.map((user) => ({
       user_id: user.id,
-      coins: 3,
+      subscription_coins: 3, // Use subscription_coins instead of coins
+      bonus_coins: 0,
       subscription_plan: "free",
       last_daily_charge: new Date().toISOString().split("T")[0], // Today's date
       created_at: new Date().toISOString(),
@@ -60,17 +61,20 @@ export async function POST(request: NextRequest) {
     console.log(`[v0] Successfully migrated ${insertedCoins?.length || 0} users`)
 
     // Get final statistics
-    const { data: stats, error: statsError } = await supabase.from("user_coins").select("subscription_plan, coins")
+    const { data: stats, error: statsError } = await supabase
+      .from("user_coins")
+      .select("subscription_plan, subscription_coins, bonus_coins")
 
     let breakdown = {}
     if (stats && !statsError) {
       breakdown = stats.reduce((acc: any, user: any) => {
         const plan = user.subscription_plan || "unknown"
         if (!acc[plan]) {
-          acc[plan] = { count: 0, totalCoins: 0 }
+          acc[plan] = { count: 0, totalSubscriptionCoins: 0, totalBonusCoins: 0 }
         }
         acc[plan].count++
-        acc[plan].totalCoins += user.coins
+        acc[plan].totalSubscriptionCoins += user.subscription_coins || 0
+        acc[plan].totalBonusCoins += user.bonus_coins || 0
         return acc
       }, {})
     }
@@ -121,18 +125,19 @@ export async function GET() {
     // Get breakdown by subscription plan
     const { data: breakdown, error: breakdownError } = await supabase
       .from("user_coins")
-      .select("subscription_plan, coins")
+      .select("subscription_plan, subscription_coins, bonus_coins")
 
     let planBreakdown = {}
     if (breakdown && !breakdownError) {
       planBreakdown = breakdown.reduce((acc: any, user: any) => {
         const plan = user.subscription_plan || "unknown"
         if (!acc[plan]) {
-          acc[plan] = { count: 0, totalCoins: 0, avgCoins: 0 }
+          acc[plan] = { count: 0, totalSubscriptionCoins: 0, totalBonusCoins: 0, avgSubscriptionCoins: 0 }
         }
         acc[plan].count++
-        acc[plan].totalCoins += user.coins
-        acc[plan].avgCoins = acc[plan].totalCoins / acc[plan].count
+        acc[plan].totalSubscriptionCoins += user.subscription_coins || 0
+        acc[plan].totalBonusCoins += user.bonus_coins || 0
+        acc[plan].avgSubscriptionCoins = acc[plan].totalSubscriptionCoins / acc[plan].count
         return acc
       }, {})
     }

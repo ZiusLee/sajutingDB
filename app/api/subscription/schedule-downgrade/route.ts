@@ -84,9 +84,9 @@ export async function POST(request: NextRequest) {
       // Create new record if doesn't exist
       const { error } = await supabase.from("user_coins").insert({
         user_id: user.id,
-        coins: 0,
+        subscription_coins: 3, // Set to 3 for free tier instead of 0
         bonus_coins: 0,
-        subscription_coins: 0,
+        subscription_plan: "free", // Set default plan to free
         ...updateData,
         created_at: new Date().toISOString(),
       })

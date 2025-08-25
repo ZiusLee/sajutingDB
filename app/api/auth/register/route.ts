@@ -79,20 +79,41 @@ export async function POST(req: NextRequest) {
 
       console.log(`[v0] Attempting to create user_coins for user ${session.id}`)
 
-      const { error: coinsError } = await supabase.from("user_coins").insert({
-        user_id: session.id,
-        subscription_coins: 3,
-        bonus_coins: 0,
-        subscription_plan: "free",
-        last_daily_charge: new Date().toISOString().split("T")[0],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      const { data: coinsData, error: coinsError } = await supabase
+        .from("user_coins")
+        .insert({
+          user_id: session.id,
+          subscription_coins: 3,
+          bonus_coins: 0,
+          subscription_plan: "free",
+          last_daily_charge: new Date().toISOString().split("T")[0],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
 
       if (coinsError) {
         console.error("Failed to create user_coins:", coinsError)
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("user_coins")
+          .upsert({
+            user_id: session.id,
+            subscription_coins: 3,
+            bonus_coins: 0,
+            subscription_plan: "free",
+            last_daily_charge: new Date().toISOString().split("T")[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+
+        if (fallbackError) {
+          console.error("Fallback user_coins creation also failed:", fallbackError)
+        } else {
+          console.log(`[v0] Fallback user_coins creation succeeded:`, fallbackData)
+        }
       } else {
-        console.log(`[v0] Successfully created user_coins with 3 subscription_coins`)
+        console.log(`[v0] Successfully created user_coins:`, coinsData)
       }
 
       // JWT 토큰 생성
