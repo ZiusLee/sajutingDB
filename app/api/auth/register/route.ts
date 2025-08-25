@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       try {
         const { error: coinsError } = await supabase.from("user_coins").insert({
           user_id: session.id,
-          coins: 3, // Free plan gets 3 coins initially
+          subscription_coins: 3, // Free plan gets 3 subscription_coins initially
           bonus_coins: 0,
           subscription_plan: "free",
           last_daily_charge: new Date().toISOString().split("T")[0], // Today's date
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
           console.error("Error creating initial user_coins:", coinsError)
           // Don't fail registration if coins creation fails
         } else {
-          console.log(`💰 Created initial user_coins with 3 coins for user ${session.id}`)
+          console.log(`💰 Created initial user_coins with 3 subscription_coins for user ${session.id}`)
         }
       } catch (coinsCreationError) {
         console.error("Error in user_coins creation:", coinsCreationError)

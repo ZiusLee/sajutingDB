@@ -43,9 +43,27 @@ export async function GET(request: NextRequest) {
   console.log("[Daily Charge] Starting daily subscription charge process...")
 
   try {
+    console.log("[Daily Charge] Executing scheduled plan changes...")
+    const { data: scheduledChanges, error: scheduledError } = await supabase.rpc("execute_scheduled_plan_changes")
+
+    if (scheduledError) {
+      console.error("[Daily Charge] Error executing scheduled changes:", scheduledError)
+    } else {
+      console.log(`[Daily Charge] Executed ${scheduledChanges?.length || 0} scheduled plan changes`)
+    }
+
+    console.log("[Daily Charge] Handling expired subscriptions...")
+    const { data: expiredSubs, error: expiredError } = await supabase.rpc("handle_expired_subscriptions")
+
+    if (expiredError) {
+      console.error("[Daily Charge] Error handling expired subscriptions:", expiredError)
+    } else {
+      console.log(`[Daily Charge] Handled ${expiredSubs?.length || 0} expired subscriptions`)
+    }
+
     const { data: allUsers, error: usersError } = await supabase.from("user_coins").select(`
         user_id,
-        coins,
+        subscription_coins,
         bonus_coins,
         subscription_plan,
         subscription_start_date,
@@ -107,7 +125,7 @@ export async function GET(request: NextRequest) {
           const { data: updateResult, error: updateError } = await supabase
             .from("user_coins")
             .update({
-              coins: dailyCoins, // Set to 3 coins, don't accumulate for free users
+              subscription_coins: dailyCoins, // Set to 3 coins, don't accumulate for free users
               last_daily_charge: koreanToday,
               updated_at: koreanNow,
             })
@@ -120,7 +138,7 @@ export async function GET(request: NextRequest) {
             continue
           }
 
-          console.log(`[Daily Charge] Successfully set ${dailyCoins} coins for free user ${user.user_id}`)
+          console.log(`[Daily Charge] Successfully set ${dailyCoins} subscription_coins for free user ${user.user_id}`)
           processedUsers.push({
             user_id: user.user_id,
             type: "free",
@@ -154,7 +172,7 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(`[Daily Charge] Processing subscription user ${user.user_id}:`, {
-          current_coins: user.coins,
+          current_subscription_coins: user.subscription_coins,
           subscription_plan: user.subscription_plan,
           daily_coins: dailyCoins,
         })
@@ -162,7 +180,7 @@ export async function GET(request: NextRequest) {
         const { data: updateResult, error: updateError } = await supabase
           .from("user_coins")
           .update({
-            coins: (user.coins || 0) + dailyCoins,
+            subscription_coins: (user.subscription_coins || 0) + dailyCoins,
             last_daily_charge: koreanToday,
             updated_at: koreanNow,
           })
@@ -176,7 +194,7 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(
-          `[Daily Charge] Successfully charged ${dailyCoins} coins to subscription user ${user.user_id}`,
+          `[Daily Charge] Successfully charged ${dailyCoins} subscription_coins to user ${user.user_id}`,
           updateResult?.[0],
         )
         processedUsers.push({
@@ -185,8 +203,8 @@ export async function GET(request: NextRequest) {
           plan: user.subscription_plan,
           coins_added: dailyCoins,
           status: "success",
-          previous_coins: user.coins || 0,
-          new_coins: (user.coins || 0) + dailyCoins,
+          previous_coins: user.subscription_coins || 0,
+          new_coins: (user.subscription_coins || 0) + dailyCoins,
         })
         successCount++
       } catch (userError) {
@@ -208,6 +226,8 @@ export async function GET(request: NextRequest) {
       successful: successCount,
       errors: errorCount,
       koreanDate: koreanToday,
+      scheduledChanges: scheduledChanges?.length || 0,
+      expiredSubscriptions: expiredSubs?.length || 0,
     })
 
     await supabase.from("cron_executions").insert({
@@ -222,6 +242,8 @@ export async function GET(request: NextRequest) {
       status: errorCount === 0 ? "completed" : "completed_with_errors",
       details: {
         processedUsers: processedUsers.slice(0, 10),
+        scheduledChanges: scheduledChanges?.length || 0,
+        expiredSubscriptions: expiredSubs?.length || 0,
         koreanTime: koreanNow,
         utcTime: new Date().toISOString(),
         isManualTest,
@@ -239,6 +261,8 @@ export async function GET(request: NextRequest) {
         subscriptionUsers: subscriptionUsers.length,
         successfulCharges: successCount,
         errors: errorCount,
+        scheduledChanges: scheduledChanges?.length || 0,
+        expiredSubscriptions: expiredSubs?.length || 0,
         koreanDate: koreanToday,
         koreanTime: koreanNow,
         processedSample: processedUsers.slice(0, 5),
