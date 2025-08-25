@@ -6,160 +6,165 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+function getKoreanDate(): string {
+  const now = new Date()
+  const koreanTime = new Date(now.getTime() + 9 * 60 * 60 * 1000) // UTC + 9 hours
+  return koreanTime.toISOString().split("T")[0]
+}
+
+function getKoreanDateTime(): string {
+  const now = new Date()
+  const koreanTime = new Date(now.getTime() + 9 * 60 * 60 * 1000) // UTC + 9 hours
+  return koreanTime.toISOString()
+}
+
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
-  const cronSecret = process.env.CRON_SECRET
   const isManualTest = request.nextUrl.searchParams.get("manual") === "true"
+  const isVercelCron =
+    request.headers.get("user-agent")?.includes("vercel-cron") || request.headers.get("x-vercel-cron") === "1"
+
+  const koreanToday = getKoreanDate()
+  const koreanNow = getKoreanDateTime()
 
   console.log("[Daily Charge] Cron job triggered", {
-    hasAuthHeader: !!authHeader,
-    hasCronSecret: !!cronSecret,
     isManualTest,
-    timestamp: new Date().toISOString(),
+    isVercelCron,
+    userAgent: request.headers.get("user-agent"),
+    koreanDate: koreanToday,
+    koreanTime: koreanNow,
+    utcTime: new Date().toISOString(),
   })
 
-  // Allow manual testing in development or with special parameter
-  if (!isManualTest && authHeader !== `Bearer ${cronSecret}`) {
-    console.error("[Daily Charge] Unauthorized access attempt", {
-      authHeader: authHeader ? "present" : "missing",
-      cronSecret: cronSecret ? "present" : "missing",
-    })
+  if (!isManualTest && !isVercelCron) {
+    console.error("[Daily Charge] Unauthorized access - not from Vercel cron or manual test")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   console.log("[Daily Charge] Starting daily subscription charge process...")
 
-  const today = new Date().toISOString().split("T")[0]
-  const now = new Date().toISOString()
-
   try {
-    console.log("[Daily Charge] Fetching users who haven't been charged today:", today)
-
-    const { data: allUsers, error: usersError } = await supabase
-      .from("user_coins")
-      .select(`
+    const { data: allUsers, error: usersError } = await supabase.from("user_coins").select(`
         user_id,
+        coins,
+        bonus_coins,
         subscription_plan,
         subscription_start_date,
         subscription_end_date,
         last_daily_charge,
-        subscription_coins,
-        purchased_coins
+        created_at,
+        updated_at
       `)
-      .neq("last_daily_charge", today)
 
     if (usersError) {
       console.error("[Daily Charge] Error fetching users:", usersError)
       return NextResponse.json({ error: "Failed to fetch users", details: usersError }, { status: 500 })
     }
 
-    console.log(`[Daily Charge] Total users found: ${allUsers?.length || 0}`)
+    console.log(`[Daily Charge] Total users in database: ${allUsers?.length || 0}`)
 
-    const freeUsers = allUsers?.filter((user) => !user.subscription_plan || user.subscription_plan === "free") || []
-    const subscriptionUsers =
-      allUsers?.filter(
-        (user) =>
-          user.subscription_plan &&
-          user.subscription_plan !== "free" &&
-          user.subscription_end_date &&
-          new Date(user.subscription_end_date) >= new Date(),
-      ) || []
+    const usersNeedingCharge =
+      allUsers?.filter((user) => {
+        const needsCharge = !user.last_daily_charge || user.last_daily_charge !== koreanToday
+        return needsCharge
+      }) || []
+
+    console.log(`[Daily Charge] Users needing charge today: ${usersNeedingCharge.length}`)
+
+    const freeUsers = usersNeedingCharge.filter((user) => {
+      const isFreeUser =
+        !user.subscription_plan ||
+        user.subscription_plan === "free" ||
+        user.subscription_plan === "" ||
+        user.subscription_plan === null
+      return isFreeUser
+    })
+
+    const subscriptionUsers = usersNeedingCharge.filter((user) => {
+      const hasValidSubscription =
+        user.subscription_plan &&
+        user.subscription_plan !== "free" &&
+        user.subscription_plan !== "" &&
+        user.subscription_end_date &&
+        new Date(user.subscription_end_date) >= new Date(koreanToday)
+      return hasValidSubscription
+    })
 
     console.log(
       `[Daily Charge] Found ${freeUsers.length} free users and ${subscriptionUsers.length} subscription users to charge`,
     )
 
-    if (freeUsers.length > 0) {
-      console.log(
-        "[Daily Charge] Sample free users:",
-        freeUsers.slice(0, 3).map((u) => ({
-          user_id: u.user_id,
-          subscription_plan: u.subscription_plan,
-          last_daily_charge: u.last_daily_charge,
-          current_coins: u.subscription_coins,
-        })),
-      )
-    }
-
     let successCount = 0
     let errorCount = 0
     const processedUsers = []
 
-    for (const user of freeUsers) {
-      try {
-        const dailyCoins = 3 // Free plan gets 3 coins daily
+    if (freeUsers.length > 0) {
+      console.log("[Daily Charge] Processing free users in batch...")
 
-        console.log(`[Daily Charge] Processing free user ${user.user_id}, current coins: ${user.subscription_coins}`)
+      for (const user of freeUsers) {
+        try {
+          const dailyCoins = 3 // Free plan gets 3 coins daily
 
-        const { data: updateResult, error: updateError } = await supabase
-          .from("user_coins")
-          .update({
-            subscription_coins: supabase.raw(`subscription_coins + ${dailyCoins}`),
-            last_daily_charge: today,
-            updated_at: now,
+          const { data: updateResult, error: updateError } = await supabase
+            .from("user_coins")
+            .update({
+              coins: dailyCoins, // Set to 3 coins, don't accumulate for free users
+              last_daily_charge: koreanToday,
+              updated_at: koreanNow,
+            })
+            .eq("user_id", user.user_id)
+            .select()
+
+          if (updateError) {
+            console.error(`[Daily Charge] Error updating coins for free user ${user.user_id}:`, updateError)
+            errorCount++
+            continue
+          }
+
+          console.log(`[Daily Charge] Successfully set ${dailyCoins} coins for free user ${user.user_id}`)
+          processedUsers.push({
+            user_id: user.user_id,
+            type: "free",
+            coins_set: dailyCoins,
+            status: "success",
           })
-          .eq("user_id", user.user_id)
-          .select()
-
-        if (updateError) {
-          console.error(`[Daily Charge] Error updating coins for free user ${user.user_id}:`, updateError)
+          successCount++
+        } catch (userError) {
+          console.error(`[Daily Charge] Error processing free user ${user.user_id}:`, userError)
           errorCount++
-          continue
         }
-
-        console.log(
-          `[Daily Charge] Successfully charged ${dailyCoins} coins to free user ${user.user_id}`,
-          updateResult,
-        )
-        processedUsers.push({
-          user_id: user.user_id,
-          type: "free",
-          coins_added: dailyCoins,
-          status: "success",
-        })
-        successCount++
-      } catch (userError) {
-        console.error(`[Daily Charge] Error processing free user ${user.user_id}:`, userError)
-        processedUsers.push({
-          user_id: user.user_id,
-          type: "free",
-          coins_added: 0,
-          status: "error",
-          error: userError instanceof Error ? userError.message : "Unknown error",
-        })
-        errorCount++
       }
     }
 
     for (const user of subscriptionUsers) {
       try {
-        // Get payment order for this subscription user
-        const { data: paymentOrder, error: paymentError } = await supabase
-          .from("payment_orders")
-          .select("daily_coins, subscription_status")
-          .eq("user_id", user.user_id)
-          .eq("subscription_status", "active")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
+        let dailyCoins = 10 // Default for starter
 
-        if (paymentError || !paymentOrder) {
-          console.warn(`[Daily Charge] No active payment order found for user ${user.user_id}`)
-          continue
+        switch (user.subscription_plan) {
+          case "starter":
+            dailyCoins = 10
+            break
+          case "plus":
+            dailyCoins = 30
+            break
+          case "pro":
+            dailyCoins = 100
+            break
+          default:
+            dailyCoins = 10 // Default to starter plan
         }
 
-        const dailyCoins = paymentOrder.daily_coins
-
-        console.log(
-          `[Daily Charge] Processing subscription user ${user.user_id}, current coins: ${user.subscription_coins}`,
-        )
+        console.log(`[Daily Charge] Processing subscription user ${user.user_id}:`, {
+          current_coins: user.coins,
+          subscription_plan: user.subscription_plan,
+          daily_coins: dailyCoins,
+        })
 
         const { data: updateResult, error: updateError } = await supabase
           .from("user_coins")
           .update({
-            subscription_coins: supabase.raw(`subscription_coins + ${dailyCoins}`),
-            last_daily_charge: today,
-            updated_at: now,
+            coins: (user.coins || 0) + dailyCoins,
+            last_daily_charge: koreanToday,
+            updated_at: koreanNow,
           })
           .eq("user_id", user.user_id)
           .select()
@@ -170,23 +175,18 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // Record the charge
-        await supabase.from("subscription_charges").insert({
-          user_id: user.user_id,
-          charge_date: today,
-          coins_added: dailyCoins,
-          status: "completed",
-        })
-
         console.log(
           `[Daily Charge] Successfully charged ${dailyCoins} coins to subscription user ${user.user_id}`,
-          updateResult,
+          updateResult?.[0],
         )
         processedUsers.push({
           user_id: user.user_id,
           type: "subscription",
+          plan: user.subscription_plan,
           coins_added: dailyCoins,
           status: "success",
+          previous_coins: user.coins || 0,
+          new_coins: (user.coins || 0) + dailyCoins,
         })
         successCount++
       } catch (userError) {
@@ -194,6 +194,7 @@ export async function GET(request: NextRequest) {
         processedUsers.push({
           user_id: user.user_id,
           type: "subscription",
+          plan: user.subscription_plan,
           coins_added: 0,
           status: "error",
           error: userError instanceof Error ? userError.message : "Unknown error",
@@ -202,61 +203,66 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log("[Daily Charge] Daily subscription charge process completed")
+    console.log("[Daily Charge] Daily subscription charge process completed", {
+      totalProcessed: successCount + errorCount,
+      successful: successCount,
+      errors: errorCount,
+      koreanDate: koreanToday,
+    })
 
-    try {
-      await supabase.from("cron_executions").insert({
-        job_name: "daily-subscription",
-        execution_date: today,
-        execution_time: now,
-        success_count: successCount,
-        error_count: errorCount,
-        total_users: allUsers?.length || 0,
-        free_users: freeUsers.length,
-        subscription_users: subscriptionUsers.length,
-        status: errorCount === 0 ? "completed" : "completed_with_errors",
-        details: { processedUsers: processedUsers.slice(0, 10) }, // Store sample for debugging
-      })
-    } catch (logError) {
-      console.error("[Daily Charge] Failed to log execution:", logError)
-    }
+    await supabase.from("cron_executions").insert({
+      job_name: "daily-subscription",
+      execution_date: koreanToday,
+      execution_time: koreanNow,
+      success_count: successCount,
+      error_count: errorCount,
+      total_users: allUsers?.length || 0,
+      free_users: freeUsers.length,
+      subscription_users: subscriptionUsers.length,
+      status: errorCount === 0 ? "completed" : "completed_with_errors",
+      details: {
+        processedUsers: processedUsers.slice(0, 10),
+        koreanTime: koreanNow,
+        utcTime: new Date().toISOString(),
+        isManualTest,
+        isVercelCron,
+      },
+    })
 
     return NextResponse.json({
       success: true,
       message: "Daily subscription charge completed",
       statistics: {
         totalUsers: allUsers?.length || 0,
+        usersNeedingCharge: usersNeedingCharge.length,
         freeUsers: freeUsers.length,
         subscriptionUsers: subscriptionUsers.length,
         successfulCharges: successCount,
         errors: errorCount,
-        date: today,
-        executionTime: now,
+        koreanDate: koreanToday,
+        koreanTime: koreanNow,
         processedSample: processedUsers.slice(0, 5),
       },
     })
   } catch (error) {
     console.error("[Daily Charge] Fatal error in daily charge process:", error)
 
-    try {
-      await supabase.from("cron_executions").insert({
-        job_name: "daily-subscription",
-        execution_date: today,
-        execution_time: now,
-        success_count: 0,
-        error_count: 1,
-        status: "failed",
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      })
-    } catch (logError) {
-      console.error("[Daily Charge] Failed to log error:", logError)
-    }
+    await supabase.from("cron_executions").insert({
+      job_name: "daily-subscription",
+      execution_date: koreanToday,
+      execution_time: koreanNow,
+      success_count: 0,
+      error_count: 1,
+      status: "failed",
+      error_message: error instanceof Error ? error.message : "Unknown error",
+    })
 
     return NextResponse.json(
       {
         error: "Fatal error in daily charge process",
         details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: now,
+        koreanTime: koreanNow,
+        utcTime: new Date().toISOString(),
       },
       { status: 500 },
     )

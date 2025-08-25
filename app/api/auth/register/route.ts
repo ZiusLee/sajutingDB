@@ -77,6 +77,28 @@ export async function POST(req: NextRequest) {
         auth_user_id: authUser.user?.id, // Link to Supabase Auth user
       })
 
+      try {
+        const { error: coinsError } = await supabase.from("user_coins").insert({
+          user_id: session.id,
+          coins: 3, // Free plan gets 3 coins initially
+          bonus_coins: 0,
+          subscription_plan: "free",
+          last_daily_charge: new Date().toISOString().split("T")[0], // Today's date
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (coinsError) {
+          console.error("Error creating initial user_coins:", coinsError)
+          // Don't fail registration if coins creation fails
+        } else {
+          console.log(`💰 Created initial user_coins with 3 coins for user ${session.id}`)
+        }
+      } catch (coinsCreationError) {
+        console.error("Error in user_coins creation:", coinsCreationError)
+        // Continue with registration even if coins creation fails
+      }
+
       // JWT 토큰 생성
       const token = sign({ userId: session.id, email: session.email }, JWT_SECRET, { expiresIn: "7d" })
 

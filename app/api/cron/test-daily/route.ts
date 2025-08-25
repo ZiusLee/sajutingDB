@@ -6,6 +6,12 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+function getKoreanDate(): string {
+  const now = new Date()
+  const koreanTime = new Date(now.getTime() + 9 * 60 * 60 * 1000) // UTC + 9 hours
+  return koreanTime.toISOString().split("T")[0]
+}
+
 export async function GET(request: NextRequest) {
   // Only allow in development or with admin auth
   const isDev = process.env.NODE_ENV === "development"
@@ -19,11 +25,26 @@ export async function GET(request: NextRequest) {
   console.log("[Test Daily Charge] Manual test started")
 
   try {
-    // Check current state of user_coins table
-    const { data: sampleUsers, error: sampleError } = await supabase.from("user_coins").select("*").limit(5)
+    const koreanToday = getKoreanDate()
+
+    // Check current state of user_coins table with more detailed info
+    const { data: sampleUsers, error: sampleError } = await supabase
+      .from("user_coins")
+      .select("user_id, subscription_coins, bonus_coins, subscription_plan, last_daily_charge, created_at")
+      .limit(10)
 
     if (sampleError) {
       console.error("[Test Daily Charge] Error fetching sample users:", sampleError)
+    }
+
+    const { data: eligibleUsers, error: eligibleError } = await supabase
+      .from("user_coins")
+      .select("user_id, subscription_coins, bonus_coins, subscription_plan, last_daily_charge")
+      .or(`last_daily_charge.is.null,last_daily_charge.neq.${koreanToday}`)
+      .limit(5)
+
+    if (eligibleError) {
+      console.error("[Test Daily Charge] Error fetching eligible users:", eligibleError)
     }
 
     // Check recent cron executions
@@ -57,7 +78,10 @@ export async function GET(request: NextRequest) {
       success: true,
       message: "Manual test completed",
       data: {
+        koreanDate: koreanToday,
+        utcDate: new Date().toISOString().split("T")[0],
         sampleUsers: sampleUsers || [],
+        eligibleUsers: eligibleUsers || [],
         recentExecutions: recentExecutions || [],
         cronResponse: {
           status: cronResponse.status,
