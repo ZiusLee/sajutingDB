@@ -79,53 +79,20 @@ export async function POST(req: NextRequest) {
 
       console.log(`[v0] Attempting to create user_coins for user ${session.id}`)
 
-      try {
-        // First check if user_coins already exists
-        const { data: existingCoins } = await supabase
-          .from("user_coins")
-          .select("user_id")
-          .eq("user_id", session.id)
-          .single()
+      const { error: coinsError } = await supabase.from("user_coins").insert({
+        user_id: session.id,
+        subscription_coins: 3,
+        bonus_coins: 0,
+        subscription_plan: "free",
+        last_daily_charge: new Date().toISOString().split("T")[0],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
 
-        if (!existingCoins) {
-          // Create new user_coins record with 3 subscription_coins immediately
-          const { data: newCoins, error: insertError } = await supabase
-            .from("user_coins")
-            .insert({
-              user_id: session.id,
-              subscription_coins: 3,
-              bonus_coins: 0,
-              subscription_plan: "free",
-              last_daily_charge: new Date().toISOString().split("T")[0],
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .select()
-
-          if (insertError) {
-            console.error("Failed to create user_coins:", insertError)
-            const { error: fallbackError } = await supabase.from("user_coins").insert({
-              user_id: session.id,
-              subscription_coins: 3,
-              bonus_coins: 0,
-              subscription_plan: "free",
-              last_daily_charge: new Date().toISOString().split("T")[0],
-            })
-
-            if (fallbackError) {
-              console.error("Fallback insert also failed:", fallbackError)
-            } else {
-              console.log(`[v0] Successfully created user_coins via fallback`)
-            }
-          } else {
-            console.log(`[v0] Successfully created user_coins:`, newCoins)
-          }
-        } else {
-          console.log(`[v0] user_coins already exists for user ${session.id}`)
-        }
-      } catch (error) {
-        console.error("Exception creating user_coins:", error)
-        // Don't fail registration if coins creation fails
+      if (coinsError) {
+        console.error("Failed to create user_coins:", coinsError)
+      } else {
+        console.log(`[v0] Successfully created user_coins with 3 subscription_coins`)
       }
 
       // JWT 토큰 생성
