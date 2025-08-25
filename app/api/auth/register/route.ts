@@ -77,26 +77,46 @@ export async function POST(req: NextRequest) {
         auth_user_id: authUser.user?.id, // Link to Supabase Auth user
       })
 
+      console.log(`[v0] Attempting to create user_coins for user ${session.id}`)
+
       try {
-        const { error: coinsError } = await supabase.from("user_coins").insert({
-          user_id: session.id,
-          subscription_coins: 3, // Free plan gets 3 subscription_coins initially
-          bonus_coins: 0,
-          subscription_plan: "free",
-          last_daily_charge: new Date().toISOString().split("T")[0], // Today's date
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        // Use upsert to handle conflicts gracefully
+        const { data: coinsData, error: coinsError } = await supabase
+          .from("user_coins")
+          .upsert(
+            {
+              user_id: session.id,
+              subscription_coins: 3,
+              bonus_coins: 0,
+              subscription_plan: "free",
+              last_daily_charge: new Date().toISOString().split("T")[0],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "user_id",
+              ignoreDuplicates: false,
+            },
+          )
+          .select()
+          .single()
 
         if (coinsError) {
-          console.error("Error creating initial user_coins:", coinsError)
-          // Don't fail registration if coins creation fails
-        } else {
-          console.log(`💰 Created initial user_coins with 3 subscription_coins for user ${session.id}`)
+          // Fallback: try simple insert if upsert fails
+          const { error: insertError } = await supabase.from("user_coins").insert({
+            user_id: session.id,
+            subscription_coins: 3,
+            bonus_coins: 0,
+            subscription_plan: "free",
+            last_daily_charge: new Date().toISOString().split("T")[0],
+          })
+
+          if (insertError) {
+            console.error("Failed to create user_coins:", insertError)
+          }
         }
-      } catch (coinsCreationError) {
-        console.error("Error in user_coins creation:", coinsCreationError)
-        // Continue with registration even if coins creation fails
+      } catch (error) {
+        console.error("Exception creating user_coins:", error)
       }
 
       // JWT 토큰 생성
