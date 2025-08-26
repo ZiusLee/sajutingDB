@@ -13,12 +13,12 @@ function getKoreanDate(): string {
 }
 
 export async function GET(request: NextRequest) {
-  // Only allow in development or with admin auth
   const isDev = process.env.NODE_ENV === "development"
   const authHeader = request.headers.get("authorization")
   const adminSecret = process.env.ADMIN_SECRET || "test-admin-secret"
+  const cronSecret = process.env.CRON_SECRET
 
-  if (!isDev && authHeader !== `Bearer ${adminSecret}`) {
+  if (!isDev && authHeader !== `Bearer ${adminSecret}` && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized - Admin access required" }, { status: 401 })
   }
 
@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
     // Check current state of user_coins table with more detailed info
     const { data: sampleUsers, error: sampleError } = await supabase
       .from("user_coins")
-      .select("user_id, subscription_coins, bonus_coins, subscription_plan, last_daily_charge, created_at")
+      .select(
+        "user_id, subscription_coins, bonus_coins, subscription_plan, subscription_end_date, last_daily_charge, scheduled_plan_change, created_at",
+      )
       .limit(10)
 
     if (sampleError) {
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     const { data: eligibleUsers, error: eligibleError } = await supabase
       .from("user_coins")
-      .select("user_id, subscription_coins, bonus_coins, subscription_plan, last_daily_charge")
+      .select("user_id, subscription_coins, bonus_coins, subscription_plan, subscription_end_date, last_daily_charge")
       .or(`last_daily_charge.is.null,last_daily_charge.neq.${koreanToday}`)
       .limit(5)
 
@@ -59,6 +61,14 @@ export async function GET(request: NextRequest) {
       console.error("[Test Daily Charge] Error fetching executions:", execError)
     }
 
+    const { data: dbFunctions, error: funcError } = await supabase
+      .rpc("execute_scheduled_plan_changes")
+      .then(() => ({ exists: true, error: null }))
+      .catch((err) => ({ exists: false, error: err.message }))
+
+    const { data: scheduledTest, error: scheduledTestError } = await supabase.rpc("execute_scheduled_plan_changes")
+    const { data: expiredTest, error: expiredTestError } = await supabase.rpc("handle_expired_subscriptions")
+
     // Test the actual cron endpoint
     const baseUrl = request.nextUrl.origin
     const cronUrl = `${baseUrl}/api/cron/daily-subscription?manual=true`
@@ -69,6 +79,7 @@ export async function GET(request: NextRequest) {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        Authorization: authHeader || `Bearer ${adminSecret}`,
       },
     })
 
@@ -83,6 +94,18 @@ export async function GET(request: NextRequest) {
         sampleUsers: sampleUsers || [],
         eligibleUsers: eligibleUsers || [],
         recentExecutions: recentExecutions || [],
+        databaseFunctions: {
+          scheduledChanges: {
+            exists: !scheduledTestError,
+            result: scheduledTest?.length || 0,
+            error: scheduledTestError?.message,
+          },
+          expiredSubscriptions: {
+            exists: !expiredTestError,
+            result: expiredTest?.length || 0,
+            error: expiredTestError?.message,
+          },
+        },
         cronResponse: {
           status: cronResponse.status,
           result: cronResult,
@@ -90,6 +113,7 @@ export async function GET(request: NextRequest) {
         environment: {
           NODE_ENV: process.env.NODE_ENV,
           hasCronSecret: !!process.env.CRON_SECRET,
+          hasAdminSecret: !!process.env.ADMIN_SECRET,
           hasSupabaseUrl: !!process.env.SUPABASE_URL,
           hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
         },
@@ -101,6 +125,7 @@ export async function GET(request: NextRequest) {
       {
         error: "Test failed",
         details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )

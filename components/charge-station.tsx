@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, AlertTriangle } from "lucide-react"
+import { Check, AlertTriangle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -289,17 +289,7 @@ export default function ChargeStation() {
 
   return (
     <>
-      <div className="sticky top-0 z-10 bg-[#1b1c1e]/95 backdrop-blur-sm border-b border-[#70737c]/20">
-        <div className="flex items-center justify-between p-4">
-          <button
-            aria-label="뒤로 가기"
-            onClick={handleGoBack}
-            className="p-2 text-[#aeb0b6] hover:text-white transition-colors"
-          >
-            <ArrowLeft size={18} />
-          </button>
-        </div>
-      </div>
+      <div className="sticky top-0 z-10 bg-[#1b1c1e]/95 backdrop-blur-sm border-b border-[#70737c]/20"></div>
 
       <div className="px-4 pb-6 space-y-6">
         <section className="pt-4 space-y-2">

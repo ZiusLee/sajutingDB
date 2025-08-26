@@ -132,7 +132,9 @@
 - ✅ 스마트 메모리 시스템
 - ✅ 질문권 시스템 개선 (subscription_coins/bonus_coins 분리)
 
-### Phase 2 (3개월) - Voice Integration
+
+### Phase 2 (1개월) - Voice Integration
+- 📋 해외 진출 (영어, 중국어 음성 지원)
 - 🔄 **Voice-based Conversation 시스템**
   - Text + Voice 하이브리드 상담 모드
   - 음성 인식 및 TTS(Text-to-Speech) 연동
@@ -141,11 +143,9 @@
   - 음성으로 궁합 질문 및 답변
   - 실시간 음성 궁합 상담
   - 커플/친구와 함께하는 음성 세션
-- 🔄 타로 카드 분석 추가
-- 🔄 일일 운세 자동 발송
-- 🔄 모바일 앱 출시
 
-### Phase 3 (6개월) - Advanced Voice Features
+
+### Phase 3 (2개월) - Advanced Voice Features
 - 📋 **고급 음성 기능**
   - 감정 인식 기반 맞춤 상담
   - 음성 톤 분석을 통한 심리 상태 파악
@@ -156,10 +156,11 @@
 - 📋 풍수 상담
 
 ### Phase 4 (12개월) - Platform Expansion
-- 📋 해외 진출 (영어, 중국어 음성 지원)
 - 📋 B2B 서비스 (기업 상담)
 - 📋 오프라인 연계 서비스
-- 📋 전문가 매칭 플랫폼
+- 🔄 타로 카드 분석 추가
+- 🔄 일일 운세 자동 발송
+- 🔄 모바일 앱 출시
 
 ## Voice-based Conversation 상세 기획
 

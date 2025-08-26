@@ -21,7 +21,10 @@ function getKoreanDateTime(): string {
 export async function GET(request: NextRequest) {
   const isManualTest = request.nextUrl.searchParams.get("manual") === "true"
   const isVercelCron =
-    request.headers.get("user-agent")?.includes("vercel-cron") || request.headers.get("x-vercel-cron") === "1"
+    request.headers.get("user-agent")?.includes("vercel-cron") ||
+    request.headers.get("x-vercel-cron") === "1" ||
+    request.headers.get("x-vercel-deployment-url") !== null ||
+    request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`
 
   const koreanToday = getKoreanDate()
   const koreanNow = getKoreanDateTime()
@@ -30,6 +33,9 @@ export async function GET(request: NextRequest) {
     isManualTest,
     isVercelCron,
     userAgent: request.headers.get("user-agent"),
+    xVercelCron: request.headers.get("x-vercel-cron"),
+    xVercelDeployment: request.headers.get("x-vercel-deployment-url"),
+    hasAuthHeader: !!request.headers.get("authorization"),
     koreanDate: koreanToday,
     koreanTime: koreanNow,
     utcTime: new Date().toISOString(),
@@ -69,6 +75,8 @@ export async function GET(request: NextRequest) {
         subscription_start_date,
         subscription_end_date,
         last_daily_charge,
+        scheduled_plan_change,
+        scheduled_date,
         created_at,
         updated_at
       `)
@@ -135,6 +143,13 @@ export async function GET(request: NextRequest) {
           if (updateError) {
             console.error(`[Daily Charge] Error updating coins for free user ${user.user_id}:`, updateError)
             errorCount++
+            processedUsers.push({
+              user_id: user.user_id,
+              type: "free",
+              coins_set: 0,
+              status: "error",
+              error: updateError.message,
+            })
             continue
           }
 
@@ -149,6 +164,13 @@ export async function GET(request: NextRequest) {
         } catch (userError) {
           console.error(`[Daily Charge] Error processing free user ${user.user_id}:`, userError)
           errorCount++
+          processedUsers.push({
+            user_id: user.user_id,
+            type: "free",
+            coins_set: 0,
+            status: "error",
+            error: userError instanceof Error ? userError.message : "Unknown error",
+          })
         }
       }
     }
@@ -168,14 +190,29 @@ export async function GET(request: NextRequest) {
             dailyCoins = 100
             break
           default:
+            console.warn(`[Daily Charge] Unknown subscription plan: ${user.subscription_plan} for user ${user.user_id}`)
             dailyCoins = 10 // Default to starter plan
         }
 
         console.log(`[Daily Charge] Processing subscription user ${user.user_id}:`, {
           current_subscription_coins: user.subscription_coins,
           subscription_plan: user.subscription_plan,
+          subscription_end_date: user.subscription_end_date,
           daily_coins: dailyCoins,
         })
+
+        if (user.subscription_end_date && new Date(user.subscription_end_date) < new Date(koreanToday)) {
+          console.warn(`[Daily Charge] Subscription expired for user ${user.user_id}, skipping charge`)
+          processedUsers.push({
+            user_id: user.user_id,
+            type: "subscription",
+            plan: user.subscription_plan,
+            coins_set: 0,
+            status: "skipped",
+            reason: "subscription_expired",
+          })
+          continue
+        }
 
         const { data: updateResult, error: updateError } = await supabase
           .from("user_coins")
@@ -190,6 +227,14 @@ export async function GET(request: NextRequest) {
         if (updateError) {
           console.error(`[Daily Charge] Error updating coins for subscription user ${user.user_id}:`, updateError)
           errorCount++
+          processedUsers.push({
+            user_id: user.user_id,
+            type: "subscription",
+            plan: user.subscription_plan,
+            coins_set: 0,
+            status: "error",
+            error: updateError.message,
+          })
           continue
         }
 
@@ -201,10 +246,10 @@ export async function GET(request: NextRequest) {
           user_id: user.user_id,
           type: "subscription",
           plan: user.subscription_plan,
-          coins_set: dailyCoins, // Changed from coins_added to coins_set
+          coins_set: dailyCoins,
           status: "success",
           previous_coins: user.subscription_coins || 0,
-          new_coins: dailyCoins, // Set to exact daily amount
+          new_coins: dailyCoins,
         })
         successCount++
       } catch (userError) {
@@ -213,7 +258,7 @@ export async function GET(request: NextRequest) {
           user_id: user.user_id,
           type: "subscription",
           plan: user.subscription_plan,
-          coins_set: 0, // Changed from coins_added to coins_set
+          coins_set: 0,
           status: "error",
           error: userError instanceof Error ? userError.message : "Unknown error",
         })
@@ -230,7 +275,7 @@ export async function GET(request: NextRequest) {
       expiredSubscriptions: expiredSubs?.length || 0,
     })
 
-    await supabase.from("cron_executions").insert({
+    const { error: cronLogError } = await supabase.from("cron_executions").insert({
       job_name: "daily-subscription",
       execution_date: koreanToday,
       execution_time: koreanNow,
@@ -248,8 +293,18 @@ export async function GET(request: NextRequest) {
         utcTime: new Date().toISOString(),
         isManualTest,
         isVercelCron,
+        headers: {
+          userAgent: request.headers.get("user-agent"),
+          xVercelCron: request.headers.get("x-vercel-cron"),
+          xVercelDeployment: request.headers.get("x-vercel-deployment-url"),
+        },
+        errors: processedUsers.filter((u) => u.status === "error").slice(0, 5),
       },
     })
+
+    if (cronLogError) {
+      console.error("[Daily Charge] Failed to log cron execution:", cronLogError)
+    }
 
     return NextResponse.json({
       success: true,
@@ -271,7 +326,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[Daily Charge] Fatal error in daily charge process:", error)
 
-    await supabase.from("cron_executions").insert({
+    const { error: cronLogError } = await supabase.from("cron_executions").insert({
       job_name: "daily-subscription",
       execution_date: koreanToday,
       execution_time: koreanNow,
@@ -279,7 +334,23 @@ export async function GET(request: NextRequest) {
       error_count: 1,
       status: "failed",
       error_message: error instanceof Error ? error.message : "Unknown error",
+      details: {
+        koreanTime: koreanNow,
+        utcTime: new Date().toISOString(),
+        isManualTest,
+        isVercelCron,
+        errorStack: error instanceof Error ? error.stack : undefined,
+        headers: {
+          userAgent: request.headers.get("user-agent"),
+          xVercelCron: request.headers.get("x-vercel-cron"),
+          xVercelDeployment: request.headers.get("x-vercel-deployment-url"),
+        },
+      },
     })
+
+    if (cronLogError) {
+      console.error("[Daily Charge] Failed to log cron execution error:", cronLogError)
+    }
 
     return NextResponse.json(
       {
