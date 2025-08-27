@@ -90,6 +90,19 @@ export default function RefundPolicyPage() {
                 </div>
 
                 <div className="space-y-4">
+                  <h3 className="text-lg font-medium">{"제4조의2 (질문권 유효기간)"}</h3>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li>유료로 구매한 질문권의 유효기간은 구매일로부터 1년입니다.</li>
+                    <li>유효기간이 경과한 질문권은 자동으로 소멸되며, 이에 대한 환불이나 연장은 제공되지 않습니다.</li>
+                    <li>
+                      보너스 질문권의 유효기간은 별도로 안내되는 기간에 따르며, 명시되지 않은 경우 구매한 질문권과
+                      동일한 유효기간이 적용됩니다.
+                    </li>
+                    <li>회원은 앱 내에서 보유 중인 질문권의 유효기간을 확인할 수 있습니다.</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-4">
                   <h3 className="text-lg font-medium">{"제5조 (계약성립)"}</h3>
                   <ul className="list-disc pl-5 space-y-2">
                     <li>결제 완료 시 이용계약이 성립합니다.</li>

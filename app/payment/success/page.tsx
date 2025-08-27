@@ -18,30 +18,55 @@ function PaymentSuccessContent() {
       const packageId = searchParams.get("packageId")
       const paymentKey = searchParams.get("paymentKey")
       const amount = searchParams.get("amount")
+      const authKey = searchParams.get("authKey")
+      const customerKey = searchParams.get("customerKey")
 
       if (orderId && packageId) {
         try {
-          // Process the payment completion
-          const response = await fetch("/api/payment/confirm", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              orderId,
-              packageId,
-              paymentKey,
-              amount: amount ? Number.parseInt(amount) : undefined,
-            }),
-          })
-
-          if (response.ok) {
-            toast({
-              title: "결제 완료",
-              description: "질문권이 성공적으로 충전되었습니다!",
+          if (authKey && customerKey) {
+            const billingResponse = await fetch("/api/payment/billing-auth", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                authKey,
+                customerKey,
+                orderId,
+                packageId,
+              }),
             })
+
+            if (billingResponse.ok) {
+              toast({
+                title: "구독 등록 완료",
+                description: "구독이 성공적으로 등록되었습니다. 매일 질문권이 자동으로 충전됩니다!",
+              })
+            } else {
+              throw new Error("Billing authorization failed")
+            }
           } else {
-            throw new Error("Payment confirmation failed")
+            const response = await fetch("/api/payment/confirm", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                orderId,
+                packageId,
+                paymentKey,
+                amount: amount ? Number.parseInt(amount) : undefined,
+              }),
+            })
+
+            if (response.ok) {
+              toast({
+                title: "결제 완료",
+                description: "질문권이 성공적으로 충전되었습니다!",
+              })
+            } else {
+              throw new Error("Payment confirmation failed")
+            }
           }
         } catch (error) {
           console.error("Payment confirmation error:", error)
