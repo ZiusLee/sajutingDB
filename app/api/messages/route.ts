@@ -107,13 +107,13 @@ export async function POST(request: NextRequest) {
       lastMessageOrder = lastMessage?.[0]?.message_order || 0
     }
 
-    // Prepare messages for insertion
+    // Prepare messages for insertion with proper sequential ordering
     const messagesToInsert = messages.map((msg, index) => ({
       session_id: sessionId,
       chat_room_id: chatRoomId || null,
       role: msg.role,
       content: msg.content,
-      message_order: msg.messageOrder || lastMessageOrder + index + 1,
+      message_order: msg.messageOrder !== undefined ? msg.messageOrder : lastMessageOrder + index + 1,
       room_type: roomType || "sajuping",
       model_used: msg.modelUsed || null,
       response_time_ms: msg.responseTimeMs || null,
