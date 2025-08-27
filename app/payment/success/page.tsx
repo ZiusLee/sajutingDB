@@ -38,7 +38,7 @@ function PaymentSuccessContent() {
           if (response.ok) {
             toast({
               title: "결제 완료",
-              description: "핑이 성공적으로 충전되었습니다!",
+              description: "질문권이 성공적으로 충전되었습니다!",
             })
           } else {
             throw new Error("Payment confirmation failed")
@@ -68,7 +68,7 @@ function PaymentSuccessContent() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold">결제 완료</h1>
           <p className="text-[#aeb0b6]">
-            {isProcessing ? "결제를 처리하고 있습니다..." : "핑이 성공적으로 충전되었습니다!"}
+            {isProcessing ? "결제를 처리하고 있습니다..." : "질문권이 성공적으로 충전되었습니다!"}
           </p>
         </div>
 

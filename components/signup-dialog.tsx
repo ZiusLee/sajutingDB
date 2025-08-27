@@ -184,7 +184,7 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
               <div>
                 <h4 className="font-semibold mb-2">제6조 (보유기간)</h4>
                 <p className="text-gray-600">
-                  탈퇴 시 즉시 파기하되, 결제내역(5년), 분쟁기록(3년), 접속기록(3개월)은 법령에 따릅니다.
+                  탈퇴 시 즉시 파기하되, 결제내역(1년), 분쟁기록(3년), 접속기록(3개월)은 법령에 따릅니다.
                 </p>
               </div>
 
