@@ -11,7 +11,7 @@ import { cookies } from "next/headers"
 import { getCachedTodaySaju, setCachedTodaySaju } from "@/lib/saju-cache"
 
 export const runtime = "nodejs"
-export const maxDuration = 120
+export const maxDuration = 60
 
 // 🚀 로그 레벨 설정
 const LOG_LEVEL = process.env.NODE_ENV === "development" ? "DEBUG" : "ERROR"
@@ -753,13 +753,6 @@ ${index + 1}. **${person.name}**
         temperature: 1.0,
         maxTokens: 2048,
         top_p: 1.0,
-        experimental_providerMetadata: {
-          openai: {
-            stream_options: {
-              include_usage: true,
-            },
-          },
-        },
       })
 
       // 🚀 스트리밍 응답과 함께 메모리 처리
@@ -782,12 +775,7 @@ ${index + 1}. **${person.name}**
           console.error("❌❌❌ MEMORY PROCESSING FAILED:", error)
         })
 
-      const response = result.toDataStreamResponse()
-      response.headers.set("Cache-Control", "no-cache")
-      response.headers.set("Connection", "keep-alive")
-      response.headers.set("X-Accel-Buffering", "no")
-
-      return response
+      return result.toDataStreamResponse()
     } catch (streamError) {
       console.error("❌ StreamText error details:", {
         error: streamError,
@@ -800,17 +788,12 @@ ${index + 1}. **${person.name}**
       return new Response(
         JSON.stringify({
           error: "Stream generation failed",
-          message: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 네트워크 연결을 확인하고 다시 시도해주세요.",
+          message: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
           details: shouldLog("DEBUG") ? streamError.message : undefined,
-          retryable: true,
-          timestamp: new Date().toISOString(),
         }),
         {
           status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            "Retry-After": "5",
-          },
+          headers: { "Content-Type": "application/json" },
         },
       )
     }
@@ -851,9 +834,9 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 오늘은 ${dateInfo.formattedDate}입니다.
 양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
 음력: ${dateInfo.lunarInfo}
-일간: ${dateInfo.dayGanji}, 이게 오늘의 운입니다.
-올해: ${dateInfo.yearGanji}년, 이게 세운입니다.
-이번 달: ${dateInfo.monthGanji}월, 이게 월운입니다.
+일간: ${dateInfo.dayGanji}
+올해: ${dateInfo.yearGanji}년
+이번 달: ${dateInfo.monthGanji}월
 오늘 시간: ${dateInfo.hourGanji}시
 
 1. 맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
@@ -921,11 +904,11 @@ ${sajuInfo}${compatibilityInfo}
 -----------------
 연애운 질문이 들어올시:
 
-다음 3년의 세운을 바탕으로 연애운을 솔직하게 봐주세요. 보통 30대는 결혼운이 제일 궁금해합니다, 결혼을 할 수 있을지.
+오늘 날짜(2025년은 을사년입니다) 기준 다음 3년의 세운을 바탕으로 연애운을 솔직하게 봐주세요. 보통 30대는 결혼운이 제일 궁금해합니다, 결혼을 할 수 있을지.
 
 안될시기에는 왜 안될건지 혹은 안됐었는지, 어떤달은 연애운이 좋을건지. 믿음이 갈수 있게, 사주적으로 연애운이 안 좋을 달들도 명확히 넣어주세요. 
 
-그리고 맨 하단에 월별로 한번 풀어드릴까요? 하고 물어봐줘.
+그리고 맨 하단에 월별로 자세하게 한번 풀어드릴까요? 하고 물어봐줘.
 
 월별로 소개 할때 괄호 안에 음력 월 대신에 양력으로 대략적 날짜의 범위를 주세요.
 그리고 월별 연애운이 어떨지 솔직하고 자세하게 사주를 바탕으로 풀이해주세요. 언제 연애운이 없어서 나를 더 괜찮은 사람으로 만들고 있을지 언제 연애운이 좋아지는지, 그리고 뭘해야하는지 사용자가 듣고 싶어하는 말을 해주세요. 
