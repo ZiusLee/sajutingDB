@@ -607,20 +607,13 @@ export default function SajuChat({
       } else {
         console.warn("[v0] setCurrentChatRoomId is not available")
       }
-    },
-    [router, roomType, setSidebarOpen, setCurrentChatRoomId], // Added setCurrentChatRoomId to dependencies
-  )
 
-  useEffect(() => {
-    if (isChangingRoom && chatData.isInitialized && !isLoading) {
-      // Data is loaded and not currently loading AI response
-      const timer = setTimeout(() => {
+      setTimeout(() => {
         setIsChangingRoom(false)
-      }, 100) // Small delay to ensure smooth transition
-
-      return () => clearTimeout(timer)
-    }
-  }, [isChangingRoom, chatData.isInitialized, isLoading])
+      }, 1000) // 1 second loading animation
+    },
+    [router, roomType, setSidebarOpen, setCurrentChatRoomId],
+  )
 
   const handleNewChat = () => {
     router.push(`/saju-chat/${roomType}`)
