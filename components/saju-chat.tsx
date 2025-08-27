@@ -287,6 +287,42 @@ export default function SajuChat({
   ])
 
   const [input, setInput] = useState("") // Declare setInput variable
+  const [messages, setMessages] = useState<any[]>([])
+
+  useEffect(() => {
+    const loadChatRoomMessages = async () => {
+      if (!currentChatRoomId || !sessionId || currentChatRoomId.startsWith("temp-")) {
+        return
+      }
+
+      console.log("[v0] Loading messages for chat room:", currentChatRoomId)
+
+      try {
+        const pastMessages = (await getSessionMessages(sessionId, currentChatRoomId))
+          .filter((msg) => msg.role === "user" || msg.role === "assistant")
+          .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+          .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+
+        console.log("[v0] Loaded messages:", pastMessages.length)
+
+        // 메시지 상태 업데이트
+        setMessages(pastMessages)
+        setLastSavedMessageCount(pastMessages.length)
+
+        // 채팅 데이터 업데이트
+        setChatData((prev) => ({
+          ...prev,
+          initialMessages: pastMessages,
+        }))
+      } catch (error) {
+        console.error("[v0] Error loading chat room messages:", error)
+        setMessages([])
+        setLastSavedMessageCount(0)
+      }
+    }
+
+    loadChatRoomMessages()
+  }, [currentChatRoomId, sessionId])
 
   useEffect(() => {
     let isMounted = true
@@ -444,7 +480,7 @@ export default function SajuChat({
     }
   }, [stableSaju, effectiveChatRoomId, sessionId, calculatedDaeun])
 
-  const { messages, handleInputChange, handleSubmit, isLoading, error, reload, stop, append } = useAIChat({
+  const { handleInputChange, handleSubmit, isLoading, error, reload, stop, append } = useAIChat({
     api: "/api/saju-chat",
     body: aiChatBody,
     experimental_throttle: 100,

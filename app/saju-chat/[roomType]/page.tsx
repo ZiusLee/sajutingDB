@@ -470,6 +470,15 @@ export default function SajuChatPage() {
     [roomType],
   )
 
+  const setCurrentChatRoomId = useCallback((newChatRoomId: string) => {
+    console.log("[v0] Setting current chat room ID:", newChatRoomId)
+    setCurrentChatRoom((prev: any) => ({
+      ...prev,
+      id: newChatRoomId,
+      isTemporary: newChatRoomId.startsWith("temp-"),
+    }))
+  }, [])
+
   const handleOAuth = useCallback(
     async (provider: "kakao" | "google") => {
       console.log(`🔐 Starting ${provider} OAuth...`)
@@ -883,6 +892,7 @@ export default function SajuChatPage() {
         currentChatRoomId={currentChatRoom?.id}
         temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
         onChatRoomPersisted={handleChatRoomPersisted}
+        setCurrentChatRoomId={setCurrentChatRoomId}
       />
 
       <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
