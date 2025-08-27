@@ -458,16 +458,25 @@ export default function SajuChat({
     }
   }, [stableSaju, effectiveChatRoomId, sessionId, calculatedDaeun])
 
-  const { messages, handleInputChange, handleSubmit, isLoading, error, reload, stop, append } = useAIChat({
+  const { messages, handleInputChange, handleSubmit, isLoading, error, reload, stop, append, setMessages } = useAIChat({
     api: "/api/saju-chat",
     body: aiChatBody,
     experimental_throttle: 100,
     maxRetries: 3,
-    initialMessages: chatData.initialMessages, // 기존 메시지들을 초기값으로 설정
     onError: (error) => {
       console.error("[v0] Chat error:", error)
     },
   })
+
+  useEffect(() => {
+    if (chatData.isInitialized && chatData.initialMessages.length > 0) {
+      console.log("[v0] Setting messages from chatData.initialMessages:", chatData.initialMessages.length)
+      setMessages(chatData.initialMessages)
+    } else if (chatData.isInitialized && chatData.initialMessages.length === 0) {
+      console.log("[v0] Clearing messages for new chat room")
+      setMessages([])
+    }
+  }, [chatData.initialMessages, chatData.isInitialized, setMessages])
 
   useEffect(() => {
     if (
