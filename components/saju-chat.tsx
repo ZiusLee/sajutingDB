@@ -589,9 +589,13 @@ export default function SajuChat({
     }
   }, [roomType])
 
+  const [isChangingRoom, setIsChangingRoom] = useState(false)
+
   const handleChatRoomSelect = useCallback(
     (chatRoomId: string) => {
       console.log("[v0] Chat room selected:", chatRoomId)
+
+      setIsChangingRoom(true)
 
       if (window.innerWidth < 1024) setSidebarOpen(false)
 
@@ -603,8 +607,12 @@ export default function SajuChat({
       } else {
         console.warn("[v0] setCurrentChatRoomId is not available")
       }
+
+      setTimeout(() => {
+        setIsChangingRoom(false)
+      }, 500)
     },
-    [router, roomType, setSidebarOpen, setCurrentChatRoomId], // Added setCurrentChatRoomId to dependency array
+    [router, roomType, setSidebarOpen, setCurrentChatRoomId],
   )
 
   const handleNewChat = () => {
@@ -1191,6 +1199,18 @@ export default function SajuChat({
                 )}
               </div>
             ))}
+            {isChangingRoom && (
+              <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="animate-bounce h-3 w-3 bg-gray-600 rounded-full [animation-delay:-0.3s]"></div>
+                    <div className="animate-bounce h-3 w-3 bg-gray-600 rounded-full [animation-delay:-0.15s]"></div>
+                    <div className="animate-bounce h-3 w-3 bg-gray-600 rounded-full"></div>
+                  </div>
+                  <p className="text-sm text-gray-600">채팅방을 불러오는 중...</p>
+                </div>
+              </div>
+            )}
             {isLoading && (
               <div className="flex items-center gap-2 pt-2">
                 <div className="animate-bounce h-2 w-2 bg-muted-foreground rounded-full [animation-delay:-0.3s]"></div>
