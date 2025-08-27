@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function RefundPolicyPage() {
   return (
-    <main className="min-h-[100dvh] bg-white">
+    <main className="min-h-screen bg-white overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl px-4 md:px-6 py-8 md:py-12">
         <div className="mb-6">
           <Link
@@ -25,7 +25,7 @@ export default function RefundPolicyPage() {
           <CardHeader>
             <CardTitle className="text-2xl md:text-3xl font-bold">{"사주핑 유료 이용약관"}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-h-[80vh] overflow-y-auto">
             <div className="prose prose-neutral max-w-none">
               <p className="text-sm text-gray-600 mb-6">
                 <strong>공고일자:</strong> 2025년 8월 22일
