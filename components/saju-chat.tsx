@@ -1176,9 +1176,14 @@ export default function SajuChat({
                             </strong>
                           ),
                           em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
-                          del: ({ children }) => (
-                            <del className="line-through text-gray-500 opacity-75">{children}</del>
-                          ),
+                          del: ({ children }) => {
+                            const text = String(children)
+                            // 단일 물결표 패턴 (예: "1~3월", "~생과 궁합") 감지
+                            if (text.match(/^[^~]*~[^~]*$/) && !text.match(/~~.*~~/)) {
+                              return <span>{children}</span>
+                            }
+                            return <del className="line-through text-gray-500 opacity-75">{children}</del>
+                          },
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {

@@ -188,7 +188,7 @@ export default function SajuResultClient({
           setLoadingStage("결과 정리 중")
         }
 
-        // 주기적���로 메시지 추가
+        // 주기적으로 메시지 추가
         const now = Date.now()
         if (now - lastMessageTime > messageInterval) {
           lastMessageTime = now
@@ -422,7 +422,7 @@ ${interpretation}
                 </div>
                 <div className="text-center space-y-1">
                   <p className="font-medium text-primary">{loadingStage}</p>
-                  <p className="text-sm text-muted-foreground">AI가 사��를 심층 분석하고 있습니다.</p>
+                  <p className="text-sm text-muted-foreground">AI가 사주를 심층 분석하고 있습니다.</p>
                 </div>
                 <div className="w-full max-w-xs mt-1">
                   <Progress value={loadingProgress} className="h-1.5" />
@@ -452,7 +452,20 @@ ${interpretation}
             {interpretation && !isLoading && (
               <div className="space-y-4">
                 <div className="markdown-content prose dark:prose-invert max-w-none">
-                  <ReactMarkdown>{interpretation}</ReactMarkdown>
+                  <ReactMarkdown
+                    components={{
+                      del: ({ children }) => {
+                        const text = String(children)
+                        // 단일 물결표 패턴 (예: "1~3월", "~생과 궁합") 감지
+                        if (text.match(/^[^~]*~[^~]*$/) && !text.match(/~~.*~~/)) {
+                          return <span>{children}</span>
+                        }
+                        return <del className="line-through text-gray-500 opacity-75">{children}</del>
+                      },
+                    }}
+                  >
+                    {interpretation}
+                  </ReactMarkdown>
                 </div>
                 <Separator className="my-4" />
                 <FeedbackButtons contentType="saju-interpretation" contentId={saju.dayStem + saju.dayBranch} />
@@ -460,7 +473,7 @@ ${interpretation}
                 {/* Donation Section */}
                 <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg shadow-sm">
                   <div className="flex flex-col items-center">
-                    <h3 className="text-xl font-bold mb-3">복채 주면 운이 더 �����진다냥!</h3>
+                    <h3 className="text-xl font-bold mb-3">복채 주면 운이 더 좋다냥!</h3>
                     <img src="/images/donation-cat.png" alt="복채 고양이" className="w-32 h-32 object-contain mb-3" />
                     <div className="text-center space-y-1 text-xs dark:text-gray-200">
                       <p>사주 다 보고 나면,오늘 운이 조금 더 잘 풀렸으면 좋겠다냥~ 🐾</p>

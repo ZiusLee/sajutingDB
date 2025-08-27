@@ -851,9 +851,9 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 오늘은 ${dateInfo.formattedDate}입니다.
 양력: ${dateInfo.year}년 ${dateInfo.month}월 ${dateInfo.day}일
 음력: ${dateInfo.lunarInfo}
-일간: ${dateInfo.dayGanji}
-올해: ${dateInfo.yearGanji}년
-이번 달: ${dateInfo.monthGanji}월
+일간: ${dateInfo.dayGanji}, 이게 오늘의 운입니다.
+올해: ${dateInfo.yearGanji}년, 이게 세운입니다.
+이번 달: ${dateInfo.monthGanji}월, 이게 월운입니다.
 오늘 시간: ${dateInfo.hourGanji}시
 
 1. 맥락: 사용자의 감정/상황/문제 유형 및 답변 스타일에 대한 선호를 인지하는 해석 및 질문 설계
@@ -921,7 +921,7 @@ ${sajuInfo}${compatibilityInfo}
 -----------------
 연애운 질문이 들어올시:
 
-오늘 날짜(2025년은 을사년입니다) 기준 다음 3년의 세운을 바탕으로 연애운을 솔직하게 봐주세요. 보통 30대는 결혼운이 제일 궁금해합니다, 결혼을 할 수 있을지.
+다음 3년의 세운을 바탕으로 연애운을 솔직하게 봐주세요. 보통 30대는 결혼운이 제일 궁금해합니다, 결혼을 할 수 있을지.
 
 안될시기에는 왜 안될건지 혹은 안됐었는지, 어떤달은 연애운이 좋을건지. 믿음이 갈수 있게, 사주적으로 연애운이 안 좋을 달들도 명확히 넣어주세요. 
 
