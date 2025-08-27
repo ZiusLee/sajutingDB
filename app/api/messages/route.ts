@@ -85,56 +85,94 @@ export async function POST(request: NextRequest) {
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-    // Get the last message order for proper sequencing
-    let lastMessageOrder = 0
-    if (chatRoomId) {
-      const { data: lastMessage } = await supabase
-        .from("messages")
-        .select("message_order")
-        .eq("chat_room_id", chatRoomId)
-        .order("message_order", { ascending: false })
-        .limit(1)
+    const { data: insertedMessages, error } = await supabase.rpc("insert_messages_with_order", {
+      p_session_id: sessionId,
+      p_chat_room_id: chatRoomId || null,
+      p_messages: messages.map((msg, index) => ({
+        role: msg.role,
+        content: msg.content,
+        room_type: roomType || "sajuping",
+        model_used: msg.modelUsed || null,
+        response_time_ms: msg.responseTimeMs || null,
+        created_at: msg.createdAt || new Date().toISOString(),
+      })),
+    })
 
-      lastMessageOrder = lastMessage?.[0]?.message_order || 0
-    } else {
-      const { data: lastMessage } = await supabase
-        .from("messages")
-        .select("message_order")
-        .eq("session_id", sessionId)
-        .order("message_order", { ascending: false })
-        .limit(1)
+    if (error && error.message?.includes("function")) {
+      console.log("RPC function not available, using fallback logic")
 
-      lastMessageOrder = lastMessage?.[0]?.message_order || 0
+      // Get the last message order for proper sequencing
+      let lastMessageOrder = 0
+      if (chatRoomId) {
+        const { data: lastMessage } = await supabase
+          .from("messages")
+          .select("message_order")
+          .eq("chat_room_id", chatRoomId)
+          .order("message_order", { ascending: false })
+          .limit(1)
+
+        lastMessageOrder = lastMessage?.[0]?.message_order || 0
+      } else {
+        const { data: lastMessage } = await supabase
+          .from("messages")
+          .select("message_order")
+          .eq("session_id", sessionId)
+          .order("message_order", { ascending: false })
+          .limit(1)
+
+        lastMessageOrder = lastMessage?.[0]?.message_order || 0
+      }
+
+      const baseOrder = Math.max(lastMessageOrder, Date.now() % 1000000)
+
+      // Prepare messages for insertion with proper sequential ordering
+      const messagesToInsert = messages.map((msg, index) => ({
+        session_id: sessionId,
+        chat_room_id: chatRoomId || null,
+        role: msg.role,
+        content: msg.content,
+        message_order: baseOrder + index + 1,
+        room_type: roomType || "sajuping",
+        model_used: msg.modelUsed || null,
+        response_time_ms: msg.responseTimeMs || null,
+        created_at: msg.createdAt || new Date().toISOString(),
+      }))
+
+      const { data: fallbackInserted, error: insertError } = await supabase
+        .from("messages")
+        .insert(messagesToInsert)
+        .select("id")
+
+      if (insertError) {
+        console.error("Error saving messages:", insertError)
+        return NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
+      }
+
+      const messageIds = fallbackInserted?.map((msg) => msg.id) || []
+
+      console.log(
+        `Successfully saved ${messagesToInsert.length} messages for session ${sessionId}${chatRoomId ? ` in chat room ${chatRoomId}` : ""}`,
+      )
+
+      return NextResponse.json({
+        savedCount: messagesToInsert.length,
+        messageIds,
+      })
     }
 
-    // Prepare messages for insertion with proper sequential ordering
-    const messagesToInsert = messages.map((msg, index) => ({
-      session_id: sessionId,
-      chat_room_id: chatRoomId || null,
-      role: msg.role,
-      content: msg.content,
-      message_order: msg.messageOrder !== undefined ? msg.messageOrder : lastMessageOrder + index + 1,
-      room_type: roomType || "sajuping",
-      model_used: msg.modelUsed || null,
-      response_time_ms: msg.responseTimeMs || null,
-      created_at: msg.createdAt || new Date().toISOString(),
-    }))
-
-    const { data: insertedMessages, error } = await supabase.from("messages").insert(messagesToInsert).select("id")
-
     if (error) {
-      console.error("Error saving messages:", error)
+      console.error("Error saving messages with RPC:", error)
       return NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
     }
 
-    const messageIds = insertedMessages?.map((msg) => msg.id) || []
+    const messageIds = insertedMessages?.map((msg: any) => msg.id) || []
 
     console.log(
-      `Successfully saved ${messagesToInsert.length} messages for session ${sessionId}${chatRoomId ? ` in chat room ${chatRoomId}` : ""}`,
+      `Successfully saved ${messages.length} messages for session ${sessionId}${chatRoomId ? ` in chat room ${chatRoomId}` : ""}`,
     )
 
     return NextResponse.json({
-      savedCount: messagesToInsert.length,
+      savedCount: messages.length,
       messageIds,
     })
   } catch (error) {

@@ -181,34 +181,6 @@ export async function saveMessages(
       }
     }
 
-    // Get the current highest message order to ensure proper sequencing
-    let lastMessageOrder = 0
-    if (finalChatRoomId) {
-      const { data: lastMessage } = await supabase
-        .from("messages")
-        .select("message_order")
-        .eq("chat_room_id", finalChatRoomId)
-        .order("message_order", { ascending: false })
-        .limit(1)
-
-      lastMessageOrder = lastMessage?.[0]?.message_order || 0
-    } else {
-      const { data: lastMessage } = await supabase
-        .from("messages")
-        .select("message_order")
-        .eq("session_id", sessionId)
-        .order("message_order", { ascending: false })
-        .limit(1)
-
-      lastMessageOrder = lastMessage?.[0]?.message_order || 0
-    }
-
-    // Assign sequential message orders if not already set
-    const messagesWithOrder = messages.map((msg, index) => ({
-      ...msg,
-      messageOrder: msg.messageOrder !== undefined ? msg.messageOrder : lastMessageOrder + index + 1,
-    }))
-
     const response = await fetch("/api/messages", {
       method: "POST",
       headers: {
@@ -216,7 +188,10 @@ export async function saveMessages(
       },
       body: JSON.stringify({
         sessionId,
-        messages: messagesWithOrder,
+        messages: messages.map((msg, index) => ({
+          ...msg,
+          messageOrder: undefined,
+        })),
         roomType,
         chatRoomId: finalChatRoomId,
       }),

@@ -517,21 +517,43 @@ export default function SajuChat({
 
   useEffect(() => {
     const saveNewMessages = async () => {
-      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) return
-      savingRef.current = true
+      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized || isLoading) {
+        return
+      }
+
       const newMessages = messages.slice(lastSavedMessageCount)
+      if (newMessages.length === 0) {
+        return
+      }
+
+      const currentMessageCount = messages.length
+      if (currentMessageCount === lastSavedMessageCount) {
+        return
+      }
+
+      savingRef.current = true
+
       const messagesToSave = newMessages.map((msg, index) => ({
         id: generateUUID(),
         role: msg.role,
         content: msg.content,
         createdAt: msg.createdAt || new Date().toISOString(),
-        messageOrder: lastSavedMessageCount + index,
+        messageOrder: lastSavedMessageCount + index + 1,
         chatRoomId: effectiveChatRoomId,
       }))
 
       try {
+        console.log(
+          `[v0] Saving ${messagesToSave.length} new messages (total: ${messages.length}, saved: ${lastSavedMessageCount})`,
+        )
+
         const result = await saveMessages(sessionId, messagesToSave, roomType, effectiveChatRoomId, temporaryChatRoom)
-        setLastSavedMessageCount(messages.length)
+
+        if (result.savedCount > 0) {
+          setLastSavedMessageCount(currentMessageCount) // 현재 메시지 수로 업데이트
+          console.log(`[v0] Successfully saved ${result.savedCount} messages`)
+        }
+
         if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
           if (chatContainerRef.current) {
             scrollPositionRef.current = chatContainerRef.current.scrollTop
@@ -552,9 +574,10 @@ export default function SajuChat({
         savingRef.current = false
       }
     }
-    if (messages.length > 0 && !isLoading) saveNewMessages()
+
+    saveNewMessages()
   }, [
-    messages,
+    messages.length,
     lastSavedMessageCount,
     isLoading,
     roomType,
@@ -563,6 +586,7 @@ export default function SajuChat({
     sessionId,
     temporaryChatRoom,
     onChatRoomPersisted,
+    messages,
   ])
 
   useEffect(() => {
@@ -800,7 +824,7 @@ export default function SajuChat({
         )
       }
     }
-  }, [effectiveChatRoomId, sessionId, isLoading, messages, chatStreamState.isStreaming])
+  }, [effectiveChatRoomId, sessionId])
 
   useEffect(() => {
     const handleBeforeUnload = () => {
