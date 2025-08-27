@@ -115,6 +115,132 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
     setShowPrivacyDetails(false)
   }, [])
 
+  if (showPrivacyDetails) {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange} modal={true}>
+        <DialogContent
+          className="sm:max-w-md max-w-[90vw] rounded-3xl border-none bg-white shadow-xl"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <div className="flex flex-row items-center justify-between p-6 pb-0">
+            <h2 className="text-lg font-semibold">개인정보 처리방침</h2>
+            <Button variant="ghost" size="icon" onClick={hidePrivacyTerms} className="h-6 w-6">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <ScrollArea className="h-96 w-full px-6">
+            <div className="space-y-4 text-sm">
+              <div>
+                <h4 className="font-semibold mb-2">제1조 (개인정보 수집항목 및 이용목적)</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="font-medium text-gray-700">1. 회원가입 및 서비스 제공</p>
+                    <p className="text-gray-600">수집: 이름, 성별, 음양력, 생년월일, 출생도시, 소셜ID</p>
+                    <p className="text-gray-600">목적: 이용자 식별 및 서비스 제공</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-700">2. 민원처리</p>
+                    <p className="text-gray-600">수집: 이메일, 문의내용, 앱버전, 단말정보</p>
+                    <p className="text-gray-600">보관: 3년</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-700">3. 유료결제</p>
+                    <p className="text-gray-600">수집: 결제수단정보, 결제내역</p>
+                    <p className="text-gray-600">법정보관기간 준수(전자상거래법)</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-700">4. 마케팅 및 통계</p>
+                    <p className="text-gray-600">IP, 이용기록, 국가, 쿠키 등 / 동의 철회 시까지 보관</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제2조 (민감정보 수집 제한)</h4>
+                <p className="text-gray-600">회사는 민감정보를 수집하지 않습니다.</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제3조 (만 14세 미만 아동)</h4>
+                <p className="text-gray-600">14세 미만 아동의 개인정보는 수집하지 않습니다.</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제4조 (가명정보 처리)</h4>
+                <p className="text-gray-600">
+                  서비스 품질 개선 및 연구를 위해 가명처리 정보를 사용할 수 있으며, 탈퇴 시까지 보관합니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제5조 (쿠키 및 광고ID 수집)</h4>
+                <p className="text-gray-600">
+                  쿠키 수집을 통해 맞춤형 서비스 제공 가능하며 이용자는 차단할 수 있습니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제6조 (보유기간)</h4>
+                <p className="text-gray-600">
+                  탈퇴 시 즉시 파기하되, 결제내역(5년), 분쟁기록(3년), 접속기록(3개월)은 법령에 따릅니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제7조 (위탁)</h4>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>AWS, Firebase, Supabase (서버‧DB)</li>
+                  <li>PG사 (결제), Onesignal (푸시발송)</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제8조 (제3자 제공)</h4>
+                <p className="text-gray-600">법령 근거가 없는 한 제3자에게 제공하지 않습니다.</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제9조 (국외이전)</h4>
+                <p className="text-gray-600">AWS, Firebase 서버를 통해 국외이전이 발생할 수 있습니다(암호화 저장).</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제10조 (보안조치)</h4>
+                <p className="text-gray-600">암호화, 접근통제, 침입탐지 시스템 등 통해 개인정보를 보호합니다.</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제11조 (이용자 권리)</h4>
+                <p className="text-gray-600">이용자는 정보 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다.</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제12조 (책임자)</h4>
+                <div className="p-3 bg-gray-50 rounded">
+                  <p className="text-sm">
+                    <strong>개인정보보호책임자:</strong> 이윤섭 yoon@sajuping.ai
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <p className="text-sm text-gray-500">공고일자: 2025년 8월 22일</p>
+                <p className="text-sm text-gray-500">시행일자: 2025년 8월 22일</p>
+              </div>
+            </div>
+          </ScrollArea>
+          <div className="p-6 pt-0">
+            <Button onClick={hidePrivacyTerms} className="w-full">
+              확인
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   if (showServiceTermsDetails) {
     return (
       <Dialog open={open} onOpenChange={handleOpenChange} modal={true}>
@@ -142,10 +268,11 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
 
               <div>
                 <h4 className="font-semibold mb-2">제2조 (용어의 정의)</h4>
-                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
                   <li>
                     "서비스"란 회사가 이용자에게 사주 기반 AI 해석, 감정케어 상담, 운세 리포트 등 콘텐츠를 제공하기 위해
-                    정보통신설비를 이용하여 거래할 수 있도록 설정한 가상의 영업장을 의미합니다.
+                    정보통신설비를 이용하여 거래할 수 있도록 설정한 가상의 영업장을 의미하며, 해당 서비스를 운영하는
+                    사업자도 포함합니다.
                   </li>
                   <li>
                     "이용자"란 회사의 서비스에 접속하여 본 약관에 따라 회사가 제공하는 콘텐츠와 제반 서비스를 이용하는
@@ -156,163 +283,159 @@ export function SignupDialog({ open, onOpenChange, onSelectProvider }: SignupDia
                     말합니다.
                   </li>
                   <li>"비회원"이란 회원 가입 없이 회사가 제공하는 서비스 일부를 이용하는 자를 말합니다.</li>
-                </ul>
+                  <li>
+                    "콘텐츠"란 회사가 제공하는 서비스와 관련하여 생성·게시하는 정보, 텍스트, 이미지, 영상, 데이터 등을
+                    의미합니다.
+                  </li>
+                  <li>
+                    "유료콘텐츠"란 회사가 유료로 제공하는 프리미엄 사주 해석, 맞춤형 상담, 전문 리포트 등 콘텐츠를
+                    의미합니다.
+                  </li>
+                  <li>
+                    "질문권"이란 회원이 구독을 통해 부여받거나 추가 결제를 통해 충전하여, 사주 해석·상담·리포트 등
+                    유료콘텐츠 이용 시 차감되는 디지털 이용권을 의미합니다.
+                  </li>
+                  <li>
+                    "보너스 질문권"이란 회사가 이벤트·프로모션 등을 통해 무상 제공하는 질문권을 의미하며 환불되지
+                    않습니다.
+                  </li>
+                </ol>
               </div>
 
               <div>
                 <h4 className="font-semibold mb-2">제3조 (회원가입 및 계정관리)</h4>
-                <p className="text-gray-600 mb-2">
-                  회원가입은 카카오, 네이버, 구글, 애플 등 제3자 소셜 로그인 또는 이메일 가입을 통해 가능합니다.
-                </p>
-                <p className="text-gray-600 mb-2">
-                  가입 시 필수 입력 정보: 성별, 생년월일(음·양력 여부 포함), 태어난 도시
-                </p>
-                <p className="text-gray-600 mb-2">선택 입력 정보: 태어난 시, 추가 프로필 정보</p>
-                <p className="text-gray-600">
-                  "동의하고 시작하기" 버튼 클릭 시 본 약관과 개인정보 처리방침에 동의한 것으로 간주합니다.
-                </p>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>
+                    회원가입은 카카오, 네이버, 구글, 애플 등 제3자 소셜 로그인 또는 이메일 가입을 통해 가능합니다.
+                  </li>
+                  <li>
+                    가입 시 필수 입력 정보: 성별, 생년월일(음·양력 여부 포함), 태어난 도시 / 선택 입력 정보: 태어난 시,
+                    추가 프로필 정보
+                  </li>
+                  <li>"동의하고 시작하기" 버튼 클릭 시 본 약관과 개인정보 처리방침에 동의한 것으로 간주합니다.</li>
+                  <li>
+                    회사는 다음에 해당하는 경우 회원가입을 제한하거나 해지할 수 있습니다:
+                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                      <li>타인의 개인정보 도용</li>
+                      <li>허위 정보 입력</li>
+                      <li>만 14세 미만 미성년자의 가입 시도</li>
+                      <li>법령 또는 서비스 정책 위반 이력</li>
+                      <li>서비스 운영상 중대한 장애가 예상되는 경우</li>
+                    </ul>
+                  </li>
+                  <li>
+                    회원은 본인 계정을 직접 관리해야 하며, 계정 도용이나 양도 등으로 인한 손해에 대해 회사는 책임을 지지
+                    않습니다.
+                  </li>
+                </ol>
               </div>
 
               <div>
                 <h4 className="font-semibold mb-2">제4조 (회원의 의무)</h4>
                 <p className="text-gray-600 mb-2">회원은 다음 행위를 하여서는 안 됩니다:</p>
-                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
                   <li>서비스 접근 방해 또는 비정상적 사용 시도</li>
                   <li>타인의 개인정보 수집·이용·제공</li>
                   <li>음란·저작권 침해·허위 정보 게시</li>
                   <li>회사 승인 없이 서비스 또는 소프트웨어 복제·변경·판매·양도</li>
-                  <li>다계정 생성, 이벤트 부정참여, 포인트·사이버머니 부정사용</li>
-                </ul>
+                  <li>다계정 생성, 이벤트 부정참여, 질문권 부정사용</li>
+                  <li>타인의 권리 침해 또는 불법/미풍양속 위반 행위</li>
+                </ol>
               </div>
 
               <div>
-                <h4 className="font-semibold mb-2">제5조 (서비스 제공 및 변경)</h4>
+                <h4 className="font-semibold mb-2">제5조 (비회원 서비스 이용)</h4>
                 <p className="text-gray-600">
-                  회사는 24시간, 365일 안정적인 서비스 제공을 위해 노력합니다. 점검, 시스템 업그레이드, 천재지변 등
-                  불가피한 사유로 서비스가 일시 중단될 수 있으며, 사전 또는 사후 공지를 진행합니다.
+                  비회원은 일부 무료 콘텐츠만 이용 가능하며, 회사는 정책에 따라 비회원 이용 범위를 제한할 수 있습니다.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-semibold mb-2">제6조 (유료콘텐츠 이용)</h4>
+                <h4 className="font-semibold mb-2">제6조 (서비스 제공 및 변경)</h4>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>회사는 연중무휴 24시간 안정적인 서비스 제공을 위해 노력합니다.</li>
+                  <li>시스템점검, 천재지변 등으로 서비스가 중단될 수 있으며, 사전 또는 사후 공지합니다.</li>
+                  <li>서비스 내용이 변경되는 경우 최소 7일 전 공지하며, 긴급 시 사후 공지할 수 있습니다.</li>
+                  <li>
+                    회사는 운영상, 기술상, 정책상 필요에 따라 서비스의 전부 또는 일부를 변경·중단할 수 있으며, 이로 인한
+                    손해에 대해 고의 또는 중대한 과실이 없는 한 책임을 지지 않습니다.
+                  </li>
+                </ol>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제7조 (광고 및 정보 제공)</h4>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>회사는 서비스 화면, 알림, 이메일 등을 통해 광고 및 정보를 제공할 수 있습니다.</li>
+                  <li>이용자는 마케팅 수신 동의를 철회할 수 있습니다.</li>
+                </ol>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제8조 (유료콘텐츠 이용)</h4>
                 <p className="text-gray-600">
-                  유료콘텐츠는 포인트("핑") 또는 인앱결제를 통해 구매 후 이용할 수 있으며, 환불 규정은 별도의 유료
-                  이용약관에 따릅니다.
+                  유료콘텐츠는 질문권 또는 인앱결제를 통해 이용할 수 있으며, 환불은 유료 이용약관에 따릅니다.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-semibold mb-2">제7조 (회원 탈퇴)</h4>
+                <h4 className="font-semibold mb-2">제8조의2 (요금제 변경 및 환불 정책)</h4>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>회원은 서비스 화면에서 요금제 변경을 요청할 수 있습니다.</li>
+                  <li>
+                    상위 요금제(업그레이드)로 변경 시 기존 요금제는 즉시 종료되며 남은 이용기간 및 질문권은 환불되지
+                    않습니다.
+                  </li>
+                  <li>하위 요금제(다운그레이드)는 다음 결제일부터 적용되며, 그 전까지는 기존 요금제가 유지됩니다.</li>
+                  <li>요금제 변경 시 일할계산 환불 및 부분 환불은 제공되지 않습니다.</li>
+                </ol>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제9조 (회원 탈퇴)</h4>
                 <p className="text-gray-600">
-                  회원은 앱 내 계정삭제 메뉴 또는 고객센터를 통해 언제든 탈퇴할 수 있습니다. 탈퇴 시 법령에 따라 보관
-                  의무가 있는 정보를 제외하고 모든 데이터는 삭제됩니다.
+                  회원은 앱 또는 고객센터를 통해 탈퇴할 수 있으며, 법령상 보관의무를 제외하고 모든 정보가 삭제됩니다.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제10조 (책임의 제한)</h4>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>회사는 천재지변, 이용자 과실, 무료서비스 등으로 발생한 손해에 대해 책임을 지지 않습니다.</li>
+                  <li>
+                    회사가 제공하는 해석, 상담 및 리포트 등 모든 콘텐츠는 개인적 성찰과 자기이해를 돕기 위한 참고 자료일
+                    뿐, 법률적·의료적·재정적 자문에 해당하지 않습니다. 이에 근거한 의사결정은 전적으로 이용자의
+                    책임이며, 회사는 그 결과에 대해 어떠한 법적 책임도 지지 않습니다.
+                  </li>
+                </ol>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제11조 (약관 변경)</h4>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>회사는 본 약관을 변경할 수 있으며, 변경 시 최소 7일 전 공지합니다.</li>
+                  <li>
+                    이용자에게 불리한 경우 30일 전 고지하며, 변경 후 15일간 이의제기 없을 시 동의한 것으로 봅니다.
+                  </li>
+                </ol>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">제12조 (이용제한 및 해지)</h4>
+                <p className="text-gray-600">
+                  회사는 이용자가 본 약관 또는 관계 법령을 위반하거나, 서비스 운영을 고의로 방해하는 경우 즉시
+                  이용계약을 해지하거나 서비스 이용을 제한할 수 있습니다. 이 경우 이미 결제된 금액은 환불되지 않습니다.
                 </p>
               </div>
 
               <div className="pt-4 border-t">
-                <p className="text-sm text-gray-500">공고일자: 2025년 8월 18일</p>
-                <p className="text-sm text-gray-500">시행일자: 2025년 8월 18일</p>
+                <p className="text-sm text-gray-500">공고일자: 2025년 8월 22일</p>
+                <p className="text-sm text-gray-500">시행일자: 2025년 8월 22일</p>
               </div>
             </div>
           </ScrollArea>
           <div className="p-6 pt-0">
             <Button onClick={hideServiceTerms} className="w-full">
-              확인
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    )
-  }
-
-  if (showPrivacyDetails) {
-    return (
-      <Dialog open={open} onOpenChange={handleOpenChange} modal={true}>
-        <DialogContent
-          className="sm:max-w-md max-w-[90vw] rounded-3xl border-none bg-white shadow-xl"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <div className="flex flex-row items-center justify-between p-6 pb-0">
-            <h2 className="text-lg font-semibold">개인정보 처리방침</h2>
-            <Button variant="ghost" size="icon" onClick={hidePrivacyTerms} className="h-6 w-6">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <ScrollArea className="h-96 w-full px-6">
-            <div className="space-y-4 text-sm">
-              <div>
-                <h4 className="font-semibold mb-2">제1조 (개인정보의 수집 및 이용)</h4>
-                <p className="text-gray-600 mb-2">회사는 서비스 제공을 위해 다음과 같은 개인정보를 수집·이용합니다:</p>
-                <div className="space-y-2">
-                  <div>
-                    <p className="font-medium text-gray-700">1. 회원가입 및 서비스 이용</p>
-                    <p className="text-gray-600">필수항목: 이름, 성별, 음/양력 여부, 생년월일, 태어난 도시, 소셜ID</p>
-                    <p className="text-gray-600">선택항목: 태어난 시</p>
-                    <p className="text-gray-600">보유기간: 회원 탈퇴 시까지</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-700">2. 유료서비스 결제</p>
-                    <p className="text-gray-600">필수항목: 결제수단 정보, 결제기록</p>
-                    <p className="text-gray-600">보유기간: 전자상거래법 등 관계 법령에 따른 기간</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">제2조 (민감정보 수집 제한)</h4>
-                <p className="text-gray-600">회사는 이용자의 사상, 신념, 건강 등 민감정보를 수집하지 않습니다.</p>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">제3조 (만 14세 미만 아동의 개인정보)</h4>
-                <p className="text-gray-600">
-                  만 14세 미만 아동의 개인정보를 수집하지 않으며, 이와 관련하여 서비스 이용을 제한합니다.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">제4조 (개인정보의 보유·이용기간)</h4>
-                <ul className="list-disc list-inside space-y-1 text-gray-600">
-                  <li>회원 탈퇴 시 즉시 파기</li>
-                  <li>결제기록: 5년</li>
-                  <li>소비자 불만 및 분쟁 기록: 3년</li>
-                  <li>접속 기록: 3개월</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">제5조 (개인정보 처리 위탁)</h4>
-                <p className="text-gray-600 mb-2">
-                  회사는 원활한 서비스 제공을 위해 일부 업무를 외부에 위탁할 수 있습니다:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-gray-600">
-                  <li>Supabase, AWS, Google Firebase: 데이터 저장 및 서버 운영</li>
-                  <li>PG사(결제대행사): 결제 처리</li>
-                  <li>Onesignal: 푸시 알림 발송</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">제6조 (개인정보 보호책임자)</h4>
-                <div className="p-3 bg-gray-50 rounded">
-                  <p className="text-sm">
-                    <strong>성명:</strong> 이윤섭
-                    <br />
-                    <strong>이메일:</strong> yoon@sajuping.ai
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <p className="text-sm text-gray-500">공고일자: 2025년 8월 18일</p>
-                <p className="text-sm text-gray-500">시행일자: 2025년 8월 18일</p>
-              </div>
-            </div>
-          </ScrollArea>
-          <div className="p-6 pt-0">
-            <Button onClick={hidePrivacyTerms} className="w-full">
               확인
             </Button>
           </div>

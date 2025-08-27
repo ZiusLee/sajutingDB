@@ -9,8 +9,15 @@ import { addSajuToUrl, loadSajuFromLocalStorage } from "@/lib/url-utils"
 import { createTemporaryChatRoom } from "@/lib/chat-room-service"
 import { SignupDialog } from "@/components/signup-dialog"
 import { getSupabase } from "@/lib/supabase-client"
-import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
+import {
+  getDefaultSajuSession,
+  getSajuProfileBySessionId,
+  resolveMultipleDefaultSessions,
+  getUserSajuSessionsWithBirthInfo,
+} from "@/lib/saju-session-service"
 import { trackEvent } from "@/lib/analytics"
+import { MultipleDefaultSessionsDialog } from "@/components/multiple-default-sessions-dialog"
+import { SelectDefaultSajuDialog } from "@/components/select-default-saju-dialog"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -26,6 +33,10 @@ export default function SajuChatPage() {
   const [currentChatRoom, setCurrentChatRoom] = useState(null)
   const [isLoadingOAuth, setIsLoadingOAuth] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
+  const [multipleDefaultsOpen, setMultipleDefaultsOpen] = useState(false)
+  const [multipleDefaultSessions, setMultipleDefaultSessions] = useState<any[]>([])
+  const [selectDefaultOpen, setSelectDefaultOpen] = useState(false)
+  const [availableSessions, setAvailableSessions] = useState<any[]>([])
 
   const supabase = getSupabase()
 
@@ -83,18 +94,21 @@ export default function SajuChatPage() {
           console.log("✅ User is authenticated, loading default saju profile first...")
 
           try {
+            console.log(`[DEBUG] About to call getDefaultSajuSession for user: ${data.session.user.id}`)
             const defaultSession = await getDefaultSajuSession(data.session.user.id)
+            console.log(`[DEBUG] getDefaultSajuSession returned:`, defaultSession)
 
             if (defaultSession) {
               console.log("Found default saju session:", defaultSession.id)
 
               // Get full profile data for the default session
+              console.log(`[DEBUG] About to call getSajuProfileBySessionId for session: ${defaultSession.id}`)
               const profile = await getSajuProfileBySessionId(defaultSession.id)
+              console.log(`[DEBUG] getSajuProfileBySessionId returned:`, profile)
 
               if (profile && isMounted) {
                 console.log("Successfully loaded default saju profile, using as priority")
 
-                // Create chat saju data structure from profile
                 const chatSajuData = {
                   saju: profile.saju,
                   name: profile.name, // profile.name을 우선적으로 사용 (saju_sessions 테이블의 name)
@@ -121,6 +135,8 @@ export default function SajuChatPage() {
                     birthCityId: null,
                     timeStandard: "KST",
                   },
+                  isOptimizedLoad: true,
+                  preloadedDaeun: profile.saju.daeun,
                 }
 
                 localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
@@ -149,12 +165,42 @@ export default function SajuChatPage() {
 
                 setLoading(false)
                 return
+              } else {
+                console.log(
+                  `[DEBUG] Profile is null or component unmounted. profile:`,
+                  profile,
+                  `isMounted:`,
+                  isMounted,
+                )
               }
             } else {
-              console.log("No default saju session found for authenticated user")
+              console.log(`[DEBUG] No default saju session found for authenticated user`)
+
+              const sessionsWithBirthInfo = await getUserSajuSessionsWithBirthInfo(data.session.user.id)
+
+              if (sessionsWithBirthInfo && sessionsWithBirthInfo.length > 0) {
+                console.log(`Found ${sessionsWithBirthInfo.length} sessions without default, showing selection dialog`)
+                setAvailableSessions(sessionsWithBirthInfo)
+                setSelectDefaultOpen(true)
+                setLoading(false)
+                return
+              } else {
+                console.log("No saju sessions found for authenticated user, redirecting to saju_create")
+                if (isMounted) {
+                  router.push("/saju_create")
+                }
+                return
+              }
             }
           } catch (error) {
-            console.error("Error loading default saju session:", error)
+            if (error instanceof Error && error.message === "MULTIPLE_DEFAULT_SESSIONS") {
+              console.log("Multiple default sessions found, showing selection dialog")
+              setMultipleDefaultSessions((error as any).sessions)
+              setMultipleDefaultsOpen(true)
+              setLoading(false)
+              return
+            }
+            console.error(`[DEBUG] Error loading default saju session:`, error)
           }
 
           console.log("No default profile found, checking localStorage as fallback")
@@ -172,7 +218,7 @@ export default function SajuChatPage() {
           // If coming from onboarding, try to get data from tempSajuData
           const tempSajuData = localStorage.getItem("tempSajuData")
           if (tempSajuData && isAuthenticated) {
-            console.log("Found tempSajuData, converting to current_saju")
+            console.log("Found tempSajuData, converting to current_saju with optimization")
             const tempData = JSON.parse(tempSajuData)
 
             // Create chat saju data structure
@@ -199,9 +245,11 @@ export default function SajuChatPage() {
                 lunarMonth: tempData.lunarMonth,
                 lunarDay: tempData.lunarDay,
                 timeUnknown: tempData.timeUnknown,
-                birthCityId: tempData.birthCityId,
+                birthCityId: null,
                 timeStandard: tempData.timeStandard,
               },
+              isOptimizedLoad: true,
+              preloadedDaeun: tempData.daeun,
             }
 
             localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
@@ -422,6 +470,15 @@ export default function SajuChatPage() {
     [roomType],
   )
 
+  const setCurrentChatRoomId = useCallback((newChatRoomId: string) => {
+    console.log("[v0] Setting current chat room ID:", newChatRoomId)
+    setCurrentChatRoom((prev: any) => ({
+      ...prev,
+      id: newChatRoomId,
+      isTemporary: newChatRoomId.startsWith("temp-"),
+    }))
+  }, [])
+
   const handleOAuth = useCallback(
     async (provider: "kakao" | "google") => {
       console.log(`🔐 Starting ${provider} OAuth...`)
@@ -548,10 +605,257 @@ export default function SajuChatPage() {
     checkAnonymousSession()
   }, [isLoggedIn, loading, defaultProfileLoaded, supabase])
 
+  const handleMultipleDefaultsSelect = async (sessionId: string) => {
+    try {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session?.user) return
+
+      const success = await resolveMultipleDefaultSessions(data.session.user.id, sessionId)
+
+      if (success) {
+        setMultipleDefaultsOpen(false)
+        setMultipleDefaultSessions([])
+
+        console.log("Loading selected default session:", sessionId)
+
+        try {
+          const profile = await getSajuProfileBySessionId(sessionId)
+
+          if (profile) {
+            const chatSajuData = {
+              saju: profile.saju,
+              name: profile.name,
+              gender: profile.gender,
+              interpretation: "",
+              returnPath: "/",
+              timeStandard: "KST",
+              birthCityId: null,
+              daeun: profile.saju.daeun,
+              concerns: [],
+              userId: data.session.user.id,
+              authUserId: data.session.user.id,
+              sessionId: profile.id,
+              birthInfo: {
+                solarYear: Number.parseInt(profile.birthYear),
+                solarMonth: Number.parseInt(profile.birthMonth),
+                solarDay: Number.parseInt(profile.birthDay),
+                solarHour: Number.parseInt(profile.birthHour),
+                solarMinute: Number.parseInt(profile.birthMinute),
+                lunarYear: Number.parseInt(profile.lunarYear),
+                lunarMonth: Number.parseInt(profile.lunarMonth),
+                lunarDay: Number.parseInt(profile.lunarDay),
+                timeUnknown: profile.timeUnknown,
+                birthCityId: null,
+                timeStandard: "KST",
+              },
+              isOptimizedLoad: true,
+              preloadedDaeun: profile.saju.daeun,
+            }
+
+            localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+            localStorage.setItem("saju_session_id", profile.id)
+
+            setSaju(chatSajuData)
+            setDefaultProfileLoaded(true)
+            const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+            setSessionKey(generatedKey)
+
+            // 채팅룸 설정
+            let chatRoom = null
+            if (!roomId) {
+              chatRoom = createTemporaryChatRoom({
+                sessionId: profile.id,
+                title: "새로운 대화",
+                roomType: roomType || "sajuping",
+                isTemporary: true,
+              })
+
+              setCurrentChatRoom(chatRoom)
+              const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+              window.history.replaceState({}, "", newUrl)
+            } else {
+              setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+            }
+          }
+        } catch (error) {
+          console.error("Error loading selected session:", error)
+          // 에러 시에만 새로고침
+          window.location.reload()
+        }
+      } else {
+        toast({
+          title: "오류",
+          description: "대표 사주 설정 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error resolving multiple defaults:", error)
+      toast({
+        title: "오류",
+        description: "대표 사주 설정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleMultipleDefaultsCancel = () => {
+    setMultipleDefaultsOpen(false)
+    setMultipleDefaultSessions([])
+    router.push("/")
+  }
+
+  const handleSelectDefaultSaju = async (sessionId: string) => {
+    try {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session?.user) return
+
+      // 선택된 세션을 대표사주로 설정
+      const { error: updateError } = await supabase
+        .from("saju_sessions")
+        .update({ is_default: true })
+        .eq("id", sessionId)
+        .eq("auth_user_id", data.session.user.id)
+
+      if (updateError) throw updateError
+
+      // 다른 세션들의 기본값 해제
+      await supabase
+        .from("saju_sessions")
+        .update({ is_default: false })
+        .eq("auth_user_id", data.session.user.id)
+        .neq("id", sessionId)
+
+      setSelectDefaultOpen(false)
+      setAvailableSessions([])
+
+      console.log("Loading selected default session:", sessionId)
+
+      try {
+        const profile = await getSajuProfileBySessionId(sessionId)
+
+        if (profile) {
+          const chatSajuData = {
+            saju: profile.saju,
+            name: profile.name,
+            gender: profile.gender,
+            interpretation: "",
+            returnPath: "/",
+            timeStandard: "KST",
+            birthCityId: null,
+            daeun: profile.saju.daeun,
+            concerns: [],
+            userId: data.session.user.id,
+            authUserId: data.session.user.id,
+            sessionId: profile.id,
+            birthInfo: {
+              solarYear: Number.parseInt(profile.birthYear),
+              solarMonth: Number.parseInt(profile.birthMonth),
+              solarDay: Number.parseInt(profile.birthDay),
+              solarHour: Number.parseInt(profile.birthHour),
+              solarMinute: Number.parseInt(profile.birthMinute),
+              lunarYear: Number.parseInt(profile.lunarYear),
+              lunarMonth: Number.parseInt(profile.lunarMonth),
+              lunarDay: Number.parseInt(profile.lunarDay),
+              timeUnknown: profile.timeUnknown,
+              birthCityId: null,
+              timeStandard: "KST",
+            },
+            isOptimizedLoad: true,
+            preloadedDaeun: profile.saju.daeun,
+          }
+
+          localStorage.setItem("current_saju", JSON.stringify(chatSajuData))
+          localStorage.setItem("saju_session_id", profile.id)
+
+          setSaju(chatSajuData)
+          setDefaultProfileLoaded(true)
+          const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
+          setSessionKey(generatedKey)
+
+          // 채팅룸 설정
+          let chatRoom = null
+          if (!roomId) {
+            chatRoom = createTemporaryChatRoom({
+              sessionId: profile.id,
+              title: "새로운 대화",
+              roomType: roomType || "sajuping",
+              isTemporary: true,
+            })
+
+            setCurrentChatRoom(chatRoom)
+            const newUrl = `/saju-chat/${roomType}?roomId=${chatRoom.id}`
+            window.history.replaceState({}, "", newUrl)
+          } else {
+            setCurrentChatRoom({ id: roomId, isTemporary: roomId.startsWith("temp-") })
+          }
+        }
+      } catch (error) {
+        console.error("Error loading selected session:", error)
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error("Error setting default saju:", error)
+      toast({
+        title: "오류",
+        description: "대표 사주 설정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSelectDefaultCancel = () => {
+    setSelectDefaultOpen(false)
+    setAvailableSessions([])
+    router.push("/")
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (multipleDefaultsOpen) {
+    return (
+      <div className="h-[100dvh] w-full relative supports-[height:100dvh]:h-[100dvh] supports-[height:100svh]:h-[100svh] overflow-hidden">
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">대표 사주 선택</h2>
+            <p className="text-muted-foreground">여러 개의 대표 사주가 있습니다. 하나를 선택해주세요.</p>
+          </div>
+        </div>
+
+        <MultipleDefaultSessionsDialog
+          open={multipleDefaultsOpen}
+          sessions={multipleDefaultSessions}
+          onSelectSession={handleMultipleDefaultsSelect}
+          onCancel={handleMultipleDefaultsCancel}
+        />
+      </div>
+    )
+  }
+
+  if (selectDefaultOpen) {
+    return (
+      <div className="h-[100dvh] w-full relative supports-[height:100dvh]:h-[100dvh] supports-[height:100svh]:h-[100svh] overflow-hidden">
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">대표 사주 선택</h2>
+            <p className="text-muted-foreground mb-4">
+              대표 사주가 설정되지 않았습니다. 기존 사주 중에서 선택해주세요.
+            </p>
+          </div>
+        </div>
+
+        <SelectDefaultSajuDialog
+          open={selectDefaultOpen}
+          sessions={availableSessions}
+          onSelectSession={handleSelectDefaultSaju}
+          onCancel={handleSelectDefaultCancel}
+        />
       </div>
     )
   }
@@ -588,9 +892,24 @@ export default function SajuChatPage() {
         currentChatRoomId={currentChatRoom?.id}
         temporaryChatRoom={currentChatRoom?.isTemporary ? currentChatRoom : undefined}
         onChatRoomPersisted={handleChatRoomPersisted}
+        setCurrentChatRoomId={setCurrentChatRoomId}
       />
 
       <SignupDialog open={signupOpen} onOpenChange={setSignupOpen} onSelectProvider={handleOAuth} />
+
+      <MultipleDefaultSessionsDialog
+        open={multipleDefaultsOpen}
+        sessions={multipleDefaultSessions}
+        onSelectSession={handleMultipleDefaultsSelect}
+        onCancel={handleMultipleDefaultsCancel}
+      />
+
+      <SelectDefaultSajuDialog
+        open={selectDefaultOpen}
+        sessions={availableSessions}
+        onSelectSession={handleSelectDefaultSaju}
+        onCancel={handleSelectDefaultCancel}
+      />
     </div>
   )
 }

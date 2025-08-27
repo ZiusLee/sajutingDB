@@ -1585,7 +1585,7 @@ export const EXACT_SOLAR_TERMS = [
   { year: 1985, month: 7, solarTerm: '소서', timestamp: '1985-07-07 13:19' },
   { year: 1985, month: 7, solarTerm: '대서', timestamp: '1985-07-23 06:36' },
   { year: 1985, month: 8, solarTerm: '입추', timestamp: '1985-08-07 23:04' },
-  { year: 1985, month: 8, solarTerm: '처서', timestamp: '1985-08-23 13:36' },
+  { year: 1985, month: 8, solarTerm: '���서', timestamp: '1985-08-23 13:36' },
   { year: 1985, month: 9, solarTerm: '백로', timestamp: '1985-09-08 01:53' },
   { year: 1985, month: 9, solarTerm: '추분', timestamp: '1985-09-23 11:07' },
   { year: 1985, month: 10, solarTerm: '한로', timestamp: '1985-10-08 17:25' },

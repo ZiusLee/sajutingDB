@@ -1,7 +1,6 @@
 "use client"
-import { useState, useRef, useEffect, useMemo } from "react"
 import type React from "react"
-
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Send, ArrowLeft, MoreHorizontal, ArrowDown } from "lucide-react"
 import { useChat as useAIChat } from "ai/react"
@@ -24,7 +23,7 @@ import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 import Sidebar from "@/components/sidebar"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { trackEvent } from "@/lib/analytics"
-import { SuggestedQuestionsAgent } from "@/lib/suggested-questions-agent"
+import { getCachedDaeunInfo, setCachedDaeunInfo, generateSajuKey } from "@/lib/saju-cache"
 
 interface SajuChatProps {
   saju: any
@@ -42,6 +41,7 @@ interface SajuChatProps {
   currentChatRoomId?: string
   temporaryChatRoom?: any
   onChatRoomPersisted?: (newChatRoomId: string) => void
+  setCurrentChatRoomId?: (newChatRoomId: string) => void
 }
 
 const generateSuggestedQuestions = (concerns: string[] = [], roomType: string): string[] => {
@@ -111,24 +111,23 @@ export default function SajuChat({
   saju,
   name,
   gender,
-  initialInterpretation,
   roomType,
   onBack,
-  isLoggedIn,
   sessionKey,
   birthInfo,
-  concerns = [],
-  isSidebarOpen,
-  onSidebarToggle,
+  concerns,
+  isSidebarOpen: externalSidebarOpen,
+  onSidebarToggle: externalSidebarToggle,
   currentChatRoomId,
   temporaryChatRoom,
   onChatRoomPersisted,
+  setCurrentChatRoomId,
 }: SajuChatProps) {
   const { user } = useAuth()
   const { isKeyboardOpen } = useMobileKeyboard()
   const [internalSidebarOpen, setInternalSidebarOpen] = useState(false)
-  const internalIsSidebarOpen = isSidebarOpen ?? internalSidebarOpen
-  const setSidebarOpen = onSidebarToggle ? () => onSidebarToggle() : setInternalSidebarOpen
+  const isSidebarOpen = externalSidebarOpen ?? internalSidebarOpen
+  const setSidebarOpen = externalSidebarToggle ? () => externalSidebarToggle() : setInternalSidebarOpen
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const [lastSavedMessageCount, setLastSavedMessageCount] = useState(0)
@@ -215,6 +214,40 @@ export default function SajuChat({
     }
   }, [user]) // Removed chatData.isInitialized dependency
 
+  const calculatedDaeun = useMemo(() => {
+    if (!stableSaju?.yearStem || !stableBirthInfo?.solarYear || !gender) {
+      return null
+    }
+
+    // 캐시 키 생성
+    const sajuKey = generateSajuKey(stableSaju, stableBirthInfo)
+    if (!sajuKey) return null
+
+    // 캐시에서 먼저 확인
+    const cached = getCachedDaeunInfo(sajuKey)
+    if (cached) {
+      console.log("🚀 대운 정보 캐시에서 로드:", sajuKey)
+      return cached
+    }
+
+    // 캐시에 없으면 계산
+    console.log("🔄 대운 정보 새로 계산:", sajuKey)
+    const calculated = calculateDaeunInfo(
+      { yearStem: stableSaju.yearStem, monthStem: stableSaju.monthStem, monthBranch: stableSaju.monthBranch },
+      stableBirthInfo.solarYear,
+      stableBirthInfo.solarMonth,
+      stableBirthInfo.solarDay,
+      gender,
+      stableBirthInfo.solarHour,
+      stableBirthInfo.solarMinute,
+      stableBirthInfo.timeUnknown,
+    )
+
+    // 계산 결과 캐싱
+    setCachedDaeunInfo(sajuKey, calculated)
+    return calculated
+  }, [stableSaju, stableBirthInfo, gender])
+
   const aiChatBody = useMemo(() => {
     if (!chatData.isInitialized) return {}
     const compressedSajuObject =
@@ -253,28 +286,163 @@ export default function SajuChat({
     effectiveChatRoomId,
   ])
 
+  const [input, setInput] = useState("") // Declare setInput variable
+
+  const customHandleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("[v0] Input change detected:", e.target.value)
+    setInput(e.target.value)
+    // 원래 핸들러도 호출
+    if (handleInputChange) {
+      handleInputChange(e)
+    }
+  }
+  const [messages, setMessages] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!currentChatRoomId) return
+
+    const loadMessagesForRoom = async () => {
+      console.log("[v0] Loading messages for chat room:", currentChatRoomId)
+
+      if (currentChatRoomId.startsWith("temp-")) {
+        console.log("[v0] Skipping message load for temporary chat room")
+        setMessages([])
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/messages?chatRoomId=${currentChatRoomId}`)
+        if (response.ok) {
+          const data = await response.json()
+          const roomMessages = data.messages || []
+          setMessages(roomMessages)
+
+          // 메시지 로드 완료 후 잠시 대기한 다음 맨 아래로 스크롤
+          setTimeout(() => {
+            scrollToBottom()
+            console.log("[v0] Auto-scrolled to bottom after room change")
+          }, 100)
+        }
+      } catch (error) {
+        console.error("[v0] Error loading messages for room:", error)
+      }
+    }
+
+    loadMessagesForRoom()
+  }, [currentChatRoomId])
+
+  useEffect(() => {
+    const loadChatRoomMessages = async () => {
+      if (!currentChatRoomId || !sessionId || currentChatRoomId.startsWith("temp-")) {
+        return
+      }
+
+      console.log("[v0] Loading messages for chat room:", currentChatRoomId)
+
+      try {
+        const pastMessages = (await getSessionMessages(sessionId, currentChatRoomId))
+          .filter((msg) => msg.role === "user" || msg.role === "assistant")
+          .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+          .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+
+        console.log("[v0] Loaded messages:", pastMessages.length)
+
+        // 메시지 상태 업데이트
+        setMessages(pastMessages)
+        setLastSavedMessageCount(pastMessages.length)
+
+        // 채팅 데이터 업데이트
+        setChatData((prev) => ({
+          ...prev,
+          initialMessages: pastMessages,
+        }))
+      } catch (error) {
+        console.error("[v0] Error loading chat room messages:", error)
+        setMessages([])
+        setLastSavedMessageCount(0)
+      }
+    }
+
+    loadChatRoomMessages()
+  }, [currentChatRoomId, sessionId])
+
   useEffect(() => {
     let isMounted = true
     const initializeChatData = async () => {
       if (!stableSaju) return
 
+      if (stableSaju.isOptimizedLoad && stableSaju.preloadedDaeun) {
+        console.log("🚀 Using optimized load - skipping unnecessary recalculations")
+
+        try {
+          let pastMessages: any[] = []
+          let shouldSendInitialQuestions = false
+          let isFirstRoom = false
+
+          // 메시지와 채팅룸 정보만 로드
+          if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
+            try {
+              const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+              if (response.ok) {
+                const result = await response.json()
+                const chatRooms = result.chatRooms || []
+                const sortedRooms = chatRooms.sort(
+                  (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+                )
+                isFirstRoom = sortedRooms.length > 0 && sortedRooms[0].id === effectiveChatRoomId
+              }
+            } catch (error) {
+              console.error("Error fetching chat rooms:", error)
+            }
+
+            try {
+              pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
+                .filter((msg) => msg.role === "user" || msg.role === "assistant")
+                .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+                .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+            } catch (error) {
+              console.error("Error loading messages:", error)
+              pastMessages = []
+            }
+          } else {
+            shouldSendInitialQuestions = true
+            try {
+              const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
+              isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
+            } catch (error) {
+              console.error("Error checking first room:", error)
+              isFirstRoom = true
+            }
+          }
+
+          if (isMounted) {
+            setChatData({
+              calculatedDaeun: stableSaju.preloadedDaeun, // 미리 로드된 대운 사용
+              stableBirthInfo: stableBirthInfo,
+              initialMessages: pastMessages,
+              isInitialized: true,
+            })
+            setLastSavedMessageCount(pastMessages.length)
+            setIsFirstChatRoom(isFirstRoom)
+
+            if (shouldSendInitialQuestions && isFirstRoom) {
+              const questions = getInitialUserQuestions(name, roomType, stableConcerns)
+              setInitialQuestionsToSend(questions)
+              setIsInitialQuestionsMode(true)
+            }
+          }
+          return
+        } catch (error) {
+          console.error("❌ Error in optimized initialization:", error)
+          // 최적화 실패 시 일반 로직으로 폴백
+        }
+      }
+
+      console.log("📊 Using standard load - performing full calculations")
+
       let apiCallMade = false
 
       try {
-        const calculatedDaeunData =
-          stableSaju?.yearStem && stableBirthInfo?.solarYear && gender
-            ? calculateDaeunInfo(
-                { yearStem: stableSaju.yearStem, monthStem: stableSaju.monthStem, monthBranch: stableSaju.monthBranch },
-                stableBirthInfo.solarYear,
-                stableBirthInfo.solarMonth,
-                stableBirthInfo.solarDay,
-                gender,
-                stableBirthInfo.solarHour,
-                stableBirthInfo.solarMinute,
-                stableBirthInfo.timeUnknown,
-              )
-            : null
-
         let pastMessages: any[] = []
         let shouldSendInitialQuestions = false
         let isFirstRoom = false
@@ -308,27 +476,20 @@ export default function SajuChat({
           }
         } else {
           shouldSendInitialQuestions = true
-          if (!apiCallMade && sessionId) {
+          if (!apiCallMade) {
             try {
               const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-              if (response.ok) {
-                const result = await response.json()
-                isFirstRoom = !(result.chatRooms?.length > 0)
-              } else {
-                isFirstRoom = true
-              }
+              isFirstRoom = !(response.ok && (await response.json()).chatRooms?.length > 0)
             } catch (error) {
               console.error("Error checking first room:", error)
-              isFirstRoom = true // 에러 시 첫 번째 방으로 간주
+              isFirstRoom = true
             }
-          } else if (!sessionId) {
-            isFirstRoom = true
           }
         }
 
         if (isMounted) {
           setChatData({
-            calculatedDaeun: calculatedDaeunData,
+            calculatedDaeun: calculatedDaeun, // useMemo에서 계산된 값 사용
             stableBirthInfo: stableBirthInfo,
             initialMessages: pastMessages,
             isInitialized: true,
@@ -336,7 +497,6 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
-          // 첫 번째 채팅방이거나 임시 채팅방인 경우에만 초기 질문 전송
           if (shouldSendInitialQuestions && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
@@ -360,17 +520,15 @@ export default function SajuChat({
     return () => {
       isMounted = false
     }
-  }, [stableSaju, effectiveChatRoomId, sessionId])
+  }, [stableSaju, effectiveChatRoomId, sessionId, calculatedDaeun])
 
-  const [dynamicSuggestedQuestions, setDynamicSuggestedQuestions] = useState<string[]>([])
-  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
-  const [showDynamicQuestions, setShowDynamicQuestions] = useState(false)
-
-  const { messages, input, setInput, handleSubmit, isLoading, error, reload, stop } = useAIChat({
+  const { handleInputChange, handleSubmit, isLoading, error, reload, stop, append } = useAIChat({
     api: "/api/saju-chat",
     body: aiChatBody,
-    streamProtocol: "data",
-    onFinish: async (message) => {
+    experimental_throttle: 100,
+    maxRetries: 3,
+    retryDelay: (retryCount) => Math.min(1000 * Math.pow(2, retryCount), 10000),
+    onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
 
@@ -382,8 +540,6 @@ export default function SajuChat({
           session_id: sessionId,
           is_logged_in: user !== null,
         })
-
-        await generateDynamicSuggestedQuestions(message)
       }
 
       // Clear persistent streaming state
@@ -394,7 +550,18 @@ export default function SajuChat({
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
-      toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+
+      let errorMessage = "오류가 발생했습니다. 다시 시도해주세요."
+
+      if (error.message?.includes("fetch")) {
+        errorMessage = "네트워크 연결에 문제가 있습니다. 인터넷 연결을 확인하고 다시 시도해주세요."
+      } else if (error.message?.includes("timeout")) {
+        errorMessage = "응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."
+      } else if (error.message?.includes("rate limit")) {
+        errorMessage = "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
+      }
+
+      toast.error(errorMessage)
 
       trackEvent("AI_error", {
         error_type: "chat_response_error",
@@ -411,32 +578,6 @@ export default function SajuChat({
     },
   })
 
-  const generateDynamicSuggestedQuestions = async (assistantMessage: any) => {
-    try {
-      setIsGeneratingQuestions(true)
-
-      const response = await SuggestedQuestionsAgent.generateQuestions({
-        messages: [...messages, assistantMessage],
-        saju: stableSaju,
-        roomType,
-        concerns,
-        name,
-        gender,
-      })
-
-      if (response.questions.length > 0) {
-        setDynamicSuggestedQuestions(response.questions)
-        setShowDynamicQuestions(true)
-        console.log("🤖 Generated dynamic questions:", response.questions)
-      }
-    } catch (error) {
-      console.error("Failed to generate dynamic questions:", error)
-      // 실패 시 기본 질문 유지
-    } finally {
-      setIsGeneratingQuestions(false)
-    }
-  }
-
   useEffect(() => {
     if (
       isInitialQuestionsMode &&
@@ -447,9 +588,9 @@ export default function SajuChat({
     ) {
       console.log("📤 [Flow] Sending first question...")
       setInitialQuestionsSent((prev) => ({ ...prev, q1: true }))
-      setInput(initialQuestionsToSend[0])
+      append({ role: "user", content: initialQuestionsToSend[0] })
     }
-  }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, setInput, initialQuestionsSent.q1])
+  }, [isInitialQuestionsMode, isLoading, messages.length, initialQuestionsToSend, append, initialQuestionsSent.q1])
 
   useEffect(() => {
     const endInitialMode = () => {
@@ -529,18 +670,35 @@ export default function SajuChat({
   const handleSuggestedQuestionClick = (question: string) => {
     if (isLoading) return
     setInput(question)
-    setShowDynamicQuestions(false)
     setTimeout(() => document.querySelector("form")?.requestSubmit(), 100)
   }
 
-  const handleChatRoomSelect = (chatRoomId: string) => {
-    if (window.innerWidth < 1024) setSidebarOpen(false)
-    saveScrollPosition()
-    router.push(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
-  }
+  const saveScrollPosition = useCallback(() => {
+    if (chatContainerRef.current) {
+      const scrollPosition = chatContainerRef.current.scrollTop
+      sessionStorage.setItem(`chat-scroll-${roomType}`, scrollPosition.toString())
+    }
+  }, [roomType])
+
+  const handleChatRoomSelect = useCallback(
+    (chatRoomId: string) => {
+      console.log("[v0] Chat room selected:", chatRoomId)
+
+      if (window.innerWidth < 1024) setSidebarOpen(false)
+
+      router.replace(`/saju-chat/${roomType}?roomId=${chatRoomId}`)
+
+      if (setCurrentChatRoomId) {
+        console.log("[v0] Setting current chat room ID:", chatRoomId)
+        setCurrentChatRoomId(chatRoomId)
+      } else {
+        console.warn("[v0] setCurrentChatRoomId is not available")
+      }
+    },
+    [router, roomType, setSidebarOpen],
+  )
 
   const handleNewChat = () => {
-    saveScrollPosition()
     router.push(`/saju-chat/${roomType}`)
   }
 
@@ -553,21 +711,32 @@ export default function SajuChat({
     if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
   }
 
-  const scrollToLastUserMessage = () => {
+  const scrollToLastUserMessage = useCallback(() => {
     if (!chatContainerRef.current) return
 
     const container = chatContainerRef.current
     const messageElements = container.querySelectorAll('[data-role="user"]')
     const lastUserMessageElement = messageElements[messageElements.length - 1]
 
-    if (lastUserMessageElement) {
-      const containerRect = container.getBoundingClientRect()
-      const messageRect = lastUserMessageElement.getBoundingClientRect()
-      const scrollTop = container.scrollTop + messageRect.top - containerRect.top - 20 // 20px 여백
+    if (!lastUserMessageElement) return
 
-      container.scrollTo({ top: scrollTop, behavior: "smooth" })
+    try {
+      const containerClientHeight = container.clientHeight // Moved this line above the usage
+      const elementOffsetTop = (lastUserMessageElement as HTMLElement).offsetTop
+      const containerScrollTop = container.scrollTop
+      const offset = 20 // 20px margin
+
+      const targetScrollPosition =
+        elementOffsetTop - containerClientHeight + (lastUserMessageElement as HTMLElement).offsetHeight + offset
+
+      container.scrollTo({
+        top: Math.max(0, targetScrollPosition),
+        behavior: "smooth",
+      })
+    } catch (error) {
+      console.error("Error scrolling to last user message:", error)
     }
-  }
+  }, [])
 
   const handleSignupProvider = async (provider: "kakao" | "google") => {
     trackEvent("auth_attempt", {
@@ -597,21 +766,9 @@ export default function SajuChat({
     [stableConcerns, roomType],
   )
 
-  const displayQuestions = useMemo(() => {
-    if (showDynamicQuestions && dynamicSuggestedQuestions.length > 0) {
-      return dynamicSuggestedQuestions
-    }
-    return suggestedQuestions
-  }, [showDynamicQuestions, dynamicSuggestedQuestions, suggestedQuestions])
-
   useEffect(() => {
     if (chatContainerRef.current && messages.length > prevMessageCountRef.current && !isTransitioningRef.current) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage && lastMessage.role === "user") {
-        setTimeout(() => {
-          scrollToLastUserMessage()
-        }, 100)
-      }
+      // No automatic scrolling - user controls scroll position
     }
     prevMessageCountRef.current = messages.length
   }, [messages])
@@ -626,6 +783,37 @@ export default function SajuChat({
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [messages.length])
+
+  useEffect(() => {
+    let reconnectTimer: NodeJS.Timeout | null = null
+
+    const handleOnline = () => {
+      console.log("🌐 네트워크 연결 복구됨")
+      if (chatStreamState.isStreaming && chatStreamState.currentMessageId) {
+        console.log("🔄 스트리밍 재개 시도")
+        // 3초 후 자동으로 재시도
+        reconnectTimer = setTimeout(() => {
+          reload()
+        }, 3000)
+      }
+    }
+
+    const handleOffline = () => {
+      console.log("🌐 네트워크 연결 끊김")
+      toast.error("네트워크 연결이 끊어졌습니다. 연결이 복구되면 자동으로 재시도됩니다.")
+    }
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+      }
+    }
+  }, [chatStreamState.isStreaming, chatStreamState.currentMessageId, reload])
 
   useEffect(() => {
     const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
@@ -670,10 +858,13 @@ export default function SajuChat({
         localStorage.setItem(streamKey, JSON.stringify(newStreamState))
       }
     } else if (!isLoading && chatStreamState.isStreaming) {
-      // Stream finished, clear persistent state
-      localStorage.removeItem(streamKey)
-      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
-      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
+      const clearStreamState = () => {
+        localStorage.removeItem(streamKey)
+        setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
+        chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
+      }
+
+      setTimeout(clearStreamState, 500)
     }
 
     // Cleanup function
@@ -722,8 +913,7 @@ export default function SajuChat({
         const streamState = JSON.parse(savedStream)
         const timeDiff = Date.now() - (streamState.timestamp || 0)
 
-        // If stream is less than 5 minutes old, try to restore it
-        if (timeDiff < 5 * 60 * 1000 && streamState.isStreaming) {
+        if (timeDiff < 10 * 60 * 1000 && streamState.isStreaming) {
           console.log("🔄 Attempting to restore interrupted stream")
 
           // Check if the message exists in current messages
@@ -738,10 +928,12 @@ export default function SajuChat({
               createdAt: new Date().toISOString(),
             }
 
+            toast.info("중단된 응답을 복구하고 있습니다...")
+
             // Trigger the AI to continue from where it left off
             setTimeout(() => {
               reload()
-            }, 1000)
+            }, 2000)
           }
         } else {
           // Clean up old stream state
@@ -754,30 +946,58 @@ export default function SajuChat({
     }
   }, [chatData.isInitialized, messages, effectiveChatRoomId, sessionId, reload])
 
-  const saveScrollPosition = () => {
-    if (chatContainerRef.current) {
-      const scrollPosition = chatContainerRef.current.scrollTop
-      sessionStorage.setItem(`chat-scroll-${roomType}`, scrollPosition.toString())
-    }
-  }
+  useEffect(() => {
+    const container = chatContainerRef.current
+    if (!container) return
 
-  const restoreScrollPosition = () => {
-    const savedPosition = sessionStorage.getItem(`chat-scroll-${roomType}`)
-    if (savedPosition && chatContainerRef.current) {
-      const position = Number.parseInt(savedPosition, 10)
-      if (position > 0) {
-        setTimeout(() => {
-          if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = position
-          }
-        }, 100)
+    // Preserve scroll position when streaming state changes
+    const savedScrollTop = container.scrollTop
+
+    const preserveScroll = () => {
+      if (container.scrollTop !== savedScrollTop) {
+        container.scrollTop = savedScrollTop
       }
     }
+
+    // Use requestAnimationFrame to preserve scroll after DOM updates
+    const rafId = requestAnimationFrame(preserveScroll)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+    }
+  }, [chatStreamState.isStreaming, isLoading])
+
+  useEffect(() => {
+    const container = chatContainerRef.current
+    if (!container || messages.length <= prevMessageCountRef.current || isTransitioningRef.current) {
+      prevMessageCountRef.current = messages.length
+      return
+    }
+
+    // Store current scroll position before message update
+    const scrollTop = container.scrollTop
+
+    // Restore scroll position after DOM update
+    requestAnimationFrame(() => {
+      if (container.scrollTop !== scrollTop) {
+        container.scrollTop = scrollTop
+      }
+    })
+
+    prevMessageCountRef.current = messages.length
+  }, [messages])
+
+  const restoreScrollPosition = () => {
+    // No automatic scroll restoration
   }
 
   useEffect(() => {
-    restoreScrollPosition()
+    // No automatic scroll on room type change
   }, [roomType])
+
+  useEffect(() => {
+    // No automatic scroll on initialization
+  }, [chatData.isInitialized, roomType])
 
   const handleUserSubmit = (e: React.FormEvent) => {
     if (input.trim()) {
@@ -819,7 +1039,7 @@ export default function SajuChat({
     )
   }
 
-  if (!stableSaju) {
+  if (!stableSaju || !aiChatBody.compressedSaju) {
     return (
       <div className="flex h-screen-mobile items-center justify-center bg-background p-4 text-center">
         <div>
@@ -853,7 +1073,7 @@ export default function SajuChat({
 
   return (
     <div className="flex overflow-hidden bg-white keyboard-aware-container">
-      <Sheet open={internalIsSidebarOpen} onOpenChange={setSidebarOpen}>
+      <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-80 p-0 lg:hidden">
           <Sidebar
             saju={stableSaju}
@@ -971,7 +1191,7 @@ export default function SajuChat({
                               saju={stableSaju}
                               name={name}
                               gender={gender}
-                              variant="card"
+                              variant="chat"
                               solarYear={chatData.stableBirthInfo?.solarYear}
                               solarMonth={chatData.stableBirthInfo?.solarMonth}
                               solarDay={chatData.stableBirthInfo?.solarDay}
@@ -987,7 +1207,7 @@ export default function SajuChat({
                         )}
                       </div>
                     )}
-                    <div className="ai-response-content">
+                    <div className="ai-response-content break-words overflow-wrap-anywhere">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
@@ -1034,6 +1254,14 @@ export default function SajuChat({
                             </strong>
                           ),
                           em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
+                          del: ({ children }) => {
+                            const text = String(children)
+                            // 단일 물결표 패턴 (예: "1~3월", "~생과 궁합") 감지
+                            if (text.match(/^[^~]*~[^~]*$/) && !text.match(/~~.*~~/)) {
+                              return <span>{children}</span>
+                            }
+                            return <del className="line-through text-gray-500 opacity-75">{children}</del>
+                          },
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {
@@ -1077,7 +1305,7 @@ export default function SajuChat({
                           ),
                         }}
                       >
-                        {message.content}
+                        {message.content || ""}
                       </ReactMarkdown>
                     </div>
                     <MessageFeedbackButtons
@@ -1122,16 +1350,12 @@ export default function SajuChat({
           <div className="space-y-1.5">
             {!isLoading && messages.length >= 0 && !isInitialQuestionsMode && (
               <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-                {displayQuestions.map((q, i) => (
+                {suggestedQuestions.map((q, i) => (
                   <Button
-                    key={`${showDynamicQuestions ? "dynamic" : "static"}-${i}`}
+                    key={i}
                     variant="outline"
                     size="sm"
-                    className={`rounded-full whitespace-nowrap border-gray-200 text-xs sm:text-sm px-2.5 sm:px-3 py-1 sm:py-1.5 min-w-fit ${
-                      showDynamicQuestions
-                        ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                    className="rounded-full whitespace-nowrap bg-gray-100 border-gray-200 text-xs sm:text-sm px-2.5 sm:px-3 py-1 sm:py-1.5 min-w-fit"
                     onClick={() => handleSuggestedQuestionClick(q)}
                   >
                     {q}
@@ -1139,23 +1363,11 @@ export default function SajuChat({
                 ))}
               </div>
             )}
-            {showDynamicQuestions && (
-              <div className="flex justify-center mt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowDynamicQuestions(false)}
-                >
-                  기본 질문 보기
-                </Button>
-              </div>
-            )}
             <form onSubmit={handleUserSubmit} className="flex gap-2 items-center">
               <div className="flex-1 relative">
                 <Input
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={customHandleInputChange}
                   placeholder="무엇이든 물어보세요"
                   className="h-9 sm:h-11 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
                   disabled={isLoading || isInitialQuestionsMode}
@@ -1164,7 +1376,7 @@ export default function SajuChat({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full"
+                  className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 rounded-full shrink-0"
                   disabled={isInitialQuestionsMode}
                 >
                   <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />

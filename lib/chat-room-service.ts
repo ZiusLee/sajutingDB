@@ -104,50 +104,42 @@ export async function createChatRoom(data: CreateChatRoomRequest): Promise<ChatR
   }
 
   const result = await response.json()
+
+  // Clear cache for this session
+  chatRoomCache.delete(`chatRooms_${data.sessionId}`)
+
   return result.chatRoom
 }
 
-const requestCache = new Map<string, { data: any; timestamp: number }>()
-const CACHE_DURATION = 5000 // 5 seconds
+// Get all chat rooms for a session (excluding temporary ones) with caching
+const chatRoomCache = new Map<string, { data: ChatRoom[]; timestamp: number }>()
+const CACHE_DURATION = 30000 // 30 seconds
 
-// Get all chat rooms for a session (excluding temporary ones)
 export async function getChatRooms(sessionId: string): Promise<ChatRoom[]> {
-  const cacheKey = `chatrooms-${sessionId}`
-  const cached = requestCache.get(cacheKey)
-  const now = Date.now()
+  // Check cache first
+  const cacheKey = `chatRooms_${sessionId}`
+  const cached = chatRoomCache.get(cacheKey)
 
-  if (cached && now - cached.timestamp < CACHE_DURATION) {
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     console.log("[v0] Using cached chat rooms")
     return cached.data
   }
 
-  console.log("[v0] Fetching chat rooms from API for session:", sessionId)
+  console.log("[v0] Fetching fresh chat rooms from API")
+  const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
 
-  try {
-    const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("[v0] API Error:", response.status, errorText)
-
-      if (response.status === 429 || errorText.includes("Too Many Requests")) {
-        throw new Error("Too Many Requests - please wait a moment")
-      }
-
-      const error = JSON.parse(errorText)
-      throw new Error(error.error || "Failed to fetch chat rooms")
-    }
-
-    const result = await response.json()
-    const chatRooms = result.chatRooms.filter((room: ChatRoom) => !room.isTemporary)
-
-    requestCache.set(cacheKey, { data: chatRooms, timestamp: now })
-
-    return chatRooms
-  } catch (error) {
-    console.error("[v0] Error in getChatRooms:", error)
-    throw error
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || "Failed to fetch chat rooms")
   }
+
+  const result = await response.json()
+  const chatRooms = result.chatRooms.filter((room: ChatRoom) => !room.isTemporary)
+
+  // Cache the results
+  chatRoomCache.set(cacheKey, { data: chatRooms, timestamp: Date.now() })
+
+  return chatRooms
 }
 
 // Get a specific chat room with session info
@@ -184,6 +176,10 @@ export async function updateChatRoom(chatRoomId: string, data: UpdateChatRoomReq
   }
 
   const result = await response.json()
+
+  // Clear all cache entries (we don't know which session this room belongs to)
+  chatRoomCache.clear()
+
   return result.chatRoom
 }
 
@@ -197,6 +193,9 @@ export async function deleteChatRoom(chatRoomId: string): Promise<void> {
     const error = await response.json()
     throw new Error(error.error || "Failed to delete chat room")
   }
+
+  // Clear all cache entries
+  chatRoomCache.clear()
 }
 
 // Generate smart title based on first message

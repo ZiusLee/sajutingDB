@@ -363,7 +363,7 @@ export const CITY_TIMEZONE_DATA: CityTimezoneData[] = [
   // UTC-2
   {
     id: "fernando_de_noronha",
-    city: "페르난두 지 노로냐",
+    city: "페르난두 지 노로��",
     country: "브라질",
     timezone: "America/Noronha",
     utcOffset: -2,

@@ -6,12 +6,15 @@ import { useToast } from "@/components/ui/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { getDefaultSajuSession, getSajuProfileBySessionId } from "@/lib/saju-session-service"
-import { FortuneSlotMachine } from "./fortune-slot-machine-gpt"
+import {
+  getDefaultSajuSession,
+  getSajuProfileBySessionId,
+  getUserSajuSessionsWithBirthInfo,
+} from "@/lib/saju-session-service"
 import { TalismanCollection } from "./talisman-collection"
+import { SelectDefaultSajuDialog } from "./select-default-saju-dialog"
 
 export default function DailyFortuneClient() {
   const [isLoading, setIsLoading] = useState(true)
@@ -21,7 +24,8 @@ export default function DailyFortuneClient() {
   const [coins, setCoins] = useState(0)
   const [lastCheckIn, setLastCheckIn] = useState<string | null>(null)
   const [talismans, setTalismans] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState("fortune")
+  const [selectDefaultOpen, setSelectDefaultOpen] = useState(false)
+  const [availableSessions, setAvailableSessions] = useState<any[]>([])
   const supabase = createClientComponentClient()
   const { toast } = useToast()
 
@@ -58,15 +62,9 @@ export default function DailyFortuneClient() {
       const defaultSession = await getDefaultSajuSession(userId)
 
       if (!defaultSession) {
-        // 대표 사주가 없으면 사주 세션 목록 가져오기
-        const { data: sessions, error: sessionsError } = await supabase
-          .from("saju_sessions")
-          .select("*")
-          .eq("auth_user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
+        const sessionsWithBirthInfo = await getUserSajuSessionsWithBirthInfo(userId)
 
-        if (sessionsError || !sessions || sessions.length === 0) {
+        if (!sessionsWithBirthInfo || sessionsWithBirthInfo.length === 0) {
           toast({
             title: "사주 정보 없음",
             description: "사주 정보를 먼저 등록해주세요.",
@@ -74,11 +72,10 @@ export default function DailyFortuneClient() {
           return
         }
 
-        setDefaultSession(sessions[0])
-
-        // 사주 프로필 정보 가져오기
-        const profile = await getSajuProfileBySessionId(sessions[0].id)
-        setSajuProfile(profile)
+        // 사용자가 선택할 수 있도록 다이얼로그 표시
+        setAvailableSessions(sessionsWithBirthInfo)
+        setSelectDefaultOpen(true)
+        return
       } else {
         setDefaultSession(defaultSession)
 
@@ -189,66 +186,55 @@ export default function DailyFortuneClient() {
     }
   }
 
-  const useCoins = async (amount = 1) => {
-    if (!user || coins < amount) return false
-
-    try {
-      const { error } = await supabase
-        .from("user_coins")
-        .update({ coins: coins - amount })
-        .eq("user_id", user.id)
-
-      if (error) throw error
-
-      setCoins(coins - amount)
-      return true
-    } catch (error) {
-      console.error("코인 사용 오류:", error)
-      toast({
-        title: "코인 사용 오류",
-        description: "코인을 사용하는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-      return false
-    }
-  }
-
-  const addTalisman = async (talismanId: string) => {
+  const handleSelectDefaultSaju = async (sessionId: string) => {
     if (!user) return
 
     try {
-      // 이미 가지고 있는 부적인지 확인
-      if (talismans.includes(talismanId)) {
-        toast({
-          title: "이미 보유한 부적입니다",
-          description: "다른 부적을 모아보세요!",
-        })
-        return
-      }
-
-      const updatedTalismans = [...talismans, talismanId]
-
+      // 선택된 세션을 대표사주로 설정
       const { error } = await supabase
-        .from("user_talismans")
-        .update({ talisman_ids: updatedTalismans })
-        .eq("user_id", user.id)
+        .from("saju_sessions")
+        .update({ is_default: true })
+        .eq("id", sessionId)
+        .eq("auth_user_id", user.id)
 
       if (error) throw error
 
-      setTalismans(updatedTalismans)
+      // 다른 세션들의 기본값 해제
+      await supabase
+        .from("saju_sessions")
+        .update({ is_default: false })
+        .eq("auth_user_id", user.id)
+        .neq("id", sessionId)
+
+      // 선택된 세션으로 프로필 로드
+      const profile = await getSajuProfileBySessionId(sessionId)
+      if (profile) {
+        setSajuProfile(profile)
+        setDefaultSession({ id: sessionId })
+      }
+
+      setSelectDefaultOpen(false)
+      setAvailableSessions([])
 
       toast({
-        title: "새로운 부적을 획득했습니다!",
-        description: "부적 컬렉션에서 확인해보세요.",
+        title: "대표 사주 설정 완료",
+        description: "선택한 사주가 대표 사주로 설정되었습니다.",
       })
     } catch (error) {
-      console.error("부적 추가 오류:", error)
+      console.error("대표사주 설정 오류:", error)
       toast({
-        title: "부적 추가 오류",
-        description: "부적을 추가하는 중 오류가 발생했습니다.",
+        title: "설정 오류",
+        description: "대표 사주를 설정하는 중 오류가 발생했습니다.",
         variant: "destructive",
       })
     }
+  }
+
+  const handleSelectDefaultCancel = () => {
+    setSelectDefaultOpen(false)
+    setAvailableSessions([])
+    // 홈으로 리다이렉트
+    window.location.href = "/"
   }
 
   if (isLoading) {
@@ -256,6 +242,19 @@ export default function DailyFortuneClient() {
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-4 text-lg">로딩 중...</p>
+      </div>
+    )
+  }
+
+  if (selectDefaultOpen) {
+    return (
+      <div className="container max-w-md mx-auto p-4 pb-20">
+        <SelectDefaultSajuDialog
+          open={selectDefaultOpen}
+          sessions={availableSessions}
+          onSelectSession={handleSelectDefaultSaju}
+          onCancel={handleSelectDefaultCancel}
+        />
       </div>
     )
   }
@@ -281,9 +280,7 @@ export default function DailyFortuneClient() {
       <Card className="mb-4 bg-gray-900 border-amber-800">
         <CardHeader>
           <CardTitle className="text-center text-2xl text-amber-400">오늘의 운세</CardTitle>
-          <CardDescription className="text-center text-amber-300/70">
-            레버를 당겨 오늘의 운세를 확인하세요!
-          </CardDescription>
+          <CardDescription className="text-center text-amber-300/70">사주 기반 운세 서비스입니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex justify-between items-center mb-4">
@@ -296,7 +293,7 @@ export default function DailyFortuneClient() {
               size="sm"
               onClick={checkInForCoins}
               disabled={lastCheckIn === new Date().toISOString().split("T")[0]}
-              className="border-amber-500 text-amber-400 hover:bg-amber-500/20"
+              className="border-amber-500 text-amber-400 hover:bg-amber-500/20 bg-transparent"
             >
               {lastCheckIn === new Date().toISOString().split("T")[0] ? "출석 완료" : "출석 체크"}
             </Button>
@@ -304,36 +301,11 @@ export default function DailyFortuneClient() {
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-800">
-          <TabsTrigger value="fortune" className="data-[state=active]:bg-gray-700">
-            운세 보기
-          </TabsTrigger>
-          <TabsTrigger value="talismans" className="data-[state=active]:bg-gray-700">
-            부적 컬렉션
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="fortune">
-          <Card className="bg-gray-900 border-amber-800">
-            <CardContent className="pt-6">
-              <FortuneSlotMachine
-                coins={coins}
-                useCoins={useCoins}
-                addTalisman={addTalisman}
-                sajuProfile={sajuProfile}
-                userId={user?.id}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="talismans">
-          <Card className="bg-gray-900 border-amber-800">
-            <CardContent className="pt-6">
-              <TalismanCollection talismans={talismans} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Card className="bg-gray-900 border-amber-800 mb-6">
+        <CardContent className="pt-6">
+          <TalismanCollection talismans={talismans} />
+        </CardContent>
+      </Card>
 
       <div className="mt-6">
         <Card className="bg-gray-900 border-amber-800">

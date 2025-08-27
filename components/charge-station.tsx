@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, AlertTriangle } from "lucide-react"
+import { Check, AlertTriangle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -110,19 +110,33 @@ export default function ChargeStation() {
     try {
       setLoadingCoins(true)
       const response = await fetch("/api/user-coins")
-      if (response.ok) {
-        const data = await response.json()
-        const total = (data.subscription_coins || 0) + (data.bonus_coins || 0)
-        setBalance(total)
-        setUserCoins({
-          total,
-          subscription: data.subscription_coins || 0,
-          bonus: data.bonus_coins || 0,
-          plan: data.subscription_plan || "Free Plan",
-        })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("코인 정보 조회 실패:", response.status, errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text()
+        console.error("응답이 JSON이 아닙니다:", contentType, responseText)
+        throw new Error("서버에서 올바르지 않은 응답을 받았습니다")
+      }
+
+      const data = await response.json()
+      const total = (data.subscription_coins || 0) + (data.bonus_coins || 0)
+      setBalance(total)
+      setUserCoins({
+        total,
+        subscription: data.subscription_coins || 0,
+        bonus: data.bonus_coins || 0,
+        plan: data.subscription_plan || "Free Plan",
+      })
     } catch (error) {
       console.error("질문권 정보 조회 오류:", error)
+      // Don't show error toast for now, just log it
     } finally {
       setLoadingCoins(false)
     }
@@ -275,17 +289,7 @@ export default function ChargeStation() {
 
   return (
     <>
-      <div className="sticky top-0 z-10 bg-[#1b1c1e]/95 backdrop-blur-sm border-b border-[#70737c]/20">
-        <div className="flex items-center justify-between p-4">
-          <button
-            aria-label="뒤로 가기"
-            onClick={handleGoBack}
-            className="p-2 text-[#aeb0b6] hover:text-white transition-colors"
-          >
-            <ArrowLeft size={18} />
-          </button>
-        </div>
-      </div>
+      <div className="sticky top-0 z-10 bg-[#1b1c1e]/95 backdrop-blur-sm border-b border-[#70737c]/20"></div>
 
       <div className="px-4 pb-6 space-y-6">
         <section className="pt-4 space-y-2">

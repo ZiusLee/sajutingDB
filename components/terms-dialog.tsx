@@ -221,46 +221,14 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                         "유료콘텐츠"란 회사가 유료로 제공하는 프리미엄 사주 해석, 맞춤형 상담, 전문 리포트 등 콘텐츠를
                         의미합니다.
                       </li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제3조 (회원가입 및 계정관리)</h3>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
                       <li>
-                        회원가입은 카카오, 네이버, 구글, 애플 등 제3자 소셜 로그인 또는 이메일 가입을 통해 가능합니다.
+                        "질문권"이란 회원이 구독을 통해 부여받거나 추가 결제를 통해 충전하여, 사주 해석·상담·리포트 등
+                        유료콘텐츠 이용 시 차감되는 디지털 이용권을 의미합니다.
                       </li>
                       <li>
-                        가입 시 필수 입력 정보: 성별, 생년월일(음·양력 여부 포함), 태어난 도시
-                        <br />
-                        선택 입력 정보: 태어난 시, 추가 프로필 정보
+                        "보너스 질문권"이란 회사가 이벤트·프로모션 등을 통해 무상 제공하는 질문권을 의미하며 환불되지
+                        않습니다.
                       </li>
-                      <li>"동의하고 시작하기" 버튼 클릭 시 본 약관과 개인정보 처리방침에 동의한 것으로 간주합니다.</li>
-                      <li>
-                        회사는 다음의 경우 회원가입을 제한하거나 해지할 수 있습니다.
-                        <br />- 타인의 개인정보 도용
-                        <br />- 허위 정보 입력
-                        <br />- 만 14세 미만 미성년자
-                        <br />- 법령 또는 서비스 정책 위반 이력
-                        <br />- 기술적·운영상 현저한 지장이 예상되는 경우
-                      </li>
-                      <li>
-                        회원은 본인 계정을 직접 관리해야 하며, 타인 사용을 허용하거나 계정 보안을 소홀히 하여 발생한
-                        손해에 대해 회사는 책임지지 않습니다.
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제4조 (회원의 의무)</h3>
-                    <p className="mb-2">회원은 다음 행위를 하여서는 안 됩니다.</p>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>서비스 접근 방해 또는 비정상적 사용 시도</li>
-                      <li>타인의 개인정보 수집·이용·제공</li>
-                      <li>음란·저작권 침해·허위 정보 게시</li>
-                      <li>회사 승인 없이 서비스 또는 소프트웨어 복제·변경·판매·양도</li>
-                      <li>다계정 생성, 이벤트 부정참여, 포인트·사이버머니 부정사용</li>
-                      <li>서비스 이용 중 타인 명예훼손, 불법·미풍양속 위반 행위</li>
                     </ul>
                   </div>
 
@@ -269,8 +237,8 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                     <ul className="list-decimal list-inside space-y-1 ml-4">
                       <li>회원은 서비스 화면에서 요금제 변경을 요청할 수 있습니다.</li>
                       <li>
-                        상위 요금제(업그레이드)로 변경 시 기존 요금제는 즉시 종료되며 남은 이용기간 및 핑은 환불되지
-                        않습니다. 변경된 요금제는 즉시 적용되며 회원은 해당 요금 전액을 즉시 결제합니다.
+                        상위 요금제(업그레이드)로 변경 시 기존 요금제는 즉시 종료되며 남은 이용기간 및 질문권은 환불되지
+                        않습니다.
                       </li>
                       <li>
                         하위 요금제(다운그레이드)는 다음 결제일부터 적용되며, 그 전까지는 기존 요금제가 유지됩니다.
@@ -278,87 +246,16 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                       <li>요금제 변경 시 일할계산 환불 및 부분 환불은 제공되지 않습니다.</li>
                     </ul>
                   </div>
-                </div>
-              </section>
 
-              {/* 개인정보 처리방침 */}
-              <section>
-                <h2 className="font-bold text-lg mb-4 text-green-600">2. 사주핑 개인정보 처리방침</h2>
-
-                <div className="space-y-4">
                   <div>
-                    <h3 className="font-semibold text-base mb-2">제1조 (개인정보의 수집 및 이용)</h3>
-                    <p className="mb-2">회사는 서비스 제공을 위해 다음과 같은 개인정보를 수집·이용합니다.</p>
-                    <ul className="list-decimal list-inside space-y-2 ml-4">
+                    <h3 className="font-semibold text-base mb-2">제10조 (책임의 제한)</h3>
+                    <ul className="list-decimal list-inside space-y-1 ml-4">
+                      <li>회사는 천재지변, 이용자 과실, 무료서비스 등으로 발생한 손해에 대해 책임을 지지 않습니다.</li>
                       <li>
-                        <strong>회원가입 및 서비스 이용</strong>
-                        <br />- 필수항목: 이름, 성별, 음/양력 여부, 생년월일, 태어난 도시, 소셜ID
-                        <br />- 선택항목: 태어난 시<br />- 보유기간: 회원 탈퇴 시까지
+                        회사가 제공하는 해석, 상담 및 리포트 등 모든 콘텐츠는 개인적 성찰과 자기이해를 돕기 위한 참고
+                        자료일 뿐, 법률적·의료적·재정적 자문에 해당하지 않습니다. 이에 근거한 의사결정은 전적으로
+                        이용자의 책임이며, 회사는 그 결과에 대해 어떠한 법적 책임도 지지 않습니다.
                       </li>
-                      <li>
-                        <strong>민원처리</strong>
-                        <br />- 필수항목: 이메일, 문의내용, 앱 버전, 단말기 정보
-                        <br />- 보유기간: 처리 완료 후 3년
-                      </li>
-                      <li>
-                        <strong>유료서비스 결제</strong>
-                        <br />- 필수항목: 결제수단 정보(카드번호, 계좌정보), 결제기록
-                        <br />- 보유기간: 전자상거래법 등 관계 법령에 따른 기간
-                      </li>
-                      <li>
-                        <strong>마케팅 및 이벤트</strong>
-                        <br />- 필수항목: 이름, 성별, 접속IP, 서비스 이용기록, 기기정보, 국가정보, 쿠키, 푸시 알림 토큰
-                        <br />- 보유기간: 동의 철회 또는 탈퇴 시까지
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제2조 (민감정보 수집 제한)</h3>
-                    <p>회사는 이용자의 사상, 신념, 건강 등 민감정보를 수집하지 않습니다.</p>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제3조 (만 14세 미만 아동의 개인정보)</h3>
-                    <p>만 14세 미만 아동의 개인정보를 수집하지 않으며, 이와 관련하여 서비스 이용을 제한합니다.</p>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제7조 (개인정보 처리 위탁)</h3>
-                    <p className="mb-2">
-                      회사는 원활한 서비스 제공을 위해 일부 업무를 외부에 위탁할 수 있으며, 위탁사는 법령에 따라
-                      관리·감독합니다.
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>Supabase, AWS, Google Firebase: 데이터 저장 및 서버 운영</li>
-                      <li>PG사(결제대행사): 결제 처리</li>
-                      <li>Onesignal: 푸시 알림 발송</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제10조 (안전성 확보조치)</h3>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>암호화 저장</li>
-                      <li>접근권한 최소화</li>
-                      <li>해킹·바이러스 대비 보안시스템 적용</li>
-                      <li>접속기록 위변조 방지</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제11조 (이용자 권리)</h3>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>개인정보 열람·정정·삭제·처리정지 요청 가능</li>
-                      <li>국외 이전 거부 가능(단, 서비스 이용이 제한될 수 있음)</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제12조 (개인정보 보호책임자)</h3>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>성명: 이윤섭</li>
-                      <li>이메일: yoon@sajuping.ai</li>
                     </ul>
                   </div>
                 </div>
@@ -370,99 +267,64 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-semibold text-base mb-2">제2조 (정의)</h3>
+                    <h3 className="font-semibold text-base mb-2">제8조 (청약철회)</h3>
                     <ul className="list-decimal list-inside space-y-1 ml-4">
                       <li>
-                        <strong>핑:</strong> 회원이 유료서비스 또는 콘텐츠 구매 시 사용할 수 있도록 유상으로 충전하는
-                        사이버머니를 말합니다. 핑은 마지막 이용일로부터 5년 동안 사용하지 않을 경우 「상사소멸시효」에
-                        따라 소멸될 수 있습니다.
+                        구독형 유료서비스는 결제와 동시에 이용이 개시되므로, 결제 완료 후에는 청약철회(환불)가
+                        불가합니다.
+                      </li>
+                      <li>단, 관계 법령상 환불 의무가 있는 경우(과오금 결제 등)에는 해당 법령에 따라 처리합니다.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제9조 (환불정책)</h3>
+                    <ul className="list-decimal list-inside space-y-1 ml-4">
+                      <li>
+                        구독은 결제 시점부터 즉시 효력이 발생하며, 결제일로부터 1일이라도 경과하거나 질문권을 사용한
+                        경우 환불이 불가합니다.
+                      </li>
+                      <li>부분 환불, 잔여기간 환불, 잔여 질문권 환불은 제공되지 않습니다.</li>
+                      <li>보너스 질문권은 환불되지 않습니다.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제9조의2 (요금제 변경에 따른 환불정책)</h3>
+                    <ul className="list-decimal list-inside space-y-1 ml-4">
+                      <li>
+                        상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 질문권은 즉시 소멸되며 환불되지 않습니다.
                       </li>
                       <li>
-                        <strong>보너스핑:</strong> 회사가 이벤트, 프로모션 등으로 무상 지급하는 가상의 데이터를
-                        말합니다. 보너스핑은 환불되지 않으며, 유효기간은 회사 정책에 따릅니다. 유효기간 경과 시 자동
-                        소멸되며, 소멸된 보너스핑은 환불 불가합니다.
+                        하위 요금제로 변경 요청 시 변경은 다음 결제일부터 적용되며 그 이전에 결제된 요금은 환불되지
+                        않습니다.
                       </li>
+                      <li>변경 신청 후 서비스 이용을 중단하더라도 이미 결제된 요금은 환불되지 않습니다.</li>
                     </ul>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-base mb-2">제5조 (이용계약의 성립)</h3>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>결제가 완료되는 시점에 계약이 성립합니다.</li>
-                      <li>핑과 보너스핑을 모두 보유한 경우, 유효기간이 먼저 도래하는 보너스핑이 우선 차감됩니다.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제8조 (청약철회 및 해지)</h3>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>결제일로부터 7일 이내, 미사용 유료콘텐츠는 환불 가능합니다.</li>
-                      <li>콘텐츠 사용이 시작된 경우 환불이 제한됩니다.</li>
-                      <li>일부 사용한 핑은 기존 규정에 따라 처리하며, 제9조 환불정책에 따른다.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제9조 (환불정책 및 유효기간)</h3>
-                    <div className="space-y-2">
-                      <div>
-                        <h4 className="font-medium">제1항 (전액 환불)</h4>
-                        <ul className="list-decimal list-inside space-y-1 ml-4">
-                          <li>
-                            구매한 핑(포인트)은 1회도 사용하지 않은 경우에 한하여, 구매일로부터 7일 이내 전액 환불이
-                            가능합니다.
-                          </li>
-                          <li>전액 환불 시, 결제 대행 수수료 등 환불 처리에 소요되는 실비가 공제될 수 있습니다.</li>
-                          <li>환불은 결제 시 사용한 동일한 결제 수단으로만 진행됩니다.</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">제2항 (부분 사용 후 환불 불가 및 유효기간)</h4>
-                        <ul className="list-decimal list-inside space-y-1 ml-4">
-                          <li>구매한 핑(포인트)을 1회 이상 사용한 경우, 잔여 핑에 대해서는 환불이 불가합니다.</li>
-                          <li>구매한 핑(포인트)의 이용기간과 환불 가능 기간은 결제일로부터 1년입니다.</li>
-                          <li>유효기간이 경과하면 잔여 핑은 자동 소멸되며, 소멸된 핑은 환불되지 않습니다.</li>
-                          <li>
-                            서비스 이용 중 이용자의 귀책사유로 계정이 정지·탈퇴된 경우 잔여 핑은 환불되지 않습니다.
-                          </li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">제3항 (보너스핑 환불 불가)</h4>
-                        <ul className="list-decimal list-inside space-y-1 ml-4">
-                          <li>보너스핑은 환불 대상이 아니며, 유효기간 내 미사용 시 자동 소멸됩니다.</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">제4항 (요금제 변경에 따른 환불정책)</h4>
-                        <ul className="list-decimal list-inside space-y-1 ml-4">
-                          <li>
-                            상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 핑은 즉시 소멸되며 환불되지 않습니다.
-                          </li>
-                          <li>
-                            하위 요금제로 변경 요청 시 변경은 다음 결제일부터 적용되며 그 이전에 결제된 요금은 환불되지
-                            않습니다.
-                          </li>
-                          <li>변경 신청 후 서비스 이용을 중단하더라도 이미 결제된 요금은 환불되지 않습니다.</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제10조 (보너스핑)</h3>
-                    <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>부정 취득 시 회수됩니다.</li>
-                      <li>유효기간 경과 또는 계정 해지 시 소멸됩니다.</li>
-                      <li>양도·매매는 불가합니다.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-base mb-2">제11조 (과오금)</h3>
+                    <h3 className="font-semibold text-base mb-2">제13조 (콘텐츠 및 계정 소유권)</h3>
                     <p>
-                      과오금 발생 시 결제와 동일한 방법으로 환불하며, 동일 방법 불가 시 사전 안내 후 다른 방법으로
-                      환불합니다.
+                      서비스 내에서 제공되는 모든 콘텐츠 및 데이터에 대한 저작권과 지식재산권은 회사에 귀속됩니다.
+                      이용자가 서비스를 통해 작성하거나 입력한 데이터는 회사의 서비스 개선 및 연구 목적으로 활용될 수
+                      있습니다.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제14조 (자동결제 및 해지)</h3>
+                    <p>
+                      구독 서비스는 결제일을 기준으로 매월/매년 자동 갱신됩니다. 이용자가 갱신을 원하지 않는 경우, 차기
+                      결제일 이전에 반드시 해지 신청을 해야 하며, 결제 완료 후에는 환불되지 않습니다.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-base mb-2">제15조 (준거법 및 관할법원)</h3>
+                    <p>
+                      본 약관은 대한민국 법률을 준거법으로 하며, 서비스 이용과 관련하여 회사와 이용자 간 발생하는 분쟁은
+                      민사소송법에 따른 대한민국 법원을 전속관할법원으로 합니다.
                     </p>
                   </div>
                 </div>
@@ -470,9 +332,9 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
 
               <section className="pt-4 border-t">
                 <p className="text-xs text-muted-foreground">
-                  <strong>공고일자:</strong> 2025년 8월 18일
+                  <strong>공고일자:</strong> 2025년 8월 22일
                   <br />
-                  <strong>시행일자:</strong> 2025년 8월 18일
+                  <strong>시행일자:</strong> 2025년 8월 22일
                 </p>
               </section>
             </div>

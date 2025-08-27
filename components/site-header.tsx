@@ -6,7 +6,7 @@ import { SajuLogo } from "@/components/saju-logo"
 import { useAuth } from "@/hooks/use-auth"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Menu } from "lucide-react"
+import { Menu, ArrowLeft } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function SiteHeader() {
@@ -62,12 +62,28 @@ export function SiteHeader() {
     }
   }
 
+  const handleBackClick = () => {
+    router.back()
+  }
+
   return (
-    <header className="fixed top-0 z-50 w-full bg-transparent">
+    <header className="fixed top-0 z-40 w-full bg-transparent">
       <div className="flex h-16 lg:h-20 items-center justify-between px-2 sm:px-4 md:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex items-center">
-          {isSajuChat ? (
+          {isChargePage ? (
+            <button
+              onClick={handleBackClick}
+              className={`flex items-center space-x-2 hover:opacity-80 transition-all duration-300 text-white ${
+                isMobile && isScrollingDown
+                  ? "lg:opacity-100 opacity-0 translate-y-[-10px]"
+                  : "opacity-100 translate-y-0"
+              }`}
+            >
+              <ArrowLeft className="h-6 w-6 text-white" />
+              <span className="hidden lg:inline font-medium text-white">뒤로</span>
+            </button>
+          ) : isSajuChat ? (
             <button
               onClick={handleLogoClick}
               className={`flex items-center space-x-2 hover:opacity-80 transition-all duration-300 ${
@@ -80,12 +96,10 @@ export function SiteHeader() {
             </button>
           ) : (
             // Normal behavior: Logo links to home
-            !isChargePage && (
-              <Link href="/" className="flex items-center space-x-2">
-                <SajuLogo className="lg:hidden" />
-                <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
-              </Link>
-            )
+            <Link href="/" className="flex items-center space-x-2">
+              <SajuLogo className="lg:hidden" />
+              <span className="hidden lg:inline font-bold text-xl tracking-tight">SAJUPING</span>
+            </Link>
           )}
         </div>
 

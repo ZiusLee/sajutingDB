@@ -34,17 +34,31 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     try {
       setLoadingCoins(true)
       const response = await fetch("/api/user-coins")
-      if (response.ok) {
-        const data = await response.json()
-        setUserCoins({
-          total: (data.subscription_coins || 0) + (data.bonus_coins || 0),
-          subscription: data.subscription_coins || 0,
-          bonus: data.bonus_coins || 0,
-          plan: data.subscription_plan || null,
-        })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("코인 정보 조회 실패:", response.status, errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text()
+        console.error("응답이 JSON이 아닙니다:", contentType, responseText)
+        throw new Error("서버에서 올바르지 않은 응답을 받았습니다")
+      }
+
+      const data = await response.json()
+      setUserCoins({
+        total: (data.subscription_coins || 0) + (data.bonus_coins || 0),
+        subscription: data.subscription_coins || 0,
+        bonus: data.bonus_coins || 0,
+        plan: data.subscription_plan || null,
+      })
     } catch (error) {
       console.error("질문권 갯수 조회 오류:", error)
+      // Don't show error toast for now, just log it
     } finally {
       setLoadingCoins(false)
     }

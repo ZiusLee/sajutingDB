@@ -31,9 +31,9 @@ export async function GET(request: Request) {
           .from("user_coins")
           .insert({
             user_id: user.id,
-            subscription_coins: 0,
+            subscription_coins: 3, // Set default 3 coins for free tier users instead of 0
             bonus_coins: 0,
-            coins: 0,
+            subscription_plan: "free", // Set default subscription plan to free
           })
           .select()
           .single()
@@ -43,10 +43,10 @@ export async function GET(request: Request) {
         }
 
         return NextResponse.json({
-          subscription_coins: 0,
+          subscription_coins: 3, // Return 3 coins instead of 0
           bonus_coins: 0,
-          total_coins: 0,
-          subscription_plan: null,
+          total_coins: 3, // Total should be 3 instead of 0
+          subscription_plan: "free", // Return free plan
           last_check_in: null,
         })
       }
@@ -95,9 +95,9 @@ export async function POST(request: Request) {
       if (selectError.code === "PGRST116") {
         const initialData = {
           user_id: user.id,
-          subscription_coins: finalCoinType === "subscription" && action === "add" ? amount : 0,
+          subscription_coins: finalCoinType === "subscription" && action === "add" ? amount : 3, // Default to 3 for free tier
           bonus_coins: finalCoinType === "bonus" && action === "add" ? amount : 0,
-          coins: 0,
+          subscription_plan: "free", // Set default subscription plan
           last_check_in: action === "check_in" ? new Date().toISOString().split("T")[0] : null,
         }
 
