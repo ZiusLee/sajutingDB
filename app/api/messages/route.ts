@@ -107,18 +107,30 @@ export async function POST(request: NextRequest) {
       lastMessageOrder = lastMessage?.[0]?.message_order || 0
     }
 
-    // Prepare messages for insertion
-    const messagesToInsert = messages.map((msg, index) => ({
-      session_id: sessionId,
-      chat_room_id: chatRoomId || null,
-      role: msg.role,
-      content: msg.content,
-      message_order: msg.messageOrder || lastMessageOrder + index + 1,
-      room_type: roomType || "sajuping",
-      model_used: msg.modelUsed || null,
-      response_time_ms: msg.responseTimeMs || null,
-      created_at: msg.createdAt || new Date().toISOString(),
-    }))
+    // Prepare messages for insertion with proper sequential ordering
+    const messagesToInsert = messages.map((msg, index) => {
+      // Use provided messageOrder if available, otherwise calculate sequentially
+      let messageOrder = msg.messageOrder
+      if (!messageOrder) {
+        messageOrder = lastMessageOrder + index + 1
+      }
+
+      return {
+        session_id: sessionId,
+        chat_room_id: chatRoomId || null,
+        role: msg.role,
+        content: msg.content,
+        message_order: messageOrder,
+        room_type: roomType || "sajuping",
+        model_used: msg.modelUsed || null,
+        response_time_ms: msg.responseTimeMs || null,
+        created_at: msg.createdAt || new Date().toISOString(),
+      }
+    })
+
+    console.log(
+      `[v0] Saving messages with orders: ${messagesToInsert.map((m) => `${m.role}:${m.message_order}`).join(", ")}`,
+    )
 
     const { data: insertedMessages, error } = await supabase.from("messages").insert(messagesToInsert).select("id")
 
