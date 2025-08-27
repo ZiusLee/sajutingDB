@@ -604,7 +604,7 @@ export default function SajuChat({
         console.warn("[v0] setCurrentChatRoomId is not available")
       }
     },
-    [router, roomType, setSidebarOpen],
+    [router, roomType, setSidebarOpen, setCurrentChatRoomId], // Added setCurrentChatRoomId to dependency array
   )
 
   const handleNewChat = () => {
