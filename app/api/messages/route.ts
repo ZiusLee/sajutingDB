@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const sessionId = searchParams.get("sessionId")
     const chatRoomId = searchParams.get("chatRoomId")
+    const getLastOrder = searchParams.get("getLastOrder") === "true"
 
     if (!sessionId) {
       return NextResponse.json({ error: "Session ID is required" }, { status: 400 })
@@ -14,6 +15,18 @@ export async function GET(request: NextRequest) {
 
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+
+    if (getLastOrder && chatRoomId) {
+      const { data: lastMessage } = await supabase
+        .from("messages")
+        .select("message_order")
+        .eq("chat_room_id", chatRoomId)
+        .order("message_order", { ascending: false })
+        .limit(1)
+
+      const lastOrder = lastMessage?.[0]?.message_order || 0
+      return NextResponse.json({ lastOrder })
+    }
 
     let query = supabase
       .from("messages")

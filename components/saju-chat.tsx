@@ -393,7 +393,7 @@ export default function SajuChat({
             try {
               pastMessages = (await getSessionMessages(sessionId, effectiveChatRoomId))
                 .filter((msg) => msg.role === "user" || msg.role === "assistant")
-                .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
+                .sort((a: any, b: any) => (a.messageOrder || 0) - (b.messageOrder || 0))
                 .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
             } catch (error) {
               console.error("Error loading messages:", error)
@@ -601,18 +601,49 @@ export default function SajuChat({
     }
   }, [isInitialQuestionsMode, isLoading, messages])
 
+  const handleSuggestedQuestionClick = async (question: string) => {
+    if (isLoading) return
+
+    console.log("[v0] Suggested question clicked:", question)
+
+    // 입력창에 질문 설정하고 폼 제출
+    setInput(question)
+
+    // 다음 틱에서 폼 제출 (React 상태 업데이트 후)
+    setTimeout(() => {
+      const form = document.querySelector("form")
+      if (form) {
+        const submitEvent = new Event("submit", { bubbles: true, cancelable: true })
+        form.dispatchEvent(submitEvent)
+      }
+    }, 10)
+  }
+
   useEffect(() => {
     const saveNewMessages = async () => {
       if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) return
       savingRef.current = true
       const newMessages = messages.slice(lastSavedMessageCount)
 
+      let startOrder = lastSavedMessageCount + 1
+      try {
+        // 현재 채팅룸의 실제 마지막 메시지 order 조회
+        const response = await fetch(`/api/messages?chatRoomId=${effectiveChatRoomId}&getLastOrder=true`)
+        if (response.ok) {
+          const data = await response.json()
+          startOrder = (data.lastOrder || 0) + 1
+          console.log(`[v0] Using actual last order from DB: ${data.lastOrder}, starting from: ${startOrder}`)
+        }
+      } catch (error) {
+        console.log(`[v0] Failed to get last order, using fallback: ${startOrder}`)
+      }
+
       const messagesToSave = newMessages.map((msg, index) => ({
         id: generateUUID(),
         role: msg.role,
         content: msg.content,
         createdAt: msg.createdAt || new Date().toISOString(),
-        messageOrder: lastSavedMessageCount + index + 1, // Start from 1, not 0
+        messageOrder: startOrder + index, // Use actual DB order
         chatRoomId: effectiveChatRoomId,
       }))
 
@@ -666,71 +697,6 @@ export default function SajuChat({
       })
     }
   }, [transitionMessages])
-
-  const handleSuggestedQuestionClick = async (question: string) => {
-    if (isLoading) return
-
-    console.log("[v0] Suggested question clicked:", question)
-
-    // 입력창에 질문 설정
-    setInput(question)
-
-    // 직접 메시지 전송 처리
-    console.log("[v0] Submitting suggested question")
-
-    try {
-      // 사용자 메시지 추가
-      const userMessage = {
-        role: "user" as const,
-        content: question,
-      }
-
-      setMessages((prev) => [...prev, userMessage])
-      setInput("") // 입력창 클리어
-      setIsLoading(true)
-
-      // API 호출
-      const response = await fetch("/api/saju-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          sessionId,
-          roomType: roomType || "sajuping",
-          chatRoomId: currentChatRoomId,
-          temporaryChatRoom: temporaryChatRoom?.isTemporary ? temporaryChatRoom : undefined,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-
-        // 응답 메시지 추가
-        if (data.response) {
-          const assistantMessage = {
-            role: "assistant" as const,
-            content: data.response,
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-        }
-
-        // 채팅룸 정보 업데이트
-        if (data.persistedChatRoomId && temporaryChatRoom?.isTemporary) {
-          setCurrentChatRoomId(data.persistedChatRoomId)
-        }
-
-        console.log("[v0] Suggested question response received")
-      } else {
-        console.error("[v0] Failed to send suggested question:", response.status)
-      }
-    } catch (error) {
-      console.error("[v0] Error sending suggested question:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const saveScrollPosition = useCallback(() => {
     if (chatContainerRef.current) {
