@@ -6,15 +6,15 @@ export class SmartMemoryClient {
   async getAllMemories(options?: {
     limit?: number
     sortBy?: string
-    sortOrder?: 'asc' | 'desc'
+    sortOrder?: "asc" | "desc"
     type?: string
   }): Promise<SmartContext[]> {
     try {
       const params = new URLSearchParams()
-      if (options?.limit) params.append('limit', options.limit.toString())
-      if (options?.sortBy) params.append('sortBy', options.sortBy)
-      if (options?.sortOrder) params.append('sortOrder', options.sortOrder)
-      if (options?.type) params.append('type', options.type)
+      if (options?.limit) params.append("limit", options.limit.toString())
+      if (options?.sortBy) params.append("sortBy", options.sortBy)
+      if (options?.sortOrder) params.append("sortOrder", options.sortOrder)
+      if (options?.type) params.append("type", options.type)
 
       const response = await fetch(`${this.baseUrl}?${params}`)
       if (!response.ok) {
@@ -29,17 +29,20 @@ export class SmartMemoryClient {
     }
   }
 
-  async searchMemories(query: string, options?: {
-    limit?: number
-    types?: string[]
-    minQuality?: number
-  }): Promise<MemorySearchResult[]> {
+  async searchMemories(
+    query: string,
+    options?: {
+      limit?: number
+      types?: string[]
+      minQuality?: number
+    },
+  ): Promise<MemorySearchResult[]> {
     try {
       const params = new URLSearchParams()
-      params.append('search', query)
-      if (options?.limit) params.append('limit', options.limit.toString())
-      if (options?.types) params.append('types', options.types.join(','))
-      if (options?.minQuality) params.append('minQuality', options.minQuality.toString())
+      params.append("search", query)
+      if (options?.limit) params.append("limit", options.limit.toString())
+      if (options?.types) params.append("types", options.types.join(","))
+      if (options?.minQuality) params.append("minQuality", options.minQuality.toString())
 
       const response = await fetch(`${this.baseUrl}?${params}`)
       if (!response.ok) {
@@ -69,23 +72,40 @@ export class SmartMemoryClient {
     }
   }
 
-  async saveMemory(content: string, type: string, options?: {
-    importance?: number
-    keywords?: string[]
-  }): Promise<boolean> {
+  async saveMemory(
+    content: string,
+    type: string,
+    options?: {
+      importance?: number
+      keywords?: string[]
+    },
+  ): Promise<boolean> {
     try {
+      const typeImportanceMap = {
+        identity: 0.8,
+        goal: 0.7,
+        relationship: 0.7,
+        preference: 0.6,
+        emotion: 0.5,
+        interest: 0.5,
+        situation: 0.4,
+        schedule: 0.3,
+      } as const
+
+      const defaultImportance = typeImportanceMap[type as keyof typeof typeImportanceMap] || 0.5
+
       const response = await fetch(this.baseUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           memory: {
             content,
             type,
-            importance: options?.importance || 0.5,
+            importance: options?.importance || defaultImportance, // 타입별 기본값 사용
             keywords: options?.keywords || [],
-          }
+          },
         }),
       })
 
@@ -103,9 +123,9 @@ export class SmartMemoryClient {
   async updateMemory(id: string, updates: Partial<SmartContext>): Promise<SmartContext> {
     try {
       const response = await fetch(this.baseUrl, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ id, ...updates }),
       })
@@ -125,7 +145,7 @@ export class SmartMemoryClient {
   async deleteMemory(id: string): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}?id=${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       })
 
       if (!response.ok) {
@@ -142,7 +162,7 @@ export class SmartMemoryClient {
   async deleteAllMemories(): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}?deleteAll=true`, {
-        method: 'DELETE',
+        method: "DELETE",
       })
 
       if (!response.ok) {
@@ -159,7 +179,7 @@ export class SmartMemoryClient {
   async deleteLowQualityMemories(): Promise<{ success: boolean; deletedCount: number; message: string }> {
     try {
       const response = await fetch(`${this.baseUrl}?deleteLowQuality=true`, {
-        method: 'DELETE',
+        method: "DELETE",
       })
 
       if (!response.ok) {
@@ -177,9 +197,9 @@ export class SmartMemoryClient {
   async provideFeedback(memoryId: string, helpful: boolean, feedbackType?: string): Promise<any> {
     try {
       const response = await fetch(`${this.baseUrl}?id=${memoryId}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           helpful,
@@ -199,21 +219,17 @@ export class SmartMemoryClient {
     }
   }
 
-  async processConversation(
-    userMessage: string,
-    assistantResponse: string,
-    conversationId?: string
-  ): Promise<any> {
+  async processConversation(userMessage: string, assistantResponse: string, conversationId?: string): Promise<any> {
     try {
       const response = await fetch(this.baseUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           userMessage,
           assistantResponse,
-          conversationId: conversationId || 'unknown',
+          conversationId: conversationId || "unknown",
         }),
       })
 

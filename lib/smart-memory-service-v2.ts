@@ -57,6 +57,17 @@ const QueryUnderstandingSchema = z.object({
   memoryTypes: z.array(MemoryType).describe("관련 메모리 타입"),
 })
 
+const MEMORY_TYPE_IMPORTANCE = {
+  identity: 0.8, // 정체성 정보는 매우 중요
+  goal: 0.7, // 목표는 중요
+  relationship: 0.7, // 인간관계도 중요
+  preference: 0.6, // 선호도는 중간 중요도
+  emotion: 0.5, // 감정은 기본 중요도
+  interest: 0.5, // 관심사는 기본 중요도
+  situation: 0.4, // 상황은 상대적으로 낮음
+  schedule: 0.3, // 일정은 가장 낮음
+} as const
+
 class SmartMemoryServiceV2 {
   private supabase: any
 
@@ -528,18 +539,25 @@ class SmartMemoryServiceV2 {
 AI: ${assistantResponse}
 
 🎯 **메모리 분류 가이드 (시제 구분 중요!):**
-- **identity**: 현재 상태, 이미 이룬 것 ("창업했다", "개발자다", "결혼했다")
-- **goal**: 미래 목표, 하고 싶은 것 ("창업하고 싶다", "의사가 되고 싶다")
-- **emotion**: 지속적 감정 패턴 ("자주 우울해", "항상 스트레스")
-- **relationship**: 중요한 인간관계 ("연인과 사귐", "부모님과 갈등")
-- **interest**: 취미, 관심사 ("음악 좋아함", "운동 즐김")
-- **preference**: 강한 선호도 ("매운 음식 좋아함", "직설적 대화 선호")
-- **situation**: 현재 중요한 상황 ("취업 준비 중", "이사 준비")
+- **identity**: 현재 상태, 이미 이룬 것 ("창업했다", "개발자다", "결혼했다") - 중요도 0.7-0.9
+- **goal**: 미래 목표, 하고 싶은 것 ("창업하고 싶다", "의사가 되고 싶다") - 중요도 0.6-0.8
+- **emotion**: 지속적 감정 패턴 ("자주 우울해", "항상 스트레스") - 중요도 0.4-0.7
+- **relationship**: 중요한 인간관계 ("연인과 사귐", "부모님과 갈등") - 중요도 0.6-0.8
+- **interest**: 취미, 관심사 ("음악 좋아함", "운동 즐김") - 중요도 0.3-0.6
+- **preference**: 강한 선호도 ("매운 음식 좋아함", "직설적 대화 선호") - 중요도 0.4-0.7
+- **situation**: 현재 중요한 상황 ("취업 준비 중", "이사 준비") - 중요도 0.3-0.6
 
-⚠️ **핵심 규칙:**
-1. 오직 '사용자'의 발언 내용에서만 정보를 추출하세요. 한 대화당 최대 2개만 추출 (정말 중요한 것만!)
-2. AI의 질문, 조언, 분석 내용은 절대 저장하지 마세요.
-3. 중요도 0.4 이상만 추출하고, 사용자가 직접 언급하지 않은 내용은 저장하지 마세요.
+⚠️ **중요도 판단 기준:**
+- 0.8-1.0: 핵심 정체성, 인생 목표, 중요한 관계
+- 0.6-0.7: 지속적 패턴, 강한 선호도, 현재 상황
+- 0.4-0.5: 일반적 관심사, 일시적 감정
+- 0.1-0.3: 사소한 정보, 변할 가능성 높은 것
+
+**중요도를 높게 줄 조건:**
+- 강한 감정 표현 ("정말", "매우", "너무")
+- 구체적 수치/날짜 포함
+- 부정적 감정 (상담에서 중요)
+- 인생의 중요한 변화나 결정
 
 ❌ **저장하지 말 것:**
 - AI가 분석한 내용 ("당신은 ~성격인 것 같아요")
@@ -548,6 +566,13 @@ AI: ${assistantResponse}
 - 일시적 감정 ("오늘 기분 좋아")
 - 인사말, 감사 인사`,
       })
+
+      if (result.object.shouldSave && result.object.memories.length > 0) {
+        result.object.memories = result.object.memories.map((memory) => ({
+          ...memory,
+          importance: this.calculateImportanceScore(memory.type, memory.content, memory.importance),
+        }))
+      }
 
       return result.object
     } catch (error) {
@@ -937,9 +962,19 @@ AI: ${assistantResponse}
     importanceScore: number,
     usageCount: number,
   ): number {
-    const usageBonus = Math.min(0.2, usageCount * 0.02)
+    const relevanceWeight = 0.4
+    const qualityWeight = 0.2
+    const importanceWeight = 0.3 // 기존 0.2에서 0.3으로 증가
+    const usageWeight = 0.1
 
-    return relevanceScore * 0.5 + qualityScore * 0.25 + importanceScore * 0.15 + usageBonus * 0.1
+    const normalizedUsage = Math.min(usageCount / 10, 1)
+
+    return (
+      relevanceScore * relevanceWeight +
+      qualityScore * qualityWeight +
+      importanceScore * importanceWeight +
+      normalizedUsage * usageWeight
+    )
   }
 
   // Get high-quality recent memories
@@ -1009,7 +1044,7 @@ AI: ${assistantResponse}
       /\d+/g,
       /[가-힣]+[시도군구]/g,
       /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
-      /\d{2,4}[-년]\d{1,2}[-월]/g,
+      /\d{4}년|\d+월|\d+일|\d+살|\d+년차/.g,
       /(주식회사|회사|대학교|학교)/g,
     ]
 
@@ -1333,6 +1368,36 @@ AI: ${assistantResponse}
       console.error("Same-type semantic match failed:", error)
       return null
     }
+  }
+
+  private calculateImportanceScore(type: string, content: string, aiImportance?: number): number {
+    const baseImportance = MEMORY_TYPE_IMPORTANCE[type as keyof typeof MEMORY_TYPE_IMPORTANCE] || 0.5
+
+    // AI가 제공한 중요도가 있으면 가중평균 사용
+    if (aiImportance !== undefined && aiImportance > 0) {
+      return Math.round((baseImportance * 0.3 + aiImportance * 0.7) * 10) / 10
+    }
+
+    // 내용 기반 중요도 조정
+    const contentLower = content.toLowerCase()
+    let adjustment = 0
+
+    // 강한 감정 표현이 있으면 중요도 증가
+    if (contentLower.includes("정말") || contentLower.includes("매우") || contentLower.includes("너무")) {
+      adjustment += 0.1
+    }
+
+    // 부정적 감정이 있으면 중요도 증가 (상담에서 중요)
+    if (contentLower.includes("힘들") || contentLower.includes("우울") || contentLower.includes("스트레스")) {
+      adjustment += 0.15
+    }
+
+    // 구체적인 수치나 날짜가 있으면 중요도 증가
+    if (/\d{4}년|\d+월|\d+일|\d+살|\d+년차/.test(content)) {
+      adjustment += 0.1
+    }
+
+    return Math.min(1.0, Math.max(0.1, baseImportance + adjustment))
   }
 }
 
