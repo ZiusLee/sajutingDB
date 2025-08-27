@@ -610,7 +610,7 @@ export default function SajuChat({
 
       setTimeout(() => {
         setIsChangingRoom(false)
-      }, 1000) // 1 second loading animation
+      }, 2000) // 2 second loading animation
     },
     [router, roomType, setSidebarOpen, setCurrentChatRoomId],
   )
