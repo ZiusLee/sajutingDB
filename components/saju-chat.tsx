@@ -286,6 +286,8 @@ export default function SajuChat({
     effectiveChatRoomId,
   ])
 
+  const [input, setInput] = useState("") // Declare setInput variable
+
   useEffect(() => {
     let isMounted = true
     const initializeChatData = async () => {
@@ -442,12 +444,12 @@ export default function SajuChat({
     }
   }, [stableSaju, effectiveChatRoomId, sessionId, calculatedDaeun])
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, reload, append } = useAIChat({
+  const { messages, handleInputChange, handleSubmit, isLoading, error, reload, stop, append } = useAIChat({
     api: "/api/saju-chat",
-    id: effectiveChatRoomId ? `${sessionId}-${effectiveChatRoomId}` : sessionId,
-    initialMessages: transitionMessages ?? chatData.initialMessages,
     body: aiChatBody,
-    experimental_throttle: 50,
+    experimental_throttle: 100,
+    maxRetries: 3,
+    retryDelay: (retryCount) => Math.min(1000 * Math.pow(2, retryCount), 10000),
     onFinish: (message) => {
       if (transitionMessages) setTransitionMessages(null)
       console.log("✅ onFinish triggered for message from:", message.role)
@@ -470,7 +472,18 @@ export default function SajuChat({
     },
     onError: (error) => {
       console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
-      toast.error("오류가 발생했습니다. 다시 시도해주세요.")
+
+      let errorMessage = "오류가 발생했습니다. 다시 시도해주세요."
+
+      if (error.message?.includes("fetch")) {
+        errorMessage = "네트워크 연결에 문제가 있습니다. 인터넷 연결을 확인하고 다시 시도해주세요."
+      } else if (error.message?.includes("timeout")) {
+        errorMessage = "응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."
+      } else if (error.message?.includes("rate limit")) {
+        errorMessage = "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
+      }
+
+      toast.error(errorMessage)
 
       trackEvent("AI_error", {
         error_type: "chat_response_error",
@@ -694,6 +707,37 @@ export default function SajuChat({
   }, [messages.length])
 
   useEffect(() => {
+    let reconnectTimer: NodeJS.Timeout | null = null
+
+    const handleOnline = () => {
+      console.log("🌐 네트워크 연결 복구됨")
+      if (chatStreamState.isStreaming && chatStreamState.currentMessageId) {
+        console.log("🔄 스트리밍 재개 시도")
+        // 3초 후 자동으로 재시도
+        reconnectTimer = setTimeout(() => {
+          reload()
+        }, 3000)
+      }
+    }
+
+    const handleOffline = () => {
+      console.log("🌐 네트워크 연결 끊김")
+      toast.error("네트워크 연결이 끊어졌습니다. 연결이 복구되면 자동으로 재시도됩니다.")
+    }
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+      }
+    }
+  }, [chatStreamState.isStreaming, chatStreamState.currentMessageId, reload])
+
+  useEffect(() => {
     const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
 
     // Load persistent stream state on mount
@@ -742,8 +786,7 @@ export default function SajuChat({
         chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
       }
 
-      // Wait a bit to ensure the final message content is fully rendered
-      setTimeout(clearStreamState, 100)
+      setTimeout(clearStreamState, 500)
     }
 
     // Cleanup function
@@ -792,8 +835,7 @@ export default function SajuChat({
         const streamState = JSON.parse(savedStream)
         const timeDiff = Date.now() - (streamState.timestamp || 0)
 
-        // If stream is less than 5 minutes old, try to restore it
-        if (timeDiff < 5 * 60 * 1000 && streamState.isStreaming) {
+        if (timeDiff < 10 * 60 * 1000 && streamState.isStreaming) {
           console.log("🔄 Attempting to restore interrupted stream")
 
           // Check if the message exists in current messages
@@ -808,10 +850,12 @@ export default function SajuChat({
               createdAt: new Date().toISOString(),
             }
 
+            toast.info("중단된 응답을 복구하고 있습니다...")
+
             // Trigger the AI to continue from where it left off
             setTimeout(() => {
               reload()
-            }, 1000)
+            }, 2000)
           }
         } else {
           // Clean up old stream state

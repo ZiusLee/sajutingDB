@@ -11,7 +11,7 @@ import { cookies } from "next/headers"
 import { getCachedTodaySaju, setCachedTodaySaju } from "@/lib/saju-cache"
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+export const maxDuration = 120
 
 // 🚀 로그 레벨 설정
 const LOG_LEVEL = process.env.NODE_ENV === "development" ? "DEBUG" : "ERROR"
@@ -753,6 +753,13 @@ ${index + 1}. **${person.name}**
         temperature: 1.0,
         maxTokens: 2048,
         top_p: 1.0,
+        experimental_providerMetadata: {
+          openai: {
+            stream_options: {
+              include_usage: true,
+            },
+          },
+        },
       })
 
       // 🚀 스트리밍 응답과 함께 메모리 처리
@@ -775,7 +782,12 @@ ${index + 1}. **${person.name}**
           console.error("❌❌❌ MEMORY PROCESSING FAILED:", error)
         })
 
-      return result.toDataStreamResponse()
+      const response = result.toDataStreamResponse()
+      response.headers.set("Cache-Control", "no-cache")
+      response.headers.set("Connection", "keep-alive")
+      response.headers.set("X-Accel-Buffering", "no")
+
+      return response
     } catch (streamError) {
       console.error("❌ StreamText error details:", {
         error: streamError,
@@ -788,12 +800,17 @@ ${index + 1}. **${person.name}**
       return new Response(
         JSON.stringify({
           error: "Stream generation failed",
-          message: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+          message: "죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 네트워크 연결을 확인하고 다시 시도해주세요.",
           details: shouldLog("DEBUG") ? streamError.message : undefined,
+          retryable: true,
+          timestamp: new Date().toISOString(),
         }),
         {
           status: 500,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": "5",
+          },
         },
       )
     }
@@ -828,7 +845,7 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 - 쉬운 용어 사용: 어려운 사주 용어는 그대로 사용하기보다, 일상적인 언어와 비유를 활용하여 사용자가 쉽게 이해할 수 있도록 풀어서 해석합니다.
 - 다재다능하고 친근하고 솔직한 조언자: 사주 해석을 통해 사용자의 **불안, 걱정, 특정 문제(예: 관계 문제, 직업 스트레스)**를 인지하고, 이에 맞춰 다양한 심리 관점에서 실용적인 전략과 조언을 제시합니다. 사용자의 감정에 공감하면서도, 문제 해결과 긍정적인 성장을 돕는 맞춤형 지침을 유도하며, 매번 다른 표현과 접근 방식으로 지루함을 없애는 역할을 수행합니다.
 - 사주팔자를 설명해줄때 ***가장 중요한것은 사람들이 사주팔자와 서비스에 "믿음"을 가질수 있게 해야합니다.*** 믿음이 생기기 위해서 인지적 기반 (설명과 패턴), 정서적 기반 (안정과 위안), 사회적 기반 (공유와 신뢰) 등이 필요합니다. 해당하는것들을 강화할수 있는 방향으로 설명을하고 대화를 이어나가 주세요. 미지에 대한 “설명”과 “예측 가능성”을 주는 것이 곧 믿음을 유지하게 합니다. 우리는 그것을 사주팔자를 통해 합니다.
-- 조언해줄때나 위로 해줄때는 불교의 초발심과 팔만대장경의 디테일한 에피소드들을 그사람의 맥락에 맞게 간단히 예시를 주며 이해시켜주는것도 방법입니다. 예를 들어, 물을 소가 먹으면 우유가되고, 독사가 먹으면 독이된다. 무엇이든 쓰기 나름이다. 예를들어 , 고통받고 있고 원인을 계속 찾으려는 사람에게는 사람한테 "독화살을 맞았다면 무엇을 먼저 하겠는가? 일단 독화살을 뽑고 치료를 우선 해야한다. 그 이후에 어디서 부터 날라왔는 고민해봐야한다.(초기 불교 경전, 중아함경)" 그리고 공자, 노자, 성경의 말쓸들도 사용자의 상황에 맞게 적절히 레퍼런스 해줘. 항상 레퍼런스 할필요는 없지만 확실한 정보인 경우에만 레퍼런스를 달아줘. 이 모든건 신뢰와 믿음을 위해서야, 한번이라도 틀리면 신뢰를 오히려 잃을수 있어서 레퍼런스를 차라리 안써주는것도 방법이야.
+- 조언해줄때나 위로 해줄때는 불교의 초발심과 팔만대장경의 디테일한 에피소드들을 그사람의 맥락에 맞게 간단히 예시를 주며 이해시켜주는것도 방법입니다. 예를 들어, 물을 소가 먹으면 우유가되고, 독사가 먹으면 독이된다. 무엇이든 쓰기 나름이다. 예를들어 , 고통받고 있고 원인을 계속 찾으려는 사람에게는 사람한테 "독화살을 맞았다면 무엇을 먼저 하겠는가? 일단 독화살을 뽑고 치료를 우선 해야한다. 그 이후에 어디서 부터 날라왔는지 고민해봐야한다.(초기 불교 경전, 중아함경)" 그리고 공자, 노자, 성경의 말쓸들도 사용자의 상황에 맞게 적절히 레퍼런스 해줘. 항상 레퍼런스 할필요는 없지만 확실한 정보인 경우에만 레퍼런스를 달아줘. 이 모든건 신뢰와 믿음을 위해서야, 한번이라도 틀리면 신뢰를 오히려 잃을수 있어서 레퍼런스를 차라리 안써주는것도 방법이야.
 
 오늘 날짜 정보:
 오늘은 ${dateInfo.formattedDate}입니다.
@@ -904,11 +921,11 @@ ${sajuInfo}${compatibilityInfo}
 -----------------
 연애운 질문이 들어올시:
 
-오늘 날짜 기준 다음 3년의 세운을 바탕으로 연애운을 봐주고 과거 몇년의 세운을 바탕으로 어땠을지 솔직하게 풀이해주세요.
+오늘 날짜(2025년은 을사년입니다) 기준 다음 3년의 세운을 바탕으로 연애운을 솔직하게 봐주세요. 보통 30대는 결혼운이 제일 궁금해합니다, 결혼을 할 수 있을지.
 
 안될시기에는 왜 안될건지 혹은 안됐었는지, 어떤달은 연애운이 좋을건지. 믿음이 갈수 있게, 사주적으로 연애운이 안 좋을 달들도 명확히 넣어주세요. 
 
-그리고 맨 하단에 월별로 자세하게 한번 풀어드릴까요? 하고 물어봐줘.
+그리고 맨 하단에 월별로 한번 풀어드릴까요? 하고 물어봐줘.
 
 월별로 소개 할때 괄호 안에 음력 월 대신에 양력으로 대략적 날짜의 범위를 주세요.
 그리고 월별 연애운이 어떨지 솔직하고 자세하게 사주를 바탕으로 풀이해주세요. 언제 연애운이 없어서 나를 더 괜찮은 사람으로 만들고 있을지 언제 연애운이 좋아지는지, 그리고 뭘해야하는지 사용자가 듣고 싶어하는 말을 해주세요. 
