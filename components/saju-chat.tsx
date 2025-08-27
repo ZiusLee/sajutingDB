@@ -288,88 +288,12 @@ export default function SajuChat({
 
   const [input, setInput] = useState("") // Declare setInput variable
 
-  const customHandleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("[v0] Input change detected:", e.target.value)
-    setInput(e.target.value)
-    // 원래 핸들러도 호출
-    if (handleInputChange) {
-      handleInputChange(e)
-    }
-  }
-  const [messages, setMessages] = useState<any[]>([])
-
-  useEffect(() => {
-    if (!currentChatRoomId) return
-
-    const loadMessagesForRoom = async () => {
-      console.log("[v0] Loading messages for chat room:", currentChatRoomId)
-
-      if (currentChatRoomId.startsWith("temp-")) {
-        console.log("[v0] Skipping message load for temporary chat room")
-        setMessages([])
-        return
-      }
-
-      try {
-        const response = await fetch(`/api/messages?chatRoomId=${currentChatRoomId}`)
-        if (response.ok) {
-          const data = await response.json()
-          const roomMessages = data.messages || []
-          setMessages(roomMessages)
-
-          // 메시지 로드 완료 후 잠시 대기한 다음 맨 아래로 스크롤
-          setTimeout(() => {
-            scrollToBottom()
-            console.log("[v0] Auto-scrolled to bottom after room change")
-          }, 100)
-        }
-      } catch (error) {
-        console.error("[v0] Error loading messages for room:", error)
-      }
-    }
-
-    loadMessagesForRoom()
-  }, [currentChatRoomId])
-
-  useEffect(() => {
-    const loadChatRoomMessages = async () => {
-      if (!currentChatRoomId || !sessionId || currentChatRoomId.startsWith("temp-")) {
-        return
-      }
-
-      console.log("[v0] Loading messages for chat room:", currentChatRoomId)
-
-      try {
-        const pastMessages = (await getSessionMessages(sessionId, currentChatRoomId))
-          .filter((msg) => msg.role === "user" || msg.role === "assistant")
-          .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
-          .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
-
-        console.log("[v0] Loaded messages:", pastMessages.length)
-
-        // 메시지 상태 업데이트
-        setMessages(pastMessages)
-        setLastSavedMessageCount(pastMessages.length)
-
-        // 채팅 데이터 업데이트
-        setChatData((prev) => ({
-          ...prev,
-          initialMessages: pastMessages,
-        }))
-      } catch (error) {
-        console.error("[v0] Error loading chat room messages:", error)
-        setMessages([])
-        setLastSavedMessageCount(0)
-      }
-    }
-
-    loadChatRoomMessages()
-  }, [currentChatRoomId, sessionId])
-
   useEffect(() => {
     let isMounted = true
     const initializeChatData = async () => {
       if (!stableSaju) return
+
+      console.log("[v0] Initializing chat data for room:", effectiveChatRoomId)
 
       if (stableSaju.isOptimizedLoad && stableSaju.preloadedDaeun) {
         console.log("🚀 Using optimized load - skipping unnecessary recalculations")
@@ -381,6 +305,8 @@ export default function SajuChat({
 
           // 메시지와 채팅룸 정보만 로드
           if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
+            console.log("[v0] Loading messages for chat room:", effectiveChatRoomId)
+
             try {
               const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
               if (response.ok) {
@@ -400,6 +326,8 @@ export default function SajuChat({
                 .filter((msg) => msg.role === "user" || msg.role === "assistant")
                 .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
                 .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+
+              console.log("[v0] Loaded", pastMessages.length, "messages for room:", effectiveChatRoomId)
             } catch (error) {
               console.error("Error loading messages:", error)
               pastMessages = []
@@ -425,6 +353,8 @@ export default function SajuChat({
             setLastSavedMessageCount(pastMessages.length)
             setIsFirstChatRoom(isFirstRoom)
 
+            console.log("[v0] Chat data initialized with", pastMessages.length, "messages")
+
             if (shouldSendInitialQuestions && isFirstRoom) {
               const questions = getInitialUserQuestions(name, roomType, stableConcerns)
               setInitialQuestionsToSend(questions)
@@ -448,6 +378,8 @@ export default function SajuChat({
         let isFirstRoom = false
 
         if (sessionId && effectiveChatRoomId && !effectiveChatRoomId.startsWith("temp-")) {
+          console.log("[v0] Loading messages for chat room (standard load):", effectiveChatRoomId)
+
           try {
             const response = await fetch(`/api/chat-rooms?sessionId=${sessionId}`)
             if (response.ok) {
@@ -470,6 +402,8 @@ export default function SajuChat({
               .filter((msg) => msg.role === "user" || msg.role === "assistant")
               .sort((a, b) => (a.messageOrder || 0) - (b.messageOrder || 0))
               .map((msg) => ({ id: msg.id, role: msg.role, content: msg.content, createdAt: msg.createdAt }))
+
+            console.log("[v0] Loaded", pastMessages.length, "messages for room (standard load):", effectiveChatRoomId)
           } catch (error) {
             console.error("Error loading messages:", error)
             pastMessages = []
@@ -497,6 +431,8 @@ export default function SajuChat({
           setLastSavedMessageCount(pastMessages.length)
           setIsFirstChatRoom(isFirstRoom)
 
+          console.log("[v0] Chat data initialized with", pastMessages.length, "messages (standard load)")
+
           if (shouldSendInitialQuestions && isFirstRoom) {
             const questions = getInitialUserQuestions(name, roomType, stableConcerns)
             setInitialQuestionsToSend(questions)
@@ -522,59 +458,14 @@ export default function SajuChat({
     }
   }, [stableSaju, effectiveChatRoomId, sessionId, calculatedDaeun])
 
-  const { handleInputChange, handleSubmit, isLoading, error, reload, stop, append } = useAIChat({
+  const { messages, handleInputChange, handleSubmit, isLoading, error, reload, stop, append } = useAIChat({
     api: "/api/saju-chat",
     body: aiChatBody,
     experimental_throttle: 100,
     maxRetries: 3,
-    retryDelay: (retryCount) => Math.min(1000 * Math.pow(2, retryCount), 10000),
-    onFinish: (message) => {
-      if (transitionMessages) setTransitionMessages(null)
-      console.log("✅ onFinish triggered for message from:", message.role)
-
-      if (message.role === "assistant") {
-        trackEvent("AI_message_sent", {
-          message_length: message.content.length,
-          response_time: Date.now() - (window.lastUserMessageTime || Date.now()),
-          room_type: roomType,
-          session_id: sessionId,
-          is_logged_in: user !== null,
-        })
-      }
-
-      // Clear persistent streaming state
-      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
-      localStorage.removeItem(streamKey)
-      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
-      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
-    },
+    initialMessages: chatData.initialMessages, // 기존 메시지들을 초기값으로 설정
     onError: (error) => {
-      console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
-
-      let errorMessage = "오류가 발생했습니다. 다시 시도해주세요."
-
-      if (error.message?.includes("fetch")) {
-        errorMessage = "네트워크 연결에 문제가 있습니다. 인터넷 연결을 확인하고 다시 시도해주세요."
-      } else if (error.message?.includes("timeout")) {
-        errorMessage = "응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."
-      } else if (error.message?.includes("rate limit")) {
-        errorMessage = "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
-      }
-
-      toast.error(errorMessage)
-
-      trackEvent("AI_error", {
-        error_type: "chat_response_error",
-        error_message: error.message,
-        room_type: roomType,
-        session_id: sessionId,
-      })
-
-      // Clear persistent streaming state on error
-      const streamKey = `chat-stream-${effectiveChatRoomId || sessionId}`
-      localStorage.removeItem(streamKey)
-      setChatStreamState({ isStreaming: false, currentMessageId: null, pendingContent: "" })
-      chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
+      console.error("[v0] Chat error:", error)
     },
   })
 
@@ -692,10 +583,15 @@ export default function SajuChat({
         console.log("[v0] Setting current chat room ID:", chatRoomId)
         setCurrentChatRoomId(chatRoomId)
       } else {
-        console.warn("[v0] setCurrentChatRoomId is not available")
+        console.log("[v0] setCurrentChatRoomId not provided, but navigation should still work via URL change")
+      }
+
+      if (window.location.pathname === `/saju-chat/${roomType}` && window.location.search === `?roomId=${chatRoomId}`) {
+        console.log("[v0] Same route detected, forcing refresh to ensure proper chat room loading")
+        window.location.reload()
       }
     },
-    [router, roomType, setSidebarOpen],
+    [router, roomType, setSidebarOpen, setCurrentChatRoomId],
   )
 
   const handleNewChat = () => {
@@ -1254,14 +1150,9 @@ export default function SajuChat({
                             </strong>
                           ),
                           em: ({ children }) => <em className="italic text-gray-600 font-medium">{children}</em>,
-                          del: ({ children }) => {
-                            const text = String(children)
-                            // 단일 물결표 패턴 (예: "1~3월", "~생과 궁합") 감지
-                            if (text.match(/^[^~]*~[^~]*$/) && !text.match(/~~.*~~/)) {
-                              return <span>{children}</span>
-                            }
-                            return <del className="line-through text-gray-500 opacity-75">{children}</del>
-                          },
+                          del: ({ children }) => (
+                            <del className="line-through text-gray-500 opacity-75">{children}</del>
+                          ),
                           code: ({ children, className }) => {
                             const isInline = !className
                             if (isInline) {
@@ -1367,7 +1258,7 @@ export default function SajuChat({
               <div className="flex-1 relative">
                 <Input
                   value={input}
-                  onChange={customHandleInputChange}
+                  onChange={handleInputChange}
                   placeholder="무엇이든 물어보세요"
                   className="h-9 sm:h-11 rounded-full pl-3 sm:pl-4 pr-12 sm:pr-14 bg-gray-100 border-gray-200 focus:ring-gray-900 text-base transition-all duration-200"
                   disabled={isLoading || isInitialQuestionsMode}

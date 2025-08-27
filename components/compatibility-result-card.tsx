@@ -47,23 +47,10 @@ export default function CompatibilityResultCard({ result, onReset }: Compatibili
                     dark:text-gray-100 rounded-xl p-3 sm:p-4 shadow-sm"
       >
         <div className="markdown-content">
-          <ReactMarkdown
-            components={{
-              del: ({ children }) => {
-                const text = String(children)
-                // 단일 물결표 패턴 (예: "1~3월", "~생과 궁합") 감지
-                if (text.match(/^[^~]*~[^~]*$/) && !text.match(/~~.*~~/)) {
-                  return <span>{children}</span>
-                }
-                return <del className="line-through text-gray-500 opacity-75">{children}</del>
-              },
-            }}
-          >
-            {isExpanded ? result : firstSection}
-          </ReactMarkdown>
+          <ReactMarkdown>{isExpanded ? result : firstSection}</ReactMarkdown>
         </div>
 
-        {/* 더보기/접기 버튼 */}
+        {/* 더보기/접기 버�� */}
         {result.length > 500 && (
           <Button
             variant="ghost"
@@ -84,7 +71,7 @@ export default function CompatibilityResultCard({ result, onReset }: Compatibili
         )}
       </div>
 
-      <Button onClick={onReset} className="w-full sm:w-auto bg-transparent" variant="outline">
+      <Button onClick={onReset} className="w-full sm:w-auto" variant="outline">
         다시 분석하기
       </Button>
     </div>
