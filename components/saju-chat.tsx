@@ -590,12 +590,14 @@ export default function SajuChat({
   }, [roomType])
 
   const [isChangingRoom, setIsChangingRoom] = useState(false)
+  const [loadingStartTime, setLoadingStartTime] = useState<number | null>(null)
 
   const handleChatRoomSelect = useCallback(
     (chatRoomId: string) => {
       console.log("[v0] Chat room selected:", chatRoomId)
 
       setIsChangingRoom(true)
+      setLoadingStartTime(Date.now())
 
       if (window.innerWidth < 1024) setSidebarOpen(false)
 
@@ -607,13 +609,43 @@ export default function SajuChat({
       } else {
         console.warn("[v0] setCurrentChatRoomId is not available")
       }
-
-      setTimeout(() => {
-        setIsChangingRoom(false)
-      }, 2000) // 2 second loading animation
     },
     [router, roomType, setSidebarOpen, setCurrentChatRoomId],
   )
+
+  useEffect(() => {
+    if (isChangingRoom && chatData.isInitialized && effectiveChatRoomId && loadingStartTime) {
+      console.log("[v0] Chat data initialized for room:", effectiveChatRoomId)
+      console.log("[v0] Messages loaded:", chatData.initialMessages.length)
+
+      // Check if we have messages or if this is a new chat room (no messages expected)
+      const hasMessagesOrNewRoom = chatData.initialMessages.length > 0 || messages.length === 0
+
+      if (hasMessagesOrNewRoom) {
+        const elapsedTime = Date.now() - loadingStartTime
+        const minLoadingTime = 2000
+        const remainingTime = Math.max(0, minLoadingTime - elapsedTime)
+
+        setTimeout(() => {
+          setIsChangingRoom(false)
+          setLoadingStartTime(null)
+          console.log("[v0] Chat room loading completed")
+
+          // Scroll to bottom to show latest messages in new chat room
+          setTimeout(() => {
+            scrollToBottom()
+          }, 50) // Minimal delay only for DOM update
+        }, remainingTime)
+      }
+    }
+  }, [
+    isChangingRoom,
+    chatData.isInitialized,
+    effectiveChatRoomId,
+    chatData.initialMessages.length,
+    messages.length,
+    loadingStartTime,
+  ])
 
   const handleNewChat = () => {
     router.push(`/saju-chat/${roomType}`)
@@ -1135,7 +1167,7 @@ export default function SajuChat({
                             </li>
                           ),
                           strong: ({ children }) => (
-                            <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded text-sm font-mono">
+                            <strong className="font-semibold text-gray-900 bg-yellow-50 px-1 py-0.5 rounded">
                               {children}
                             </strong>
                           ),
