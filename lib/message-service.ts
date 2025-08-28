@@ -188,10 +188,7 @@ export async function saveMessages(
       },
       body: JSON.stringify({
         sessionId,
-        messages: messages.map((msg, index) => ({
-          ...msg,
-          messageOrder: undefined,
-        })),
+        messages,
         roomType,
         chatRoomId: finalChatRoomId,
       }),

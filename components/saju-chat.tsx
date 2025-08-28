@@ -12,6 +12,7 @@ import DaeunDiagram from "@/components/daeun-diagram"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Input } from "@/components/ui/input"
+import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
@@ -159,9 +160,6 @@ export default function SajuChat({
 
   const router = useRouter()
 
-  const [userContext, setUserContext] = useState<any>(null)
-  const [contextLoaded, setContextLoaded] = useState(false)
-
   const sessionId = useMemo(() => {
     try {
       const savedSaju = localStorage.getItem("current_saju")
@@ -250,74 +248,42 @@ export default function SajuChat({
     return calculated
   }, [stableSaju, stableBirthInfo, gender])
 
-  const loadUserContext = useCallback(async () => {
-    if (!user?.id || contextLoaded) return
-
-    try {
-      console.log("🔄 Loading user context...")
-      const response = await fetch(`/api/user-context?userId=${user.id}`)
-      if (response.ok) {
-        const contextData = await response.json()
-        setUserContext(contextData)
-        setContextLoaded(true)
-        console.log("✅ User context loaded:", contextData.totalContexts, "contexts")
-      } else {
-        console.error("Failed to load user context:", response.status)
-      }
-    } catch (error) {
-      console.error("Error loading user context:", error)
-    }
-  }, [user?.id, contextLoaded])
-
-  useEffect(() => {
-    if (user?.id && !contextLoaded) {
-      loadUserContext()
-    }
-  }, [user?.id, loadUserContext])
-
   const aiChatBody = useMemo(() => {
-    const compressedSaju = stableSaju
-      ? {
-          year: stableSaju.year,
-          month: stableSaju.month,
-          day: stableSaju.day,
-          hour: stableSaju.hour,
-          minute: stableSaju.minute,
-          gender: gender,
-          name: name,
-          pillars: stableSaju.pillars,
-          daeun: calculatedDaeun,
-        }
-      : null
-
-    const body: any = {
-      sessionId,
-      chatRoomId: effectiveChatRoomId,
-      roomType,
+    if (!chatData.isInitialized) return {}
+    const compressedSajuObject =
+      stableSaju && chatData.stableBirthInfo
+        ? compressSaju(
+            stableSaju,
+            chatData.stableBirthInfo.solarYear?.toString(),
+            chatData.stableBirthInfo.solarMonth?.toString(),
+            chatData.stableBirthInfo.solarDay?.toString(),
+            chatData.stableBirthInfo.solarHour?.toString(),
+            chatData.stableBirthInfo.solarMinute?.toString(),
+            chatData.stableBirthInfo.timeUnknown,
+          )
+        : stableSaju
+    return {
       name,
-      saju: stableSaju,
-      compressedSaju, // 누락된 필드 추가
-      birthInfo: stableBirthInfo,
-      daeunInfo: calculatedDaeun,
-      concerns: stableConcerns,
       gender,
-      userId: user?.id,
-      userContext: userContext?.contextSummary || null,
+      roomType,
+      userId: stableUserId,
+      currentYear: 2025,
+      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
+      birthInfo: chatData.stableBirthInfo,
+      compressedSaju: compressedSajuObject,
+      daeun: chatData.calculatedDaeun,
+      chatRoomId: effectiveChatRoomId,
     }
-
-    return body
   }, [
-    sessionId,
-    effectiveChatRoomId,
-    roomType,
-    name,
+    chatData.isInitialized,
+    chatData.stableBirthInfo,
+    chatData.calculatedDaeun,
     stableSaju,
-    stableBirthInfo,
-    calculatedDaeun,
-    stableConcerns,
+    name,
     gender,
-    user?.id,
-    userContext,
+    roomType,
+    stableUserId,
+    effectiveChatRoomId,
   ])
 
   useEffect(() => {
@@ -503,24 +469,7 @@ export default function SajuChat({
       chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     },
     onError: (error) => {
-      console.error("❌ 채팅 오류 상세:", {
-        error,
-        body: aiChatBody,
-        errorMessage: error?.message,
-        errorStack: error?.stack,
-        apiEndpoint: "/api/saju-chat",
-        timestamp: new Date().toISOString(),
-      })
-
-      console.log("🔍 API 호출 시도 확인:", {
-        bodyKeys: Object.keys(aiChatBody || {}),
-        hasMessages: !!aiChatBody?.messages,
-        messagesLength: aiChatBody?.messages?.length,
-        hasUserContext: !!aiChatBody?.userContext,
-        userContextType: typeof aiChatBody?.userContext,
-        endpoint: "/api/saju-chat",
-      })
-
+      console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
 
       trackEvent("AI_error", {
@@ -568,43 +517,21 @@ export default function SajuChat({
 
   useEffect(() => {
     const saveNewMessages = async () => {
-      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized || isLoading) {
-        return
-      }
-
-      const newMessages = messages.slice(lastSavedMessageCount)
-      if (newMessages.length === 0) {
-        return
-      }
-
-      const currentMessageCount = messages.length
-      if (currentMessageCount === lastSavedMessageCount) {
-        return
-      }
-
+      if (savingRef.current || messages.length <= lastSavedMessageCount || !chatData.isInitialized) return
       savingRef.current = true
-
+      const newMessages = messages.slice(lastSavedMessageCount)
       const messagesToSave = newMessages.map((msg, index) => ({
         id: generateUUID(),
         role: msg.role,
         content: msg.content,
         createdAt: msg.createdAt || new Date().toISOString(),
-        messageOrder: lastSavedMessageCount + index + 1,
+        messageOrder: lastSavedMessageCount + index,
         chatRoomId: effectiveChatRoomId,
       }))
 
       try {
-        console.log(
-          `[v0] Saving ${messagesToSave.length} new messages (total: ${messages.length}, saved: ${lastSavedMessageCount})`,
-        )
-
         const result = await saveMessages(sessionId, messagesToSave, roomType, effectiveChatRoomId, temporaryChatRoom)
-
-        if (result.savedCount > 0) {
-          setLastSavedMessageCount(currentMessageCount) // 현재 메시지 수로 업데이트
-          console.log(`[v0] Successfully saved ${result.savedCount} messages`)
-        }
-
+        setLastSavedMessageCount(messages.length)
         if (result.persistedChatRoomId && result.persistedChatRoomId !== effectiveChatRoomId) {
           if (chatContainerRef.current) {
             scrollPositionRef.current = chatContainerRef.current.scrollTop
@@ -625,10 +552,9 @@ export default function SajuChat({
         savingRef.current = false
       }
     }
-
-    saveNewMessages()
+    if (messages.length > 0 && !isLoading) saveNewMessages()
   }, [
-    messages.length,
+    messages,
     lastSavedMessageCount,
     isLoading,
     roomType,
@@ -637,7 +563,6 @@ export default function SajuChat({
     sessionId,
     temporaryChatRoom,
     onChatRoomPersisted,
-    messages,
   ])
 
   useEffect(() => {
@@ -875,7 +800,7 @@ export default function SajuChat({
         )
       }
     }
-  }, [effectiveChatRoomId, sessionId])
+  }, [effectiveChatRoomId, sessionId, isLoading, messages, chatStreamState.isStreaming])
 
   useEffect(() => {
     const handleBeforeUnload = () => {

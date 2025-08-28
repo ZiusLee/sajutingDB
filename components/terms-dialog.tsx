@@ -222,7 +222,7 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                         의미합니다.
                       </li>
                       <li>
-                        "질문권"이란 회원이 구독을 통해 부여받거나 추가 결제를 통해 지급하여, 사주 해석·상담·리포트 등
+                        "질문권"이란 회원이 구독을 통해 부여받거나 추가 결제를 통해 제공받아, 사주 해석·상담·리포트 등
                         유료콘텐츠 이용 시 차감되는 디지털 이용권을 의미합니다.
                       </li>
                       <li>
@@ -292,7 +292,9 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                   <div>
                     <h3 className="font-semibold text-base mb-2">제9조의2 (요금제 변경에 따른 환불정책)</h3>
                     <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>상위 요금제로 변경 시 기존 요금제의 잔여기간 및 질문권은 즉시 소멸되며 환불되지 않습니다.</li>
+                      <li>
+                        상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 질문권은 즉시 소멸되며 환불되지 않습니다.
+                      </li>
                       <li>
                         하위 요금제로 변경 요청 시 변경은 다음 결제일부터 적용되며 그 이전에 결제된 요금은 환불되지
                         않습니다.

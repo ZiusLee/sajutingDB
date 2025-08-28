@@ -158,26 +158,26 @@ async function createSimpleSummary(messages: any[], roomType: string) {
 
 // 🚀 스마트 메모리 통합 함수
 async function getMemoryContext(userId: string, userMessage: string, roomType: string): Promise<string> {
-  if (!ENABLE_SMART_MEMORY || !userId) {
-    console.log("🧠 Smart memory disabled or no userId, skipping memory context")
+  if (!ENABLE_SMART_MEMORY) {
+    console.log("🧠 Smart memory is disabled by environment variable.")
+    return ""
+  }
+  if (!userId) {
+    console.log("🧠 No user ID provided, skipping memory context.")
     return ""
   }
 
   try {
     console.log("🧠 Getting memory context for user:", userId)
-    const relevantMemories = await smartMemoryServiceV2.getRelevantMemories(userId, userMessage, roomType)
+    const memoryContext = await smartMemoryServiceV2.getRelevantMemories(userId, userMessage)
 
-    if (!relevantMemories || relevantMemories.length === 0) {
-      console.log("🧠 No relevant memories found")
-      return ""
+    if (shouldLog("DEBUG")) {
+      console.log("🧠 메모리 컨텍스트 추가:", memoryContext)
     }
 
-    const memoryContext = relevantMemories.map((memory: any) => `📝 ${memory.content}`).join("\n")
-
-    console.log(`🧠 Found ${relevantMemories.length} relevant memories`)
-    return `🧠 **관련 기억 정보:**\n${memoryContext}\n`
+    return memoryContext
   } catch (error) {
-    console.error("🧠 Memory context error:", error)
+    console.error("메모리 컨텍스트 생성 실패:", error)
     return ""
   }
 }
@@ -254,35 +254,7 @@ async function processMemoryImmediate(
   }
 }
 
-// 🚀 preloaded context를 메시지 형태로 변환하는 함수 추가
-async function getMemoryContextFromPreloaded(userContext: any, userMessage: string, roomType: string): Promise<string> {
-  if (!userContext || !Array.isArray(userContext)) {
-    console.log("🧠 No preloaded context available")
-    return ""
-  }
-
-  try {
-    // contextSummary 구조를 메시지 형태로 변환
-    const contextMessages = userContext
-      .map((typeGroup: any) => {
-        const typeHeader = `📂 ${typeGroup.type} (${typeGroup.count}개)`
-        const items = typeGroup.items
-          .slice(0, 3) // 각 타입별로 최대 3개만 사용
-          .map((item: any) => `  • ${item.content}`)
-          .join("\n")
-        return `${typeHeader}\n${items}`
-      })
-      .join("\n\n")
-
-    console.log(`🧠 Using preloaded context: ${userContext.length} types`)
-    return `🧠 **사전 로드된 사용자 컨텍스트:**\n${contextMessages}\n`
-  } catch (error) {
-    console.error("🧠 Preloaded context error:", error)
-    return ""
-  }
-}
-
-async function POST(req: Request) {
+export async function POST(req: Request) {
   console.log("==================================================")
   console.log("🚀🚀🚀 SAJU CHAT API CALLED 🚀🚀🚀")
   console.log("Time:", new Date().toISOString())
@@ -302,7 +274,6 @@ async function POST(req: Request) {
       compatibilityData,
       continueFromMessage,
       chatRoomId,
-      userContext, // 추가된 필드
     } = body
 
     console.log("🚀 Saju Chat API called with:", {
@@ -312,7 +283,6 @@ async function POST(req: Request) {
       hasCompressedSaju: !!compressedSaju,
       name,
       gender,
-      hasUserContext: !!userContext,
     })
 
     // 🚀 브라우저별 차이 디버깅
@@ -459,13 +429,13 @@ async function POST(req: Request) {
         const optimizedMessages = await processMessagesForContext(continueMessages, compressedSaju, name, roomType)
 
         // 시스템 메시지 설정 (기존과 동일)
-        const systemMessage = getSystemMessage(roomType, dateInfo, compressedSaju, compatibilityData)
+        const systemMessage = getSystemMessage(roomType, dateInfo, compressedSaju, name, gender, compatibilityData)
         const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
         try {
           const result = await streamText({
             messages: apiMessages,
-            model: openai("gpt-4o"),
+            model: openai("gpt-4.1"),
             temperature: 0.8,
             maxTokens: 2048,
           })
@@ -491,21 +461,8 @@ async function POST(req: Request) {
     const latestMessage = messages[messages.length - 1]?.content || ""
     const userMessageVar = latestMessage
 
-    const memoryContext = body.userContext
-      ? await getMemoryContextFromPreloaded(body.userContext, userMessageVar, roomType)
-      : ""
-
-    console.log("🧠 [DEBUG] userContext processing:", {
-      hasUserContext: !!body.userContext,
-      userContextType: typeof body.userContext,
-      isArray: Array.isArray(body.userContext),
-      userContextLength: body.userContext?.length,
-      memoryContextLength: memoryContext.length,
-    })
-
-    if (shouldLog("DEBUG")) {
-      console.log("🧠 Using preloaded memory context:", memoryContext.length, "characters")
-    }
+    // 🚀 스마트 메모리 컨텍스트 가져오기
+    const memoryContext = await getMemoryContext(userId, userMessageVar, roomType)
 
     // 🚀 메모리 컨텍스트와 최신 메시지를 함께 파싱
     let combinedParsingText = latestMessage
@@ -792,7 +749,7 @@ ${index + 1}. **${person.name}**
       // 🚨 CRITICAL: DO NOT CHANGE THESE MODEL SETTINGS - SEE docs/MODEL_CONFIGURATION.md
       const result = await streamText({
         messages: apiMessages,
-        model: openai("gpt-4o"),
+        model: openai("gpt-4.1"),
         temperature: 1.0,
         maxTokens: 2048,
         top_p: 1.0,
@@ -841,19 +798,17 @@ ${index + 1}. **${person.name}**
       )
     }
   } catch (error) {
-    console.error("❌❌❌ SAJU CHAT API ERROR:", {
+    console.error("❌ API error details:", {
       error: error,
       message: error.message,
       stack: error.stack,
-      timestamp: new Date().toISOString(),
     })
 
     return new Response(
       JSON.stringify({
-        error: "Internal server error",
-        message: "죄송합니다. 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        error: "Request processing failed",
+        message: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
         details: shouldLog("DEBUG") ? error.message : undefined,
-        timestamp: new Date().toISOString(),
       }),
       {
         status: 500,
@@ -873,7 +828,7 @@ function getSystemMessage(roomType: string, dateInfo: any, sajuInfo: string, com
 - 쉬운 용어 사용: 어려운 사주 용어는 그대로 사용하기보다, 일상적인 언어와 비유를 활용하여 사용자가 쉽게 이해할 수 있도록 풀어서 해석합니다.
 - 다재다능하고 친근하고 솔직한 조언자: 사주 해석을 통해 사용자의 **불안, 걱정, 특정 문제(예: 관계 문제, 직업 스트레스)**를 인지하고, 이에 맞춰 다양한 심리 관점에서 실용적인 전략과 조언을 제시합니다. 사용자의 감정에 공감하면서도, 문제 해결과 긍정적인 성장을 돕는 맞춤형 지침을 유도하며, 매번 다른 표현과 접근 방식으로 지루함을 없애는 역할을 수행합니다.
 - 사주팔자를 설명해줄때 ***가장 중요한것은 사람들이 사주팔자와 서비스에 "믿음"을 가질수 있게 해야합니다.*** 믿음이 생기기 위해서 인지적 기반 (설명과 패턴), 정서적 기반 (안정과 위안), 사회적 기반 (공유와 신뢰) 등이 필요합니다. 해당하는것들을 강화할수 있는 방향으로 설명을하고 대화를 이어나가 주세요. 미지에 대한 “설명”과 “예측 가능성”을 주는 것이 곧 믿음을 유지하게 합니다. 우리는 그것을 사주팔자를 통해 합니다.
-- 조언해줄때나 위로 해줄때는 불교의 초발심과 팔만대장경의 디테일한 에피소드들을 그사람의 맥락에 맞게 간단히 예시를 주며 이해시켜주는것도 방법입니다. 예를 들어, 불경, 공자, 노자, 성경의 말씀들도 사용자의 상황에 맞게 적절히 레퍼런스 해줘. 항상 레퍼런스 할 필요는 없지만 공자, 노자, 성경의 말씀이 확실한 경우에만 레퍼런스를 달아줘. 이 모든건 신뢰와 믿음을 위해서야, 한번이라도 틀리면 신뢰를 오히려 잃을수 있어서 레퍼런스를 차라리 안써주는것도 방법이야.
+- 조언해줄때나 위로 해줄때는 불교의 초발심과 팔만대장경의 디테일한 에피소드들을 그사람의 맥락에 맞게 간단히 예시를 주며 이해시켜주는것도 방법입니다. 예를 들어, 물을 소가 먹으면 우유가되고, 독사가 먹으면 독이된다. 무엇이든 쓰기 나름이다. 예를들어 , 고통받고 있고 원인을 계속 찾으려는 사람에게는 사람한테 "독화살을 맞았다면 무엇을 먼저 하겠는가? 일단 독화살을 뽑고 치료를 우선 해야한다. 그 이후에 어디서 부터 날라왔는지 고민해봐야한다.(초기 불교 경전, 중아함경)" 그리고 공자, 노자, 성경의 말쓸들도 사용자의 상황에 맞게 적절히 레퍼런스 해줘. 항상 레퍼런스 할필요는 없지만 확실한 정보인 경우에만 레퍼런스를 달아줘. 이 모든건 신뢰와 믿음을 위해서야, 한번이라도 틀리면 신뢰를 오히려 잃을수 있어서 레퍼런스를 차라리 안써주는것도 방법이야.
 
 오늘 날짜 정보:
 오늘은 ${dateInfo.formattedDate}입니다.
@@ -951,10 +906,10 @@ ${sajuInfo}${compatibilityInfo}
 
 다음 3년의 세운을 바탕으로 연애운을 솔직하게 봐주세요. 좋을때와 안좋을때를 사주를 근거로 제시해주세요. 보통 30대는 결혼운이 제일 궁금해합니다, 결혼을 할 수 있을지 그리고 언제 연애 운이 제일 좋은지.
 
-그리고 맨 하단에 월별로 한번 풀어드릴까요? 하고 물어봐줘.
+그리고 맨 하단에 월별로 자세하게 한번 풀어드릴까요? 하고 물어봐줘.
 
 월별로 소개 할때 괄호 안에 음력 월 대신에 양력으로 대략적 날짜의 범위를 주세요.
-그리고 월별 연애운이 어떨지 솔직하고 가감없이 하지만 친절하게 사용자가 듣고 싶어하는 말을 해주세요. 
+그리고 월별 연애운이 어떨지 솔직하고 자세하게 사주를 바탕으로 풀이해주세요. 언제 연애운이 없어서 나를 더 괜찮은 사람으로 만들고 있을지 언제 연애운이 좋아지는지, 그리고 뭘해야하는지 사용자가 듣고 싶어하는 말을 해주세요. 
 
 재회운도 마찬가지로 솔직하고 가감없이 하지만 친절하게 사용자가 듣고 싶어하는 말을 해주세요.
 
