@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         "id, type, content, source_context, keywords, importance_score, quality_score, reference_count, is_pinned, created_at, updated_at",
       )
       .eq("user_id", userId)
-      .gte("quality_score", 0.3) // 최소 품질 점수 필터
+      .gte("quality_score", 0.1) // 최소 품질 점수 필터
       .order("quality_score", { ascending: false })
       .order("importance_score", { ascending: false })
       .limit(50) // 최대 50개로 제한

@@ -276,12 +276,27 @@ export default function SajuChat({
   }, [user?.id, loadUserContext])
 
   const aiChatBody = useMemo(() => {
+    const compressedSaju = stableSaju
+      ? {
+          year: stableSaju.year,
+          month: stableSaju.month,
+          day: stableSaju.day,
+          hour: stableSaju.hour,
+          minute: stableSaju.minute,
+          gender: gender,
+          name: name,
+          pillars: stableSaju.pillars,
+          daeun: calculatedDaeun,
+        }
+      : null
+
     const body: any = {
       sessionId,
       chatRoomId: effectiveChatRoomId,
       roomType,
       name,
       saju: stableSaju,
+      compressedSaju, // 누락된 필드 추가
       birthInfo: stableBirthInfo,
       daeunInfo: calculatedDaeun,
       concerns: stableConcerns,
@@ -302,7 +317,7 @@ export default function SajuChat({
     stableConcerns,
     gender,
     user?.id,
-    userContext, // 의존성에 userContext 추가
+    userContext,
   ])
 
   useEffect(() => {
