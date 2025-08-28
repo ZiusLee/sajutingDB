@@ -312,6 +312,7 @@ async function POST(req: Request) {
       hasCompressedSaju: !!compressedSaju,
       name,
       gender,
+      hasUserContext: !!userContext,
     })
 
     // 🚀 브라우저별 차이 디버깅
@@ -458,13 +459,13 @@ async function POST(req: Request) {
         const optimizedMessages = await processMessagesForContext(continueMessages, compressedSaju, name, roomType)
 
         // 시스템 메시지 설정 (기존과 동일)
-        const systemMessage = getSystemMessage(roomType, dateInfo, compressedSaju, name, gender, compatibilityData)
+        const systemMessage = getSystemMessage(roomType, dateInfo, compressedSaju, compatibilityData)
         const apiMessages = [{ role: "system", content: systemMessage }, ...optimizedMessages]
 
         try {
           const result = await streamText({
             messages: apiMessages,
-            model: openai("gpt-4.1"),
+            model: openai("gpt-4o"),
             temperature: 0.8,
             maxTokens: 2048,
           })
@@ -493,6 +494,14 @@ async function POST(req: Request) {
     const memoryContext = body.userContext
       ? await getMemoryContextFromPreloaded(body.userContext, userMessageVar, roomType)
       : ""
+
+    console.log("🧠 [DEBUG] userContext processing:", {
+      hasUserContext: !!body.userContext,
+      userContextType: typeof body.userContext,
+      isArray: Array.isArray(body.userContext),
+      userContextLength: body.userContext?.length,
+      memoryContextLength: memoryContext.length,
+    })
 
     if (shouldLog("DEBUG")) {
       console.log("🧠 Using preloaded memory context:", memoryContext.length, "characters")
@@ -783,7 +792,7 @@ ${index + 1}. **${person.name}**
       // 🚨 CRITICAL: DO NOT CHANGE THESE MODEL SETTINGS - SEE docs/MODEL_CONFIGURATION.md
       const result = await streamText({
         messages: apiMessages,
-        model: openai("gpt-4.1"),
+        model: openai("gpt-4o"),
         temperature: 1.0,
         maxTokens: 2048,
         top_p: 1.0,
@@ -832,17 +841,19 @@ ${index + 1}. **${person.name}**
       )
     }
   } catch (error) {
-    console.error("❌ API error details:", {
+    console.error("❌❌❌ SAJU CHAT API ERROR:", {
       error: error,
       message: error.message,
       stack: error.stack,
+      timestamp: new Date().toISOString(),
     })
 
     return new Response(
       JSON.stringify({
-        error: "Request processing failed",
-        message: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        error: "Internal server error",
+        message: "죄송합니다. 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
         details: shouldLog("DEBUG") ? error.message : undefined,
+        timestamp: new Date().toISOString(),
       }),
       {
         status: 500,

@@ -503,7 +503,24 @@ export default function SajuChat({
       chatStreamRef.current = { isStreaming: false, messageId: null, content: "" }
     },
     onError: (error) => {
-      console.error("❌ 채팅 오류 상세:", { error, body: aiChatBody })
+      console.error("❌ 채팅 오류 상세:", {
+        error,
+        body: aiChatBody,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        apiEndpoint: "/api/saju-chat",
+        timestamp: new Date().toISOString(),
+      })
+
+      console.log("🔍 API 호출 시도 확인:", {
+        bodyKeys: Object.keys(aiChatBody || {}),
+        hasMessages: !!aiChatBody?.messages,
+        messagesLength: aiChatBody?.messages?.length,
+        hasUserContext: !!aiChatBody?.userContext,
+        userContextType: typeof aiChatBody?.userContext,
+        endpoint: "/api/saju-chat",
+      })
+
       toast.error("오류가 발생했습니다. 다시 시도해주세요.")
 
       trackEvent("AI_error", {
