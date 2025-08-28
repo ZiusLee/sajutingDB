@@ -152,7 +152,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
 
             <Button variant="ghost" className="w-full justify-start h-12 px-4" onClick={handleChargeStation}>
               <Zap className="h-5 w-5 mr-3 text-yellow-500" />
-              <span className="flex-1 text-left">정기결제</span>
+              <span className="flex-1 text-left">구독 관리</span>
               <div className="flex flex-col items-end gap-1 mr-2">
                 <div className="flex items-center gap-1">
                   <TicketIcon className="text-yellow-500" size={16} />

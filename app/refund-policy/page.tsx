@@ -15,9 +15,9 @@ export default function RefundPolicyPage() {
           <Link
             href="/charge"
             className="text-sm text-neutral-600 hover:text-neutral-900 underline underline-offset-4"
-            aria-label="충전 페이지로 돌아가기"
+            aria-label="구독 관리 페이지로 돌아가기"
           >
-            {"← 충전(결제) 페이지로 돌아가기"}
+            {"← 구독 관리 페이지로 돌아가기"}
           </Link>
         </div>
 
@@ -56,7 +56,7 @@ export default function RefundPolicyPage() {
                       <strong>유료서비스:</strong> 회사가 유료로 제공하는 디지털콘텐츠
                     </li>
                     <li>
-                      <strong>질문권:</strong> 구독 또는 별도 유상 결제를 통해 충전되는 디지털 이용권(사주 해석·상담
+                      <strong>질문권:</strong> 구독 또는 별도 유상 결제를 통해 제공되는 디지털 이용권(사주 해석·상담
                       등에 사용)
                     </li>
                     <li>
@@ -196,6 +196,17 @@ export default function RefundPolicyPage() {
                     <li>결제 완료 후에는 해당 주기에 대한 환불이 되지 않습니다.</li>
                   </ul>
                 </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">{"제4조 (질문권 유효기간)"}</h3>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li>
+                      <strong>제4조의2:</strong> 질문권의 유효기간은 제공일로부터 1년입니다.
+                    </li>
+                    <li>유효기간이 경과한 질문권은 자동으로 소멸되며 환불되지 않습니다.</li>
+                    <li>보너스 질문권 역시 동일한 유효기간이 적용됩니다.</li>
+                  </ul>
+                </div>
               </section>
 
               <Separator className="my-6" />
@@ -257,9 +268,9 @@ export default function RefundPolicyPage() {
           <Link
             href="/charge"
             className="inline-flex items-center justify-center rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-            aria-label="충전 페이지로 이동"
+            aria-label="구독 관리 페이지로 이동"
           >
-            {"충전(결제) 페이지로 돌아가기"}
+            {"구독 관리 페이지로 돌아가기"}
           </Link>
         </div>
       </div>
