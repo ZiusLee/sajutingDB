@@ -12,7 +12,6 @@ import DaeunDiagram from "@/components/daeun-diagram"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Input } from "@/components/ui/input"
-import { compressSaju } from "@/lib/saju-compression"
 import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
@@ -160,6 +159,9 @@ export default function SajuChat({
 
   const router = useRouter()
 
+  const [userContext, setUserContext] = useState<any>(null)
+  const [contextLoaded, setContextLoaded] = useState(false)
+
   const sessionId = useMemo(() => {
     try {
       const savedSaju = localStorage.getItem("current_saju")
@@ -248,42 +250,59 @@ export default function SajuChat({
     return calculated
   }, [stableSaju, stableBirthInfo, gender])
 
-  const aiChatBody = useMemo(() => {
-    if (!chatData.isInitialized) return {}
-    const compressedSajuObject =
-      stableSaju && chatData.stableBirthInfo
-        ? compressSaju(
-            stableSaju,
-            chatData.stableBirthInfo.solarYear?.toString(),
-            chatData.stableBirthInfo.solarMonth?.toString(),
-            chatData.stableBirthInfo.solarDay?.toString(),
-            chatData.stableBirthInfo.solarHour?.toString(),
-            chatData.stableBirthInfo.solarMinute?.toString(),
-            chatData.stableBirthInfo.timeUnknown,
-          )
-        : stableSaju
-    return {
-      name,
-      gender,
-      roomType,
-      userId: stableUserId,
-      currentYear: 2025,
-      yearDescription: "을사년(乙巳年), 푸른 뱀의 해",
-      birthInfo: chatData.stableBirthInfo,
-      compressedSaju: compressedSajuObject,
-      daeun: chatData.calculatedDaeun,
-      chatRoomId: effectiveChatRoomId,
+  const loadUserContext = useCallback(async () => {
+    if (!user?.id || contextLoaded) return
+
+    try {
+      console.log("🔄 Loading user context...")
+      const response = await fetch(`/api/user-context?userId=${user.id}`)
+      if (response.ok) {
+        const contextData = await response.json()
+        setUserContext(contextData)
+        setContextLoaded(true)
+        console.log("✅ User context loaded:", contextData.totalContexts, "contexts")
+      } else {
+        console.error("Failed to load user context:", response.status)
+      }
+    } catch (error) {
+      console.error("Error loading user context:", error)
     }
+  }, [user?.id, contextLoaded])
+
+  useEffect(() => {
+    if (user?.id && !contextLoaded) {
+      loadUserContext()
+    }
+  }, [user?.id, loadUserContext])
+
+  const aiChatBody = useMemo(() => {
+    const body: any = {
+      sessionId,
+      chatRoomId: effectiveChatRoomId,
+      roomType,
+      name,
+      saju: stableSaju,
+      birthInfo: stableBirthInfo,
+      daeunInfo: calculatedDaeun,
+      concerns: stableConcerns,
+      gender,
+      userId: user?.id,
+      userContext: userContext?.contextSummary || null,
+    }
+
+    return body
   }, [
-    chatData.isInitialized,
-    chatData.stableBirthInfo,
-    chatData.calculatedDaeun,
-    stableSaju,
-    name,
-    gender,
-    roomType,
-    stableUserId,
+    sessionId,
     effectiveChatRoomId,
+    roomType,
+    name,
+    stableSaju,
+    stableBirthInfo,
+    calculatedDaeun,
+    stableConcerns,
+    gender,
+    user?.id,
+    userContext, // 의존성에 userContext 추가
   ])
 
   useEffect(() => {
