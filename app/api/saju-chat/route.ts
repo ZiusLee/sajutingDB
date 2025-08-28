@@ -158,26 +158,26 @@ async function createSimpleSummary(messages: any[], roomType: string) {
 
 // 🚀 스마트 메모리 통합 함수
 async function getMemoryContext(userId: string, userMessage: string, roomType: string): Promise<string> {
-  if (!ENABLE_SMART_MEMORY) {
-    console.log("🧠 Smart memory is disabled by environment variable.")
-    return ""
-  }
-  if (!userId) {
-    console.log("🧠 No user ID provided, skipping memory context.")
+  if (!ENABLE_SMART_MEMORY || !userId) {
+    console.log("🧠 Smart memory disabled or no userId, skipping memory context")
     return ""
   }
 
   try {
     console.log("🧠 Getting memory context for user:", userId)
-    const memoryContext = await smartMemoryServiceV2.getRelevantMemories(userId, userMessage)
+    const relevantMemories = await smartMemoryServiceV2.getRelevantMemories(userId, userMessage, roomType)
 
-    if (shouldLog("DEBUG")) {
-      console.log("🧠 메모리 컨텍스트 추가:", memoryContext)
+    if (!relevantMemories || relevantMemories.length === 0) {
+      console.log("🧠 No relevant memories found")
+      return ""
     }
 
-    return memoryContext
+    const memoryContext = relevantMemories.map((memory: any) => `📝 ${memory.content}`).join("\n")
+
+    console.log(`🧠 Found ${relevantMemories.length} relevant memories`)
+    return `🧠 **관련 기억 정보:**\n${memoryContext}\n`
   } catch (error) {
-    console.error("메모리 컨텍스트 생성 실패:", error)
+    console.error("🧠 Memory context error:", error)
     return ""
   }
 }
@@ -254,102 +254,35 @@ async function processMemoryImmediate(
   }
 }
 
+// 🚀 preloaded context를 메시지 형태로 변환하는 함수 추가
 async function getMemoryContextFromPreloaded(userContext: any, userMessage: string, roomType: string): Promise<string> {
-  if (!userContext || !userContext.length) {
+  if (!userContext || !Array.isArray(userContext)) {
     console.log("🧠 No preloaded context available")
     return ""
   }
 
   try {
-    console.log("🧠 Using preloaded context:", userContext.length, "context groups")
+    // contextSummary 구조를 메시지 형태로 변환
+    const contextMessages = userContext
+      .map((typeGroup: any) => {
+        const typeHeader = `📂 ${typeGroup.type} (${typeGroup.count}개)`
+        const items = typeGroup.items
+          .slice(0, 3) // 각 타입별로 최대 3개만 사용
+          .map((item: any) => `  • ${item.content}`)
+          .join("\n")
+        return `${typeHeader}\n${items}`
+      })
+      .join("\n\n")
 
-    // 메시지 내용과 관련성이 높은 컨텍스트 타입 식별
-    const relevantTypes = identifyRelevantTypes(userMessage, roomType)
-
-    // 관련 컨텍스트 필터링 및 포맷팅
-    const relevantContexts = userContext
-      .filter((group: any) => relevantTypes.includes(group.type))
-      .flatMap((group: any) => group.items.slice(0, 3)) // 각 타입별로 최대 3개
-      .sort((a: any, b: any) => (b.quality_score || 0) - (a.quality_score || 0))
-      .slice(0, 10) // 전체 최대 10개
-
-    if (relevantContexts.length === 0) {
-      // 관련 타입이 없으면 고품질 컨텍스트 사용
-      const highQualityContexts = userContext
-        .flatMap((group: any) => group.items.slice(0, 2))
-        .sort((a: any, b: any) => (b.quality_score || 0) - (a.quality_score || 0))
-        .slice(0, 5)
-
-      return formatContextForPrompt(highQualityContexts)
-    }
-
-    return formatContextForPrompt(relevantContexts)
+    console.log(`🧠 Using preloaded context: ${userContext.length} types`)
+    return `🧠 **사전 로드된 사용자 컨텍스트:**\n${contextMessages}\n`
   } catch (error) {
-    console.error("Error processing preloaded context:", error)
+    console.error("🧠 Preloaded context error:", error)
     return ""
   }
 }
 
-function identifyRelevantTypes(userMessage: string, roomType: string): string[] {
-  const message = userMessage.toLowerCase()
-  const relevantTypes: string[] = []
-
-  // 키워드 기반 타입 매칭
-  if (message.includes("직업") || message.includes("일") || message.includes("회사")) {
-    relevantTypes.push("identity", "goal")
-  }
-  if (message.includes("관계") || message.includes("사람") || message.includes("친구") || message.includes("가족")) {
-    relevantTypes.push("relationship")
-  }
-  if (message.includes("감정") || message.includes("기분") || message.includes("스트레스")) {
-    relevantTypes.push("emotion")
-  }
-  if (message.includes("취미") || message.includes("좋아") || message.includes("관심")) {
-    relevantTypes.push("interest", "preference")
-  }
-  if (message.includes("목표") || message.includes("계획") || message.includes("미래")) {
-    relevantTypes.push("goal")
-  }
-  if (message.includes("경험") || message.includes("과거") || message.includes("했었")) {
-    relevantTypes.push("experience")
-  }
-
-  // 기본 타입들 (항상 포함)
-  relevantTypes.push("identity", "situation")
-
-  return [...new Set(relevantTypes)] // 중복 제거
-}
-
-function formatContextForPrompt(contexts: any[]): string {
-  if (!contexts || contexts.length === 0) return ""
-
-  const formatted = contexts
-    .map((ctx: any) => {
-      const typeLabel = getTypeLabel(ctx.type)
-      return `${typeLabel}: ${ctx.content}`
-    })
-    .join("\n")
-
-  return `\n\n📚 사용자 정보:\n${formatted}\n`
-}
-
-function getTypeLabel(type: string): string {
-  const labels: { [key: string]: string } = {
-    identity: "신원/직업",
-    goal: "목표/계획",
-    emotion: "감정 패턴",
-    relationship: "인간관계",
-    interest: "관심사",
-    preference: "선호도",
-    situation: "현재 상황",
-    experience: "과거 경험",
-    belief: "신념/가치관",
-    skill: "능력/기술",
-  }
-  return labels[type] || type
-}
-
-export async function POST(req: Request) {
+async function POST(req: Request) {
   console.log("==================================================")
   console.log("🚀🚀🚀 SAJU CHAT API CALLED 🚀🚀🚀")
   console.log("Time:", new Date().toISOString())
@@ -1010,7 +943,7 @@ ${sajuInfo}${compatibilityInfo}
 그리고 맨 하단에 월별로 한번 풀어드릴까요? 하고 물어봐줘.
 
 월별로 소개 할때 괄호 안에 음력 월 대신에 양력으로 대략적 날짜의 범위를 주세요.
-그리고 월별 연애운이 어떨지 솔직하고 자세하게 사주를 바탕으로 풀이해주세요. 언제 연애운이 없어서 나를 더 괜찮은 사람으로 만들고 있을지 언제 연애운이 좋아지는지, 그리고 뭘해야하는지 사용자가 듣고 싶어하는 말을 해주세요. 
+그리고 월별 연애운이 어떨지 솔직하고 가감없이 하지만 친절하게 사용자가 듣고 싶어하는 말을 해주세요. 
 
 재회운도 마찬가지로 솔직하고 가감없이 하지만 친절하게 사용자가 듣고 싶어하는 말을 해주세요.
 
