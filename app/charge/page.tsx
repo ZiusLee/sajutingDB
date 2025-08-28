@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 
 export default function ChargePage() {
   useEffect(() => {
-    trackIntegratedEvents.pageView("subscription-management")
+    trackIntegratedEvents.pageView("charge")
   }, [])
 
   return (

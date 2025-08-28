@@ -222,7 +222,7 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                         의미합니다.
                       </li>
                       <li>
-                        "질문권"이란 회원이 구독을 통해 부여받거나 추가 결제를 통해 지급하여, 사주 해석·상담·리포트 등
+                        "질문권"이란 회원이 구독을 통해 부여받거나 추가 결제를 통해 충전하여, 사주 해석·상담·리포트 등
                         유료콘텐츠 이용 시 차감되는 디지털 이용권을 의미합니다.
                       </li>
                       <li>
@@ -281,8 +281,8 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                     <h3 className="font-semibold text-base mb-2">제9조 (환불정책)</h3>
                     <ul className="list-decimal list-inside space-y-1 ml-4">
                       <li>
-                        구독은 결제일을 기준으로 매월/매년 자동 갱신됩니다. 이용자가 갱신을 원하지 않는 경우, 차기
-                        결제일 이전에 반드시 해지 신청을 해야 하며, 결제 완료 후에는 환불되지 않습니다.
+                        구독은 결제 시점부터 즉시 효력이 발생하며, 결제일로부터 1일이라도 경과하거나 질문권을 사용한
+                        경우 환불이 불가합니다.
                       </li>
                       <li>부분 환불, 잔여기간 환불, 잔여 질문권 환불은 제공되지 않습니다.</li>
                       <li>보너스 질문권은 환불되지 않습니다.</li>
@@ -292,7 +292,9 @@ export function TermsDialog({ open, onOpenChange, onAgree }: TermsDialogProps) {
                   <div>
                     <h3 className="font-semibold text-base mb-2">제9조의2 (요금제 변경에 따른 환불정책)</h3>
                     <ul className="list-decimal list-inside space-y-1 ml-4">
-                      <li>상위 요금제로 변경 시 기존 요금제의 잔여기간 및 질문권은 즉시 소멸되며 환불되지 않습니다.</li>
+                      <li>
+                        상위 요금제로 변경 시 기존 요금제의 잔여기간 및 잔여 질문권은 즉시 소멸되며 환불되지 않습니다.
+                      </li>
                       <li>
                         하위 요금제로 변경 요청 시 변경은 다음 결제일부터 적용되며 그 이전에 결제된 요금은 환불되지
                         않습니다.

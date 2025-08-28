@@ -389,7 +389,7 @@ export function parseMessageForDatesAndBirth(message: string): ParsedMessageInfo
           const partnerOriginalPos = message.indexOf(result.partnerInfo.original)
           const distanceToPartner = Math.abs(matchPosition - partnerOriginalPos)
           
-          if (distanceToPartner <= 50) { // 50자 이내면 연관된 것으로 간���
+          if (distanceToPartner <= 50) { // 50자 이내면 연관된 것으로 간주
             Object.assign(result.partnerInfo, timeInfo)
             continue
           }

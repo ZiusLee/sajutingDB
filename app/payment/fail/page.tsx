@@ -29,7 +29,7 @@ export default function PaymentFailPage() {
             variant="outline"
             className="w-full border-[#70737c]/20 text-white hover:bg-white/5"
           >
-            구독 관리로 돌아가기
+            충전소로 돌아가기
           </Button>
         </div>
       </div>

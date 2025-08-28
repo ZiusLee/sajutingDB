@@ -78,9 +78,7 @@ export async function GET(request: NextRequest) {
         scheduled_plan_change,
         scheduled_date,
         created_at,
-        updated_at,
-        payment_failure_count,
-        subscription_status
+        updated_at
       `)
 
     if (usersError) {
@@ -180,138 +178,78 @@ export async function GET(request: NextRequest) {
     for (const user of subscriptionUsers) {
       try {
         let dailyCoins = 10 // Default for starter
-        let packagePrice = 9900 // Default price
 
         switch (user.subscription_plan) {
           case "starter":
             dailyCoins = 10
-            packagePrice = 9900
             break
           case "plus":
             dailyCoins = 30
-            packagePrice = 19900
             break
           case "pro":
             dailyCoins = 100
-            packagePrice = 49900
             break
           default:
             console.warn(`[Daily Charge] Unknown subscription plan: ${user.subscription_plan} for user ${user.user_id}`)
-            dailyCoins = 10
-            packagePrice = 9900
+            dailyCoins = 10 // Default to starter plan
         }
 
-        const { data: paymentOrder, error: paymentError } = await supabase
-          .from("payment_orders")
-          .select("billing_key, payment_data, id")
-          .eq("user_id", user.user_id)
-          .eq("subscription_status", "active")
-          .not("billing_key", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
+        console.log(`[Daily Charge] Processing subscription user ${user.user_id}:`, {
+          current_subscription_coins: user.subscription_coins,
+          subscription_plan: user.subscription_plan,
+          subscription_end_date: user.subscription_end_date,
+          daily_coins: dailyCoins,
+        })
 
-        if (paymentError || !paymentOrder?.billing_key) {
-          console.warn(`[Daily Charge] No billing key found for user ${user.user_id}, skipping payment`)
+        if (user.subscription_end_date && new Date(user.subscription_end_date) < new Date(koreanToday)) {
+          console.warn(`[Daily Charge] Subscription expired for user ${user.user_id}, skipping charge`)
           processedUsers.push({
             user_id: user.user_id,
             type: "subscription",
             plan: user.subscription_plan,
             coins_set: 0,
             status: "skipped",
-            reason: "no_billing_key",
+            reason: "subscription_expired",
           })
-          continue
-        }
-
-        const orderId = `daily_${user.user_id}_${koreanToday.replace(/-/g, "")}`
-        const billingResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/payment/billing-charge`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              billingKey: paymentOrder.billing_key,
-              amount: packagePrice,
-              orderId,
-              orderName: `사주핑 ${user.subscription_plan} 구독 (${koreanToday})`,
-              customerEmail: paymentOrder.payment_data?.customerEmail || "customer@sajuping.ai",
-              customerName: paymentOrder.payment_data?.customerName || "사주핑 사용자",
-            }),
-          },
-        )
-
-        const billingResult = await billingResponse.json()
-
-        if (!billingResult.success) {
-          console.error(`[Daily Charge] Payment failed for user ${user.user_id}:`, billingResult.error)
-
-          const failureCount = (user.payment_failure_count || 0) + 1
-
-          if (failureCount >= 3) {
-            await supabase
-              .from("user_coins")
-              .update({
-                subscription_plan: "free",
-                subscription_coins: 3, // Downgrade to free tier
-                payment_failure_count: failureCount,
-                subscription_status: "suspended",
-                updated_at: koreanNow,
-              })
-              .eq("user_id", user.user_id)
-
-            console.log(`[Daily Charge] Suspended subscription for user ${user.user_id} after ${failureCount} failures`)
-          } else {
-            await supabase
-              .from("user_coins")
-              .update({
-                payment_failure_count: failureCount,
-                updated_at: koreanNow,
-              })
-              .eq("user_id", user.user_id)
-          }
-
-          processedUsers.push({
-            user_id: user.user_id,
-            type: "subscription",
-            plan: user.subscription_plan,
-            coins_set: 0,
-            status: "payment_failed",
-            error: billingResult.error,
-            failure_count: failureCount,
-          })
-          errorCount++
           continue
         }
 
         const { data: updateResult, error: updateError } = await supabase
           .from("user_coins")
           .update({
-            subscription_coins: dailyCoins,
+            subscription_coins: dailyCoins, // Set to exact daily amount, don't accumulate
             last_daily_charge: koreanToday,
-            payment_failure_count: 0, // Reset failure count on successful payment
             updated_at: koreanNow,
           })
           .eq("user_id", user.user_id)
           .select()
 
         if (updateError) {
-          console.error(`[Daily Charge] Error updating coins for user ${user.user_id}:`, updateError)
+          console.error(`[Daily Charge] Error updating coins for subscription user ${user.user_id}:`, updateError)
           errorCount++
+          processedUsers.push({
+            user_id: user.user_id,
+            type: "subscription",
+            plan: user.subscription_plan,
+            coins_set: 0,
+            status: "error",
+            error: updateError.message,
+          })
           continue
         }
 
         console.log(
-          `[Daily Charge] Successfully charged ${packagePrice}원 and added ${dailyCoins} coins for user ${user.user_id}`,
+          `[Daily Charge] Successfully set ${dailyCoins} subscription_coins for user ${user.user_id}`,
+          updateResult?.[0],
         )
         processedUsers.push({
           user_id: user.user_id,
           type: "subscription",
           plan: user.subscription_plan,
           coins_set: dailyCoins,
-          amount_charged: packagePrice,
-          payment_key: billingResult.paymentKey,
           status: "success",
+          previous_coins: user.subscription_coins || 0,
+          new_coins: dailyCoins,
         })
         successCount++
       } catch (userError) {

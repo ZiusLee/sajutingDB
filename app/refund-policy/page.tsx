@@ -15,9 +15,9 @@ export default function RefundPolicyPage() {
           <Link
             href="/charge"
             className="text-sm text-neutral-600 hover:text-neutral-900 underline underline-offset-4"
-            aria-label="구독 관리 페이지로 돌아가기"
+            aria-label="충전 페이지로 돌아가기"
           >
-            {"← 구독 관리 페이지로 돌아가기"}
+            {"← 충전(결제) 페이지로 돌아가기"}
           </Link>
         </div>
 
@@ -56,7 +56,7 @@ export default function RefundPolicyPage() {
                       <strong>유료서비스:</strong> 회사가 유료로 제공하는 디지털콘텐츠
                     </li>
                     <li>
-                      <strong>질문권:</strong> 구독 또는 별도 유상 결제를 통해 지급되는 디지털 이용권(사주 해석·상담
+                      <strong>질문권:</strong> 구독 또는 별도 유상 결제를 통해 충전되는 디지털 이용권(사주 해석·상담
                       등에 사용)
                     </li>
                     <li>
@@ -87,19 +87,6 @@ export default function RefundPolicyPage() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">{"제4조 (서비스 안내)"}</h3>
                   <p>회사는 서비스명, 가격, 이용기간, 제공 내용을 앱 화면에 명확히 표시합니다.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">{"제4조의2 (질문권 유효기간)"}</h3>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>유료로 구매한 질문권의 유효기간은 구매일로부터 1년입니다.</li>
-                    <li>유효기간이 경과한 질문권은 자동으로 소멸되며, 이에 대한 환불이나 연장은 제공되지 않습니다.</li>
-                    <li>
-                      보너스 질문권의 유효기간은 별도로 안내되는 기간에 따르며, 명시되지 않은 경우 구매한 질문권과
-                      동일한 유효기간이 적용됩니다.
-                    </li>
-                    <li>회원은 앱 내에서 보유 중인 질문권의 유효기간을 확인할 수 있습니다.</li>
-                  </ul>
                 </div>
 
                 <div className="space-y-4">
@@ -270,9 +257,9 @@ export default function RefundPolicyPage() {
           <Link
             href="/charge"
             className="inline-flex items-center justify-center rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-            aria-label="구독 관리 페이지로 이동"
+            aria-label="충전 페이지로 이동"
           >
-            {"구독 관리 페이지로 돌아가기"}
+            {"충전(결제) 페이지로 돌아가기"}
           </Link>
         </div>
       </div>

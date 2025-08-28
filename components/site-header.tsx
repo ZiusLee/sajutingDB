@@ -20,7 +20,7 @@ export function SiteHeader() {
 
   // Check if we're in saju chat or mypage
   const isSajuChat = pathname?.includes("/saju-chat/")
-  const isSubscriptionPage = pathname === "/charge"
+  const isChargePage = pathname === "/charge"
 
   useEffect(() => {
     const checkMobile = () => {
@@ -71,7 +71,7 @@ export function SiteHeader() {
       <div className="flex h-16 lg:h-20 items-center justify-between px-2 sm:px-4 md:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex items-center">
-          {isSubscriptionPage ? (
+          {isChargePage ? (
             <button
               onClick={handleBackClick}
               className={`flex items-center space-x-2 hover:opacity-80 transition-all duration-300 text-white ${
