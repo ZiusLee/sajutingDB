@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("user_coins")
       .select(
-        "subscription_coins, bonus_coins, subscription_plan, subscription_start_date, subscription_end_date, last_check_in",
+        "subscription_coins, bonus_coins, subscription_plan, subscription_status, subscription_start_date, subscription_end_date, last_check_in",
       )
       .eq("user_id", user.id)
       .single()
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
             subscription_coins: 3, // Set default 3 coins for free tier users instead of 0
             bonus_coins: 0,
             subscription_plan: "free", // Set default subscription plan to free
+            subscription_status: "active", // Set default subscription status to active for free tier
           })
           .select()
           .single()
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
           bonus_coins: 0,
           total_coins: 3, // Total should be 3 instead of 0
           subscription_plan: "free", // Return free plan
+          subscription_status: "active", // Return active status for free tier
           last_check_in: null,
         })
       }
@@ -98,6 +100,7 @@ export async function POST(request: Request) {
           subscription_coins: finalCoinType === "subscription" && action === "add" ? amount : 3, // Default to 3 for free tier
           bonus_coins: finalCoinType === "bonus" && action === "add" ? amount : 0,
           subscription_plan: "free", // Set default subscription plan
+          subscription_status: "active", // Set default subscription status to active for free tier
           last_check_in: action === "check_in" ? new Date().toISOString().split("T")[0] : null,
         }
 

@@ -8,7 +8,10 @@ export async function POST(request: NextRequest) {
   try {
     const { orderId, packageId, paymentKey, amount } = await request.json()
 
+    console.log("[Payment Confirm] Processing payment:", { orderId, packageId, paymentKey, amount })
+
     if (!orderId || !packageId) {
+      console.error("[Payment Confirm] Missing required fields")
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
@@ -19,39 +22,29 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
+      console.error("[Payment Confirm] Authentication failed:", userError)
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     const packageData = getPackageData(packageId)
     if (!packageData) {
+      console.error("[Payment Confirm] Invalid package:", packageId)
       return NextResponse.json({ error: "Invalid package" }, { status: 400 })
     }
 
-    const isSubscription = packageData.isSubscription || false
-    const dailyCoins = isSubscription ? Math.floor(packageData.coins / 7) : 0
+    const dailyCoins = packageData.dailyCoins
 
-    if (isSubscription) {
-      // Deactivate previous subscription orders
-      await supabase
-        .from("payment_orders")
-        .update({
-          subscription_status: "cancelled",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id)
-        .eq("subscription_status", "active")
+    console.log("[Payment Confirm] Package data:", { packageData, dailyCoins })
 
-      // Clear existing subscription coins when changing plans
-      await supabase
-        .from("user_coins")
-        .update({
-          subscription_coins: 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id)
-
-      console.log(`[Payment Confirm] Cleared existing subscription coins for user ${user.id}`)
-    }
+    console.log("[Payment Confirm] Processing subscription - deactivating previous subscriptions")
+    await supabase
+      .from("payment_orders")
+      .update({
+        subscription_status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id)
+      .eq("subscription_status", "active")
 
     const { data: paymentOrder, error: insertError } = await supabase
       .from("payment_orders")
@@ -60,17 +53,17 @@ export async function POST(request: NextRequest) {
         order_id: orderId,
         package_id: packageId,
         amount: amount || packageData.price,
-        coins: packageData.coins + (packageData.bonus || 0),
+        coins: dailyCoins, // Store daily coins, not total
         payment_key: paymentKey,
         status: "pending",
-        subscription_type: isSubscription ? packageId : null,
-        subscription_status: isSubscription ? "pending" : "inactive",
+        subscription_type: packageId,
+        subscription_status: "active",
         daily_coins: dailyCoins,
-        next_billing_date: isSubscription ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : null,
+        next_billing_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         payment_data: {
           packageName: packageData.name,
           timestamp: new Date().toISOString(),
-          isSubscription: isSubscription,
+          isSubscription: true,
         },
       })
       .select()
@@ -105,6 +98,7 @@ export async function POST(request: NextRequest) {
           .from("payment_orders")
           .update({
             status: "failed",
+            subscription_status: "failed",
             failure_reason: errorData.message || "Payment confirmation failed",
             updated_at: new Date().toISOString(),
           })
@@ -128,51 +122,40 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const coinType = isSubscription ? "subscription" : "bonus"
-      const coinsToAdd = isSubscription ? dailyCoins : packageData.coins + (packageData.bonus || 0)
+      console.log("[Payment Confirm] Processing subscription activation")
 
-      const coinsResponse = await fetch(`${request.nextUrl.origin}/api/user-coins`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: request.headers.get("cookie") || "",
-        },
-        body: JSON.stringify({
-          action: "add",
-          amount: coinsToAdd,
-          coin_type: coinType,
-        }),
-      })
+      const subscriptionEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      const today = new Date().toISOString().split("T")[0]
 
-      if (!coinsResponse.ok) {
-        const errorData = await coinsResponse.json()
-        throw new Error(errorData.error || "Failed to add coins")
-      }
-
-      const coinsData = await coinsResponse.json()
-
-      if (isSubscription) {
-        const subscriptionEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
-
-        await supabase
-          .from("user_coins")
-          .update({
+      const { data: userCoinsData, error: userCoinsError } = await supabase
+        .from("user_coins")
+        .upsert(
+          {
+            user_id: user.id,
+            subscription_coins: dailyCoins, // Set to daily coins amount (immediate coins for today)
+            bonus_coins: 0, // Reset bonus coins
             subscription_plan: packageId,
-            subscription_start_date: new Date().toISOString().split("T")[0],
-            subscription_end_date: subscriptionEndDate.toISOString().split("T")[0],
-            last_daily_charge: new Date().toISOString().split("T")[0],
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", user.id)
-
-        await supabase
-          .from("payment_orders")
-          .update({
             subscription_status: "active",
+            subscription_start_date: today,
+            subscription_end_date: subscriptionEndDate.toISOString().split("T")[0],
+            last_daily_charge: today, // Mark as charged today
+            payment_failure_count: 0,
             updated_at: new Date().toISOString(),
-          })
-          .eq("id", paymentOrder.id)
+          },
+          {
+            onConflict: "user_id",
+            ignoreDuplicates: false,
+          },
+        )
+        .select()
+        .single()
+
+      if (userCoinsError) {
+        console.error("[Payment Confirm] Failed to update user coins:", userCoinsError)
+        throw new Error(`Failed to activate subscription: ${userCoinsError.message}`)
       }
+
+      console.log("[Payment Confirm] Subscription activated successfully:", userCoinsData)
 
       await supabase
         .from("payment_orders")
@@ -184,50 +167,59 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        coinsAdded: coinsToAdd,
-        coinType: coinType,
-        totalCoins: coinsData.total_coins || coinsData.coins,
+        coinsAdded: dailyCoins,
+        coinType: "subscription",
+        totalCoins: (userCoinsData.subscription_coins || 0) + (userCoinsData.bonus_coins || 0),
         packageName: packageData.name,
         orderId: paymentOrder.id,
-        isSubscription: isSubscription,
+        isSubscription: true,
+        subscriptionDetails: {
+          plan: packageId,
+          dailyCoins: dailyCoins,
+          status: "active",
+          startDate: today,
+          endDate: subscriptionEndDate.toISOString().split("T")[0],
+        },
       })
     } catch (coinsError) {
-      console.error("Failed to add coins to user account:", coinsError)
+      console.error("[Payment Confirm] Failed to process subscription:", coinsError)
 
       await supabase
         .from("payment_orders")
         .update({
           status: "failed",
-          failure_reason: "Failed to add coins to user account",
+          subscription_status: "failed",
+          failure_reason: `Failed to process subscription: ${coinsError instanceof Error ? coinsError.message : "Unknown error"}`,
           updated_at: new Date().toISOString(),
         })
         .eq("id", paymentOrder.id)
 
       return NextResponse.json(
         {
-          error: "Failed to process purchase",
-          details: "Payment confirmed but coin addition failed",
+          error: "Failed to process subscription",
+          details: `Payment confirmed but processing failed: ${coinsError instanceof Error ? coinsError.message : "Unknown error"}`,
+          isSubscription: true,
         },
         { status: 500 },
       )
     }
   } catch (error) {
-    console.error("Payment confirmation error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[Payment Confirm] Payment confirmation error:", error)
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
 
 function getPackageData(packageId: string) {
-  const packages: Record<
-    string,
-    { name: string; coins: number; bonus?: number; price: number; isSubscription?: boolean }
-  > = {
-    starter: { name: "Starter", coins: 70, price: 9900, isSubscription: true }, // 7 days * 10 coins
-    plus: { name: "Plus", coins: 210, price: 19900, isSubscription: true }, // 7 days * 30 coins
-    pro: { name: "Pro", coins: 700, price: 49900, isSubscription: true }, // 7 days * 100 coins
-    "basic-20": { name: "Basic", coins: 20, price: 9900 },
-    "premium-60": { name: "Premium", coins: 60, bonus: 20, price: 29900 },
-    "heritage-100": { name: "Heritage", coins: 100, bonus: 100, price: 49900 },
+  const packages: Record<string, { name: string; dailyCoins: number; price: number }> = {
+    starter: { name: "Starter", dailyCoins: 10, price: 9900 },
+    plus: { name: "Plus", dailyCoins: 30, price: 19900 },
+    pro: { name: "Pro", dailyCoins: 100, price: 49900 },
   }
 
   return packages[packageId] || null
