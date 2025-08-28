@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
         last_daily_charge,
         scheduled_plan_change,
         scheduled_date,
+        payment_failure_count,
         created_at,
         updated_at
       `)
