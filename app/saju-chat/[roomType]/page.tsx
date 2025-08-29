@@ -18,6 +18,7 @@ import {
 import { trackEvent } from "@/lib/analytics"
 import { MultipleDefaultSessionsDialog } from "@/components/multiple-default-sessions-dialog"
 import { SelectDefaultSajuDialog } from "@/components/select-default-saju-dialog"
+import { createFallbackSessionId } from "@/lib/uuid-utils"
 
 export default function SajuChatPage() {
   const router = useRouter()
@@ -67,12 +68,24 @@ export default function SajuChatPage() {
     }
   }, [handleSidebarToggle])
 
+  const getSessionId = useCallback(() => {
+    try {
+      const sajuSessionId = localStorage.getItem("saju_session_id")
+      if (sajuSessionId) return sajuSessionId
+
+      const userId = localStorage.getItem("user_id")
+      if (userId) return userId
+    } catch (error) {
+      console.error("Error getting session ID:", error)
+    }
+    return createFallbackSessionId()
+  }, [])
+
   useEffect(() => {
     let isMounted = true
 
     const initializePage = async () => {
       try {
-        // Wait a bit for auth state to settle if coming from OAuth
         const authReturnAction = localStorage.getItem("auth_return_action")
         if (authReturnAction === "continue_to_chat") {
           console.log("Coming from OAuth, waiting for auth state to settle...")
@@ -101,7 +114,6 @@ export default function SajuChatPage() {
             if (defaultSession) {
               console.log("Found default saju session:", defaultSession.id)
 
-              // Get full profile data for the default session
               console.log(`[DEBUG] About to call getSajuProfileBySessionId for session: ${defaultSession.id}`)
               const profile = await getSajuProfileBySessionId(defaultSession.id)
               console.log(`[DEBUG] getSajuProfileBySessionId returned:`, profile)
@@ -111,7 +123,7 @@ export default function SajuChatPage() {
 
                 const chatSajuData = {
                   saju: profile.saju,
-                  name: profile.name, // profile.name을 우선적으로 사용 (saju_sessions 테이블의 name)
+                  name: profile.name,
                   gender: profile.gender,
                   interpretation: "",
                   returnPath: "/",
@@ -215,13 +227,11 @@ export default function SajuChatPage() {
         if (!savedSaju) {
           console.log("No saju data found in localStorage")
 
-          // If coming from onboarding, try to get data from tempSajuData
           const tempSajuData = localStorage.getItem("tempSajuData")
           if (tempSajuData && isAuthenticated) {
             console.log("Found tempSajuData, converting to current_saju with optimization")
             const tempData = JSON.parse(tempSajuData)
 
-            // Create chat saju data structure
             const chatSajuData = {
               saju: tempData,
               name: tempData.name,
@@ -263,7 +273,7 @@ export default function SajuChatPage() {
               let chatRoom = null
               if (!roomId) {
                 chatRoom = createTemporaryChatRoom({
-                  sessionId: chatSajuData.sessionId || `fallback-${Date.now()}`,
+                  sessionId: chatSajuData.sessionId || createFallbackSessionId(),
                   title: "새로운 대화",
                   roomType: roomType || "sajuping",
                   isTemporary: true,
@@ -294,12 +304,10 @@ export default function SajuChatPage() {
 
         const parsedSaju = JSON.parse(savedSaju)
 
-        // 인증된 사용자인 경우, 현재 사용자의 데이터인지 확인
         if (isAuthenticated && data.session?.user) {
           const currentUserId = data.session.user.id
           const sajuUserId = parsedSaju.userId || parsedSaju.authUserId
 
-          // 사주 데이터가 다른 사용자의 것이라면 삭제하고 홈으로 리다이렉트
           if (sajuUserId && sajuUserId !== currentUserId) {
             console.log("Saju data belongs to different user, clearing and redirecting")
             localStorage.removeItem("current_saju")
@@ -317,7 +325,6 @@ export default function SajuChatPage() {
             return
           }
 
-          // 현재 사용자 ID를 사주 데이터에 추가
           if (!sajuUserId) {
             parsedSaju.userId = currentUserId
             parsedSaju.authUserId = currentUserId
@@ -334,7 +341,7 @@ export default function SajuChatPage() {
           let sessionId = parsedSaju.sessionId
           if (!sessionId) {
             const sajuSessionId = localStorage.getItem("saju_session_id")
-            sessionId = sajuSessionId || `fallback-${Date.now()}`
+            sessionId = sajuSessionId || createFallbackSessionId()
           }
 
           let chatRoom = null
@@ -477,7 +484,6 @@ export default function SajuChatPage() {
       try {
         setIsLoadingOAuth(true)
 
-        // 현재 URL과 세션 정보를 저장
         const currentUrl = window.location.href
         const sessionId = localStorage.getItem("saju_session_id")
 
@@ -519,7 +525,7 @@ export default function SajuChatPage() {
         }
 
         console.log(`✅ ${provider} OAuth initiated successfully`)
-        setSignupOpen(false) // signup dialog 닫기
+        setSignupOpen(false)
       } catch (e) {
         console.error(`❌ ${provider} OAuth start error:`, e)
         toast({
@@ -554,7 +560,6 @@ export default function SajuChatPage() {
       const anonymousSessionCreated = localStorage.getItem("anonymous_session_created")
       const authReturnAction = localStorage.getItem("auth_return_action")
 
-      // onboarding에서 바로 온 경우는 signup dialog 표시하지 않음
       if (authReturnAction === "continue_to_chat") {
         console.log("Came from onboarding, not showing signup dialog")
         return
@@ -651,7 +656,6 @@ export default function SajuChatPage() {
             const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
             setSessionKey(generatedKey)
 
-            // 채팅룸 설정
             let chatRoom = null
             if (!roomId) {
               chatRoom = createTemporaryChatRoom({
@@ -670,7 +674,6 @@ export default function SajuChatPage() {
           }
         } catch (error) {
           console.error("Error loading selected session:", error)
-          // 에러 시에만 새로고침
           window.location.reload()
         }
       } else {
@@ -701,7 +704,6 @@ export default function SajuChatPage() {
       const { data } = await supabase.auth.getSession()
       if (!data.session?.user) return
 
-      // 선택된 세션을 대표사주로 설정
       const { error: updateError } = await supabase
         .from("saju_sessions")
         .update({ is_default: true })
@@ -710,7 +712,6 @@ export default function SajuChatPage() {
 
       if (updateError) throw updateError
 
-      // 다른 세션들의 기본값 해제
       await supabase
         .from("saju_sessions")
         .update({ is_default: false })
@@ -764,7 +765,6 @@ export default function SajuChatPage() {
           const generatedKey = `chat_${chatSajuData.name || "user"}_${roomType}`
           setSessionKey(generatedKey)
 
-          // 채팅룸 설정
           let chatRoom = null
           if (!roomId) {
             chatRoom = createTemporaryChatRoom({

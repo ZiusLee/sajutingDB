@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase-client"
+import { generateUUID } from "@/lib/uuid-utils"
 
 export interface ChatRoom {
   id: string
@@ -42,7 +43,7 @@ export interface ChatRoomWithSession extends ChatRoom {
 
 // Create a temporary chat room (in-memory only)
 export function createTemporaryChatRoom(data: CreateChatRoomRequest): ChatRoom {
-  const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const tempId = `temp-${generateUUID()}`
 
   return {
     id: tempId,

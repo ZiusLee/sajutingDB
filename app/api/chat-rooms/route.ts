@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
+import { isValidUUID } from "@/lib/uuid-utils"
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,6 +9,10 @@ export async function POST(request: NextRequest) {
 
     if (!sessionId) {
       return NextResponse.json({ error: "Session ID is required" }, { status: 400 })
+    }
+
+    if (!isValidUUID(sessionId)) {
+      return NextResponse.json({ error: "Invalid session ID format" }, { status: 400 })
     }
 
     const cookieStore = cookies()
@@ -55,6 +60,10 @@ export async function GET(request: NextRequest) {
 
     if (!sessionId) {
       return NextResponse.json({ error: "Session ID is required" }, { status: 400 })
+    }
+
+    if (!isValidUUID(sessionId)) {
+      return NextResponse.json({ error: "Invalid session ID format" }, { status: 400 })
     }
 
     const cookieStore = cookies()

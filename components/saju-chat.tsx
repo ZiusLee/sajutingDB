@@ -17,13 +17,14 @@ import { getSessionMessages, saveMessages } from "@/lib/message-service"
 import { MessageFeedbackButtons } from "@/components/message-feedback-buttons"
 import { useMobileKeyboard } from "@/hooks/use-mobile-keyboard"
 import { SignupDialog } from "@/components/signup-dialog"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Reverting back to original Supabase client creation method
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
+import { useAuth } from "@/hooks/use-auth"
 import Sidebar from "@/components/sidebar"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { trackEvent } from "@/lib/analytics"
 import { getCachedDaeunInfo, setCachedDaeunInfo, generateSajuKey } from "@/lib/saju-cache"
+import { generateUUID, createFallbackSessionId } from "@/lib/uuid-utils"
 
 interface SajuChatProps {
   saju: any
@@ -99,14 +100,6 @@ const getInitialUserQuestions = (name: string, roomType: string, concerns: strin
   return []
 }
 
-function generateUUID() {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    const v = c === "x" ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
-}
-
 export default function SajuChat({
   saju,
   name,
@@ -142,7 +135,7 @@ export default function SajuChat({
   const [isFirstChatRoom, setIsFirstChatRoom] = useState<boolean | null>(null)
   const [initialQuestionsSent, setInitialQuestionsSent] = useState({ q1: false, q2: false })
   const [showSignupDialog, setShowSignupDialog] = useState(false)
-  const supabase = createClientComponentClient() // Using original createClientComponentClient() method
+  const supabase = createClientComponentClient()
   const [chatStreamState, setChatStreamState] = useState<{
     isStreaming: boolean
     currentMessageId: string | null
@@ -160,20 +153,22 @@ export default function SajuChat({
 
   const router = useRouter()
 
-  const sessionId = useMemo(() => {
+  const getSessionId = useCallback(() => {
     try {
-      const savedSaju = localStorage.getItem("current_saju")
-      if (savedSaju) {
-        const parsedSaju = JSON.parse(savedSaju)
-        if (parsedSaju.sessionId) return parsedSaju.sessionId
-      }
+      const sajuSessionId = localStorage.getItem("saju_session_id")
+      if (sajuSessionId) return sajuSessionId
+
       const userId = localStorage.getItem("user_id")
       if (userId) return userId
     } catch (error) {
       console.error("Error getting session ID:", error)
     }
-    return `fallback-${Date.now()}`
+    return createFallbackSessionId()
   }, [])
+
+  const sessionId = useMemo(() => {
+    return getSessionId()
+  }, [getSessionId])
 
   const [chatData, setChatData] = useState<{
     calculatedDaeun: any
