@@ -431,61 +431,41 @@ class SmartMemoryServiceV2 {
   }
 
   // Embedding generation with environment support
-  async generateEmbedding(text: string, retries = 3): Promise<number[]> {
-    for (let i = 0; i < retries; i++) {
-      try {
-        // Client-side: use API endpoint
-        if (typeof window !== "undefined") {
-          const response = await fetch("/api/embeddings", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ text: text.slice(0, 8000) }),
-          })
+  private async generateEmbedding(text: string): Promise<number[]> {
+    try {
+      const response = await fetch("/api/embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      })
 
-          if (!response.ok) {
-            const error = await response.json()
-            throw new Error(`Embedding API error: ${error.error}`)
-          }
-
-          const data = await response.json()
-          return data.embedding
-        }
-
-        // Server-side: direct OpenAI API call
-        const apiKey = process.env.OPENAI_API_KEY
-        if (!apiKey) {
-          throw new Error("OPENAI_API_KEY environment variable is required")
-        }
-
-        const response = await fetch("https://api.openai.com/v1/embeddings", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "text-embedding-3-small",
-            input: text.slice(0, 8000),
-            dimensions: 1536,
-          }),
-        })
-
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(`Embedding API error: ${JSON.stringify(error)}`)
-        }
-
-        const data = await response.json()
-        return data.data[0].embedding
-      } catch (error) {
-        console.error(`임베딩 생성 실패 (시도 ${i + 1}/${retries}):`, error)
-        if (i === retries - 1) throw error
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)))
+      if (!response.ok) {
+        throw new Error(`Embedding API error: ${response.status}`)
       }
+
+      const data = await response.json()
+
+      if (!data.embedding || !Array.isArray(data.embedding)) {
+        throw new Error("Invalid embedding format received")
+      }
+
+      if (data.embedding.length !== 1536) {
+        throw new Error(`Invalid embedding dimensions: ${data.embedding.length}, expected 1536`)
+      }
+
+      const validEmbedding = data.embedding.map((val: any) => {
+        const num = Number(val)
+        if (isNaN(num)) {
+          throw new Error("Invalid embedding value: not a number")
+        }
+        return num
+      })
+
+      return validEmbedding
+    } catch (error) {
+      console.error("❌ Embedding generation failed:", error)
+      throw error
     }
-    throw new Error("임베딩 생성 최대 재시도 횟수 초과")
   }
 
   // Memory extraction with improved prompting
@@ -828,6 +808,11 @@ AI: ${assistantResponse}
     limit: number,
   ): Promise<any[]> {
     try {
+      if (!Array.isArray(embedding) || embedding.length !== 1536) {
+        console.error("❌ Invalid embedding for vector search:", typeof embedding, embedding?.length)
+        return []
+      }
+
       // Try to use the stored function first
       const { data: highQualityResults, error: hqError } = await this.supabase.rpc("find_quality_memories", {
         p_user_id: userId,
@@ -862,12 +847,11 @@ AI: ${assistantResponse}
         .from("smart_contexts")
         .select("*, relevance_embedding")
         .eq("user_id", userId)
-        .not("relevance_embedding", "is", null) // Ensure embedding exists
+        .not("relevance_embedding", "is", null)
         .gte("quality_score", 0.3)
         .order("quality_score", { ascending: false })
         .limit(limit * 3)
 
-      // Add type filter if specified
       if (understanding.memoryTypes?.length > 0) {
         dbQuery = dbQuery.in("type", understanding.memoryTypes)
       }
@@ -875,8 +859,7 @@ AI: ${assistantResponse}
       const { data, error } = await dbQuery
 
       if (error) {
-        console.error("Fallback vector search error:", error.message)
-        console.error("Error details:", error)
+        console.error("❌ Fallback vector search error:", error.message)
         return []
       }
 
@@ -887,18 +870,41 @@ AI: ${assistantResponse}
 
       console.log(`🔍 Fallback search found ${data.length} memories to process`)
 
-      // Calculate relevance scores using cosine similarity
       const scoredResults = data
         .map((memory) => {
-          if (!memory.relevance_embedding || !Array.isArray(memory.relevance_embedding)) {
-            console.log(`⚠️ Memory ${memory.id} has invalid embedding:`, typeof memory.relevance_embedding)
+          if (!memory.relevance_embedding) {
+            console.log(`⚠️ Memory ${memory.id} has no embedding`)
+            return null
+          }
+
+          let embeddingArray: number[]
+
+          // Handle different embedding formats
+          if (typeof memory.relevance_embedding === "string") {
+            try {
+              embeddingArray = JSON.parse(memory.relevance_embedding)
+            } catch (e) {
+              console.log(
+                `⚠️ Memory ${memory.id} has invalid embedding string:`,
+                memory.relevance_embedding.substring(0, 100),
+              )
+              return null
+            }
+          } else if (Array.isArray(memory.relevance_embedding)) {
+            embeddingArray = memory.relevance_embedding
+          } else {
+            console.log(`⚠️ Memory ${memory.id} has invalid embedding type:`, typeof memory.relevance_embedding)
+            return null
+          }
+
+          if (!Array.isArray(embeddingArray) || embeddingArray.length !== 1536) {
+            console.log(`⚠️ Memory ${memory.id} has invalid embedding dimensions:`, embeddingArray?.length)
             return null
           }
 
           try {
-            const relevanceScore = this.calculateCosineSimilarity(embedding, memory.relevance_embedding)
+            const relevanceScore = this.calculateCosineSimilarity(embedding, embeddingArray)
 
-            // Apply similarity threshold
             if (relevanceScore < 0.1) {
               return null
             }
@@ -913,19 +919,19 @@ AI: ${assistantResponse}
                 memory.usage_count || 0,
               ),
             }
-          } catch (cosineError) {
-            console.error(`Error calculating similarity for memory ${memory.id}:`, cosineError)
+          } catch (error) {
+            console.log(`⚠️ Error calculating similarity for memory ${memory.id}:`, error.message)
             return null
           }
         })
         .filter(Boolean)
         .sort((a, b) => b.effective_score - a.effective_score)
+        .slice(0, limit)
 
       console.log(`🔍 Fallback vector search results: ${scoredResults.length}개`)
-      return scoredResults.slice(0, limit)
+      return scoredResults
     } catch (error) {
-      console.error("Quality-aware vector search failed:", error)
-      console.error("Error stack:", error.stack)
+      console.error("❌ Quality-aware vector search failed:", error)
       return []
     }
   }
@@ -1293,7 +1299,7 @@ AI: ${assistantResponse}
         .select("*, relevance_embedding")
         .eq("user_id", userId)
         .eq("type", type)
-        .not("relevance_embedding", "is", null) // Ensure embedding exists
+        .not("relevance_embedding", "is", null)
         .gte("quality_score", 0.3)
         .limit(20)
 
