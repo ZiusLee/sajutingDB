@@ -127,144 +127,167 @@ export async function GET(request: NextRequest) {
     if (freeUsers.length > 0) {
       console.log("[Daily Charge] Processing free users in batch...")
 
-      for (const user of freeUsers) {
-        try {
-          const dailyCoins = 3 // Free plan gets 3 coins daily
+      try {
+        const freeUserIds = freeUsers.map((user) => user.user_id)
+        const dailyCoins = 3 // Free plan gets 3 coins daily
 
-          const { data: updateResult, error: updateError } = await supabase
-            .from("user_coins")
-            .update({
-              subscription_coins: dailyCoins, // Set to 3 coins, don't accumulate for free users
-              last_daily_charge: koreanToday,
-              updated_at: koreanNow,
-            })
-            .eq("user_id", user.user_id)
-            .select()
+        const { data: batchUpdateResult, error: batchUpdateError } = await supabase
+          .from("user_coins")
+          .update({
+            subscription_coins: dailyCoins,
+            last_daily_charge: koreanToday,
+            updated_at: koreanNow,
+          })
+          .in("user_id", freeUserIds)
+          .select("user_id")
 
-          if (updateError) {
-            console.error(`[Daily Charge] Error updating coins for free user ${user.user_id}:`, updateError)
-            errorCount++
+        if (batchUpdateError) {
+          console.error("[Daily Charge] Error in batch update for free users:", batchUpdateError)
+          errorCount += freeUsers.length
+          freeUsers.forEach((user) => {
             processedUsers.push({
               user_id: user.user_id,
               type: "free",
               coins_set: 0,
               status: "error",
-              error: updateError.message,
+              error: batchUpdateError.message,
             })
-            continue
-          }
-
-          console.log(`[Daily Charge] Successfully set ${dailyCoins} subscription_coins for free user ${user.user_id}`)
-          processedUsers.push({
-            user_id: user.user_id,
-            type: "free",
-            coins_set: dailyCoins,
-            status: "success",
           })
-          successCount++
-        } catch (userError) {
-          console.error(`[Daily Charge] Error processing free user ${user.user_id}:`, userError)
-          errorCount++
+        } else {
+          const updatedCount = batchUpdateResult?.length || 0
+          console.log(`[Daily Charge] Successfully batch updated ${updatedCount} free users with ${dailyCoins} coins`)
+          successCount += updatedCount
+
+          batchUpdateResult?.forEach((result) => {
+            processedUsers.push({
+              user_id: result.user_id,
+              type: "free",
+              coins_set: dailyCoins,
+              status: "success",
+            })
+          })
+        }
+      } catch (batchError) {
+        console.error("[Daily Charge] Error in free users batch processing:", batchError)
+        errorCount += freeUsers.length
+        freeUsers.forEach((user) => {
           processedUsers.push({
             user_id: user.user_id,
             type: "free",
             coins_set: 0,
             status: "error",
-            error: userError instanceof Error ? userError.message : "Unknown error",
+            error: batchError instanceof Error ? batchError.message : "Batch processing error",
           })
-        }
+        })
       }
     }
 
-    for (const user of subscriptionUsers) {
-      try {
-        let dailyCoins = 10 // Default for starter
+    if (subscriptionUsers.length > 0) {
+      console.log("[Daily Charge] Processing subscription users in batches by plan...")
 
-        switch (user.subscription_plan) {
-          case "starter":
-            dailyCoins = 10
-            break
-          case "plus":
-            dailyCoins = 30
-            break
-          case "pro":
-            dailyCoins = 100
-            break
-          default:
-            console.warn(`[Daily Charge] Unknown subscription plan: ${user.subscription_plan} for user ${user.user_id}`)
-            dailyCoins = 10 // Default to starter plan
-        }
-
-        console.log(`[Daily Charge] Processing subscription user ${user.user_id}:`, {
-          current_subscription_coins: user.subscription_coins,
-          subscription_plan: user.subscription_plan,
-          subscription_end_date: user.subscription_end_date,
-          daily_coins: dailyCoins,
-        })
-
-        if (user.subscription_end_date && new Date(user.subscription_end_date) < new Date(koreanToday)) {
-          console.warn(`[Daily Charge] Subscription expired for user ${user.user_id}, skipping charge`)
-          processedUsers.push({
-            user_id: user.user_id,
-            type: "subscription",
-            plan: user.subscription_plan,
-            coins_set: 0,
-            status: "skipped",
-            reason: "subscription_expired",
-          })
-          continue
-        }
-
-        const { data: updateResult, error: updateError } = await supabase
-          .from("user_coins")
-          .update({
-            subscription_coins: dailyCoins, // Set to exact daily amount, don't accumulate
-            last_daily_charge: koreanToday,
-            updated_at: koreanNow,
-          })
-          .eq("user_id", user.user_id)
-          .select()
-
-        if (updateError) {
-          console.error(`[Daily Charge] Error updating coins for subscription user ${user.user_id}:`, updateError)
-          errorCount++
-          processedUsers.push({
-            user_id: user.user_id,
-            type: "subscription",
-            plan: user.subscription_plan,
-            coins_set: 0,
-            status: "error",
-            error: updateError.message,
-          })
-          continue
-        }
-
-        console.log(
-          `[Daily Charge] Successfully set ${dailyCoins} subscription_coins for user ${user.user_id}`,
-          updateResult?.[0],
-        )
-        processedUsers.push({
-          user_id: user.user_id,
-          type: "subscription",
-          plan: user.subscription_plan,
-          coins_set: dailyCoins,
-          status: "success",
-          previous_coins: user.subscription_coins || 0,
-          new_coins: dailyCoins,
-        })
-        successCount++
-      } catch (userError) {
-        console.error(`[Daily Charge] Error processing subscription user ${user.user_id}:`, userError)
-        processedUsers.push({
-          user_id: user.user_id,
-          type: "subscription",
-          plan: user.subscription_plan,
-          coins_set: 0,
-          status: "error",
-          error: userError instanceof Error ? userError.message : "Unknown error",
-        })
-        errorCount++
+      const planGroups = {
+        starter: subscriptionUsers.filter((u) => u.subscription_plan === "starter"),
+        plus: subscriptionUsers.filter((u) => u.subscription_plan === "plus"),
+        pro: subscriptionUsers.filter((u) => u.subscription_plan === "pro"),
       }
+
+      const planCoins = {
+        starter: 10,
+        plus: 30,
+        pro: 100,
+      }
+
+      // Process each plan group in parallel
+      const planPromises = Object.entries(planGroups).map(async ([plan, users]) => {
+        if (users.length === 0) return { plan, success: 0, errors: 0, processed: [] }
+
+        try {
+          const validUsers = users.filter((user) => {
+            if (user.subscription_end_date && new Date(user.subscription_end_date) < new Date(koreanToday)) {
+              console.warn(`[Daily Charge] Subscription expired for user ${user.user_id}, skipping`)
+              return false
+            }
+            return true
+          })
+
+          if (validUsers.length === 0) {
+            return { plan, success: 0, errors: 0, processed: [] }
+          }
+
+          const userIds = validUsers.map((user) => user.user_id)
+          const dailyCoins = planCoins[plan as keyof typeof planCoins]
+
+          const { data: batchResult, error: batchError } = await supabase
+            .from("user_coins")
+            .update({
+              subscription_coins: dailyCoins,
+              last_daily_charge: koreanToday,
+              updated_at: koreanNow,
+            })
+            .in("user_id", userIds)
+            .select("user_id")
+
+          if (batchError) {
+            console.error(`[Daily Charge] Error in batch update for ${plan} users:`, batchError)
+            return {
+              plan,
+              success: 0,
+              errors: validUsers.length,
+              processed: validUsers.map((user) => ({
+                user_id: user.user_id,
+                type: "subscription",
+                plan: user.subscription_plan,
+                coins_set: 0,
+                status: "error",
+                error: batchError.message,
+              })),
+            }
+          }
+
+          const updatedCount = batchResult?.length || 0
+          console.log(
+            `[Daily Charge] Successfully batch updated ${updatedCount} ${plan} users with ${dailyCoins} coins`,
+          )
+
+          return {
+            plan,
+            success: updatedCount,
+            errors: 0,
+            processed:
+              batchResult?.map((result) => ({
+                user_id: result.user_id,
+                type: "subscription",
+                plan: plan,
+                coins_set: dailyCoins,
+                status: "success",
+              })) || [],
+          }
+        } catch (planError) {
+          console.error(`[Daily Charge] Error processing ${plan} users:`, planError)
+          return {
+            plan,
+            success: 0,
+            errors: users.length,
+            processed: users.map((user) => ({
+              user_id: user.user_id,
+              type: "subscription",
+              plan: user.subscription_plan,
+              coins_set: 0,
+              status: "error",
+              error: planError instanceof Error ? planError.message : "Plan processing error",
+            })),
+          }
+        }
+      })
+
+      // Wait for all plan batches to complete
+      const planResults = await Promise.all(planPromises)
+
+      planResults.forEach((result) => {
+        successCount += result.success
+        errorCount += result.errors
+        processedUsers.push(...result.processed)
+      })
     }
 
     console.log("[Daily Charge] Daily subscription charge process completed", {
