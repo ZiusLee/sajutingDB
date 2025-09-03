@@ -433,9 +433,12 @@ class SmartMemoryServiceV2 {
   // Embedding generation with environment support
   public async generateEmbedding(text: string): Promise<number[]> {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-        ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
-        : "http://localhost:3000"
+      // Use the correct application URL, not Supabase URL
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.NODE_ENV === "production"
+          ? "https://www.sajuping.ai" // Your production domain
+          : "http://localhost:3000"
 
       const response = await fetch(`${baseUrl}/api/embeddings`, {
         method: "POST",
