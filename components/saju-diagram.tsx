@@ -1333,7 +1333,7 @@ export default function SajuDiagram({
         <div className="p-3">
           <Collapsible open={!profileCollapsed} onOpenChange={(open) => setProfileCollapsed(!open)}>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between p-2 h-auto">
+              <Button variant="ghost" className="w-full justify-start gap-2 p-2 h-auto">
                 <span className="text-sm font-medium">내 사주 정보</span>
                 {profileCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
               </Button>
