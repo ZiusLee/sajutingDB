@@ -431,9 +431,13 @@ class SmartMemoryServiceV2 {
   }
 
   // Embedding generation with environment support
-  private async generateEmbedding(text: string): Promise<number[]> {
+  public async generateEmbedding(text: string): Promise<number[]> {
     try {
-      const response = await fetch("/api/embeddings", {
+      const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
+        : "http://localhost:3000"
+
+      const response = await fetch(`${baseUrl}/api/embeddings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),

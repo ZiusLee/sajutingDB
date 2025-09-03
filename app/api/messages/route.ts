@@ -85,6 +85,22 @@ export async function POST(request: NextRequest) {
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
+    const { data: sessionExists, error: sessionError } = await supabase
+      .from("saju_sessions")
+      .select("id")
+      .eq("id", sessionId)
+      .single()
+
+    if (sessionError || !sessionExists) {
+      console.error(`Session ${sessionId} not found in saju_sessions table:`, sessionError)
+      return NextResponse.json(
+        {
+          error: "Session not found. Please refresh the page to create a new session.",
+        },
+        { status: 404 },
+      )
+    }
+
     // Get the last message order for proper sequencing
     let lastMessageOrder = 0
     if (chatRoomId) {
