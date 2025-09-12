@@ -20,13 +20,15 @@ export default function ClientLayout({
   const shouldHideNavbar = hiddenNavbarPaths.some((path) => pathname?.startsWith(path))
 
   const isPrivacyPage = pathname === "/privacy"
+  const isAccountDeletionPage = pathname === "/accountdeletion"
+  const isScrollablePage = isPrivacyPage || isAccountDeletionPage
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <AuthProvider>
         <ChatProvider>
           {!shouldHideNavbar && <SiteHeader />}
-          <main className={shouldHideNavbar ? "" : isPrivacyPage ? "h-screen overflow-hidden" : "min-h-screen"}>
+          <main className={shouldHideNavbar ? "" : isScrollablePage ? "h-screen overflow-hidden" : "min-h-screen"}>
             {children}
           </main>
           <Toaster />
