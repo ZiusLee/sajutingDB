@@ -48,21 +48,12 @@ class SmartMemoryService {
         throw new Error("Embedding generation must run on server-side")
       }
 
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error("OPENAI_API_KEY is not configured")
-      }
-
-      const response = await fetch("https://api.openai.com/v1/embeddings", {
+      const response = await fetch("/api/embeddings", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: "text-embedding-3-small",
-          input: text,
-          dimensions: 1536,
-        }),
+        body: JSON.stringify({ text }),
       })
 
       if (!response.ok) {
@@ -71,7 +62,7 @@ class SmartMemoryService {
       }
 
       const data = await response.json()
-      return data.data[0].embedding
+      return data.embedding
     } catch (error) {
       console.error("임베딩 생성 실패:", error)
       throw error

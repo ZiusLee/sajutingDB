@@ -2,52 +2,12 @@
 
 import { sendGAEvent } from "@next/third-parties/google"
 import React from "react"
-import { createBrowserClient } from "@supabase/ssr"
 
 declare global {
   interface Window {
     amplitude?: any
     gtag?: any
   }
-}
-
-const createSupabaseClient = () => {
-  return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-}
-
-const getUserAge = async (userId?: string): Promise<number | null> => {
-  if (!userId || typeof window === "undefined") return null
-
-  try {
-    const supabase = createSupabaseClient()
-
-    const { data, error } = await supabase.from("birth_info").select("solar_year").eq("user_id", userId).single()
-
-    if (error || !data?.solar_year) {
-      console.log("Birth info not found for user:", userId)
-      return null
-    }
-
-    const currentYear = new Date().getFullYear()
-    const age = currentYear - data.solar_year
-
-    return age >= 0 && age <= 120 ? age : null
-  } catch (error) {
-    console.error("Error fetching user age:", error)
-    return null
-  }
-}
-
-const getAgeGroup = (age: number | null): string => {
-  if (!age) return "unknown"
-
-  if (age < 18) return "under_18"
-  if (age < 25) return "18_24"
-  if (age < 35) return "25_34"
-  if (age < 45) return "35_44"
-  if (age < 55) return "45_54"
-  if (age < 65) return "55_64"
-  return "65_plus"
 }
 
 // 기본 이벤트 추적 함수
@@ -112,15 +72,12 @@ const getCommonParameters = () => {
   }
 }
 
-const getUserContext = async (userId?: string) => {
+const getUserContext = () => {
   if (typeof window === "undefined") return {}
 
   const visitCount = Number.parseInt(localStorage.getItem("visit_count") || "0")
   const firstVisit = localStorage.getItem("first_visit_date")
   const lastVisit = localStorage.getItem("last_visit_date")
-
-  const age = await getUserAge(userId)
-  const ageGroup = getAgeGroup(age)
 
   return {
     visit_count: visitCount,
@@ -130,12 +87,12 @@ const getUserContext = async (userId?: string) => {
     days_since_first_visit: firstVisit
       ? Math.floor((Date.now() - new Date(firstVisit).getTime()) / (1000 * 60 * 60 * 24))
       : 0,
-    user_age: age,
-    age_group: ageGroup,
   }
 }
 
+// 1. 통합된 이벤트 (props로 세분화)
 export const trackIntegratedEvents = {
+  // 페이지 뷰
   pageView: (page: "home" | "login" | "register" | "mypage" | "saju_chat" | "onboarding") => {
     trackEvent("page_view", {
       page: page,
@@ -143,6 +100,7 @@ export const trackIntegratedEvents = {
     })
   },
 
+  // 로그인 클릭
   loginClick: (method: "kakao" | "email" | "google") => {
     trackEvent("login_click", {
       method: method,
@@ -150,12 +108,14 @@ export const trackIntegratedEvents = {
     })
   },
 
+  // 회원가입 클릭
   registerClick: () => {
     trackEvent("register_click", {
       timestamp: new Date().toISOString(),
     })
   },
 
+  // 버튼 클릭
   buttonClick: (buttonId: "logout" | "saju_create" | "new_chat") => {
     trackEvent("button_click", {
       button_id: buttonId,
@@ -163,6 +123,7 @@ export const trackIntegratedEvents = {
     })
   },
 
+  // 폼 제출
   formSubmit: (form: "login" | "register" | "chat_message" | "password_reset") => {
     trackEvent("form_submit", {
       form: form,
@@ -170,6 +131,7 @@ export const trackIntegratedEvents = {
     })
   },
 
+  // API 호출
   apiCall: (
     endpoint:
       | "saju_chat"
@@ -189,14 +151,7 @@ export const trackIntegratedEvents = {
 }
 
 export const trackAIEvents = {
-  messageSent: async (
-    messageLength: number,
-    roomType?: string,
-    messageType?: "question" | "followup" | "clarification",
-    userId?: string,
-  ) => {
-    const userContext = await getUserContext(userId)
-
+  messageSent: (messageLength: number, roomType?: string, messageType?: "question" | "followup" | "clarification") => {
     trackEvent("AI_message_sent", {
       message_length: messageLength,
       message_character_count: messageLength,
@@ -205,7 +160,7 @@ export const trackAIEvents = {
       conversation_turn: Number.parseInt(sessionStorage.getItem("conversation_turn") || "1"),
       session_duration: Date.now() - Number.parseInt(sessionStorage.getItem("session_start") || "0"),
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 
@@ -219,26 +174,26 @@ export const trackAIEvents = {
     })
   },
 
-  conversationCompleted: async (totalMessages: number, totalDuration: number, roomType?: string, userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  conversationCompleted: (totalMessages: number, totalDuration: number, roomType?: string) => {
     trackEvent("AI_conversation_completed", {
       total_messages: totalMessages,
       total_duration_ms: totalDuration,
       room_type: roomType,
-      avg_message_length: 0,
+      avg_message_length: 0, // 계산 필요
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 }
 
 export const trackUserEvents = {
-  sessionStart: async (entryPoint?: string, utmSource?: string, userId?: string) => {
+  sessionStart: (entryPoint?: string, utmSource?: string) => {
+    // 세션 ID 생성 및 저장
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     sessionStorage.setItem("session_id", sessionId)
     sessionStorage.setItem("session_start", Date.now().toString())
 
+    // 방문 횟수 업데이트
     const visitCount = Number.parseInt(localStorage.getItem("visit_count") || "0") + 1
     localStorage.setItem("visit_count", visitCount.toString())
     localStorage.setItem("last_visit_date", new Date().toISOString())
@@ -246,8 +201,6 @@ export const trackUserEvents = {
     if (visitCount === 1) {
       localStorage.setItem("first_visit_date", new Date().toISOString())
     }
-
-    const userContext = await getUserContext(userId)
 
     trackEvent("USER_session_start", {
       session_id: sessionId,
@@ -257,91 +210,72 @@ export const trackUserEvents = {
       visit_number: visitCount,
       device_type: /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? "mobile" : "desktop",
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
-
-    await checkAndTrackRetentionMilestones(userContext.days_since_first_visit, visitCount, userId)
   },
 
-  firstVisit: async (acquisitionChannel?: string, userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  firstVisit: (acquisitionChannel?: string) => {
     trackEvent("USER_first_visit", {
       acquisition_channel: acquisitionChannel || "organic",
       landing_page: window.location.pathname,
       ...getCommonParameters(),
-      ...userContext,
     })
   },
 
-  returnVisit: async (daysSinceLastVisit?: number, userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  returnVisit: (daysSinceLastVisit?: number) => {
     trackEvent("USER_return_visit", {
       days_since_last_visit: daysSinceLastVisit || 0,
       return_frequency: daysSinceLastVisit && daysSinceLastVisit < 7 ? "frequent" : "occasional",
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
-
-    await checkAndTrackRetentionMilestones(userContext.days_since_first_visit, userContext.visit_count, userId)
   },
 
-  profileCreated: async (profileCompleteness?: number, creationMethod?: "onboarding" | "manual", userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  profileCreated: (profileCompleteness?: number, creationMethod?: "onboarding" | "manual") => {
     trackEvent("USER_profile_created", {
       profile_completeness: profileCompleteness || 0,
       creation_method: creationMethod || "onboarding",
       time_to_create: Date.now() - Number.parseInt(sessionStorage.getItem("session_start") || "0"),
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 
-  engagementHigh: async (duration: number, interactionCount?: number, pageDepth?: number, userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  engagementHigh: (duration: number, interactionCount?: number, pageDepth?: number) => {
     trackEvent("USER_engagement_high", {
       session_duration: duration,
       interaction_count: interactionCount || 0,
       page_depth: pageDepth || 1,
-      engagement_score: Math.min(100, (duration / 1000 / 60) * 10 + (interactionCount || 0) * 5),
+      engagement_score: Math.min(100, (duration / 1000 / 60) * 10 + (interactionCount || 0) * 5), // 간단한 점수 계산
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 
-  chatSessionStart: async (roomType: string, isFirstChat?: boolean, userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  chatSessionStart: (roomType: string, isFirstChat?: boolean) => {
     trackEvent("USER_chat_session_start", {
       room_type: roomType,
       is_first_chat: isFirstChat || false,
       chat_session_id: `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       user_onboarding_completed: localStorage.getItem("onboarding_completed") === "true",
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 
-  memoryBankAccessed: async (accessType?: "search" | "browse" | "direct", searchQuery?: string, userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  memoryBankAccessed: (accessType?: "search" | "browse" | "direct", searchQuery?: string) => {
     trackEvent("USER_memory_bank_accessed", {
       access_type: accessType || "direct",
       search_query: searchQuery,
-      memory_bank_size: 0,
+      memory_bank_size: 0, // 실제 메모리 뱅크 크기로 대체 필요
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 }
 
 export const trackConversionEvents = {
-  sajuProfileComplete: async (completionTime?: number, profileAccuracy?: number, userId?: string) => {
-    const userContext = await getUserContext(userId)
-
+  sajuProfileComplete: (completionTime?: number, profileAccuracy?: number) => {
     trackEvent("CONVERSION_saju_profile_complete", {
       completion_time_ms: completionTime || 0,
       profile_accuracy: profileAccuracy || 0,
@@ -349,18 +283,11 @@ export const trackConversionEvents = {
       funnel_stage: "activation",
       time_to_conversion: Date.now() - Number.parseInt(sessionStorage.getItem("session_start") || "0"),
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 
-  firstChatComplete: async (
-    chatDuration?: number,
-    messageCount?: number,
-    satisfactionScore?: number,
-    userId?: string,
-  ) => {
-    const userContext = await getUserContext(userId)
-
+  firstChatComplete: (chatDuration?: number, messageCount?: number, satisfactionScore?: number) => {
     trackEvent("CONVERSION_first_chat_complete", {
       chat_duration_ms: chatDuration || 0,
       message_count: messageCount || 0,
@@ -368,60 +295,11 @@ export const trackConversionEvents = {
       conversion_step: "first_interaction",
       funnel_stage: "engagement",
       ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 
-  userRetentionDay1: async (
-    totalSessions?: number,
-    totalChatTime?: number,
-    featureUsage?: string[],
-    userId?: string,
-  ) => {
-    const userContext = await getUserContext(userId)
-
-    trackEvent("CONVERSION_user_retention_day1", {
-      total_sessions: totalSessions || 0,
-      total_chat_time_ms: totalChatTime || 0,
-      features_used: featureUsage || [],
-      retention_quality: totalSessions && totalSessions > 1 ? "high" : "low",
-      conversion_step: "early_retention",
-      funnel_stage: "engagement",
-      retention_milestone: "day_1",
-      ...getCommonParameters(),
-      ...userContext,
-    })
-  },
-
-  userRetentionDay3: async (
-    totalSessions?: number,
-    totalChatTime?: number,
-    featureUsage?: string[],
-    userId?: string,
-  ) => {
-    const userContext = await getUserContext(userId)
-
-    trackEvent("CONVERSION_user_retention_day3", {
-      total_sessions: totalSessions || 0,
-      total_chat_time_ms: totalChatTime || 0,
-      features_used: featureUsage || [],
-      retention_quality: totalSessions && totalSessions > 2 ? "high" : "low",
-      conversion_step: "mid_retention",
-      funnel_stage: "habit_formation",
-      retention_milestone: "day_3",
-      ...getCommonParameters(),
-      ...userContext,
-    })
-  },
-
-  userRetentionDay7: async (
-    totalSessions?: number,
-    totalChatTime?: number,
-    featureUsage?: string[],
-    userId?: string,
-  ) => {
-    const userContext = await getUserContext(userId)
-
+  userRetentionDay7: (totalSessions?: number, totalChatTime?: number, featureUsage?: string[]) => {
     trackEvent("CONVERSION_user_retention_day7", {
       total_sessions: totalSessions || 0,
       total_chat_time_ms: totalChatTime || 0,
@@ -429,30 +307,8 @@ export const trackConversionEvents = {
       retention_quality: totalSessions && totalSessions > 3 ? "high" : "low",
       conversion_step: "retention",
       funnel_stage: "loyalty",
-      retention_milestone: "day_7",
       ...getCommonParameters(),
-      ...userContext,
-    })
-  },
-
-  userRetentionDay30: async (
-    totalSessions?: number,
-    totalChatTime?: number,
-    featureUsage?: string[],
-    userId?: string,
-  ) => {
-    const userContext = await getUserContext(userId)
-
-    trackEvent("CONVERSION_user_retention_day30", {
-      total_sessions: totalSessions || 0,
-      total_chat_time_ms: totalChatTime || 0,
-      features_used: featureUsage || [],
-      retention_quality: totalSessions && totalSessions > 5 ? "high" : "low",
-      conversion_step: "long_term_retention",
-      funnel_stage: "loyalty_established",
-      retention_milestone: "day_30",
-      ...getCommonParameters(),
-      ...userContext,
+      ...getUserContext(),
     })
   },
 }
@@ -490,6 +346,7 @@ export const trackBehaviorEvents = {
       engagement_indicator: "high_curiosity",
       user_intent: questionCount > 10 ? "deep_exploration" : "casual_inquiry",
       ...getCommonParameters(),
+      ...getUserContext(),
     })
   },
 }
@@ -501,9 +358,9 @@ export const trackPerformanceEvents = {
       load_time_ms: loadTime,
       connection_type: connectionType || "unknown",
       device_type: deviceType || (/Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? "mobile" : "desktop"),
-      performance_threshold: 3000,
+      performance_threshold: 3000, // 3초 기준
       performance_impact: loadTime > 5000 ? "high" : "medium",
-      user_experience_score: Math.max(0, 100 - loadTime / 100),
+      user_experience_score: Math.max(0, 100 - loadTime / 100), // 간단한 UX 점수
       ...getCommonParameters(),
     })
   },
@@ -513,13 +370,14 @@ export const trackPerformanceEvents = {
       endpoint: endpoint,
       response_time_ms: responseTime,
       status_code: statusCode || 200,
-      performance_threshold: 2000,
+      performance_threshold: 2000, // 2초 기준
       performance_impact: responseTime > 5000 ? "high" : "medium",
       ...getCommonParameters(),
     })
   },
 }
 
+// 페이지 조회 추적 (기존 유지)
 export const trackPageView = (url: string, title?: string) => {
   trackEvent("page_view", {
     page_location: url,
@@ -527,6 +385,7 @@ export const trackPageView = (url: string, title?: string) => {
   })
 }
 
+// 사주 관련 이벤트 추적 (기존 유지)
 export const trackSajuEvents = {
   startCalculation: (birthYear: number, gender: string) => {
     trackEvent("saju_calculation_start", {
@@ -565,6 +424,7 @@ export const trackSajuEvents = {
   },
 }
 
+// 인증 관련 이벤트 추적 (기존 유지)
 export const trackAuthEvents = {
   signIn: (method: string) => {
     trackEvent("login", {
@@ -585,6 +445,7 @@ export const trackAuthEvents = {
   },
 }
 
+// 채팅 관련 이벤트 추적 (기존 유지)
 export const trackChatEvents = {
   startChat: (roomType: string) => {
     trackEvent("chat_start", {
@@ -608,6 +469,7 @@ export const trackChatEvents = {
   },
 }
 
+// 전자상거래 이벤트 추적 (기존 유지)
 export const trackEcommerceEvents = {
   beginCheckout: (coinAmount: number, price: number) => {
     trackEvent("begin_checkout", {
@@ -643,6 +505,7 @@ export const trackEcommerceEvents = {
   },
 }
 
+// 사용자 참여 이벤트 추적 (기존 유지)
 export const trackEngagementEvents = {
   search: (searchTerm: string) => {
     trackEvent("search", {
@@ -664,6 +527,7 @@ export const trackEngagementEvents = {
   },
 }
 
+// 성능 추적 (기존 유지)
 export const trackPerformance = {
   pageLoadTime: (loadTime: number, pageName: string) => {
     trackEvent("page_load_time", {
@@ -682,6 +546,7 @@ export const trackPerformance = {
   },
 }
 
+// 오류 추적 (기존 유지)
 export const trackError = (errorMessage: string, errorLocation: string) => {
   trackEvent("exception", {
     description: errorMessage,
@@ -690,6 +555,7 @@ export const trackError = (errorMessage: string, errorLocation: string) => {
   })
 }
 
+// 사용자 정의 이벤트 (기존 유지)
 export const trackCustomEvent = (eventName: string, parameters: Record<string, any>) => {
   trackEvent(eventName, {
     event_category: "custom",
@@ -698,34 +564,35 @@ export const trackCustomEvent = (eventName: string, parameters: Record<string, a
 }
 
 export const quickTrack = {
+  // 페이지 진입
   enterPage: (page: "home" | "login" | "register" | "mypage" | "saju_chat" | "onboarding") => {
     trackIntegratedEvents.pageView(page)
   },
 
+  // 로그인 시도
   attemptLogin: (method: "kakao" | "email" | "google") => {
     trackIntegratedEvents.loginClick(method)
   },
 
+  // 채팅 메시지 전송
   sendChatMessage: (messageLength: number, roomType: string) => {
     trackIntegratedEvents.formSubmit("chat_message")
     trackAIEvents.messageSent(messageLength, roomType)
-
-    const currentChatTime = Number.parseInt(localStorage.getItem("total_chat_time_ms") || "0")
-    localStorage.setItem("total_chat_time_ms", (currentChatTime + 1000).toString()) // Approximate 1 second per message
   },
 
+  // 사주 프로필 생성 완료
   completeSajuProfile: () => {
     trackConversionEvents.sajuProfileComplete()
     trackUserEvents.profileCreated()
-
-    localStorage.setItem("has_created_saju_profile", "true")
   },
 
+  // 온보딩 단계 완료
   completeOnboardingStep: (step: string) => {
     trackOnboardingDetailEvents.apiStatus("user_data_sync", "completed")
   },
 }
 
+// 7. 온보딩 생명주기 이벤트
 export const trackOnboardingEvents = {
   started: () => {
     trackEvent("onboarding_started", {
@@ -754,7 +621,9 @@ export const trackOnboardingEvents = {
   },
 }
 
+// 8. 온보딩 세부 이벤트
 export const trackOnboardingDetailEvents = {
+  // 이름 입력
   inputInteraction: (field: "name", action: "focused" | "blurred" | "typed" | "cleared") => {
     trackEvent("input_interaction", {
       field: field,
@@ -763,6 +632,7 @@ export const trackOnboardingDetailEvents = {
     })
   },
 
+  // 성별 선택
   genderInteraction: (
     action: "clicked" | "hovered" | "changed" | "completed" | "confirmed",
     value?: "male" | "female",
@@ -774,6 +644,7 @@ export const trackOnboardingDetailEvents = {
     })
   },
 
+  // 도시 선택
   cityInteraction: (
     action:
       | "search_focused"
@@ -795,6 +666,7 @@ export const trackOnboardingDetailEvents = {
     })
   },
 
+  // 생년월일/시간
   birthInfoInteraction: (
     field: "date" | "time" | "time_unknown",
     action: "focused" | "typed" | "validated" | "error" | "checked" | "unchecked" | "completed",
@@ -806,6 +678,7 @@ export const trackOnboardingDetailEvents = {
     })
   },
 
+  // 고민 선택
   concernInteraction: (
     action:
       | "option_clicked"
@@ -837,6 +710,7 @@ export const trackOnboardingDetailEvents = {
     })
   },
 
+  // 페이지 로딩
   pageLoadEvent: (type: "onboarding_loaded" | "assets_loaded") => {
     trackEvent("page_load_event", {
       type: type,
@@ -844,6 +718,7 @@ export const trackOnboardingDetailEvents = {
     })
   },
 
+  // API 상태
   apiStatus: (endpoint: "saju_calculation" | "user_data_sync", status: "started" | "completed" | "failed") => {
     trackEvent("api_status", {
       endpoint: endpoint,
@@ -892,10 +767,12 @@ export const useAutoTracking = (pageName: keyof typeof PAGE_TRACKING_CONFIG) => 
   const config = PAGE_TRACKING_CONFIG[pageName]
 
   React.useEffect(() => {
+    // 페이지뷰 자동 추적
     if (config.autoTrack.includes("pageView")) {
       trackIntegratedEvents.pageView(pageName as any)
     }
 
+    // 스크롤 깊이 자동 추적
     if (config.autoTrack.includes("scrollDepth")) {
       const handleScroll = () => {
         const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100
@@ -908,11 +785,12 @@ export const useAutoTracking = (pageName: keyof typeof PAGE_TRACKING_CONFIG) => 
       return () => window.removeEventListener("scroll", handleScroll)
     }
 
+    // 페이지 체류 시간 자동 추적
     if (config.autoTrack.includes("timeOnPage")) {
       const startTime = Date.now()
       const timer = setTimeout(() => {
         trackBehaviorEvents.timeOnPage5Min(pageName, Date.now() - startTime)
-      }, 300000)
+      }, 300000) // 5분
       return () => clearTimeout(timer)
     }
   }, [pageName, config])
@@ -968,11 +846,13 @@ export const useChatTracking = (roomType: string) => {
 
 export const usePerformanceTracking = (pageName: string) => {
   React.useEffect(() => {
+    // 페이지 로드 시간 측정
     const startTime = performance.now()
 
     const handleLoad = () => {
       const loadTime = performance.now() - startTime
       if (loadTime > 3000) {
+        // 3초 이상이면 느린 로딩으로 간주
         trackPerformanceEvents.pageLoadSlow(pageName, loadTime)
       }
     }
@@ -994,52 +874,5 @@ export const usePageAnalytics = (pageName: keyof typeof PAGE_TRACKING_CONFIG) =>
     ...autoTracking,
     form: useFormTracking,
     chat: useChatTracking,
-  }
-}
-
-const checkAndTrackRetentionMilestones = async (daysSinceFirstVisit: number, visitCount: number, userId?: string) => {
-  if (typeof window === "undefined") return
-
-  const trackedMilestones = JSON.parse(localStorage.getItem("retention_milestones_tracked") || "{}")
-
-  // Get user's feature usage from localStorage
-  const getFeatureUsage = (): string[] => {
-    const features: string[] = []
-    if (localStorage.getItem("has_completed_first_chat")) features.push("chat")
-    if (localStorage.getItem("has_created_saju_profile")) features.push("saju_profile")
-    if (localStorage.getItem("has_used_memory_bank")) features.push("memory_bank")
-    if (localStorage.getItem("has_shared_result")) features.push("social_share")
-    return features
-  }
-
-  const featureUsage = getFeatureUsage()
-  const totalChatTime = Number.parseInt(localStorage.getItem("total_chat_time_ms") || "0")
-
-  // Day 1 retention (24-48 hours after first visit)
-  if (daysSinceFirstVisit >= 1 && daysSinceFirstVisit < 2 && !trackedMilestones.day1 && visitCount > 1) {
-    await trackConversionEvents.userRetentionDay1(visitCount, totalChatTime, featureUsage, userId)
-    trackedMilestones.day1 = true
-    localStorage.setItem("retention_milestones_tracked", JSON.stringify(trackedMilestones))
-  }
-
-  // Day 3 retention (72-96 hours after first visit)
-  if (daysSinceFirstVisit >= 3 && daysSinceFirstVisit < 4 && !trackedMilestones.day3 && visitCount > 1) {
-    await trackConversionEvents.userRetentionDay3(visitCount, totalChatTime, featureUsage, userId)
-    trackedMilestones.day3 = true
-    localStorage.setItem("retention_milestones_tracked", JSON.stringify(trackedMilestones))
-  }
-
-  // Day 7 retention (7-8 days after first visit)
-  if (daysSinceFirstVisit >= 7 && daysSinceFirstVisit < 8 && !trackedMilestones.day7 && visitCount > 1) {
-    await trackConversionEvents.userRetentionDay7(visitCount, totalChatTime, featureUsage, userId)
-    trackedMilestones.day7 = true
-    localStorage.setItem("retention_milestones_tracked", JSON.stringify(trackedMilestones))
-  }
-
-  // Day 30 retention (30-31 days after first visit)
-  if (daysSinceFirstVisit >= 30 && daysSinceFirstVisit < 31 && !trackedMilestones.day30 && visitCount > 1) {
-    await trackConversionEvents.userRetentionDay30(visitCount, totalChatTime, featureUsage, userId)
-    trackedMilestones.day30 = true
-    localStorage.setItem("retention_milestones_tracked", JSON.stringify(trackedMilestones))
   }
 }

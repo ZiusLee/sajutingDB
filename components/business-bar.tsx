@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 type BusinessBarProps = {
   companyName: string
@@ -20,7 +20,7 @@ export default function BusinessBar({
   businessNumber,
   address,
   phone,
-  className = '',
+  className = "",
 }: BusinessBarProps) {
   return (
     <footer
@@ -32,25 +32,30 @@ export default function BusinessBar({
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] md:text-xs leading-5">
           <span className="font-medium text-gray-900">상호명</span>
           <span>{companyName}</span>
-          <span className="text-gray-300" aria-hidden="true">|</span>
+          <span className="text-gray-600" aria-hidden="true">
+            |
+          </span>
 
           <span className="font-medium text-gray-900">대표자명</span>
           <span>{representative}</span>
-          <span className="text-gray-300" aria-hidden="true">|</span>
+          <span className="text-gray-600" aria-hidden="true">
+            |
+          </span>
 
           <span className="font-medium text-gray-900">사업자등록번호</span>
           <span className="tabular-nums tracking-wide">{businessNumber}</span>
-          <span className="text-gray-300" aria-hidden="true">|</span>
+          <span className="text-gray-600" aria-hidden="true">
+            |
+          </span>
 
           <span className="font-medium text-gray-900">사업장 주소</span>
           <span className="truncate max-w-[40ch] md:max-w-none">{address}</span>
-          <span className="text-gray-300" aria-hidden="true">|</span>
+          <span className="text-gray-600" aria-hidden="true">
+            |
+          </span>
 
           <span className="font-medium text-gray-900">전화번호</span>
-          <a
-            href="tel:01056144801"
-            className="underline-offset-2 hover:underline text-gray-800"
-          >
+          <a href="tel:01056144801" className="underline-offset-2 hover:underline text-gray-800">
             {phone}
           </a>
         </div>
