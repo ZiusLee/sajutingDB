@@ -48,21 +48,10 @@ class SmartMemoryService {
         throw new Error("Embedding generation must run on server-side")
       }
 
-      const response = await fetch("/api/embeddings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-      })
+      // Use AI SDK directly instead of internal API route to avoid authentication issues
+      const { embedding } = await openai.embedding("text-embedding-3-small").embed(text.slice(0, 8000))
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Embedding API error: ${response.status} - ${JSON.stringify(errorData)}`)
-      }
-
-      const data = await response.json()
-      return data.embedding
+      return embedding
     } catch (error) {
       console.error("임베딩 생성 실패:", error)
       throw error
