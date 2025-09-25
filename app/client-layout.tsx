@@ -1,11 +1,7 @@
 "use client"
 
 import type React from "react"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
 import { SiteHeader } from "@/components/site-header"
-import { AuthProvider } from "@/contexts/auth-context"
-import { ChatProvider } from "@/contexts/chat-context"
 import { usePathname } from "next/navigation"
 
 export default function ClientLayout({
@@ -24,16 +20,11 @@ export default function ClientLayout({
   const isScrollablePage = isPrivacyPage || isAccountDeletionPage
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <AuthProvider>
-        <ChatProvider>
-          {!shouldHideNavbar && <SiteHeader />}
-          <main className={shouldHideNavbar ? "" : isScrollablePage ? "h-screen overflow-hidden" : "min-h-screen"}>
-            {children}
-          </main>
-          <Toaster />
-        </ChatProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <>
+      {!shouldHideNavbar && <SiteHeader />}
+      <main className={shouldHideNavbar ? "" : isScrollablePage ? "h-screen overflow-hidden" : "min-h-screen"}>
+        {children}
+      </main>
+    </>
   )
 }
